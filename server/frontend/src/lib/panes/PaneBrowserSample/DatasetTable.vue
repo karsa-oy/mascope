@@ -53,7 +53,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         ? `Datasets (${filteredCount}/${app.data.dataset.list?.length})`
         : `Datasets (${app.data.dataset.list?.length})`
     "
-    icon="pi ph ph-folder"
+    icon="pi ph ph-folders"
     :pt="
       app.ui.help.right(`
         <h1>Sample Browser: Datasets</h1>

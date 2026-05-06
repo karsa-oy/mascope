@@ -23,6 +23,9 @@ watch(
   () => app.data.workspace.focused,
   async (value) => {
     if (value && sidebarMenu.open) {
+      // Don't close the sidebar while a dialog (e.g. membership) is open.
+      // workspace reloads re-trigger this watcher without the user switching.
+      if (document.querySelector('.p-dialog-mask')) return
       await nextTick()
       sidebarMenu.open = false
     }

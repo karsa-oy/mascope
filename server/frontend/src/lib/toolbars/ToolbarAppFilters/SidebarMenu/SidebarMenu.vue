@@ -71,6 +71,15 @@ watchEffect(() => {
 // Prevent closing without a workspace selected
 const canClose = computed(() => !!app.data.workspace.focused)
 
+// PrimeVue's Drawer closes on any document click outside its DOM tree.
+// Dialogs with appendTo="body" are teleported out of the Drawer, so clicking
+// inside them triggers the Drawer's outside-click handler. We block the close
+// when a PrimeVue dialog mask is present in the DOM.
+const onDrawerVisibleUpdate = (val) => {
+  if (!val && document.querySelector('.p-dialog-mask')) return
+  sidebarMenu.open = val
+}
+
 watchEffect(() => {
   if (sidebarMenu.open && sidebarMenu.tab === 'notifications') {
     app.ui.notification.clearRecentBadge()
@@ -195,7 +204,8 @@ watchEffect(() => {
   </menu>
   <Tabs v-model:value="sidebarMenu.tab">
     <Drawer
-      v-model:visible="sidebarMenu.open"
+      :visible="sidebarMenu.open"
+      @update:visible="onDrawerVisibleUpdate"
       header="Mascope"
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"

@@ -167,6 +167,7 @@ watch(visible, (v) => {
     v-model:visible="visible"
     :header="`Members of ${workspace?.workspace_name ?? 'Workspace'}`"
     modal
+    appendTo="body"
     style="width: 720px"
     closable
   >

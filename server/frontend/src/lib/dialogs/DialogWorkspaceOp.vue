@@ -4,6 +4,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import FloatLabel from 'primevue/floatlabel'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
@@ -107,15 +108,15 @@ const invalid = computed(() =>
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="title" modal style="max-width: 600px">
+  <Dialog v-model:visible="visible" :header="title" modal appendTo="body" style="width: 720px">
     <section>
       <template v-if="action !== 'delete'">
         <FloatLabel>
-          <InputText id="workspace-name" v-model="info.name" />
+          <InputText id="workspace-name" v-model="info.name" style="width: 100%" />
           <label for="workspace-name">Name</label>
         </FloatLabel>
         <FloatLabel>
-          <InputText id="workspace-desc" v-model="info.desc" />
+          <Textarea id="workspace-desc" v-model="info.desc" rows="4" style="width: 100%" />
           <label for="workspace-desc">Description</label>
         </FloatLabel>
       </template>

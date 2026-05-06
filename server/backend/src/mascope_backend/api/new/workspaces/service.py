@@ -145,9 +145,21 @@ async def create_workspace(
     workspace_id = gen_id()
 
     async with async_session() as session:
+        # Reject duplicate workspace names early with a clear message
+        existing = await session.execute(
+            select(Workspace).where(
+                func.lower(Workspace.workspace_name) == workspace_name.strip().lower()
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A workspace named '{workspace_name.strip()}' already exists.",
+            )
+
         workspace = Workspace(
             workspace_id=workspace_id,
-            workspace_name=workspace_name,
+            workspace_name=workspace_name.strip(),
             workspace_description=workspace_description,
             workspace_status="active",
             workspace_utc_created=now,
@@ -195,7 +207,20 @@ async def update_workspace(
             )
 
         if workspace_name is not None:
-            workspace.workspace_name = workspace_name
+            # Reject duplicate names (case-insensitive), excluding self
+            dup = await session.execute(
+                select(Workspace).where(
+                    func.lower(Workspace.workspace_name)
+                    == workspace_name.strip().lower(),
+                    Workspace.workspace_id != workspace_id,
+                )
+            )
+            if dup.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"A workspace named '{workspace_name.strip()}' already exists.",
+                )
+            workspace.workspace_name = workspace_name.strip()
         if workspace_description is not None:
             workspace.workspace_description = workspace_description
         if workspace_status is not None:
