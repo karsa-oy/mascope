@@ -11,6 +11,7 @@ from sqlalchemy import asc, func, select
 
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.workspaces.exceptions import (
     WorkspaceMemberAlreadyExistsException,
     WorkspaceMemberNotFoundException,
@@ -42,6 +43,28 @@ async def _check_last_owner(session, workspace_id: str) -> None:
         )
 
 
+def _enforce_role_ceiling(caller_role: str, target_role: str) -> None:
+    """Raise 403 if *target_role* exceeds the caller's own level.
+
+    Owners can assign any role (including owner).
+    Admins can assign up to admin.
+    """
+    role_levels = auth_settings.ROLE_ACCESS_LEVELS
+
+    if caller_role not in role_levels:
+        raise ValueError(f"Unknown caller role: {caller_role}")
+    if target_role not in role_levels:
+        raise ValueError(f"Unknown target role: {target_role}")
+    if role_levels[target_role] > role_levels[caller_role]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Cannot assign role '{target_role}',"
+                " as it exceeds your own workspace role."
+            ),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Workspace CRUD
 # ---------------------------------------------------------------------------
@@ -49,27 +72,49 @@ async def _check_last_owner(session, workspace_id: str) -> None:
 
 @api_controller()
 async def get_workspaces(
+    user: User,
     workspace_status: str | None = None,
-    user_id: int | None = None,
 ) -> dict:
-    """List workspaces, optionally filtered by status or user membership."""
+    """List workspaces visible to *user*.
+
+    Regular users see only workspaces they are a member of.
+    Superusers see all workspaces, annotated with ``is_member``.
+    """
     async with async_session() as session:
         query = select(Workspace)
 
         if workspace_status:
             query = query.where(Workspace.workspace_status == workspace_status)
-        if user_id is not None:
-            query = query.join(WorkspaceMember).where(
-                WorkspaceMember.user_id == user_id
+
+        if user.is_superuser:
+            # Superusers see everything; annotate membership
+            member_result = await session.execute(
+                select(WorkspaceMember.workspace_id).where(
+                    WorkspaceMember.user_id == user.id
+                )
             )
+            member_ids = set(member_result.scalars().all())
+        else:
+            # Regular users see only their workspaces
+            query = query.join(WorkspaceMember).where(
+                WorkspaceMember.user_id == user.id
+            )
+            member_ids = None
 
         query = query.order_by(asc(Workspace.workspace_name))
         result = await session.execute(query)
         workspaces = result.scalars().all()
 
+        data = []
+        for ws in workspaces:
+            record = ws.to_dict()
+            if member_ids is not None:
+                record["is_member"] = ws.workspace_id in member_ids
+            data.append(record)
+
         return {
-            "data": [p.to_dict() for p in workspaces],
-            "total": len(workspaces),
+            "data": data,
+            "total": len(data),
         }
 
 
@@ -89,8 +134,8 @@ async def get_workspace(workspace_id: str) -> dict:
 @api_controller()
 async def create_workspace(
     workspace_name: str,
+    creator_user_id: int,
     workspace_description: str | None = None,
-    creator_user_id: int | None = None,
 ) -> dict:
     """Create a new workspace and add the creator as owner."""
     now = datetime.now(timezone.utc)
@@ -108,16 +153,15 @@ async def create_workspace(
         session.add(workspace)
 
         # Auto-add the creating user as workspace owner
-        if creator_user_id is not None:
-            member = WorkspaceMember(
-                workspace_member_id=gen_id(),
-                workspace_id=workspace_id,
-                user_id=creator_user_id,
-                workspace_role="owner",
-                granted_at=now,
-                granted_by=creator_user_id,
-            )
-            session.add(member)
+        member = WorkspaceMember(
+            workspace_member_id=gen_id(),
+            workspace_id=workspace_id,
+            user_id=creator_user_id,
+            workspace_role="owner",
+            granted_at=now,
+            granted_by=creator_user_id,
+        )
+        session.add(member)
 
         await session.commit()
         return {"data": workspace.to_dict()}
@@ -159,7 +203,7 @@ async def update_workspace(
 
 @api_controller()
 async def delete_workspace(workspace_id: str) -> dict:
-    """Delete a workspace and all its workspaces (cascading)."""
+    """Delete a workspace and all its datasets (cascading)."""
     async with async_session() as session:
         result = await session.execute(
             select(Workspace).where(Workspace.workspace_id == workspace_id)
@@ -202,10 +246,25 @@ async def get_workspace_members(workspace_id: str) -> dict:
 async def add_workspace_member(
     workspace_id: str,
     user_id: int,
-    workspace_role: str = "guest",
+    workspace_role: str,
+    caller_role: str,
     granted_by: int | None = None,
 ) -> dict:
-    """Add a user to a workspace with a given role."""
+    """Add a user to a workspace with a given role.
+
+    :param workspace_id: The workspace to add the member to.
+    :param user_id: The ID of the user to add.
+    :param workspace_role: The role to assign (e.g. "guest", "editor", "admin", "owner")
+    :param caller_role: The workspace role of the authenticated user performing
+        the action. Used to enforce role ceiling — the assigned role must not
+        exceed the caller's own level.
+    :param granted_by: The ID of the user granting the membership.
+    :raises HTTPException: 403 if the assigned role exceeds the caller's level.
+    :raises WorkspaceNotFoundException: If the workspace does not exist.
+    :raises NotFoundException: If the user does not exist.
+    :raises WorkspaceMemberAlreadyExistsException: If the user is already a member.
+    """
+    _enforce_role_ceiling(caller_role, workspace_role)
     async with async_session() as session:
         # Validate workspace exists
         workspace = await session.get(Workspace, workspace_id)
@@ -245,8 +304,20 @@ async def update_workspace_member(
     workspace_id: str,
     user_id: int,
     workspace_role: str,
+    caller_role: str,
 ) -> dict:
-    """Update a member's role in a workspace."""
+    """Update a member's role in a workspace.
+
+    :param workspace_id: The workspace containing the member.
+    :param user_id: The ID of the member to update.
+    :param workspace_role: The new role to assign.
+    :param caller_role: The workspace role of the authenticated user. Used to
+        enforce role ceiling — the new role must not exceed the caller's own level.
+    :raises HTTPException: 403 if the new role exceeds the caller's level, or if
+        demoting the last owner.
+    :raises WorkspaceMemberNotFoundException: If the user is not a member.
+    """
+    _enforce_role_ceiling(caller_role, workspace_role)
     async with async_session() as session:
         result = await session.execute(
             select(WorkspaceMember).where(

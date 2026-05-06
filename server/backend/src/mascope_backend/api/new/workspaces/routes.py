@@ -3,8 +3,11 @@
 from fastapi import APIRouter, Depends, Path, Query
 
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.dependencies import current_active_user, editor_user
-from mascope_backend.api.new.workspaces.dependencies import require_workspace_role
+from mascope_backend.api.new.workspaces.dependencies import (
+    require_workspace_role,
+)
 from mascope_backend.api.new.workspaces.schemas import (
     WorkspaceCreate,
     WorkspaceMemberCreate,
@@ -36,8 +39,8 @@ async def get_workspaces_route(
 ):
     """List workspaces the current user has access to."""
     return await get_workspaces(
+        user=user,
         workspace_status=workspace_status,
-        user_id=user.id,
     )
 
 
@@ -52,7 +55,7 @@ async def get_workspace_route(
 
 
 @workspaces_router.post("")
-@api_route()
+@api_route(status_code=201)
 async def create_workspace_route(
     body: WorkspaceCreate,
     user: User = Depends(editor_user),
@@ -106,7 +109,7 @@ async def get_workspace_members_route(
 
 
 @workspaces_router.post("/{workspace_id}/members")
-@api_route()
+@api_route(status_code=201)
 async def add_workspace_member_route(
     body: WorkspaceMemberCreate,
     workspace_id: str = Path(...),
@@ -118,6 +121,7 @@ async def add_workspace_member_route(
         user_id=body.user_id,
         workspace_role=body.workspace_role,
         granted_by=user.id,
+        caller_role=membership.workspace_role,
     )
 
 
@@ -134,6 +138,7 @@ async def update_workspace_member_route(
         workspace_id=workspace_id,
         user_id=user_id,
         workspace_role=body.workspace_role,
+        caller_role=membership.workspace_role,
     )
 
 
@@ -143,8 +148,17 @@ async def remove_workspace_member_route(
     workspace_id: str = Path(...),
     user_id: int = Path(...),
     user: User = Depends(current_active_user),
-    membership=Depends(require_workspace_role("admin")),
+    membership=Depends(require_workspace_role("guest")),
 ):
+    # Any member can remove themselves; removing others requires admin
+    if user_id != user.id:
+        role_levels = auth_settings.ROLE_ACCESS_LEVELS
+        if role_levels.get(membership.workspace_role, -1) < role_levels["admin"]:
+            from mascope_backend.api.new.auth.exceptions import (
+                ForbiddenAccessException,
+            )
+
+            raise ForbiddenAccessException()
     return await remove_workspace_member(
         workspace_id=workspace_id,
         user_id=user_id,

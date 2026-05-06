@@ -80,7 +80,7 @@ async def test_create_workspace_adds_creator_as_owner(editor_client):
             "workspace_description": "Testing auto-owner",
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     ws_data = resp.json()["data"]
     ws_id = ws_data["workspace_id"]
 
@@ -188,7 +188,7 @@ async def test_delete_workspace_as_owner(owner_client):
         _url(),
         json={"workspace_name": "Workspace To Delete"},
     )
-    assert create_resp.status_code == 200
+    assert create_resp.status_code == 201
     ws_id = create_resp.json()["data"]["workspace_id"]
 
     # Owner deletes it

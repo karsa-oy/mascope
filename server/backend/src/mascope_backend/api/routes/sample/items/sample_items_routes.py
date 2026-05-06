@@ -173,6 +173,9 @@ async def copy_sample_items_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the copy process has started.
     """
+    # Check ACL on source items
+    for item_id in body.sample_item_ids:
+        await check_sample_access(item_id, user, "guest")
     # Check ACL on destination batch
     await check_batch_access(body.sample_batch_id, user, "editor")
     # Can't copy to locked sample batch
@@ -208,6 +211,9 @@ async def move_sample_items_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the copy process has started.
     """
+    # Check ACL on source items
+    for item_id in body.sample_item_ids:
+        await check_sample_access(item_id, user, "editor")
     # Check ACL on destination batch
     await check_batch_access(body.sample_batch_id, user, "editor")
     # Cant move locked sample items

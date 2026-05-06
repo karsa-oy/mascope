@@ -45,7 +45,7 @@ async def test_add_member_as_admin(admin_client, outsider_user, ws_alpha):
         _members_url(ws_alpha["workspace_id"]),
         json={"user_id": outsider_user.id, "workspace_role": "guest"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     member_data = resp.json()["data"]
     assert member_data["user_id"] == outsider_user.id
     assert member_data["workspace_role"] == "guest"

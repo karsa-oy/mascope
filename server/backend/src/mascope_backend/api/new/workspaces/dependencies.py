@@ -24,9 +24,9 @@ All return ``WorkspaceMember`` on success or raise ``ForbiddenAccessException``.
 from fastapi import Depends, Path, Query
 from sqlalchemy import select
 
+from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
-from mascope_backend.api.new.workspaces.schemas import WORKSPACE_ROLES
 from mascope_backend.db import (
     Dataset,
     SampleBatch,
@@ -41,7 +41,7 @@ from mascope_backend.db import (
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-_role_order = {r: i for i, r in enumerate(WORKSPACE_ROLES)}
+_role_levels = auth_settings.ROLE_ACCESS_LEVELS
 
 
 async def _get_workspace_membership(
@@ -107,6 +107,7 @@ async def _enforce(
 ) -> WorkspaceMember:
     """Core ACL check shared by all public functions."""
     if user.is_superuser:
+        # Superusers bypass workspace membership checks
         return _superuser_member(workspace_id or "__resolved__", user)
 
     if workspace_id is None:
@@ -116,7 +117,7 @@ async def _enforce(
     if membership is None:
         raise ForbiddenAccessException()
 
-    user_level = _role_order.get(membership.workspace_role, -1)
+    user_level = _role_levels[membership.workspace_role]
     if user_level < min_level:
         raise ForbiddenAccessException()
 
@@ -151,7 +152,7 @@ async def check_dataset_access(
     :raises ForbiddenAccessException: If user lacks the required workspace role.
     """
     workspace_id = await _get_workspace_id_from_dataset(dataset_id)
-    return await _enforce(workspace_id, user, _role_order[min_role])
+    return await _enforce(workspace_id, user, _role_levels[min_role])
 
 
 async def check_batch_access(
@@ -166,7 +167,7 @@ async def check_batch_access(
     :raises ForbiddenAccessException: If user lacks the required workspace role.
     """
     workspace_id = await _get_workspace_id_from_batch(sample_batch_id)
-    return await _enforce(workspace_id, user, _role_order[min_role])
+    return await _enforce(workspace_id, user, _role_levels[min_role])
 
 
 async def check_sample_access(
@@ -181,7 +182,7 @@ async def check_sample_access(
     :raises ForbiddenAccessException: If user lacks the required workspace role.
     """
     workspace_id = await _get_workspace_id_from_sample(sample_item_id)
-    return await _enforce(workspace_id, user, _role_order[min_role])
+    return await _enforce(workspace_id, user, _role_levels[min_role])
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +198,7 @@ def require_workspace_role(min_role: str):
         @router.get("/{workspace_id}/workspaces")
         async def list_ws(..., membership=Depends(require_workspace_role("guest"))):
     """
-    min_level = _role_order[min_role]
+    min_level = _role_levels[min_role]
 
     async def dependency(
         workspace_id: str = Path(...),
@@ -218,7 +219,7 @@ def require_dataset_role(min_role: str):
         @router.get("/{dataset_id}/details")
         async def get_ds(..., membership=Depends(require_dataset_role("guest"))):
     """
-    min_level = _role_order[min_role]
+    min_level = _role_levels[min_role]
 
     async def dependency(
         dataset_id: str = Path(...),
@@ -244,7 +245,7 @@ def require_dataset_query_role(min_role: str):
             membership=Depends(require_dataset_query_role("guest")),
         ):
     """
-    min_level = _role_order[min_role]
+    min_level = _role_levels[min_role]
 
     async def dependency(
         dataset_id: str = Query(...),
@@ -261,7 +262,7 @@ def require_batch_role(min_role: str):
 
     Resolves batch → dataset → workspace, then checks membership.
     """
-    min_level = _role_order[min_role]
+    min_level = _role_levels[min_role]
 
     async def dependency(
         sample_batch_id: str = Path(...),
@@ -278,7 +279,7 @@ def require_sample_role(min_role: str):
 
     Resolves sample → batch → dataset → workspace, then checks membership.
     """
-    min_level = _role_order[min_role]
+    min_level = _role_levels[min_role]
 
     async def dependency(
         sample_item_id: str = Path(...),
