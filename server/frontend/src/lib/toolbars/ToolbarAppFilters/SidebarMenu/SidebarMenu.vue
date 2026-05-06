@@ -20,6 +20,7 @@ import NotificationPane from './NotificationPane.vue'
 import NotificationOverlay from './NotificationOverlay.vue'
 
 import { useApp } from '@/stores'
+import { workspaceIcon } from '@/stores/data/modules/workspace'
 
 const app = useApp()
 const sidebarMenu = useSidebarMenu()
@@ -109,7 +110,7 @@ watchEffect(() => {
     </NotificationOverlay>
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
-      icon="pi ph ph-briefcase"
+      :icon="`pi ph ${workspaceIcon(app.data.workspace.focused)}`"
       :label="app.data.workspace.focused?.workspace_name"
       v-tooltip.bottom="
         `${app.data.workspace.focused?.workspace_description ?? 'No description'}
@@ -132,7 +133,7 @@ watchEffect(() => {
     <template v-if="app.data.dataset.focused">
       <span class="pi ph ph-caret-right" style="opacity: 0.5" />
       <Button
-        icon="pi ph ph-folder"
+        icon="pi ph ph-folders"
         :label="app.data.dataset.focused?.dataset_name"
         v-tooltip.bottom="
           `${app.data.dataset.focused?.dataset_description ?? 'No description'}

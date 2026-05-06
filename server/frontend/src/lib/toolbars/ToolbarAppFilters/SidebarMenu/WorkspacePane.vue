@@ -7,6 +7,7 @@ import ContextMenu from 'primevue/contextmenu'
 
 import { useApp } from '@/stores'
 import { DialogWorkspaceOp, DialogWorkspaceMembership } from '@/lib/dialogs'
+import { workspaceIcon } from '@/stores/data/modules/workspace'
 
 import { useSidebarMenu } from './state.js'
 
@@ -48,10 +49,15 @@ const vHelpLayer = app.ui.help.directive(layer)
       `
       <b>Workspaces</b>
       <p>
-        Select and manage workspaces. Workspaces group workspaces together
+        Select and manage workspaces. Workspaces group datasets together
         and serve as the access control boundary. Click on a workspace to select it.
       </p>
-      <p>Click on the Create button to create a new workspace.</p>
+      <p>
+        The access control boundary ensures that only members of a workspace can access it. 
+        The role of each member determines their level of access (read/write/manage).
+      </p>
+      <p>Right click on a workspace to manage its members, edit its details, or delete it.</p>
+      <p>Click on the Create button to create a new workspace. Then add members to it if desired.</p>
       `
     "
   >
@@ -100,7 +106,10 @@ const vHelpLayer = app.ui.help.directive(layer)
               }
             "
           >
-            <span class="pi ph ph-briefcase" style="font-size: 1.5rem; opacity: 0.3" />
+            <span
+              :class="['pi', 'ph', workspaceIcon(option)]"
+              style="font-size: 1.5rem; opacity: 0.3"
+            />
             <div class="col" style="gap: 1rem; align-items: flex-start">
               {{ option.workspace_name }}
               <span style="opacity: 0.5">{{ option.workspace_description }}</span>

@@ -4,6 +4,18 @@ import { api } from '@/api'
 
 import { useData } from '@/lib/store'
 
+/**
+ * Return the Phosphor icon class for a workspace based on its properties.
+ * - Acquisitions (system): ph-microscope
+ * - Default (system): ph-briefcase-metal
+ * - User-created: ph-briefcase
+ */
+export const workspaceIcon = (workspace) => {
+  if (!workspace?.is_system) return 'ph-briefcase'
+  if (/acqui/i.test(workspace.workspace_name)) return 'ph-microscope'
+  return 'ph-briefcase-metal'
+}
+
 export const useWorkspace = defineStore('app.data.workspace', () => {
   const name = 'workspace'
   const key = 'workspace_id'
