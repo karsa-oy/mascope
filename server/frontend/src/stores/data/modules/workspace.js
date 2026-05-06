@@ -31,7 +31,8 @@ export const useWorkspace = defineStore('app.data.workspace', () => {
       key,
       selection: {
         mode: 'binary',
-        persist: true
+        persist: true,
+        subscribe: true
       }
     }
   )

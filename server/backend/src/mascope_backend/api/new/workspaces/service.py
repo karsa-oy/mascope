@@ -229,7 +229,7 @@ async def update_workspace(
         workspace.workspace_utc_modified = datetime.now(timezone.utc)
         await session.commit()
 
-    await emit_record_reload(record_type="workspace")
+    await emit_record_reload(record_type="workspace", room=workspace_id)
     return {"data": workspace.to_dict()}
 
 
@@ -331,7 +331,10 @@ async def add_workspace_member(
         session.add(member)
         await session.commit()
 
-    await emit_record_reload(record_type="workspace")
+    await emit_record_reload(
+        record_type="workspace",
+        room=[workspace_id, f"user-{user_id}"],
+    )
     return {"data": member.to_dict()}
 
 
@@ -374,7 +377,7 @@ async def update_workspace_member(
         member.workspace_role = workspace_role
         await session.commit()
 
-    await emit_record_reload(record_type="workspace")
+    await emit_record_reload(record_type="workspace", room=workspace_id)
     return {"data": member.to_dict()}
 
 
@@ -400,5 +403,8 @@ async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
         await session.delete(member)
         await session.commit()
 
-    await emit_record_reload(record_type="workspace")
+    await emit_record_reload(
+        record_type="workspace",
+        room=[workspace_id, f"user-{user_id}"],
+    )
     return {"data": {"workspace_id": workspace_id, "user_id": user_id, "removed": True}}
