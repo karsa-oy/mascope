@@ -35,12 +35,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.sql.schema import CheckConstraint
 
+from mascope_backend.api.models.dataset.config import dataset_config
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.sample.items.config import sample_item_config
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-from mascope_backend.api.models.dataset.config import dataset_config
 from mascope_backend.runtime import runtime
 
 
@@ -217,12 +217,8 @@ class Dataset(Base):
     )
     instrument: Mapped[Optional[str]] = mapped_column(String(64))
     icon: Mapped[Optional[dict]] = mapped_column(JSON)
-    dataset_utc_created: Mapped[Optional[dt]] = mapped_column(
-        TIMESTAMP(timezone=True)
-    )
-    dataset_utc_modified: Mapped[Optional[dt]] = mapped_column(
-        TIMESTAMP(timezone=True)
-    )
+    dataset_utc_created: Mapped[Optional[dt]] = mapped_column(TIMESTAMP(timezone=True))
+    dataset_utc_modified: Mapped[Optional[dt]] = mapped_column(TIMESTAMP(timezone=True))
 
     # Relationships
     sample_batch = relationship(
@@ -333,7 +329,7 @@ class SampleFile(Base):
     )
     datetime_utc: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))  # stored as UTC
     length: Mapped[float] = mapped_column(Float)
-    range: Mapped[dict] = mapped_column(JSON)
+    range: Mapped[list] = mapped_column(JSON)
     mz_calibration: Mapped[Optional[dict]] = mapped_column(JSON)
     polarity: Mapped[str] = mapped_column(String(4))
 

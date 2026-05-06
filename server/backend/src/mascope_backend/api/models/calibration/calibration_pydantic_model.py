@@ -7,22 +7,25 @@ from mascope_backend.api.models.calibration.config import calibration_config
 class GetMzCalibrationQueryParams(QueryParamsModel):
     sample_item_id: str | None = Field(
         None,
-        description="Filter by the sample item ID for which you want to fetch m/z calibration.",
+        description="Sample item ID to fetch m/z calibration for.",
     )
     instrument: str | None = Field(
         None,
-        description="The instrument name to query for the last m/z calibration of that instrument.",
+        description="Instrument name to query for its last m/z calibration.",
     )
 
     @model_validator(mode="after")
-    def check_sample_item_id_or_instrument(self):
+    def check_sample_item_id_or_instrument(self) -> "GetMzCalibrationQueryParams":
+        """Validate exactly one of sample_item_id or instrument is provided."""
         if not self.sample_item_id and not self.instrument:
             raise ValueError(
-                "Please specify a sample item ID or an instrument name to search for m/z calibration."
+                "Specify a sample item ID or an instrument name "
+                "to search for m/z calibration."
             )
         if self.sample_item_id and self.instrument:
             raise ValueError(
-                "Please specify only one: either a sample item ID or an instrument name, not both."
+                "Specify only one: either a sample item ID "
+                "or an instrument name, not both."
             )
         return self
 
@@ -30,38 +33,53 @@ class GetMzCalibrationQueryParams(QueryParamsModel):
 class MzCalibrationParams(BaseModel):
     refine_window: int = Field(
         ...,
-        description="Maximum allowed m/z difference (window) for considering a peak as a potential calibration match.",
+        description=(
+            "Maximum allowed m/z difference (ppm window) for considering "
+            "a peak as a potential calibration match."
+        ),
     )
     mz_error_tolerance: float | None = Field(
         None,
-        description="Maximum allowed mean m/z error after calibration for the calibration to be accepted.",
+        description=(
+            "Maximum allowed mean m/z error after calibration "
+            "for the calibration to be accepted."
+        ),
     )
     snr_threshold: float | None = Field(
         None,
-        description="Minimum required signal-to-noise ratio for calibration peaks.",
+        description="Minimum signal-to-noise ratio for calibration peaks.",
     )
     match_score_min: float = Field(
         calibration_config.DEFAULT_MATCH_SCORE_MIN,
-        description="Minimum required match score for a peak to be considered a valid calibration match.",
+        description=(
+            "Minimum match score for a peak to be considered a valid calibration match."
+        ),
     )
     peak_intensity_min: float = Field(
         calibration_config.DEFAULT_PEAK_INTENSITY_MIN,
-        description="Minimum intensity threshold for peaks to be considered in calibration.",
+        description="Minimum intensity for peaks to be considered in calibration.",
     )
     isotope_abundance_min: float = Field(
         calibration_config.DEFAULT_ISOTOPE_ABUNDANCE_MIN,
-        description="Minimum relative abundance required for an isotope peak to be considered in calibration.",
+        description=(
+            "Minimum relative abundance required for an isotope peak "
+            "to be considered in calibration."
+        ),
     )
 
     def with_defaults(self, defaults: "MzCalibrationParams") -> "MzCalibrationParams":
-        """Fill in any missing parameters with default values from another
-        MzCalibrationParams instance.
-        The use case: automatic processing pipeline, where the params below
-        are not provided by the user, but we want to fill them in with sensible defaults.
+        """Fill missing parameters from another MzCalibrationParams instance.
 
-        :param defaults:
+        The use case: automatic processing pipeline, where the params below
+        are not provided by the user, but we want to fill them in with sensible
+        defaults.
+
+        Steps:
+        - For each nullable field, keep self value if set, else use default
+
+        :param defaults: Fallback parameter values.
         :type defaults: MzCalibrationParams
-        :return: A new MzCalibrationParams instance with missing values filled in from defaults.
+        :return: New instance with missing values filled from defaults.
         :rtype: MzCalibrationParams
         """
         return self.model_copy(
@@ -101,8 +119,8 @@ class CalibrationFitParams(MzCalibrationParams):
     calibration_collection_id: str | None = Field(
         None, description="Calibration collection ID"
     )
-    ionization_mechanism_ids: list[str | None] = Field(
-        None, description="Ionization mechanism IDs"
+    ionization_mechanism_ids: list[str] | None = Field(
+        None, description="Ionization mechanism IDs."
     )
     polarity: str | None = Field(None, description="Polarity of the ionization mode")
 

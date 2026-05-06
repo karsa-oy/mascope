@@ -39,7 +39,7 @@ def get_test_calibration_handler(filename: str, polarity: str):
         **resolved_mz_params.model_dump(),
     )
     handler = get_calibration_handler(
-        filename, calibration_fit_params, notifications=None
+        filename, calibration_fit_params, notification=None
     )
     return handler
 

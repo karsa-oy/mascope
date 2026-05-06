@@ -75,7 +75,7 @@ class BaseCalibrationHandler:
     def __init__(
         self,
         filename: str,
-        params: CalibrationFitParams,
+        params: CalibrationFitParams | None = None,
         notification: UserNotification | None = None,
     ):
         self.filename = filename
@@ -855,15 +855,15 @@ class OrbiCalibrationHandler(BaseCalibrationHandler):
 
 def get_calibration_handler(
     filename: str,
-    calibration_params: CalibrationFitParams,
-    notifications: UserNotification | None,
+    calibration_params: CalibrationFitParams | None,
+    notification: UserNotification | None,
 ) -> BaseCalibrationHandler:
     instrument_type = m_name.get_instrument_type(filename)
     match instrument_type:
         case "tof":
-            return TofCalibrationHandler(filename, calibration_params, notifications)
+            return TofCalibrationHandler(filename, calibration_params, notification)
         case "orbi":
-            return OrbiCalibrationHandler(filename, calibration_params, notifications)
+            return OrbiCalibrationHandler(filename, calibration_params, notification)
         case _:
             raise ValueError(f"Unsupported instrument type: {instrument_type}")
 

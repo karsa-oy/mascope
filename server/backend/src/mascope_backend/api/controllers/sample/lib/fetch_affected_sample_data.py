@@ -19,8 +19,8 @@ class AffectedSampleData(NamedTuple):
 
     affected_sample_item_ids: list[str]
     affected_sample_batch_ids: list[str]
-    affected_samples: list[Sample] | None = None
-    affected_sample_batches: list[SampleBatch] | None = None
+    affected_samples: list[Sample] = []
+    affected_sample_batches: list[SampleBatch] = []
 
 
 async def fetch_affected_sample_data(
@@ -29,22 +29,29 @@ async def fetch_affected_sample_data(
     include_objects: bool = False,
 ) -> AffectedSampleData:
     """
-    Fetches affected sample data (IDs, Sample view objects, and SampleBatch objects).
+    Fetch affected sample data for UI reload events.
 
-    This function serves as a unified helper for collecting data needed for UI reload events.
-    Exactly one of the filter parameters must be provided.
+    Unified helper for collecting sample IDs and optionally the full ORM
+    objects needed to drive Socket.IO reload notifications.
+    Exactly one filter parameter must be provided.
 
-    :param sample_item_ids: List of sample item IDs to fetch affected data for, defaults to None
-    :type sample_item_ids: list[str], optional
-    :param sample_file_ids: List of sample file IDs to fetch affected data for
+    Steps:
+    - Validate exactly one filter param is given
+    - Query SampleItem for matching item and batch IDs
+    - If include_objects, fetch Sample view and SampleBatch ORM objects
+    - Return AffectedSampleData with IDs and optional objects
+
+    :param sample_item_ids: Sample item IDs to fetch affected data for.
+    :type sample_item_ids: list[str] | None
+    :param sample_file_ids: Sample file IDs to fetch affected data for.
     :type sample_file_ids: list[str] | None
-    :param include_objects: Whether to include the actual SampleItem/SampleBatch objects
-    :type include_objects: bool, defaults to False
-    :return: Consolidated affected sample data including IDs and objects
+    :param include_objects: Whether to include ORM objects in the result.
+    :type include_objects: bool
+    :raises ValueError: If zero or multiple filter parameters are provided.
+    :return: Consolidated affected sample data.
     :rtype: AffectedSampleData
-    :raises ValueError: If zero or multiple filter parameters provided
     """
-    # Validate input - exactly one parameter must be provided
+    # --- Validate input - exactly one parameter must be provided ---
     provided_params = sum(x is not None for x in [sample_item_ids, sample_file_ids])
     if provided_params != 1:
         raise ValueError(
@@ -52,7 +59,7 @@ async def fetch_affected_sample_data(
         )
 
     async with async_session() as session:
-        # --- Get IDs using SampleItem (no joins needed) ---
+        # --- Fetch affected item and batch IDs ---
         id_query = select(SampleItem.sample_item_id, SampleItem.sample_batch_id)
 
         if sample_item_ids:
@@ -72,8 +79,6 @@ async def fetch_affected_sample_data(
             return AffectedSampleData(
                 affected_sample_item_ids=affected_sample_item_ids,
                 affected_sample_batch_ids=affected_sample_batch_ids,
-                affected_samples=None,
-                affected_sample_batches=None,
             )
 
         # --- Fetch Sample view objects (includes filename and all joined data) ---

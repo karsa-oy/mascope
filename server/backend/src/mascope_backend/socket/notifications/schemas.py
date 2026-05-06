@@ -1,37 +1,46 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+from mascope_backend.db.id import gen_id
 
 
 class UserNotification(BaseModel):
     process_id: str = Field(
-        ..., description="Unique identifier for the notification process."
+        default_factory=lambda: gen_id(8),
+        description="Unique identifier for the notification process.",
     )
     parent_id: str | None = Field(
         None,
-        description="Identifier of the parent process if this notification is part of a larger workflow.",
+        description=(
+            "Identifier of the parent process if this notification "
+            "is part of a larger workflow."
+        ),
     )
     type: str = Field(
         ...,
-        description="Type of process, corresponds to the backend function name handling the operation.",
+        description=(
+            "Type of process, corresponds to the backend function "
+            "name handling the operation."
+        ),
     )
     message: str = Field(
-        ..., description="User-friendly message describing the notification context."
+        ..., description="User-friendly message describing the notification."
     )
     progress: float | None = Field(
-        None, description="Current progress percentage of the process, if applicable"
+        None, description="Current progress percentage of the process."
     )
     status: str = Field(
         ...,
-        description="Current status of the process, e.g., 'success', 'error', 'pending', 'warning'",
+        description=(
+            "Current status of the process: "
+            "'success', 'error', 'pending', 'warning', 'info'."
+        ),
     )
     data: dict[str, object] | None = Field(
-        None,
-        description="Optional data payload containing additional information or results.",
+        None, description="Optional payload with additional information or results."
     )
     error: dict[str, object] | None = Field(
-        None, description="Optional details about an error if the status is 'error'."
+        None, description="Optional error details when status is 'error'."
     )
-
-    model_config = ConfigDict(exclude_none=True)
 
     @field_validator("status")
     @classmethod
