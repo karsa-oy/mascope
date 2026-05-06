@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -292,18 +293,15 @@ async def create_sample_items(
         await session.execute(insert(SampleItem).values(sample_items_data))
         await session.commit()
 
-    # --- Fetch created samples with full data (includes filename) and affected sample batches ---
+    # --- Fetch created samples and affected sample batches ---
     created_item_ids = [si["sample_item_id"] for si in sample_items_data]
 
-    (
-        _,
-        affected_sample_batch_ids,
-        affected_samples,
-        _,
-    ) = await fetch_affected_sample_data(
+    affected = await fetch_affected_sample_data(
         sample_item_ids=created_item_ids,
         include_objects=True,
     )
+    affected_sample_batch_ids = affected.affected_sample_batch_ids
+    affected_samples = cast(list[Sample], affected.affected_samples)
 
     # Preserve insertion order
     samples_by_id = {s.sample_item_id: s for s in affected_samples}

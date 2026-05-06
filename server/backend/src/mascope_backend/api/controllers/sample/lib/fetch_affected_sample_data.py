@@ -19,8 +19,8 @@ class AffectedSampleData(NamedTuple):
 
     affected_sample_item_ids: list[str]
     affected_sample_batch_ids: list[str]
-    affected_samples: list[Sample] = []
-    affected_sample_batches: list[SampleBatch] = []
+    affected_samples: list[Sample] | None = None
+    affected_sample_batches: list[SampleBatch] | None = None
 
 
 async def fetch_affected_sample_data(

@@ -10,6 +10,8 @@ Tasks:
 - Calibrate individual samples, sample sets, and full batches
 """
 
+from typing import cast
+
 from sqlalchemy import and_, func, select
 
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
@@ -49,7 +51,7 @@ from mascope_backend.api.models.calibration.calibration_pydantic_model import (
 from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
-from mascope_backend.db import IonizationMode, Sample, async_session
+from mascope_backend.db import IonizationMode, Sample, SampleBatch, async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.notifications import (
@@ -142,8 +144,6 @@ async def calibration_mz_fit(
     :type process_id: str | None, optional
     :param parent_id: Parent process ID for tracking
     :type parent_id: str | None, optional
-    :return: Dictionary containing fit results and notification data
-    :rtype: dict
     :raises NotFoundException: If sample, ionization mode or calibration
         collection not found
     :raises ApiException: If m/z fitting fails or produces a warning
@@ -279,14 +279,13 @@ async def calibration_mz_apply(
     sample_file = await fetch_sample_file(filename=filename)
 
     # --- Get affected sample items and their batches ---
-    (
-        affected_sample_item_ids,
-        affected_sample_batch_ids,
-        affected_samples,
-        affected_sample_batches,
-    ) = await fetch_affected_sample_data(
+    affected = await fetch_affected_sample_data(
         sample_file_ids=[sample_file.sample_file_id], include_objects=True
     )
+    affected_sample_item_ids = affected.affected_sample_item_ids
+    affected_sample_batch_ids = affected.affected_sample_batch_ids
+    affected_samples = cast(list[Sample], affected.affected_samples)
+    affected_sample_batches = cast(list[SampleBatch], affected.affected_sample_batches)
 
     # --- Set non-ACQUISITION batches to "processing" ---
     non_acquisition_batch_ids = [
