@@ -41,6 +41,27 @@ export const useWorkspace = defineStore('app.data.workspace', () => {
       api.http.delete(`/workspaces/${workspace.workspace_id}`, {
         use: 'delete',
         type: 'delete_workspace'
+      }),
+    // membership
+    getMembers: (workspace_id) =>
+      api.http.get(`/workspaces/${workspace_id}/members`, {
+        use: 'read',
+        type: 'load_workspace_members'
+      }),
+    addMember: (workspace_id, member) =>
+      api.http.post(`/workspaces/${workspace_id}/members`, member, {
+        use: 'create',
+        type: 'add_workspace_member'
+      }),
+    updateMember: (workspace_id, user_id, member) =>
+      api.http.patch(`/workspaces/${workspace_id}/members/${user_id}`, member, {
+        use: 'update',
+        type: 'update_workspace_member'
+      }),
+    removeMember: (workspace_id, user_id) =>
+      api.http.delete(`/workspaces/${workspace_id}/members/${user_id}`, {
+        use: 'delete',
+        type: 'remove_workspace_member'
       })
   }
 })

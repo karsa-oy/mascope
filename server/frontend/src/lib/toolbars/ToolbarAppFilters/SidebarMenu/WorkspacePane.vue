@@ -6,7 +6,7 @@ import Listbox from 'primevue/listbox'
 import ContextMenu from 'primevue/contextmenu'
 
 import { useApp } from '@/stores'
-import { DialogWorkspaceOp } from '@/lib/dialogs'
+import { DialogWorkspaceOp, DialogWorkspaceMembership } from '@/lib/dialogs'
 
 import { useSidebarMenu } from './state.js'
 
@@ -15,6 +15,7 @@ const sidebarMenu = useSidebarMenu()
 const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'workspaces')
 
 const dialog = ref()
+const membersDialog = ref(false)
 const workspaceContextMenu = ref()
 const selectedWorkspace = ref(null)
 
@@ -86,6 +87,7 @@ const vHelpLayer = app.ui.help.directive(layer)
           <div
             class="row"
             style="gap: 1rem; width: 100%; justify-content: flex-start"
+            :style="option.is_member === false ? { opacity: 0.45 } : {}"
             @contextmenu="
               (event) => {
                 event.preventDefault()
@@ -109,6 +111,13 @@ const vHelpLayer = app.ui.help.directive(layer)
     appendTo="self"
     :model="[
       {
+        label: 'Manage members',
+        icon: 'pi pi-users',
+        command: () => {
+          membersDialog = true
+        }
+      },
+      {
         label: 'Edit workspace',
         icon: 'pi pi-pen-to-square',
         command: () => {
@@ -125,4 +134,5 @@ const vHelpLayer = app.ui.help.directive(layer)
     ]"
   />
   <DialogWorkspaceOp v-model:action="dialog" :workspace="selectedWorkspace" />
+  <DialogWorkspaceMembership v-model:visible="membersDialog" :workspace="selectedWorkspace" />
 </template>
