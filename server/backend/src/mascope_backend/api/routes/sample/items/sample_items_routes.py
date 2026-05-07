@@ -30,7 +30,7 @@ from mascope_backend.api.new.auth.dependencies import (
 )
 from mascope_backend.api.new.workspaces.dependencies import (
     check_batch_access,
-    check_sample_access,
+    check_sample_access_bulk,
     require_sample_role,
 )
 from mascope_backend.db import SampleBatch, SampleItem
@@ -127,8 +127,7 @@ async def delete_sample_items_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming deletion.
     """
-    for item_id in body.sample_item_ids:
-        await check_sample_access(item_id, user, "editor")
+    await check_sample_access_bulk(body.sample_item_ids, user, "editor")
     # Check if any sample items are locked - only owners can delete locked items
     await locked_access(user, SampleItem, body.sample_item_ids, min_role="owner")
 
@@ -174,8 +173,7 @@ async def copy_sample_items_route(
     :return: A dictionary confirming the copy process has started.
     """
     # Check ACL on source items
-    for item_id in body.sample_item_ids:
-        await check_sample_access(item_id, user, "guest")
+    await check_sample_access_bulk(body.sample_item_ids, user, "guest")
     # Check ACL on destination batch
     await check_batch_access(body.sample_batch_id, user, "editor")
     # Can't copy to locked sample batch
@@ -212,8 +210,7 @@ async def move_sample_items_route(
     :return: A dictionary confirming the copy process has started.
     """
     # Check ACL on source items
-    for item_id in body.sample_item_ids:
-        await check_sample_access(item_id, user, "editor")
+    await check_sample_access_bulk(body.sample_item_ids, user, "editor")
     # Check ACL on destination batch
     await check_batch_access(body.sample_batch_id, user, "editor")
     # Cant move locked sample items

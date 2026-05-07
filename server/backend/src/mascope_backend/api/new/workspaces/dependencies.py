@@ -16,7 +16,9 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 
 - ``check_dataset_access``:   dataset_id from request body / other source
 - ``check_batch_access``:     sample_batch_id from request body / other source
+- ``check_batch_access_bulk``:  list of sample_batch_ids (single query)
 - ``check_sample_access``:      sample_item_id from request body / other source
+- ``check_sample_access_bulk``: list of sample_item_ids (single query)
 
 All return ``WorkspaceMember`` on success or raise ``ForbiddenAccessException``.
 """
@@ -88,6 +90,35 @@ async def _get_workspace_id_from_sample(sample_item_id: str) -> str | None:
             .where(SampleItem.sample_item_id == sample_item_id)
         )
         return result.scalar_one_or_none()
+
+
+async def _get_workspace_ids_from_batches(
+    sample_batch_ids: list[str],
+) -> set[str]:
+    """Resolve a list of sample_batch_ids → unique workspace_ids in one query."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Dataset.workspace_id)
+            .distinct()
+            .join(SampleBatch, SampleBatch.dataset_id == Dataset.dataset_id)
+            .where(SampleBatch.sample_batch_id.in_(sample_batch_ids))
+        )
+        return set(result.scalars().all())
+
+
+async def _get_workspace_ids_from_samples(
+    sample_item_ids: list[str],
+) -> set[str]:
+    """Resolve a list of sample_item_ids → unique workspace_ids in one query."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Dataset.workspace_id)
+            .distinct()
+            .join(SampleBatch, SampleBatch.dataset_id == Dataset.dataset_id)
+            .join(SampleItem, SampleItem.sample_batch_id == SampleBatch.sample_batch_id)
+            .where(SampleItem.sample_item_id.in_(sample_item_ids))
+        )
+        return set(result.scalars().all())
 
 
 def _superuser_member(workspace_id: str, user: User) -> WorkspaceMember:
@@ -170,6 +201,27 @@ async def check_batch_access(
     return await _enforce(workspace_id, user, _role_levels[min_role])
 
 
+async def check_batch_access_bulk(
+    sample_batch_ids: list[str],
+    user: User,
+    min_role: str,
+) -> None:
+    """Check workspace-level ACL for a list of sample_batch_ids in one query.
+
+    Resolves all batch → dataset → workspace in a single query, then checks
+    membership for each unique workspace.
+
+    :raises ForbiddenAccessException: If any batch resolves to a workspace
+        the user lacks the required role for, or if any batch doesn't resolve.
+    """
+    workspace_ids = await _get_workspace_ids_from_batches(sample_batch_ids)
+    if not workspace_ids:
+        raise ForbiddenAccessException()
+    min_level = _role_levels[min_role]
+    for workspace_id in workspace_ids:
+        await _enforce(workspace_id, user, min_level)
+
+
 async def check_sample_access(
     sample_item_id: str,
     user: User,
@@ -183,6 +235,27 @@ async def check_sample_access(
     """
     workspace_id = await _get_workspace_id_from_sample(sample_item_id)
     return await _enforce(workspace_id, user, _role_levels[min_role])
+
+
+async def check_sample_access_bulk(
+    sample_item_ids: list[str],
+    user: User,
+    min_role: str,
+) -> None:
+    """Check workspace-level ACL for a list of sample_item_ids in one query.
+
+    Resolves all sample → batch → dataset → workspace in a single query, then
+    checks membership for each unique workspace.
+
+    :raises ForbiddenAccessException: If any sample resolves to a workspace
+        the user lacks the required role for, or if any sample doesn't resolve.
+    """
+    workspace_ids = await _get_workspace_ids_from_samples(sample_item_ids)
+    if not workspace_ids:
+        raise ForbiddenAccessException()
+    min_level = _role_levels[min_role]
+    for workspace_id in workspace_ids:
+        await _enforce(workspace_id, user, min_level)
 
 
 # ---------------------------------------------------------------------------

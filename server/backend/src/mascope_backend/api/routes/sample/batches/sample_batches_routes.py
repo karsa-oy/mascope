@@ -32,7 +32,7 @@ from mascope_backend.api.new.auth.dependencies import (
     guest_user,
 )
 from mascope_backend.api.new.workspaces.dependencies import (
-    check_batch_access,
+    check_batch_access_bulk,
     check_dataset_access,
     require_batch_role,
 )
@@ -145,8 +145,7 @@ async def update_sample_batch_status_route(
     :return: Update results with count of affected batches and details
     :rtype: dict
     """
-    for batch_id in body.sample_batch_ids:
-        await check_batch_access(batch_id, user, "editor")
+    await check_batch_access_bulk(body.sample_batch_ids, user, "editor")
     return await update_sample_batch_status(
         sample_batch_ids=body.sample_batch_ids,
         status=body.status,
