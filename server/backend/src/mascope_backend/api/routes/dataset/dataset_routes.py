@@ -26,16 +26,12 @@ from mascope_backend.api.models.dataset.dataset_pydantic_model import (
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.workspaces.dependencies import require_workspace_role
-from mascope_backend.api.routes.dataset.acquisition.routes import (
-    acquisition_datasets_router,
-)
 from mascope_backend.db import Dataset
 
 
 dataset_router = APIRouter(
     prefix="/api/workspaces/{workspace_id}/datasets", tags=["Dataset"]
 )
-dataset_router.include_router(acquisition_datasets_router)
 
 
 @dataset_router.get("")

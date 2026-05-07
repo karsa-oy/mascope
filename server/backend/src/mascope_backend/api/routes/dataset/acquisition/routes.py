@@ -20,7 +20,7 @@ from mascope_backend.api.new.auth.dependencies import guest_user, owner_user
 
 
 acquisition_datasets_router = APIRouter(
-    prefix="/acquisition", tags=["Acquisition Dataset Management"]
+    prefix="/api/datasets/acquisition", tags=["Acquisition Dataset Management"]
 )
 
 

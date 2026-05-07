@@ -24,6 +24,9 @@ from mascope_backend.api.routes.attribute_templates.attribute_templates_routes i
     attribute_templates_router,
 )
 from mascope_backend.api.routes.calibration.calibration_routes import calibration_router
+from mascope_backend.api.routes.dataset.acquisition.routes import (
+    acquisition_datasets_router,
+)
 from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 from mascope_backend.api.routes.ionization_mechanisms.ionization_mechanisms_routes import (
     ionization_mechanisms_router,
@@ -97,6 +100,7 @@ routers = [
     workspaces_router,
     params_router,
     dataset_router,
+    acquisition_datasets_router,
     sample_batches_router,
     samples_router,
     sample_files_router,
