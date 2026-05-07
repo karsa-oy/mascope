@@ -23,7 +23,7 @@ export const useDatasetTableConfig = defineStore('browser.sample.datasetTable', 
   const isDefault = computed(() => JSON.stringify(config.value) === JSON.stringify(defaultConfig))
 
   function resetConfig() {
-    config.value = { ...defaultConfig }
+    config.value = structuredClone(defaultConfig)
   }
 
   return {

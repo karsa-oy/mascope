@@ -50,7 +50,7 @@ export const useBatchTableConfig = defineStore('browser.sample.batchTable', () =
 
   // reset to default config and clear local storage
   function resetConfig() {
-    config.value = { ...defaultConfig }
+    config.value = structuredClone(defaultConfig)
     localStorage.removeItem(storageKey.value)
   }
 
