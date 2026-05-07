@@ -1,6 +1,18 @@
 """
 Shared test utilities for the Mascope test suite.
+
+Provides:
+- ID generation (`gen_test_id`)
+- Test database credential resolution (host/port/user/password)
+
+The credential helpers are used by both the root conftest (async engine
+factory) and the migrations test conftest (sync engine for stairway).
+Centralised here so test infrastructure shares a single source of truth
+for connection parameters.
 """
+
+import os
+from pathlib import Path
 
 from mascope_backend.db.id import gen_id
 
@@ -23,3 +35,47 @@ def gen_test_id(size: int = 16) -> str:
     :rtype: str
     """
     return gen_id(size)
+
+
+def get_test_password() -> str:
+    """Resolve PostgreSQL password for test connections.
+
+    Resolution order:
+    - `POSTGRES_TEST_PASSWORD` env var (CI and explicit local override)
+    - `${MASCOPE_PATH}/.runtime/secrets/postgres_password.txt` (local dev)
+
+    :return: PostgreSQL password string
+    :rtype: str
+    :raises RuntimeError: If neither source is available
+    """
+    password = os.environ.get("POSTGRES_TEST_PASSWORD")
+    if password:
+        return password
+
+    mascope_path = os.environ.get("MASCOPE_PATH")
+    if not mascope_path:
+        raise RuntimeError(
+            "Cannot resolve test DB password: "
+            "set POSTGRES_TEST_PASSWORD or MASCOPE_PATH env var"
+        )
+    secret_path = Path(mascope_path) / ".runtime" / "secrets" / "postgres_password.txt"
+    if not secret_path.exists():
+        raise RuntimeError(
+            f"Cannot resolve test DB password: secret file not found at {secret_path}"
+        )
+    return secret_path.read_text().strip()
+
+
+def get_test_db_host() -> str:
+    """Test PostgreSQL host (defaults to localhost dev container)."""
+    return os.environ.get("TEST_DB_HOST", "localhost")
+
+
+def get_test_db_port() -> str:
+    """Test PostgreSQL port (defaults to 5432)."""
+    return os.environ.get("TEST_DB_PORT", "5432")
+
+
+def get_test_db_user() -> str:
+    """Test PostgreSQL user (defaults to `mascope_user`)."""
+    return os.environ.get("TEST_DB_USER", "mascope_user")

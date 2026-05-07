@@ -1,26 +1,23 @@
 """
 Global pytest fixtures and factory functions for the entire test suite.
 
-This module provides core testing infrastructure shared across all test categories
-(unit, integration, etc.). The factory creates isolated PostgreSQL databases per
-test category, dropped and recreated each session for a clean slate.
+This module provides core testing infrastructure shared across all test
+categories (unit, integration, etc.). The factory creates isolated
+PostgreSQL databases per test category, dropped and recreated each
+session for a clean slate.
 
 Local dev: requires `mascope dev up` (postgres at localhost:5432).
-CI: PostgreSQL service container, credentials via `POSTGRES_TEST_PASSWORD` env var.
+CI: PostgreSQL service container, credentials via `POSTGRES_TEST_PASSWORD`.
 
-Password resolution order:
-    1. `POSTGRES_TEST_PASSWORD` env var — CI and explicit local override
-    2. `.runtime/secrets/postgres_password.txt` — standard local dev (via MASCOPE_PATH)
-
-Connection settings (host/port/user) are controlled via `TEST_DB_*` env vars,
-defaulting to the standard dev postgres container values. These are intentionally
-independent of `runtime.config.database` to keep test infrastructure hermetic —
-tests must not be affected by whichever Mascope env happens to be active.
+Connection settings (host/port/user/password) are resolved by helpers in
+`test_utils.py` — intentionally independent of `runtime.config.database`
+to keep test infrastructure hermetic. Tests must not be affected by
+whichever Mascope env happens to be active.
 
 Async fixture design:
-    `async_engine_factory` is a session-scoped async fixture that yields an async
-    callable. Callers must use `@pytest_asyncio.fixture(scope="session")` and must
-    `await` the factory call so that all engine setup runs inside
+    `async_engine_factory` is a session-scoped async fixture that yields
+    an async callable. Callers must use `@pytest_asyncio.fixture(scope="session")`
+    and must `await` the factory call so that all engine setup runs inside
     pytest-asyncio's managed session event loop.
 
 Design principles:
@@ -31,55 +28,20 @@ Design principles:
 - Explicit organization: Test fixtures are organized by their scope and purpose
 """
 
-import os
-from pathlib import Path
-
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from test_utils import (
+    get_test_db_host,
+    get_test_db_port,
+    get_test_db_user,
+    get_test_password,
+)
 
 from mascope_backend.db import Base
 
 
-# --- Credential resolution ---
-
-
-def _get_test_password() -> str:
-    """Resolve PostgreSQL password for test connections.
-
-    Steps:
-    - POSTGRES_TEST_PASSWORD env var (CI and explicit local override)
-    - Secret file fallback (standard local dev via MASCOPE_PATH)
-
-    :return: PostgreSQL password string
-    :rtype: str
-    :raises RuntimeError: If neither source is available
-    """
-    # --- POSTGRES_TEST_PASSWORD env var (CI and explicit local override) ---
-    password = os.environ.get("POSTGRES_TEST_PASSWORD")
-    if password:
-        return password
-
-    # --- Secret file fallback (standard local dev via MASCOPE_PATH) ---
-    mascope_path = os.environ.get("MASCOPE_PATH")
-    if not mascope_path:
-        raise RuntimeError(
-            "Cannot resolve test DB password: "
-            "set POSTGRES_TEST_PASSWORD or MASCOPE_PATH env var"
-        )
-    secret_path = Path(mascope_path) / ".runtime" / "secrets" / "postgres_password.txt"
-    if not secret_path.exists():
-        raise RuntimeError(
-            f"Cannot resolve test DB password: secret file not found at {secret_path}"
-        )
-    return secret_path.read_text().strip()
-
-
 # --- Connection URLs ---
-
-# Intentionally reads from TEST_DB_* env vars rather than runtime.config.database
-# to keep test infrastructure hermetic — connection params must not vary with the
-# active Mascope env.
 
 
 def _get_test_db_url(db_name: str) -> str:
@@ -90,11 +52,10 @@ def _get_test_db_url(db_name: str) -> str:
     :return: SQLAlchemy async connection URL
     :rtype: str
     """
-    host = os.environ.get("TEST_DB_HOST", "localhost")
-    port = os.environ.get("TEST_DB_PORT", "5432")
-    user = os.environ.get("TEST_DB_USER", "mascope_user")
-    password = _get_test_password()
-    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db_name}"
+    return (
+        f"postgresql+asyncpg://{get_test_db_user()}:{get_test_password()}"
+        f"@{get_test_db_host()}:{get_test_db_port()}/{db_name}"
+    )
 
 
 def _get_admin_url() -> str:
@@ -103,11 +64,10 @@ def _get_admin_url() -> str:
     :return: SQLAlchemy async connection URL
     :rtype: str
     """
-    host = os.environ.get("TEST_DB_HOST", "localhost")
-    port = os.environ.get("TEST_DB_PORT", "5432")
-    user = os.environ.get("TEST_DB_USER", "mascope_user")
-    password = _get_test_password()
-    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/postgres"
+    return (
+        f"postgresql+asyncpg://{get_test_db_user()}:{get_test_password()}"
+        f"@{get_test_db_host()}:{get_test_db_port()}/postgres"
+    )
 
 
 # --- Startup check ---
@@ -116,20 +76,21 @@ def _get_admin_url() -> str:
 def _check_postgres_available() -> None:
     """Fail fast with a clear message if the PostgreSQL server is not reachable.
 
-    Runs at collection time so tests don't spend time collecting only to fail
-    on the first fixture setup. Skipped when `POSTGRES_TEST_PASSWORD` is not
-    set and `MASCOPE_PATH` is not set — this covers import-only scenarios.
+    Runs at collection time so tests don't spend time collecting only to
+    fail on the first fixture setup. Skipped when neither `POSTGRES_TEST_PASSWORD`
+    nor `MASCOPE_PATH` is set — this covers import-only scenarios where a
+    later, more specific failure is preferable.
     """
     import psycopg2
 
     try:
-        password = _get_test_password()
+        password = get_test_password()
     except RuntimeError:
         return  # can't resolve credentials, let the fixture fail with its own error
 
-    host = os.environ.get("TEST_DB_HOST", "localhost")
-    port = int(os.environ.get("TEST_DB_PORT", "5432"))
-    user = os.environ.get("TEST_DB_USER", "mascope_user")
+    host = get_test_db_host()
+    port = int(get_test_db_port())
+    user = get_test_db_user()
 
     try:
         conn = psycopg2.connect(
