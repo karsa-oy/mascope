@@ -19,7 +19,7 @@ from mascope_backend.api.models.dataset.dataset_pydantic_model import (
     DatasetRead,
 )
 from mascope_backend.api.new.instruments.service import get_instruments
-from mascope_backend.db import Dataset, async_session
+from mascope_backend.db import Dataset, Workspace, async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket.records.service import (
@@ -95,9 +95,7 @@ async def create_acquisition_datasets() -> dict:
     # --- Debug validation - check for duplicate acquisition datasets per instrument ---
     async with async_session() as session:
         duplicate_check_stmt = (
-            select(
-                Dataset.instrument, func.count(Dataset.dataset_id).label("count")
-            )
+            select(Dataset.instrument, func.count(Dataset.dataset_id).label("count"))
             .where(Dataset.dataset_type == "ACQUISITION")
             .group_by(Dataset.instrument)
             .having(func.count(Dataset.dataset_id) > 1)
@@ -113,9 +111,23 @@ async def create_acquisition_datasets() -> dict:
 
     # --- Get existing acquisition datasets ---
     async with async_session() as session:
-        stmt = select(Dataset.instrument).where(
-            Dataset.dataset_type == "ACQUISITION"
-        )
+        # Resolve the system Acquisitions workspace
+        acq_ws_id = (
+            await session.execute(
+                select(Workspace.workspace_id).where(
+                    Workspace.workspace_name == "Acquisitions",
+                    Workspace.is_system.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+        if acq_ws_id is None:
+            return {
+                "message": "System 'Acquisitions' workspace not found",
+                "results": 0,
+                "data": [],
+            }
+
+        stmt = select(Dataset.instrument).where(Dataset.dataset_type == "ACQUISITION")
         result = await session.execute(stmt)
         existing_instruments = set(result.scalars().all())
 
@@ -138,6 +150,7 @@ async def create_acquisition_datasets() -> dict:
 
             new_dataset = Dataset(
                 dataset_id=gen_id(16),
+                workspace_id=acq_ws_id,
                 **dataset_data.model_dump(),
                 locked=1 if dataset_config.ACQUISITION_AUTO_LOCK else 0,
                 dataset_utc_created=datetime.now(timezone.utc),
@@ -226,9 +239,7 @@ async def delete_acquisition_datasets() -> dict:
         )
         deleted_instruments.append(ws.instrument)
 
-        await delete_dataset(
-            dataset_id=ws.dataset_id, independent_transaction=True
-        )
+        await delete_dataset(dataset_id=ws.dataset_id, independent_transaction=True)
 
     # --- Emit instrument deletion events ---
     for instrument in deleted_instruments:

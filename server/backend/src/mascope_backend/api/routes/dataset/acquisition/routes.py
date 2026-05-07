@@ -16,7 +16,10 @@ from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.dataset.acquisition.schemas import (
     GetAcquisitionDatasetQueryParams,
 )
-from mascope_backend.api.new.auth.dependencies import guest_user, owner_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import (
+    require_acquisition_workspace_role,
+)
 
 
 acquisition_datasets_router = APIRouter(
@@ -28,7 +31,8 @@ acquisition_datasets_router = APIRouter(
 @api_route(token_access=True)
 async def get_acquisition_dataset_route(
     query_params: GetAcquisitionDatasetQueryParams = Query(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("guest")),
 ):
     """Retrieve a list of datasets.
 
@@ -45,7 +49,10 @@ async def get_acquisition_dataset_route(
 
 @acquisition_datasets_router.post("")
 @api_route(status_code=201)
-async def create_acquisition_datasets_route(user=Depends(owner_user)):
+async def create_acquisition_datasets_route(
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("admin")),
+):
     """Auto-create missing acquisition datasets for all instruments.
 
     Creates acquisition datasets for instruments that don't have them yet.
@@ -54,18 +61,21 @@ async def create_acquisition_datasets_route(user=Depends(owner_user)):
     - Testing and development
     - Manual dataset creation when automatic creation fails
 
-    :param user: The current authenticated user with owner permissions.
-    :type user: User
+    :param membership: Workspace membership with admin role or higher.
+    :type membership: WorkspaceMember
     :return: A dictionary containing the summary of created datasets.
     :rtype: dict
-    :raises ForbiddenAccessException: If user doesn't have owner permissions.
+    :raises ForbiddenAccessException: If user doesn't have admin role in the Acquisitions workspace.
     """
     return await create_acquisition_datasets()
 
 
 @acquisition_datasets_router.delete("")
 @api_route()
-async def delete_acquisition_datasets_route(user=Depends(owner_user)):
+async def delete_acquisition_datasets_route(
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("admin")),
+):
     """Auto-delete orphaned acquisition datasets for instruments that no longer exist.
 
     Removes acquisition datasets for instruments that have no sample files.
@@ -79,10 +89,10 @@ async def delete_acquisition_datasets_route(user=Depends(owner_user)):
     - Does not affect datasets with valid existing instruments
     - Cannot accidentally delete datasets with data
 
-    :param user: The current authenticated user with owner permissions.
-    :type user: User
+    :param membership: Workspace membership with admin role or higher.
+    :type membership: WorkspaceMember
     :return: A dictionary containing the summary of deleted datasets.
     :rtype: dict
-    :raises ForbiddenAccessException: If user doesn't have owner permissions.
+    :raises ForbiddenAccessException: If user doesn't have admin role in the Acquisitions workspace.
     """
     return await delete_acquisition_datasets()

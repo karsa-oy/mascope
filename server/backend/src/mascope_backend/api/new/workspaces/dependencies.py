@@ -11,6 +11,7 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``require_dataset_query_role``: resolves ``dataset_id`` **query** param → workspace
 - ``require_batch_role``:      resolves ``sample_batch_id`` **path** param → workspace
 - ``require_sample_role``:       resolves ``sample_item_id`` **path** param → workspace
+- ``require_acquisition_workspace_role``: resolves system Acquisitions workspace
 
 **Explicit check functions** (call in route handler body):
 
@@ -34,6 +35,7 @@ from mascope_backend.db import (
     SampleBatch,
     SampleItem,
     User,
+    Workspace,
     WorkspaceMember,
     async_session,
 )
@@ -88,6 +90,18 @@ async def _get_workspace_id_from_sample(sample_item_id: str) -> str | None:
             .join(SampleBatch, SampleBatch.dataset_id == Dataset.dataset_id)
             .join(SampleItem, SampleItem.sample_batch_id == SampleBatch.sample_batch_id)
             .where(SampleItem.sample_item_id == sample_item_id)
+        )
+        return result.scalar_one_or_none()
+
+
+async def _get_acquisition_workspace_id() -> str | None:
+    """Resolve the system workspace that holds ACQUISITION datasets."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(Workspace.workspace_id).where(
+                Workspace.workspace_name == "Acquisitions",
+                Workspace.is_system.is_(True),
+            )
         )
         return result.scalar_one_or_none()
 
@@ -359,6 +373,24 @@ def require_sample_role(min_role: str):
         user: User = Depends(current_active_user),
     ) -> WorkspaceMember:
         workspace_id = await _get_workspace_id_from_sample(sample_item_id)
+        return await _enforce(workspace_id, user, min_level)
+
+    return dependency
+
+
+def require_acquisition_workspace_role(min_role: str):
+    """Enforce minimum workspace role on the system Acquisitions workspace.
+
+    Resolves the ``Acquisitions`` system workspace and checks the caller's
+    membership role.  Used by acquisition dataset endpoints that are not
+    scoped to a specific dataset or workspace path parameter.
+    """
+    min_level = _role_levels[min_role]
+
+    async def dependency(
+        user: User = Depends(current_active_user),
+    ) -> WorkspaceMember:
+        workspace_id = await _get_acquisition_workspace_id()
         return await _enforce(workspace_id, user, min_level)
 
     return dependency
