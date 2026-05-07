@@ -22,7 +22,12 @@ from mascope_backend.api.new.users.me.schemas import (
     UserUpdateMe,
     UserUpdateMeCredentials,
 )
-from mascope_backend.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_backend.api.new.users.schemas import (
+    UserCreate,
+    UserPublic,
+    UserRead,
+    UserUpdate,
+)
 from mascope_backend.api.new.users.user_manager.service import UserManager
 from mascope_backend.api.new.users.util import check_username_exists
 from mascope_backend.db import Role, User, Workspace, WorkspaceMember, async_session
@@ -37,6 +42,7 @@ async def get_users(
     limit: int | None = None,
     sort: str = "registered_at",
     order: str = "desc",
+    caller: User | None = None,
 ) -> dict:
     """
     Retrieves a paginated, sorted, and optionally filtered list of users.
@@ -53,6 +59,9 @@ async def get_users(
     :type sort: str
     :param order: Sort order, either 'asc' or 'desc', defaults to "desc".
     :type order: str
+    :param caller: The user making the request, used for access control. Admin and
+                   higher roles see full user details, defaults to None (public view).
+    :type caller: User | None
     :raises NotFoundException: If no users are found in the database.
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
@@ -99,11 +108,18 @@ async def get_users(
         result = await session.execute(query)
 
         # Step 5: Construct the response data
+        # Admins/owners see full user details; others get public-only fields
+        admin_level = auth_settings.ROLE_ACCESS_LEVELS["admin"]
+        schema = (
+            UserRead
+            if caller and (caller.is_superuser or caller.role_id >= admin_level)
+            else UserPublic
+        )
         users = []
         for user, role_name in result.all():
             user_data = user.to_dict()
             user_data["role_name"] = role_name
-            users.append(UserRead.model_validate(user_data))
+            users.append(schema.model_validate(user_data))
 
     return {
         "message": f"Retrieved {len(users)} user records.",

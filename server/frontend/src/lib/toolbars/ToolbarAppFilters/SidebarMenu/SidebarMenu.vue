@@ -10,7 +10,7 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
 
-import { DialogWorkspaceOp, DialogDatasetOp } from '@/lib/dialogs'
+import { DialogWorkspaceOp, DialogWorkspaceMembership, DialogDatasetOp } from '@/lib/dialogs'
 import { BatchContextMenu, useBatchContextMenu, useBatchTableConfig } from '@/lib/panes'
 
 import { useSidebarMenu } from './state.js'
@@ -28,6 +28,7 @@ const sidebarMenu = useSidebarMenu()
 const dialog = ref()
 const datasetDialog = ref()
 const workspaceContextMenu = ref()
+const workspaceMembersDialog = ref(false)
 const datasetContextMenu = ref()
 const batchContextMenu = useBatchContextMenu()
 const batchTable = useBatchTableConfig()
@@ -258,10 +259,10 @@ watchEffect(() => {
     appendTo="self"
     :model="[
       {
-        label: 'Create workspace',
-        icon: 'pi pi-plus',
+        label: 'Manage members',
+        icon: 'pi pi-users',
         command: () => {
-          dialog = 'create'
+          workspaceMembersDialog = true
         }
       },
       {
@@ -302,6 +303,10 @@ watchEffect(() => {
     ]"
   />
   <DialogDatasetOp v-model:action="datasetDialog" :dataset="app.data.dataset.focused" />
+  <DialogWorkspaceMembership
+    v-model:visible="workspaceMembersDialog"
+    :workspace="app.data.workspace.focused"
+  />
   <BatchContextMenu />
 </template>
 

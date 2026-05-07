@@ -23,6 +23,9 @@ async def get_users_route(
     """
     Retrieve a paginated list of all users.
 
+    Returns full user details for admins/owners, or reduced public
+    details for regular users.
+
     :param query_params: Query parameters for pagination and sorting.
     :type query_params: GetUsersQueryParams
     :param user: The current authenticated user.
@@ -30,7 +33,7 @@ async def get_users_route(
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
     """
-    return await get_users(**query_params.model_dump())
+    return await get_users(**query_params.model_dump(), caller=user)
 
 
 @users_router.get("/{user_id}")
