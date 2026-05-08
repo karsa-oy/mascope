@@ -103,7 +103,7 @@ function init() {
 }
 
 const invalid = computed(() =>
-  action.value == 'create' ? (info.name?.trim().length ?? 0) == 0 : false
+  action.value == 'create' || action.value == 'edit' ? (info.name?.trim().length ?? 0) == 0 : false
 )
 </script>
 

@@ -31,6 +31,13 @@ class WorkspaceCreate(BaseModel):
     workspace_name: str = Field(..., min_length=1, max_length=256)
     workspace_description: str | None = Field(None, max_length=4096)
 
+    @field_validator("workspace_name")
+    @classmethod
+    def validate_name(cls, v):
+        if not v.strip():
+            raise ValueError("workspace_name must not be blank")
+        return v.strip()
+
 
 class WorkspaceUpdate(BaseModel):
     """Request schema for updating a workspace."""
@@ -38,6 +45,13 @@ class WorkspaceUpdate(BaseModel):
     workspace_name: str | None = Field(None, min_length=1, max_length=256)
     workspace_description: str | None = Field(None, max_length=4096)
     workspace_status: str | None = Field(None, pattern="^(active|archived)$")
+
+    @field_validator("workspace_name")
+    @classmethod
+    def validate_name(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError("workspace_name must not be blank")
+        return v.strip() if v is not None else v
 
 
 class WorkspaceMemberRead(BaseModel):
