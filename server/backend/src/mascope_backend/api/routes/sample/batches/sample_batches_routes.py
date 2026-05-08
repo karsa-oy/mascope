@@ -28,8 +28,6 @@ from mascope_backend.api.models.sample.batches.sample_batch_pydantic_model impor
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import (
     current_active_user,
-    editor_user,
-    guest_user,
 )
 from mascope_backend.api.new.workspaces.dependencies import (
     check_batch_access_bulk,
@@ -51,7 +49,7 @@ sample_batches_router.include_router(sample_batches_export_router)
 @api_route(token_access=True)
 async def get_sample_batches_route(
     query_params: GetSampleBatchesQueryParams = Query(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
 ):
     """Retrieve a list of sample batches.
 
@@ -111,7 +109,7 @@ async def get_batch_targets_route(
 @api_route(status_code=201)
 async def create_sample_batch_route(
     body: SampleBatchCreate,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """Create a new sample batch.
 
@@ -130,7 +128,7 @@ async def create_sample_batch_route(
 @api_route()
 async def update_sample_batch_status_route(
     body: SampleBatchUpdateStatusBody,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """
     Update the status of multiple sample batches.

@@ -25,8 +25,6 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import (
     current_active_user,
-    editor_user,
-    guest_user,
 )
 from mascope_backend.api.new.workspaces.dependencies import (
     check_batch_access,
@@ -44,7 +42,7 @@ sample_items_router = APIRouter(prefix="/api/sample/items", tags=["Sample Items"
 @api_route()
 async def get_sample_items_route(
     query_params: GetSampleItemsQueryParams = Query(),
-    user=Depends(guest_user),  # pylint: disable=unused-argument
+    user=Depends(current_active_user),
 ):
     """Retrieve a list of sample items.
 
@@ -76,7 +74,7 @@ async def get_sample_item_route(
 @api_route(status_code=201)
 async def create_sample_item_route(
     sample_item: SampleItemCreate,
-    user=Depends(editor_user),  # pylint: disable=unused-argument
+    user=Depends(current_active_user),
 ):
     """Create a new sample item.
 
@@ -119,7 +117,7 @@ async def update_sample_item_route(
 @api_route()
 async def delete_sample_items_route(
     body: SampleItemsDeleteBody,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """Delete a specific sample items by IDs.
 
@@ -162,7 +160,7 @@ async def delete_sample_item_route(
 async def copy_sample_items_route(
     body: SampleItemsCopyBody,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """Copy an existing sample item to a new sample batch.
 
@@ -199,7 +197,7 @@ async def copy_sample_items_route(
 async def move_sample_items_route(
     body: SampleItemsMoveBody,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """Copy an existing sample item to a new sample batch.
 
@@ -239,7 +237,7 @@ async def move_sample_items_route(
 async def process_sample_item_route(
     sample_item: SampleItemCreate,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
 ):
     """Process a sample item, including creation and matching.
 
