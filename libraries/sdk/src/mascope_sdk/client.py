@@ -239,6 +239,11 @@ class MascopeClient:
         return self._workspace_id
 
     @property
+    def workspace_name(self) -> str:
+        """The resolved workspace name."""
+        return self._workspace_name
+
+    @property
     def workspaces(self) -> "WorkspacesResource":
         """Resource for workspace operations."""
         if self._workspaces is None:
