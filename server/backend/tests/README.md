@@ -67,6 +67,10 @@ Tests that verify Alembic migration scripts and their consistency with SQLAlchem
   - Example: A column type changes from `String(255)` to `String(500)` in the model, but no `alembic revision --autogenerate` was run. Drift test fails with the diff.
   - Focus: Models and migrations stay in sync; `revision --autogenerate` would produce an empty migration at any time.
   - Provided by [pytest-alembic](https://pytest-alembic.readthedocs.io/en/latest/quickstart.html#built-in-tests) (`test_model_definitions_match_ddl`).
+- **Single-head test**: Asserts the Alembic revision graph has exactly one head. Catches uncaught merge conflicts where two PRs add migrations off the same parent in parallel and produce a divergent history.
+  - Example: PR A and PR B both base their new migration on revision X and merge to develop in the same window. Result: two head revisions, `alembic upgrade head` fails at deployment.
+  - Focus: Linear migration graph integrity.
+  - Provided by `pytest-alembic` (`test_single_head_revision`).
 
 ## Directory Structure Overview 📂
 
@@ -129,8 +133,9 @@ server/backend/tests/
 │           └── test_high_concurrency.py  # Test with excessive concurrent requests
 ├── migrations/                    # Alembic migration tests
 │   ├── conftest.py                # Sync DB lifecycle, alembic_config fixtures
-│   ├── test_stairway.py           # Per-revision upgrade/downgrade/upgrade
 │   └── test_model_match.py        # ORM-vs-DDL drift detection (pytest-alembic)
+│   └── test_single_head.py        # Asserts exactly one head exists in the migration script dir
+│   ├── test_stairway.py           # Per-revision upgrade/downgrade/upgrade
 └── old/                           # Tests preserved for future refactoring
     ├── test_signal_processing_pipeline.py
     ├── test_peak_fitting.py
