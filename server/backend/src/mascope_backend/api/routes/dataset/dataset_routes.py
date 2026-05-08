@@ -99,6 +99,8 @@ async def update_dataset_route(
     :return: A dictionary containing the updated dataset details.
     :rtype: dict
     """
+    # Verify dataset belongs to this workspace before checking lock status
+    await get_dataset(dataset_id, workspace_id=workspace_id)
     # Check if locked dataset - only admins can update
     await locked_access(
         user,
@@ -157,6 +159,8 @@ async def delete_dataset_route(
     :return: A dictionary confirming deletion (if applicable).
     :rtype: dict or None
     """
+    # Verify dataset belongs to this workspace before checking lock status
+    await get_dataset(dataset_id, workspace_id=workspace_id)
     # Check if locked dataset - only admins can delete
     await locked_access(
         user,

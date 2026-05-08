@@ -301,10 +301,10 @@ async def copy_sample_batch_route(
     :return: A dictionary containing a message and process ID.
     :rtype: dict
     """
+    # Check ACL on destination dataset before checking lock status
+    await check_dataset_access(body.dataset_id, user, "editor")
     # Can't copy to locked dataset
     await locked_access(user, Dataset, body.dataset_id)
-    # Check ACL on destination dataset
-    await check_dataset_access(body.dataset_id, user, "editor")
 
     process_id = gen_id(8)
 
