@@ -6,8 +6,8 @@ the stairway test, `mascope_test_migrations_drift` for the drift test)
 and the matching Alembic `Config` / engine fixtures. Self-contained sync
 infrastructure — does not use the async machinery from the root conftest.
 
-See `tests/README.md` (Migration tests) for the rationale, lifecycle,
-and how this category interacts with `alembic/env.py`.
+See `server/backend/tests/README.md` (Migration tests) for the rationale,
+lifecycle, and how this category interacts with `alembic/env.py`.
 
 NOTE: For adding more pytest-alembic tests later:
     The drift DB is session-scoped. With only one pytest-alembic test

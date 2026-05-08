@@ -104,6 +104,7 @@ def run(
       mascope test run -m unit              # Run only unit tests\n
       mascope test run -n dataset_model     # Run a specific test by name\n
       mascope test run -m migrations        # Run only Alembic stairway tests\n
+      mascope test run -m migrations        # Run Alembic migration tests\n
     """
     # Default to backend if no components specified
     if not components:
@@ -425,7 +426,5 @@ def show():
     typer.echo("  mascope test run libraries -m file     # Run File library tests")
     typer.echo("  mascope test run libraries -m match    # Run Match library tests")
     typer.echo("  mascope test run libraries -m signal   # Run Signal library tests")
-    typer.echo("  mascope test run -n dataset_model    # Run specific test by name")
-    typer.echo(
-        "  mascope test run -m migrations         # Run only Alembic stairway tests"
-    )
+    typer.echo("  mascope test run -n dataset_model      # Run specific test by name")
+    typer.echo("  mascope test run -m migrations         # Run Alembic migration tests")
