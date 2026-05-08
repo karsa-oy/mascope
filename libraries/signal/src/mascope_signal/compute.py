@@ -588,6 +588,7 @@ def get_orbi_centroids_per_scan(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    scan_type: Literal["Ms", "Ms2"] | None = None,
 ) -> list:
     """
     Extract per-scan centroids from an Orbitrap raw file
@@ -600,6 +601,8 @@ def get_orbi_centroids_per_scan(
     :type t_max: float | None, optional
     :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
+    :param scan_type: Filter by scan type ('Ms' or 'Ms2'), optional, defaults to None (all scans).
+    :type scan_type: Literal['Ms', 'Ms2'] | None, optional
     :return: List of dictionaries with per-scan centroid data, each containing
             centroid masses, intensities, resolutions, signal-to-noise ratios, and timestamps.
     :rtype: list
@@ -609,7 +612,7 @@ def get_orbi_centroids_per_scan(
         case "orbi_raw":
             datafile_path = m_name.filename_to_datafile_path(base_filename)
             centroids_per_scan = m_thermo.get_centroids_per_scan(
-                datafile_path, t_min, t_max, polarity=polarity
+                datafile_path, t_min, t_max, polarity=polarity, scan_type=scan_type
             )
             props = m_io.read_props(base_filename)
             calibration = props["mz_calibration"]

@@ -606,6 +606,7 @@ def get_centroids_per_scan(
     mz_min: float | None = None,
     mz_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    scan_type: Literal["Ms", "Ms2"] | None = None,
 ) -> list[dict[str, np.ndarray]]:
     """Reads centroided peaks from a Thermo Fisher raw file within a specified time range and m/z range.
 
@@ -624,6 +625,8 @@ def get_centroids_per_scan(
     :type mz_max: float
     :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
     :type polarity: str
+    :param scan_type: Filter by scan type ('Ms' or 'Ms2'), optional, defaults to None (all scans)
+    :type scan_type: str
     :return: List of dictionaries, each containing per-scan centroid masses, intensities, resolutions,
               signal-to-noise ratios, and timestamps.
     :rtype: list[dict[str, np.ndarray]]
@@ -635,6 +638,7 @@ def get_centroids_per_scan(
             polarity=polarity,
             t_min=t_min,
             t_max=t_max,
+            ms_type=scan_type,
         )
 
         centroids = []
