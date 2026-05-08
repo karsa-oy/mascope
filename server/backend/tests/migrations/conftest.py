@@ -1,33 +1,20 @@
 """
-Test fixtures for the Alembic migrations test category (stairway test).
+Fixtures for the Alembic migrations test category.
 
-This conftest is intentionally self-contained and does NOT use the async
-machinery from the root conftest. Reasons:
+Provides two independent test databases (`mascope_test_migrations` for
+the stairway test, `mascope_test_migrations_drift` for the drift test)
+and the matching Alembic `Config` / engine fixtures. Self-contained sync
+infrastructure — does not use the async machinery from the root conftest.
 
-- Alembic is a sync API. `alembic.command.upgrade/downgrade` cannot be
-  called from async code without thread offloading, which adds nothing
-  here since these tests don't share fixtures with the application stack.
-- The migrations test does not need `patch_db` — it never touches
-  `ASYNC_SESSION_MAKER` or the application's DB session machinery. It
-  only exercises raw DDL via Alembic.
-- The schema must be built by Alembic (`alembic upgrade`), not
-  `Base.metadata.create_all` — the whole point is testing the migration
-  scripts, not the ORM models. So this category cannot share the test DB
-  lifecycle from `async_engine_factory`.
+See `tests/README.md` (Migration tests) for the rationale, lifecycle,
+and how this category interacts with `alembic/env.py`.
 
-Design:
-- One ephemeral database `mascope_test_migrations`, created fresh at
-  session start and dropped on teardown.
-- Sync `psycopg2` driver, matching `DatabaseConfig.get_postgres_url_sync`
-  and `db-init.sh`.
-- Alembic `Config` is built programmatically, pointed at the existing
-  `alembic.ini` for `script_location` and post_write_hooks settings, with
-  `sqlalchemy.url` overridden to the test database URL. The patched
-  `env.py._resolve_url()` honors this override.
-
-Credentials are resolved via `test_utils.get_test_password` and friends —
-the same helpers used by the root conftest, so dev/CI behavior is
-identical to the rest of the test suite.
+NOTE: For adding more pytest-alembic tests later:
+    The drift DB is session-scoped. With only one pytest-alembic test
+    (``test_model_definitions_match_ddl``) this is fine — the test is
+    idempotent. If more pytest-alembic tests are added that depend on
+    specific DB state, either reset the DB between them or move the
+    fixture to function scope.
 """
 
 import os
@@ -53,6 +40,7 @@ BACKEND_PATH = Path(os.environ["MASCOPE_PATH"]) / "server" / "backend"
 ALEMBIC_INI = BACKEND_PATH / "alembic.ini"
 
 STAIRWAY_DB_NAME = "mascope_test_migrations"
+DRIFT_DB_NAME = "mascope_test_migrations_drift"
 
 
 # --- URL builders (sync, psycopg2 — matches DatabaseConfig.get_postgres_url_sync) ---
@@ -147,3 +135,53 @@ def stairway_alembic_config(stairway_db_url: str) -> Config:
     cfg = Config(str(ALEMBIC_INI))
     cfg.set_main_option("sqlalchemy.url", stairway_db_url)
     return cfg
+
+
+# --- Drift test fixtures (pytest-alembic) ---
+
+
+@pytest.fixture(scope="session")
+def drift_db_url() -> Iterator[str]:
+    """Session-scoped: drop+create `mascope_test_migrations_drift`, drop on teardown.
+
+    Used by the pytest-alembic drift test. Separate from the stairway DB
+    so the two test files don't share state — `test_model_definitions_match_ddl`
+    expects to drive its own ``upgrade head`` against a known starting
+    point.
+    """
+    yield from _ephemeral_db(DRIFT_DB_NAME)
+
+
+@pytest.fixture
+def alembic_config(drift_db_url: str) -> dict:
+    """Override pytest-alembic's `alembic_config` to point at the drift DB.
+
+    Returns a dict consumed by pytest-alembic to build its internal
+    `alembic.config.Config`. The `file` key tells pytest-alembic to load
+    our `alembic.ini` (for `script_location`, post_write_hooks, etc.);
+    `sqlalchemy.url` overrides the URL so the patched `env.py._resolve_url()`
+    targets the drift test DB.
+
+    See pytest-alembic docs for the dict-based config form:
+    https://pytest-alembic.readthedocs.io/en/latest/api.html
+    """
+    return {
+        "file": str(ALEMBIC_INI),
+        "sqlalchemy.url": drift_db_url,
+    }
+
+
+@pytest.fixture
+def alembic_engine(drift_db_url: str) -> Iterator[Engine]:
+    """Override pytest-alembic's `alembic_engine` with a sync engine on the drift DB.
+
+    pytest-alembic uses this engine for schema introspection during
+    `compare_metadata`. The URL must match the one used by `alembic_config`
+    above — otherwise migration commands and introspection would target
+    different databases.
+    """
+    engine = create_engine(drift_db_url, poolclass=NullPool)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
