@@ -116,6 +116,14 @@ def run(
             TestModule.MASCOPE_THERMO,
         ):
             components = [TestComponent.LIBRARIES]
+        elif module in (
+            TestModule.UNIT,
+            TestModule.INTEGRATION,
+            TestModule.SYSTEM,
+            TestModule.MIGRATIONS,
+        ):
+            # Backend-specific module — don't run libraries by default.
+            components = [TestComponent.BACKEND]
         else:
             components = [TestComponent.BACKEND, TestComponent.LIBRARIES]
 
