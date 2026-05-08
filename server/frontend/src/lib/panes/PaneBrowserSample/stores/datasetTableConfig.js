@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { FilterMatchMode } from '@primevue/core/api'
@@ -19,8 +19,6 @@ export const useDatasetTableConfig = defineStore('browser.sample.datasetTable', 
       global: { value: null, matchMode: FilterMatchMode.CONTAINS }
     }
   }
-
-  const isDefault = computed(() => JSON.stringify(config.value) === JSON.stringify(defaultConfig))
 
   function resetConfig() {
     config.value = structuredClone(defaultConfig)
