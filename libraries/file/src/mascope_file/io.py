@@ -1,3 +1,5 @@
+"""Storage/zarr I/O infrastructure (locks, synchronizers, load/save arrays)"""
+
 import asyncio
 import fnmatch
 import glob

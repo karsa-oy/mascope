@@ -78,7 +78,9 @@ class RawFileManager:
 
 
 class ScanSelector:
-    """Class to select scans and their indices based on polarity, time range, and scan type filters."""
+    """Class to select scans and their indices based on polarity,
+    time range, and scan type filters.
+    """
 
     def __init__(
         self,
@@ -111,7 +113,8 @@ class ScanSelector:
         """Creates a boolean mask for the specified polarity."""
         if self._polarity not in ["-", "+"]:
             raise PolarityError(
-                f"Invalid polarity '{self._polarity}' provided. Polarity must be '+' or '-'."
+                f"Invalid polarity '{self._polarity}' provided. "
+                "Polarity must be '+' or '-'."
             )
         polarity_verbose = "Negative" if self._polarity == "-" else "Positive"
         return np.array(
@@ -154,7 +157,8 @@ class ScanSelector:
         """Creates a boolean mask for the specified MS scan type."""
         if self._ms_type not in ["Ms", "Ms2"]:
             raise ScanTypeError(
-                f"Invalid scan type '{self._ms_type}' provided. MS scan type must be 'Ms' or 'Ms2'."
+                f"Invalid scan type '{self._ms_type}' provided. "
+                "MS scan type must be 'Ms' or 'Ms2'."
             )
         return np.array(
             [
@@ -165,7 +169,8 @@ class ScanSelector:
 
     @property
     def scan_indices_1based(self) -> list[int]:
-        """Returns the list of scan indices that match the specified polarity, time range, and scan type.
+        """Returns the list of scan indices that match the specified polarity,
+        time range, and scan type.
         The scans are 1-based indexed, as per the Thermo library convention.
         """
         mask = np.ones(len(self.all_scan_indices), dtype=bool)
@@ -184,7 +189,9 @@ class ScanSelector:
         if len(filtered_indices) == 0:
             raise NoScansFoundError(
                 "No scans found matching the specified filters: "
-                f"polarity='{self._polarity}', time_range=({self._t_min}, {self._t_max}), ms_type='{self._ms_type}'"
+                f"polarity='{self._polarity}', "
+                f"time_range=({self._t_min}, {self._t_max}), "
+                f"ms_type='{self._ms_type}'"
             )
 
         return filtered_indices.tolist()
@@ -196,7 +203,8 @@ class ScanSelector:
 
     @property
     def scan_indices_dotnet(self) -> List[int]:
-        """Returns the list of scan indices as a .NET List[int] for use with Thermo library functions."""
+        """Returns the list of scan indices as a .NET List[int] for use with
+        Thermo library functions."""
         net_list = List[int]()
         for index in self.scan_indices_1based:
             net_list.Add(index)
@@ -223,7 +231,8 @@ def get_polarity_options(datafile_path: str) -> str:
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :return: "-" if only negative polarities are present, "+" if only positive, "+-" if both are present.
+    :return: "-" if only negative polarities are present, "+" if only positive, "+-" if
+            both are present.
     :rtype: str
     """
     with RawFileManager(datafile_path) as RawFile:
@@ -254,8 +263,9 @@ def get_signal(
     mz_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> xr.Dataset:
-    """This function uses the Thermo Fisher libraries to read the raw file and extract the scan data.
-    It then merges the scans to have a common m/z scale and converts the data to an xarray Dataset.
+    """This function uses the Thermo Fisher libraries to read the raw file and extract
+    the scan data. It then merges the scans to have a common m/z scale and converts
+    the data to an xarray Dataset.
     Allows slicing by time and m/z range.
 
     t_min=None is equal to min scan time, t_max=None is equal to max scan time.
@@ -271,7 +281,8 @@ def get_signal(
     :type mz_min: float
     :param mz_max: Maximum m/z, optional, defaults to None
     :type mz_max: float
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional,
+                    defaults to None
     :type polarity: str
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
@@ -329,8 +340,8 @@ def compute_sum_signal(
     ppm: int = 1,
     polarity: Literal["+", "-"] | None = None,
 ) -> tuple[xr.DataArray, int]:
-    """Computes sum signal in (t_min, t_max) time range, binning counts within "ppm" value.
-    Polarity filter may be optionally provided.
+    """Computes sum signal, binning counts within ``ppm`` value.
+    Polarity and time filters may be optionally provided.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
@@ -338,14 +349,17 @@ def compute_sum_signal(
     :type t_min: float, optional
     :param t_max: End time [s]
     :type t_max: float, optional
-    :param ppm: ppm precision for binning, defaults to 1. This value determines the mass tolerance for grouping m/z values,
-                where a smaller ppm value results in finer binning and higher precision.
+    :param ppm: ppm precision for binning, defaults to 1. This value determines the mass
+                tolerance for grouping m/z values, where a smaller ppm value results in
+                finer binning and higher precision.
     :type ppm: int, optional
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :param polarity: + or -, Polarity of the scans to be retrieved, optional,
+                    defaults to None
     :type polarity: str, optional
-    :raises ValueError: If the specified time range is invalid, or if no data is found in the specified filters,
-                        or the specified polarity is not found in the raw file.
-    :return: An xarray DataArray containing the sum signal and the number of combined scans
+    :raises ValueError: If the specified time range is invalid, or if no data is found
+                        in the specified filters, or the specified polarity is not found
+                        in the raw file.
+    :return: The sum signal and the number of combined scans
     :rtype: tuple[xr.DataArray, float]
     """
     with RawFileManager(datafile_path) as RawFile:
@@ -354,7 +368,8 @@ def compute_sum_signal(
 
         scan_selector = ScanSelector(RawFile, polarity, t_min, t_max)
         runtime.logger.debug(
-            f"Selected {len(scan_selector.scan_indices_1based)} scans for sum signal computation. "
+            f"Selected {len(scan_selector.scan_indices_1based)} scans "
+            "for sum signal computation. "
             f"Polarity: {polarity}, binning ppm: {ppm}."
         )
         average_scan = Extensions.AverageScans(
@@ -362,7 +377,8 @@ def compute_sum_signal(
         )
         averaged_spec = average_scan.SegmentedScan
 
-        # Extract averaged signal, multiply by number of combined scans to restore sum signal
+        # Extract averaged signal, multiply by number of combined scans
+        # to restore sum signal.
         num_of_combined_scans = average_scan.ScansCombined
         mz = np.frombuffer(averaged_spec.Positions)
         sum_signal = np.frombuffer(averaged_spec.Intensities) * num_of_combined_scans
@@ -382,13 +398,16 @@ def get_tic_per_scan(
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Allows filtering by timestamps and polarity.
-    If timestamps are provided, the function will return the TIC values for the closest scan to each timestamp.
+    If timestamps are provided, the function will return the TIC
+    values for the closest scan to each timestamp.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param timestamps: Optional iterable of timestamps [s] to extract TIC values for, defaults to None
+    :param timestamps: Optional iterable of timestamps [s] to
+                       extract TIC values for, defaults to None
     :type timestamps: Iterable[float], optional
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :param polarity: + or -, Polarity of the scans to be retrieved,
+                     optional, defaults to None
     :type polarity: str, optional
     :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
     :rtype: tuple
@@ -432,7 +451,8 @@ def get_scan_timestamps(
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
 ) -> np.ndarray:
-    """Extracts the scan timestamps [s] from the raw file, with optional polarity and time filtering.
+    """Extracts the scan timestamps [s] from the raw file,
+    with optional polarity and time filtering.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
@@ -440,7 +460,8 @@ def get_scan_timestamps(
     :type t_min: float
     :param t_max: Maximum time [s], optional, defaults to None
     :type t_max: float
-    :param polarity: Polarity of the scans to be retrieved, either '+' or '-', optional, defaults to None
+    :param polarity: Polarity of the scans to be retrieved,
+                     either '+' or '-', optional, defaults to None
     :type polarity: str
     :return: Array of filtered scan timestamps [s]
     :rtype: np.ndarray
@@ -459,7 +480,8 @@ def get_peak_timeseries(
     polarity: Literal["+", "-"] | None = None,
     ppm: float = 5,
 ) -> xr.DataArray:
-    """Extracts the peak timeseries for the specified m/z values in the time range (t_min, t_max).
+    """Extracts the peak timeseries for the specified m/z values
+    in the time range (t_min, t_max).
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
@@ -469,7 +491,8 @@ def get_peak_timeseries(
     :type t_min: float
     :param t_max: End time [s], optional, defaults to None
     :type t_max: float
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :param polarity: + or -, Polarity of the scans to be retrieved,
+                     optional, defaults to None
     :type polarity: str
     :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 5.
     :type ppm: float, optional
@@ -608,7 +631,8 @@ def get_centroids_per_scan(
     polarity: Literal["+", "-"] | None = None,
     scan_type: Literal["Ms", "Ms2"] | None = None,
 ) -> list[dict[str, np.ndarray]]:
-    """Reads centroided peaks from a Thermo Fisher raw file within a specified time range and m/z range.
+    """Reads centroided peaks from a Thermo Fisher raw file
+    within a specified time range and m/z range.
 
     t_min=None is equal to min scan time, t_max=None is equal to max scan time.
     mz_min=None is equal to min m/z, mz_max=None is equal to max m/z.
@@ -623,12 +647,15 @@ def get_centroids_per_scan(
     :type mz_min: float
     :param mz_max: Maximum m/z, optional, defaults to None
     :type mz_max: float
-    :param polarity: + or -, Polarity of the scans to be retrieved, optional, defaults to None
+    :param polarity: + or -, Polarity of the scans to be retrieved,
+                     optional, defaults to None
     :type polarity: str
-    :param scan_type: Filter by scan type ('Ms' or 'Ms2'), optional, defaults to None (all scans)
+    :param scan_type: Filter by scan type ('Ms' or 'Ms2'),
+                      optional, defaults to None (all scans)
     :type scan_type: str
-    :return: List of dictionaries, each containing per-scan centroid masses, intensities, resolutions,
-              signal-to-noise ratios, and timestamps.
+    :return: List of dictionaries, each containing per-scan
+             centroid masses, intensities, resolutions,
+             signal-to-noise ratios, and timestamps.
     :rtype: list[dict[str, np.ndarray]]
     """
     with RawFileManager(datafile_path) as RawFile:
@@ -896,8 +923,8 @@ class RawFileMetadataLegacy(RawFileMetadata):
     def to_dict(self):
         """Convert the metadata to a dictionary.
 
-        The dictionary contains the number of scans, statistics per scan, and statistics per file.
-        The statistics per scan and per file are represented as dictionaries.
+        The dictionary contains the number of scans, statistics per scan, and statistics
+        per file. The statistics per scan and per file are represented as dictionaries.
         """
         # Concat scan-related data into a single dataframe
         per_scan_df = pd.concat([self.statistics, self.trailer], axis=0)
