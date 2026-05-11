@@ -79,6 +79,8 @@ def get_scan_timestamps(
                     time_array = time_array[time_array <= t_max + epsilon]
 
             return time_array
+        case _:
+            raise NotImplementedError(f"Unsupported sample type: {sample_type}")
 
 
 def _get_averaging_factor(
@@ -431,6 +433,8 @@ def load_signal(
                 """
                     )
                 return signal_ds_sliced.chunk(dict(mz=-1))
+            case _:
+                raise NotImplementedError(f"Unsupported sample type: {sample_type}")
     except Exception as e:
         runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
@@ -777,9 +781,11 @@ async def get_peak_timeseries(
             signal = signal.fillna(0)
             # Extract the peak timeseries for the closest m/z values
             return signal.sel(mz=mzs, method="nearest").signal
+        case _:
+            raise NotImplementedError(f"Unsupported sample type: {sample_type}")
 
 
-def get_polarity_options(base_filename: str) -> str:
+def get_polarity_options(base_filename: str) -> str | None:
     """Reads the polarities present in a sample file.
 
     :param base_filename: Sample file filename
@@ -803,6 +809,8 @@ def get_polarity_options(base_filename: str) -> str:
             else:
                 # If polarity is not specified, return None (get all scans)
                 return None
+        case _:
+            raise NotImplementedError(f"Unsupported sample type: {sample_type}")
 
 
 def get_metadata(
