@@ -134,7 +134,7 @@ watchEffect(() => {
     <template v-if="app.data.dataset.focused">
       <span class="pi ph ph-caret-right" style="opacity: 0.5" />
       <Button
-        icon="pi ph ph-folders"
+        icon="pi ph ph-folder-open"
         :label="app.data.dataset.focused?.dataset_name"
         v-tooltip.bottom="
           `${app.data.dataset.focused?.dataset_description ?? 'No description'}

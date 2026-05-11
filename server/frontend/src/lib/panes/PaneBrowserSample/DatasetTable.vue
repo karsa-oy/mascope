@@ -130,13 +130,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       <Column header="Dataset" field="dataset_name" sortable>
         <template #body="{ data }">
           <div class="row" style="justify-content: flex-start">
-            <span
-              :class="[
-                'pi', 'ph',
-                data.dataset_type === 'ANALYSIS' ? 'ph-folder' : 'ph-microscope'
-              ]"
-              style="opacity: 0.4"
-            />
+            <span :class="'pi ph ph-folder'" style="opacity: 0.4" />
             <BaseCopyableField
               :field="data.dataset_name"
               v-tooltip="{ value: data.dataset_description, showDelay: 1000 }"
