@@ -436,9 +436,7 @@ const datasetBatchSelection = computed({
   get() {
     if (!selected.dataset) return []
     // Filter global selection to only show batches from current dataset
-    return batches.selected.filter(
-      (batch) => batch.dataset_id === selected.dataset.dataset_id
-    )
+    return batches.selected.filter((batch) => batch.dataset_id === selected.dataset.dataset_id)
   },
   set(newSelection) {
     if (!selected.dataset) return
@@ -516,6 +514,14 @@ async function init(mode) {
       info.desc = ''
       info.type = 'TARGETS'
       selected.dataset = app.data.dataset.focused
+
+      const focusedBatch = app.data.batch.focused
+      if (
+        focusedBatch &&
+        getAllowedBatchTypes(info.type).includes(focusedBatch.sample_batch_type)
+      ) {
+        batches.selected = [clone(focusedBatch)]
+      }
       break
     }
     case 'update_batches': {
