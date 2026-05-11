@@ -226,6 +226,20 @@ class ScanSelector:
         """Returns the scan objects for the filtered scan indices."""
         return tuple(Extensions.GetScans(self._RawFile, self.scan_indices_dotnet))
 
+    @property
+    def scan_filters(self) -> tuple:
+        """Returns the scan filters for the filtered scan indices."""
+        return tuple(
+            self._RawFile.GetFilterForScanNumber(i) for i in self.scan_indices_1based
+        )
+
+    @property
+    def scan_stats(self) -> tuple:
+        """Returns the scan stats for the filtered scan indices."""
+        return tuple(
+            self._RawFile.GetScanStatsForScanNumber(i) for i in self.scan_indices_1based
+        )
+
 
 def get_polarity_options(datafile_path: str) -> str:
     """Reads the polarities present in a raw file.
