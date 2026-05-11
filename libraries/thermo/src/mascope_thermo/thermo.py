@@ -2,6 +2,7 @@
 This module provides functions to read and process Thermo Fisher raw files.
 """
 
+import re
 from typing import Iterable, Literal
 
 import dask.array as da
@@ -545,6 +546,70 @@ def get_peak_timeseries(
         )
 
 
+def _average_scans_centroids(
+    RawFile: RawFileReaderAdapter,
+    scan_indices_1based: list[int],
+    ppm: int = 1,
+    average: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Average scans and extract centroid data.
+
+    A helper that averages the given scans using Thermo's
+    ppm-based binning and returns the centroided peaks. Does not perform
+    file I/O or scan selection - the caller is responsible for providing an
+    already-open RawFile and the desired scan indices.
+
+    :param RawFile: An already-open RawFileReaderAdapter instance.
+    :type RawFile: RawFileReaderAdapter
+    :param scan_indices_1based: 1-based scan indices to average.
+    :type scan_indices_1based: list[int]
+    :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 1.
+    :type ppm: int, optional
+    :param average: If True, return averaged intensities; if False,
+                    scale by number of scans.
+    :type average: bool, optional
+    :return: Tuple of (masses, intensities, resolutions, signal_to_noise) arrays.
+    :rtype: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    """
+    if ppm <= 0:
+        raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
+
+    dotnet_indices = List[int]()
+    for index in scan_indices_1based:
+        dotnet_indices.Add(index)
+
+    mass_option = MassOptions(ppm, ToleranceUnits.ppm)
+    average_scan = Extensions.AverageScans(RawFile, dotnet_indices, mass_option)
+    averaged_centroids = average_scan.CentroidScan.GetLabelPeaks()
+    n_centroids = len(averaged_centroids)
+
+    masses = np.fromiter(
+        (c.Mass for c in averaged_centroids),
+        dtype=np.float64,
+        count=n_centroids,
+    )
+    intensities = np.fromiter(
+        (c.Intensity for c in averaged_centroids),
+        dtype=np.float64,
+        count=n_centroids,
+    )
+    resolutions = np.fromiter(
+        (c.Resolution for c in averaged_centroids),
+        dtype=np.float64,
+        count=n_centroids,
+    )
+    signal_to_noise = np.fromiter(
+        (c.SignalToNoise for c in averaged_centroids),
+        dtype=np.float64,
+        count=n_centroids,
+    )
+
+    if not average:
+        intensities *= average_scan.ScansCombined
+
+    return masses, intensities, resolutions, signal_to_noise
+
+
 def get_centroids(
     datafile_path: str,
     t_min: float | None = None,
@@ -554,29 +619,35 @@ def get_centroids(
     polarity: Literal["+", "-"] | None = None,
 ) -> tuple:
     """
-    Extract centroided peaks from a Thermo Fisher raw file within a specified time range and for specified m/z values.
+    Extract centroided peaks from a Thermo Fisher raw file
+    within a specified time range and for specified m/z values.
 
-    This function reads the centroided spectrum by averaging scans in the given time window and (optionally) polarity.
-    The function returns the filtered centroid m/z values, their intensities, and resolutions.
+    This function reads the centroided spectrum by averaging
+    scans in the given time window and optionally filtering
+    by polarity. The function returns the filtered centroid
+    m/z values, their intensities, and resolutions.
 
     :param datafile_path: Path to the Thermo Fisher raw file (.raw) containing the data.
     :type datafile_path: str
-    :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
+    :param t_min: Minimum time [s] for scan selection,
+                  optional, defaults to None (start of run).
     :type t_min: float | None, optional
-    :param t_max: Maximum time [s] for scan selection, optional, defaults to None (end of run).
+    :param t_max: Maximum time [s] for scan selection,
+                  optional, defaults to None (end of run).
     :type t_max: float | None, optional
-    :param average: If True, return averaged intensities; if False, scale intensities by number of scans.
+    :param average: If True, return averaged intensities; if False,
+                    scale intensities by number of scans.
     :type average: bool, optional
     :param ppm: Mass tolerance in parts-per-million for centroid binning, defaults to 1.
     :type ppm: int, optional
-    :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
+    :param polarity: Polarity of scans to use ('+' or '-'),
+                     optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
-    :return: Tuple of (masses, intensities, resolutions, signal-to-noise ratios) for centroid peaks matching the criteria.
+    :return: Tuple of (masses, intensities, resolutions,
+             signal-to-noise ratios) for centroid peaks matching
+             the criteria.
     :rtype: tuple of np.ndarray
     """
-    if ppm <= 0:
-        raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
-
     with RawFileManager(datafile_path) as RawFile:
         scan_selector = ScanSelector(
             RawFile,
@@ -584,42 +655,9 @@ def get_centroids(
             t_min=t_min,
             t_max=t_max,
         )
-        # Setup mz tolerance - counts within ppm are binned
-        mass_option = MassOptions(ppm, ToleranceUnits.ppm)
-
-        # Get averaged spectrum in time range (t_max, t_max)
-        average_scan = Extensions.AverageScans(
-            RawFile, scan_selector.scan_indices_dotnet, mass_option
+        return _average_scans_centroids(
+            RawFile, scan_selector.scan_indices_1based, ppm=ppm, average=average
         )
-        averaged_centroids = average_scan.CentroidScan.GetLabelPeaks()
-        n_centroids = len(averaged_centroids)
-
-        masses = np.fromiter(
-            (c.Mass for c in averaged_centroids),
-            dtype=np.float64,
-            count=n_centroids,
-        )
-        intensities = np.fromiter(
-            (c.Intensity for c in averaged_centroids),
-            dtype=np.float64,
-            count=n_centroids,
-        )
-        resolutions = np.fromiter(
-            (c.Resolution for c in averaged_centroids),
-            dtype=np.float64,
-            count=n_centroids,
-        )
-        signal_to_noise = np.fromiter(
-            (c.SignalToNoise for c in averaged_centroids),
-            dtype=np.float64,
-            count=n_centroids,
-        )
-
-        if not average:
-            # Multiply by number of averaged scans
-            intensities *= average_scan.ScansCombined
-
-        return masses, intensities, resolutions, signal_to_noise
 
 
 def get_centroids_per_scan(
@@ -719,6 +757,122 @@ def get_centroids_per_scan(
             )
 
         return centroids
+
+
+def _group_ms2_scans_by_parent(
+    scan_selector: ScanSelector,
+    parent_peak_tolerance: float = 0.001,
+) -> dict[float, list[int]]:
+    """Group MS2 scans by their parent peak m/z.
+
+    Parses each MS2 scan filter to extract the precursor m/z, clusters
+    near-duplicate values within tolerance, and returns a mapping of
+    canonical parent peak m/z to 1-based scan indices.
+
+    :param scan_selector: A ScanSelector already filtered for MS2 scans.
+    :type scan_selector: ScanSelector
+    :param parent_peak_tolerance: Tolerance in Da for merging
+                                  near-duplicate parent peaks.
+    :type parent_peak_tolerance: float
+    :return: Mapping of canonical parent peak m/z to list of 1-based scan indices.
+    :rtype: dict[float, list[int]]
+    """
+    scan_parent_peaks: list[tuple[int, float]] = []
+    for scan_idx, scan_filter in zip(
+        scan_selector.scan_indices_1based, scan_selector.raw_scan_filters
+    ):
+        match = re.search(r"ms2 ([\d.]+)@", scan_filter.ToString())
+        if match:
+            scan_parent_peaks.append((scan_idx, float(match.group(1))))
+
+    if not scan_parent_peaks:
+        return {}
+
+    raw_parent_peaks = np.array([pp for _, pp in scan_parent_peaks])
+    sorted_unique = np.sort(np.unique(raw_parent_peaks))
+
+    clusters: list[list[float]] = []
+    for value in sorted_unique:
+        if clusters and (value - clusters[-1][-1]) <= parent_peak_tolerance:
+            clusters[-1].append(value)
+        else:
+            clusters.append([value])
+
+    clustered_parent_peaks = [round(float(np.median(c)), 4) for c in clusters]
+
+    parent_peak_mapping: dict[float, list[int]] = {
+        pp: [] for pp in clustered_parent_peaks
+    }
+    for scan_idx, raw_pp in scan_parent_peaks:
+        for clustered_pp in clustered_parent_peaks:
+            if abs(raw_pp - clustered_pp) <= parent_peak_tolerance:
+                parent_peak_mapping[clustered_pp].append(scan_idx)
+                break
+
+    return parent_peak_mapping
+
+
+def get_ms2_centroids_by_parent(
+    datafile_path: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    parent_peak_tolerance: float = 0.001,
+    ppm: int = 1,
+    average: bool = True,
+) -> dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    """Extract averaged centroids for each parent peak in an MS2 raw file.
+
+    Opens the raw file once, groups MS2 scans by parent peak, and averages
+    each group using Thermo's native ppm-based binning.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw).
+    :type datafile_path: str
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
+    :type parent_peak_tolerance: float
+    :param ppm: Mass tolerance in ppm for centroid binning, defaults to 1.
+    :type ppm: int, optional
+    :param average: If True, return averaged intensities; if False,
+                    scale by scan count.
+    :type average: bool, optional
+    :return: Mapping of parent peak m/z to
+             (masses, intensities, resolutions, signal_to_noise).
+    :rtype: dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
+    """
+    with RawFileManager(datafile_path) as RawFile:
+        scan_selector = ScanSelector(
+            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
+        )
+
+        parent_peak_mapping = _group_ms2_scans_by_parent(
+            scan_selector, parent_peak_tolerance
+        )
+        if not parent_peak_mapping:
+            return {}
+
+        centroid_mapping: dict[
+            float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        ] = {}
+        for pp, scan_indices in parent_peak_mapping.items():
+            if not scan_indices:
+                centroid_mapping[pp] = (
+                    np.array([], dtype=np.float64),
+                    np.array([], dtype=np.float64),
+                    np.array([], dtype=np.float64),
+                    np.array([], dtype=np.float64),
+                )
+                continue
+            centroid_mapping[pp] = _average_scans_centroids(
+                RawFile, scan_indices, ppm=ppm, average=average
+            )
+
+        return centroid_mapping
 
 
 class RawFileMetadata:
