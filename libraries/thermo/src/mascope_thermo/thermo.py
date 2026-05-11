@@ -793,7 +793,7 @@ def _group_ms2_scans_by_parent(
     """
     scan_parent_peaks: list[tuple[int, float]] = []
     for scan_idx, scan_filter in zip(
-        scan_selector.scan_indices_1based, scan_selector.raw_scan_filters
+        scan_selector.scan_indices_1based, scan_selector.scan_filters, strict=True
     ):
         match = re.search(r"ms2 ([\d.]+)@", scan_filter.ToString())
         if match:
