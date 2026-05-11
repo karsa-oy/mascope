@@ -1,8 +1,20 @@
 import { io } from 'socket.io-client'
+import { Encoder, Decoder } from 'socket.io-parser'
 
 import { useApp } from '@/stores'
 import { runtime } from '@/lib/runtime.js'
 import { ref } from 'vue'
+
+// Custom parser to increase maxAttachments limit (default 10 in socket.io-parser 4.2.6+).
+// Visualization events send binary numpy arrays for each trace (x + y), easily exceeding 10.
+const parser = {
+  Encoder,
+  Decoder: class extends Decoder {
+    constructor() {
+      super({ maxAttachments: 200 })
+    }
+  }
+}
 
 const host = location.hostname
 
@@ -11,7 +23,8 @@ export async function initSocket() {
   const url = runtime.mode === 'prod' ? `https://${host}` : `ws://${host}:${runtime.meta.api_port}`
   const socket = io(url, {
     withCredentials: true, // Enables cookie sending
-    transports: ['websocket']
+    transports: ['websocket'],
+    parser
   })
   const activeSubscriptions = new Set()
   const socketConnected = ref(false)
