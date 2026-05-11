@@ -24,7 +24,7 @@ import pytest
 import pytest_asyncio
 from test_utils import gen_test_id
 
-from mascope_backend.db import IonizationMechanism, TargetCompound, Dataset
+from mascope_backend.db import Dataset, IonizationMechanism, TargetCompound
 
 
 # Stable IDs for session-scoped dataset fixtures that are referenced

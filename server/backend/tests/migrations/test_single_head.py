@@ -10,4 +10,7 @@ Re-exports pytest-alembic's `test_single_head_revision`. See
 `server/backend/tests/README.md` (Migration tests) for the broader category context.
 """
 
-from pytest_alembic.tests import test_single_head_revision  # noqa: F401
+from pytest_alembic.tests import test_single_head_revision
+
+
+__all__ = ["test_single_head_revision"]

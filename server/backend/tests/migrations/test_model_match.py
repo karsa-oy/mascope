@@ -14,4 +14,7 @@ Re-exports pytest-alembic's `test_model_definitions_match_ddl`. See
 to the stairway test.
 """
 
-from pytest_alembic.tests import test_model_definitions_match_ddl  # noqa: F401
+from pytest_alembic.tests import test_model_definitions_match_ddl
+
+
+__all__ = ["test_model_definitions_match_ddl"]
