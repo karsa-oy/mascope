@@ -27,9 +27,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 from test_utils import (
-    get_test_db_host,
-    get_test_db_port,
-    get_test_db_user,
+    TEST_DB_HOST,
+    TEST_DB_PORT,
+    TEST_DB_USER,
     get_test_password,
 )
 
@@ -53,8 +53,8 @@ def _sync_url(db_name: str) -> str:
     so the test exercises the same driver as dev/prod migrations.
     """
     return (
-        f"postgresql+psycopg2://{get_test_db_user()}:{get_test_password()}"
-        f"@{get_test_db_host()}:{get_test_db_port()}/{db_name}"
+        f"postgresql+psycopg2://{TEST_DB_USER}:{get_test_password()}"
+        f"@{TEST_DB_HOST}:{TEST_DB_PORT}/{db_name}"
     )
 
 

@@ -32,9 +32,9 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from test_utils import (
-    get_test_db_host,
-    get_test_db_port,
-    get_test_db_user,
+    TEST_DB_HOST,
+    TEST_DB_PORT,
+    TEST_DB_USER,
     get_test_password,
 )
 
@@ -53,8 +53,8 @@ def _get_test_db_url(db_name: str) -> str:
     :rtype: str
     """
     return (
-        f"postgresql+asyncpg://{get_test_db_user()}:{get_test_password()}"
-        f"@{get_test_db_host()}:{get_test_db_port()}/{db_name}"
+        f"postgresql+asyncpg://{TEST_DB_USER}:{get_test_password()}"
+        f"@{TEST_DB_HOST}:{TEST_DB_PORT}/{db_name}"
     )
 
 
@@ -65,8 +65,8 @@ def _get_admin_url() -> str:
     :rtype: str
     """
     return (
-        f"postgresql+asyncpg://{get_test_db_user()}:{get_test_password()}"
-        f"@{get_test_db_host()}:{get_test_db_port()}/postgres"
+        f"postgresql+asyncpg://{TEST_DB_USER}:{get_test_password()}"
+        f"@{TEST_DB_HOST}:{TEST_DB_PORT}/postgres"
     )
 
 
@@ -88,15 +88,11 @@ def _check_postgres_available() -> None:
     except RuntimeError:
         return  # can't resolve credentials, let the fixture fail with its own error
 
-    host = get_test_db_host()
-    port = int(get_test_db_port())
-    user = get_test_db_user()
-
     try:
         conn = psycopg2.connect(
-            host=host,
-            port=port,
-            user=user,
+            host=TEST_DB_HOST,
+            port=int(TEST_DB_PORT),
+            user=TEST_DB_USER,
             password=password,
             database="postgres",
             connect_timeout=3,
@@ -104,7 +100,7 @@ def _check_postgres_available() -> None:
         conn.close()
     except psycopg2.OperationalError:
         raise RuntimeError(
-            f"\n\nCannot connect to PostgreSQL at {host}:{port}.\n"
+            f"\n\nCannot connect to PostgreSQL at {TEST_DB_HOST}:{TEST_DB_PORT}.\n"
             "Run 'mascope dev up' before running tests locally.\n"
         )
 
