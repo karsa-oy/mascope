@@ -885,6 +885,7 @@ class RawFileMetadata:
         t_max: float | None = None,
         polarity: Literal["+", "-"] | None = None,
         scan_type: Literal["Ms", "Ms2"] | None = "Ms",
+        **kwargs,
     ):
         self.datafile_path = datafile_path
         self.t_min = t_min
@@ -970,15 +971,17 @@ class RawFileMetadata:
             # so we need to get it from the raw scan filters
             return {
                 scan_index: {
-                    **{name: getattr(stats, name) for name in stat_names},
-                    "MsType": scan_filter.MSOrder.ToString(),
+                    **{
+                        name: getattr(
+                            scan_selector.raw_scan_stats[scan_index - 1], name
+                        )
+                        for name in stat_names
+                    },
+                    "MsType": scan_selector.raw_scan_filters[
+                        scan_index - 1
+                    ].MSOrder.ToString(),
                 }
-                for scan_index, stats, scan_filter in zip(
-                    scan_selector.scan_indices_1based,
-                    scan_selector.raw_scan_stats,
-                    scan_selector.raw_scan_filters,
-                    strict=True,
-                )
+                for scan_index in scan_selector.scan_indices_1based
             }
 
 
