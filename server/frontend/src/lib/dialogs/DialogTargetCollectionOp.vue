@@ -548,7 +548,7 @@ async function init(mode) {
       info.id = ''
       info.name = ''
       info.desc = ''
-      info.type = 'TARGETS'
+      info.type = null
       selected.dataset = app.data.dataset.focused
 
       const focusedBatch = app.data.batch.focused
@@ -1245,7 +1245,16 @@ watchEffect(async () => {
     <!-- dialog menu -->
     <menu>
       <Button label="Cancel" severity="secondary" @click="action = null" />
-      <Button :label="executeLabel" @click="execute" :disabled="invalidated" />
+      <Button
+        :label="executeLabel"
+        @click="execute"
+        :disabled="invalidated"
+        v-tooltip.top="
+          invalidated && action === 'create' && !info.type
+            ? 'Please select a collection type'
+            : null
+        "
+      />
     </menu>
   </Dialog>
 </template>
