@@ -599,26 +599,34 @@ async function init(mode) {
     case 'update_batches': {
       selected.tab = 'batches'
 
-      // Load all batches from the collection (across all datasets)
-      // Clone to avoid mutating the original collection data
+      // Snapshot all batches where collection is already assigned to (spans datasets).
+      // Clone to avoid mutating the original detailed collection record.
       batches.selected = clone(original.value?.sample_batches ?? [])
 
-      // Don't allow selecting immutable ACQUISITION datasets
-      if (app.data.dataset.focused.dataset_type === 'ACQUISITION') {
-        selected.dataset = null
+      // Pick dataset to display in the listbox, prioritizing user's current context:
+      //   1. focused dataset, if compatible with collection type (not ACQUISITION,
+      //      and its dataset_type is allowed for the collection)
+      //   2. dataset owning the focused batch, as fallback when (1) fails - covers
+      //      the case where user is in an ACQUISITION dataset editing an ANALYSIS-
+      //      only collection
+      //   3. null - leaves listbox unselected, user picks manually
+      const focusedDataset = app.data.dataset.focused
+      const focusedDatasetCompatible =
+        focusedDataset?.dataset_type !== 'ACQUISITION' &&
+        getAllowedDatasetTypes(info.type).includes(focusedDataset?.dataset_type)
+
+      if (focusedDatasetCompatible) {
+        selected.dataset = focusedDataset
       } else {
-        // Set dataset for display and load batches
-        selected.dataset = app.data.dataset.focused
-        await loadBatches(selected.dataset, info.type)
+        const focusedBatchDatasetId = app.data.batch.focused?.dataset_id
+        selected.dataset = focusedBatchDatasetId
+          ? (app.data.dataset.list.find((d) => d.dataset_id === focusedBatchDatasetId) ?? null)
+          : null
       }
 
-      // Update "select all" checkbox to reflect current dataset state
-      selected.all.batches =
-        batches.loaded.length > 0
-          ? batches.loaded.every((batch) =>
-              batches.selected.some((s) => s.sample_batch_id === batch.sample_batch_id)
-            )
-          : false
+      if (selected.dataset) {
+        await loadBatches(selected.dataset, info.type)
+      }
       break
     }
     case 'delete': {
