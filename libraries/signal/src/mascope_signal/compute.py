@@ -530,6 +530,8 @@ async def get_orbi_centroids(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    ppm: int = 1,
+    average: bool = False,
 ) -> tuple:
     """
     Extract centroided peaks from an Orbitrap (Thermo .raw) file for specified m/z values and time range.
@@ -548,6 +550,10 @@ async def get_orbi_centroids(
     :type t_max: float | None, optional
     :param polarity: Polarity of scans to use ('+' or '-'), optional, defaults to None (all polarities).
     :type polarity: Literal['+', '-'], optional
+    :param ppm: Mass tolerance in ppm for centroid binning, defaults to 1.
+    :type ppm: int, optional
+    :param average: If True, return averaged intensities across scans, defaults to False.
+    :type average: bool, optional
     :return: Tuple of (masses, intensities, resolutions, signal-to-noise) for centroid peaks
     matching the criteria.
     :rtype: tuple
@@ -560,10 +566,11 @@ async def get_orbi_centroids(
             masses, intensities, resolutions, signal_to_noise = await asyncio.to_thread(
                 m_thermo.get_centroids,
                 datafile_path,
-                u_list,
-                t_min,
-                t_max,
+                t_min=t_min,
+                t_max=t_max,
                 polarity=polarity,
+                ppm=ppm,
+                average=average,
             )
             props = m_io.read_props(base_filename)
             calibration = props["mz_calibration"]
@@ -630,6 +637,69 @@ def get_orbi_centroids_per_scan(
         case _:
             raise NotImplementedError(
                 "Per-scan centroid extraction is only for Orbitrap raw files."
+            )
+
+
+async def get_orbi_ms2_centroids_by_parent(
+    base_filename: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    parent_peak_tolerance: float = 0.001,
+    ppm: int = 1,
+    average: bool = True,
+) -> dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    """Extract averaged MS2 centroids per parent peak from an Orbitrap raw file.
+
+    :param base_filename: Sample file name (base, not full path).
+    :type base_filename: str
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
+    :type parent_peak_tolerance: float
+    :param ppm: Mass tolerance in ppm for centroid binning, defaults to 1.
+    :type ppm: int, optional
+    :param average: If True, return averaged intensities, defaults to True.
+    :type average: bool, optional
+    :return: Mapping of parent peak m/z to (masses, intensities, resolutions, signal_to_noise).
+    :rtype: dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
+    """
+    sample_type = m_name.get_sample_file_type(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = m_name.filename_to_datafile_path(base_filename)
+            mapped_ms2_centroids = await asyncio.to_thread(
+                m_thermo.get_ms2_centroids_by_parent,
+                datafile_path,
+                t_min=t_min,
+                t_max=t_max,
+                polarity=polarity,
+                parent_peak_tolerance=parent_peak_tolerance,
+                ppm=ppm,
+                average=average,
+            )
+            props = m_io.read_props(base_filename)
+            calibration = props["mz_calibration"]
+            factor = calibration["par"]["calibration_factor"] if calibration else None
+
+            if factor is not None:
+                mapped_ms2_centroids = {
+                    pp: (masses * factor, intensities, resolutions, signal_to_noise)
+                    for pp, (
+                        masses,
+                        intensities,
+                        resolutions,
+                        signal_to_noise,
+                    ) in mapped_ms2_centroids.items()
+                }
+            return mapped_ms2_centroids
+        case _:
+            raise NotImplementedError(
+                "MS2 centroid extraction is only implemented for Orbitrap raw files."
             )
 
 
