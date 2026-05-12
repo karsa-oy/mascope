@@ -209,7 +209,10 @@ const allBatchesSelected = computed({
   set(select) {
     if (select) {
       const ids = new Set(batches.selected.map((b) => b.sample_batch_id))
-      batches.selected.push(...batches.loaded.filter((l) => !ids.has(l.sample_batch_id)))
+      batches.selected = [
+        ...batches.selected,
+        ...batches.loaded.filter((l) => !ids.has(l.sample_batch_id))
+      ]
     } else {
       const ids = new Set(batches.loaded.map((b) => b.sample_batch_id))
       batches.selected = batches.selected.filter((s) => !ids.has(s.sample_batch_id))
@@ -244,9 +247,10 @@ const allCompoundsSelected = computed({
   set(select) {
     if (select) {
       const formulas = new Set(compounds.selected.map((c) => c.target_compound_formula))
-      compounds.selected.push(
+      compounds.selected = [
+        ...compounds.selected,
         ...compounds.loaded.filter((l) => !formulas.has(l.target_compound_formula))
-      )
+      ]
     } else {
       const formulas = new Set(compounds.loaded.map((c) => c.target_compound_formula))
       compounds.selected = compounds.selected.filter(
