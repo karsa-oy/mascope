@@ -252,13 +252,49 @@ function execute() {
 
   switch (action.value) {
     case 'create': {
-      app.data.target.collection.create({
-        ...common,
-        target_compound_ids,
-        sample_batch_ids,
-        target_compounds_create
+      const existing = target_compound_ids.length
+      const created = target_compounds_create.length
+      const focusedBatchId = app.data.batch.focusedId
+      const focusedIncluded = focusedBatchId
+        ? batches.selected.some((b) => b.sample_batch_id === focusedBatchId)
+        : false
+      const otherCount = batches.selected.length - (focusedIncluded ? 1 : 0)
+
+      let batchSummary
+      if (batches.selected.length === 0) {
+        batchSummary = focusedBatchId
+          ? 'Not assigned to current batch or any other batch.'
+          : 'Not assigned to any batch.'
+      } else if (!focusedBatchId) {
+        batchSummary = `Assigned to ${batches.selected.length} batch${batches.selected.length === 1 ? '' : 'es'}.`
+      } else if (focusedIncluded && otherCount === 0) {
+        batchSummary = 'Assigned to current batch.'
+      } else if (focusedIncluded) {
+        batchSummary = `Assigned to current batch and ${otherCount} other${otherCount === 1 ? '' : 's'}.`
+      } else {
+        batchSummary = `Not assigned to current batch, but assigned to ${otherCount} other${otherCount === 1 ? '' : 's'}.`
+      }
+
+      confirm.require({
+        icon: 'pi pi-info-circle',
+        header: `Creating ${info.name} (${info.type})`,
+        message:
+          `Please review collection parameters before creating:\n ` +
+          `Total ${existing + created} compounds (${created} new, ${existing} existing from other collections).\n` +
+          batchSummary,
+        accept: () => {
+          app.data.target.collection.create({
+            ...common,
+            target_compound_ids,
+            sample_batch_ids,
+            target_compounds_create
+          })
+          action.value = null
+        },
+        acceptProps: { label: 'Create', icon: 'pi pi-check' },
+        rejectProps: { label: 'Cancel', severity: 'secondary' }
       })
-      break
+      return
     }
     case 'update': {
       const doUpdate = () => {
