@@ -77,10 +77,7 @@ const selected = reactive({
   source: 'collection',
   collection: 'all-compounds', // for adding compounds
   search: '',
-  tab: 'compounds',
-  all: {
-    targets: false
-  }
+  tab: 'compounds'
 })
 const add = reactive({
   expanded: false,
@@ -219,6 +216,45 @@ const allBatchesSelected = computed({
     } else {
       const ids = new Set(batches.loaded.map((b) => b.sample_batch_id))
       batches.selected = batches.selected.filter((s) => !ids.has(s.sample_batch_id))
+    }
+  }
+})
+
+/**
+ * Writable boolean tracking whether all currently-loaded compounds are
+ * present in compounds.selected.
+ *
+ * Getter: derives from compounds.loaded + compounds.selected, so the
+ * checkbox stays in sync with row-level toggles, programmatic changes,
+ * and source/collection switches.
+ *
+ * Setter:
+ *   - true  -> append every loaded compound missing from compounds.selected
+ *   - false -> remove every loaded compound from compounds.selected
+ *
+ * Compounds are matched by target_compound_formula to match the existing
+ * handler logic (covers both saved compounds and pre-save creates).
+ */
+const allCompoundsSelected = computed({
+  get() {
+    return (
+      compounds.loaded.length > 0 &&
+      compounds.loaded.every((c) =>
+        compounds.selected.some((s) => s.target_compound_formula === c.target_compound_formula)
+      )
+    )
+  },
+  set(select) {
+    if (select) {
+      const formulas = new Set(compounds.selected.map((c) => c.target_compound_formula))
+      compounds.selected.push(
+        ...compounds.loaded.filter((l) => !formulas.has(l.target_compound_formula))
+      )
+    } else {
+      const formulas = new Set(compounds.loaded.map((c) => c.target_compound_formula))
+      compounds.selected = compounds.selected.filter(
+        (s) => !formulas.has(s.target_compound_formula)
+      )
     }
   }
 })
@@ -788,15 +824,6 @@ watchEffect(async () => {
     selected.collection === 'all-compounds'
       ? app.data.target.compound.list
       : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
-  // select all checkbox state
-  selected.all.targets =
-    compounds.loaded.length > 0
-      ? compounds.loaded.every((comp) =>
-          compounds.selected
-            .map(({ target_compound_id }) => target_compound_id)
-            .includes(comp.target_compound_id)
-        )
-      : false
 })
 </script>
 
@@ -1093,30 +1120,8 @@ watchEffect(async () => {
                       <template #header>
                         <Checkbox
                           :binary="true"
-                          v-model="selected.all.targets"
+                          v-model="allCompoundsSelected"
                           :disabled="compounds.loaded.length == 0"
-                          @update:modelValue="
-                            (select) => {
-                              if (select) {
-                                const selected = compounds.selected.map(
-                                  ({ target_compound_formula }) => target_compound_formula
-                                )
-                                compounds.selected.push(
-                                  ...compounds.loaded.filter(
-                                    (loaded) => !selected.includes(loaded.target_compound_formula)
-                                  )
-                                )
-                              } else {
-                                const loaded = compounds.loaded.map(
-                                  ({ target_compound_formula }) => target_compound_formula
-                                )
-                                compounds.selected = compounds.selected.filter(
-                                  (selected) => !loaded.includes(selected.target_compound_formula)
-                                )
-                              }
-                              key.targets += 1
-                            }
-                          "
                           inputClass="custom"
                         />
                       </template>
