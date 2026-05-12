@@ -815,16 +815,22 @@ watchEffect(() => {
 })
 
 /**
- * Load compounds from selected collection and update checkbox state.
- * Runs automatically when collection selection changes.
+ * Load compounds whenever the source collection changes or the dialog opens.
+ * Watching `visible` ensures compounds.loaded is repopulated after init()
+ * clears it on each open, even when selected.collection resets to the same
+ * value ('all-compounds') and wouldn't otherwise trigger a re-fetch.
  */
-watchEffect(async () => {
-  // reload compounds
-  compounds.loaded =
-    selected.collection === 'all-compounds'
-      ? app.data.target.compound.list
-      : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
-})
+watch(
+  [() => selected.collection, visible],
+  async () => {
+    if (!visible.value) return
+    compounds.loaded =
+      selected.collection === 'all-compounds'
+        ? app.data.target.compound.list
+        : ((await app.data.target.collection.read(selected.collection))?.target_compounds ?? [])
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
