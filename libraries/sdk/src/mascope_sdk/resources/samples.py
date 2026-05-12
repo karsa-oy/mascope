@@ -9,6 +9,7 @@ from loguru import logger
 from .._concurrent import run_concurrent
 from .._resolve import resolve_id
 from ._base import BaseResource, _coerce_datetime_columns
+from .ms2 import Ms2Resource
 
 
 class SamplesResource(BaseResource):
@@ -33,6 +34,21 @@ class SamplesResource(BaseResource):
         # Get peak data with match information
         peaks = mascope.samples.get_peaks(sample_id="sample-456")
     """
+
+    def ms2(self, sample_id: str) -> Ms2Resource:
+        """Access MS2 analysis sub-resource for a specific sample.
+
+        :param sample_id: The sample item ID.
+        :type sample_id: str
+        :return: Ms2Resource instance bound to the given sample.
+        :rtype: Ms2Resource
+
+        Example::
+
+            ms2 = mascope.samples.ms2("sample-456")
+            summary = ms2.get_summary()
+        """
+        return Ms2Resource(self._client, sample_id)
 
     def _get_all_batches(self, dataset: str | None = None) -> pd.DataFrame | None:
         """Collect all batches, optionally scoped to a dataset."""
