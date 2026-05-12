@@ -703,6 +703,48 @@ async def get_orbi_ms2_centroids_by_parent(
             )
 
 
+async def get_ms2_summary(
+    base_filename: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    parent_peak_tolerance: float = 0.001,
+) -> dict:
+    """Extract MS2 summary metadata.
+
+    Returns parent peaks, HCD energy map, isolation width, and scan counts.
+
+    :param base_filename: Sample file name (base, not full path).
+    :type base_filename: str
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
+    :type parent_peak_tolerance: float
+    :return: Dictionary with MS2 summary data.
+    :rtype: dict
+    """
+    sample_type = m_name.get_sample_file_type(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = m_name.filename_to_datafile_path(base_filename)
+            return await asyncio.to_thread(
+                m_thermo.get_ms2_summary_metadata,
+                datafile_path,
+                t_min=t_min,
+                t_max=t_max,
+                polarity=polarity,
+                parent_peak_tolerance=parent_peak_tolerance,
+            )
+        case _:
+            raise NotImplementedError(
+                "MS2 summary extraction is only implemented for Orbitrap raw files."
+            )
+
+
 async def load_peak_timeseries(
     base_filename: str,
     mzs: list[float],

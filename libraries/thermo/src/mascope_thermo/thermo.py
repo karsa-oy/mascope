@@ -889,6 +889,211 @@ def get_ms2_centroids_by_parent(
         return centroid_mapping
 
 
+def get_ms2_summary_metadata(
+    datafile_path: str,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    parent_peak_tolerance: float = 0.001,
+) -> dict:
+    """Extract MS2 summary metadata from a Thermo raw file.
+
+    Groups MS2 scans by parent peak, extracts HCD energies and isolation
+    width from trailer extra data, and counts MS1/MS2 scans.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw).
+    :type datafile_path: str
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
+    :type parent_peak_tolerance: float
+    :return: Dictionary with parent_peaks, hcd_energy_map, isolation_width,
+             ms1_scan_count, ms2_scan_count, parent_peak_tolerance.
+    :rtype: dict
+    """
+    with RawFileManager(datafile_path) as RawFile:
+        # Get all scans to count MS1 vs MS2
+        all_selector = ScanSelector(
+            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type=None
+        )
+        ms2_selector = ScanSelector(
+            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
+        )
+
+        all_count = len(all_selector.scan_indices_1based)
+        ms2_count = len(ms2_selector.scan_indices_1based)
+        ms1_count = all_count - ms2_count
+
+        if ms2_count == 0:
+            return {
+                "parent_peaks": [],
+                "hcd_energy_map": {},
+                "isolation_width": None,
+                "ms1_scan_count": ms1_count,
+                "ms2_scan_count": 0,
+                "parent_peak_tolerance": parent_peak_tolerance,
+            }
+
+        # Get MS2 scans grouped by parent peak
+        parent_peak_mapping = _group_ms2_scans_by_parent(
+            ms2_selector, parent_peak_tolerance
+        )
+        parent_peaks = list(parent_peak_mapping.keys())
+
+        first_scan_idx = ms2_selector.scan_indices_1based[0]
+        trailer_info = RawFile.GetTrailerExtraInformation(first_scan_idx)
+        trailer_labels = list(trailer_info.Labels)
+
+        isolation_width_idx = trailer_labels.index("MS2 Isolation Width:")
+        hcd_label_idx = trailer_labels.index("HCD Energy V:")
+
+        isolation_widths = set()
+        scan_idx_to_hcd: dict[int, str] = {}
+
+        for scan_idx in ms2_selector.scan_indices_1based:
+            trailer = RawFile.GetTrailerExtraInformation(scan_idx)
+            trailer_values = list(trailer.Values)
+            isolation_widths.add(trailer_values[isolation_width_idx])
+            scan_idx_to_hcd[scan_idx] = trailer_values[hcd_label_idx]
+
+        isolation_widths.discard(None)
+        isolation_widths.discard("")
+        if len(isolation_widths) == 1:
+            isolation_width = float(isolation_widths.pop().replace(",", "."))
+        else:
+            raise ValueError("Multiple isolation widths found for MS2 scans.")
+
+        # Average HCD energies per parent peak, handling step dissociation
+        # where energy values may contain multiple comma-separated values
+        hcd_energy_map: dict[float, list[float]] = {}
+        for pp, scan_indices in parent_peak_mapping.items():
+            raw_values = [
+                scan_idx_to_hcd[idx] for idx in scan_indices if idx in scan_idx_to_hcd
+            ]
+            if not raw_values:
+                hcd_energy_map[pp] = []
+                continue
+
+            step_dissociation_values = [
+                [float(v) for v in str(val).split(",")] for val in raw_values
+            ]
+            max_steps = max(len(row) for row in step_dissociation_values)
+            averaged = []
+            for step_idx in range(max_steps):
+                step_values = [
+                    row[step_idx]
+                    for row in step_dissociation_values
+                    if step_idx < len(row)
+                ]
+                averaged.append(round(float(np.mean(step_values)), 2))
+            hcd_energy_map[pp] = averaged
+
+        return {
+            "parent_peaks": parent_peaks,
+            "hcd_energy_map": hcd_energy_map,
+            "isolation_width": isolation_width,
+            "ms1_scan_count": ms1_count,
+            "ms2_scan_count": ms2_count,
+            "parent_peak_tolerance": parent_peak_tolerance,
+        }
+
+
+def get_ms2_centroids_per_scan_for_parent(
+    datafile_path: str,
+    parent_peak_mz: float,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    parent_peak_tolerance: float = 0.001,
+) -> tuple[list[dict[str, np.ndarray | float]], list[float]]:
+    """Extract per-scan centroids and TIC values for MS2 scans matching a parent peak.
+
+    :param datafile_path: Path to the Thermo Fisher raw file (.raw).
+    :type datafile_path: str
+    :param parent_peak_mz: The parent peak m/z to match.
+    :type parent_peak_mz: float
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param parent_peak_tolerance: Tolerance in Da for matching parent peaks.
+    :type parent_peak_tolerance: float
+    :return: Tuple of (per-scan centroid dicts, per-scan TIC values).
+             Each centroid dict has keys: masses, intensities, resolutions,
+             signal_to_noise, timestamp.
+    :rtype: tuple[list[dict], list[float]]
+    """
+    with RawFileManager(datafile_path) as RawFile:
+        ms2_selector = ScanSelector(
+            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
+        )
+
+        parent_peak_mapping = _group_ms2_scans_by_parent(
+            ms2_selector, parent_peak_tolerance
+        )
+
+        # Find the matching parent peak cluster
+        matching_scan_indices = None
+        for pp, scan_indices in parent_peak_mapping.items():
+            if abs(pp - parent_peak_mz) <= parent_peak_tolerance:
+                matching_scan_indices = scan_indices
+                break
+
+        if not matching_scan_indices:
+            return [], []
+
+        centroids: list[dict[str, np.ndarray | float]] = []
+        tic_values: list[float] = []
+
+        for scan_idx in matching_scan_indices:
+            scan = Extensions.GetScans(RawFile, scan_idx, scan_idx)
+            scan_obj = list(scan)[0]
+            stats = ms2_selector.raw_scan_stats[scan_idx - 1]
+            timestamp = stats.StartTime * SECONDS_PER_MINUTE
+            tic = float(stats.TIC)
+
+            centroid_scan = scan_obj.CentroidScan
+            if centroid_scan is None or centroid_scan.Length == 0:
+                masses = np.array([], dtype=np.float64)
+                intensities = np.array([], dtype=np.float64)
+                resolutions = np.array([], dtype=np.float64)
+                signal_to_noise = np.array([], dtype=np.float64)
+            else:
+                scan_centroids = centroid_scan.GetLabelPeaks()
+                n = len(scan_centroids)
+                masses = np.fromiter(
+                    (c.Mass for c in scan_centroids), dtype=np.float64, count=n
+                )
+                intensities = np.fromiter(
+                    (c.Intensity for c in scan_centroids), dtype=np.float64, count=n
+                )
+                resolutions = np.fromiter(
+                    (c.Resolution for c in scan_centroids), dtype=np.float64, count=n
+                )
+                signal_to_noise = np.fromiter(
+                    (c.SignalToNoise for c in scan_centroids), dtype=np.float64, count=n
+                )
+
+            centroids.append(
+                {
+                    "masses": masses,
+                    "intensities": intensities,
+                    "resolutions": resolutions,
+                    "signal_to_noise": signal_to_noise,
+                    "timestamp": timestamp,
+                }
+            )
+            tic_values.append(tic)
+
+        return centroids, tic_values
+
+
 class RawFileMetadata:
     """Class to access metadata of a Thermo Fisher raw file."""
 
