@@ -1,355 +1,156 @@
-import re
-import warnings
-
 import numpy as np
-import pandas as pd
 
 import mascope_sdk as msdk
-from mascope_tools.alignment.calibration import CentroidedSpectrum, Spectra
+from mascope_tools.alignment.calibration import CentroidedSpectrum
 
 from .config import DEFAULT_NOISE_THRESHOLD, DEFAULT_PARENT_PEAK_TOLERANCE
 
 
 class DataExtractor:
+    """Thin client for MS2 analysis.
+
+    Uses the Mascope SDK's MS2 sub-resource to fetch pre-processed data.
+    """
+
     def __init__(
         self,
         mascope: msdk.MascopeClient,
-        sample_file_id: str,
+        sample_item_id: str,
         params: dict | None = None,
     ):
         """
-        Initialize the DataExtractor by fetching metadata and spectra from the MAScope API,
-        and precomputing necessary data structures for analysis.
+        Initialize the DataExtractor by fetching MS2 analysis data from the server.
 
         :param mascope: An instance of the MascopeClient to use for API calls
         :type mascope: msdk.MascopeClient
-        :param sample_file_id: ID of the sample file to analyze
-        :type sample_file_id: str
+        :param sample_item_id: ID of the sample item to analyze
+        :type sample_item_id: str
         :param params: Optional parameters for data extraction and processing:
-            - noise_threshold: Intensity threshold for filtering out noise peaks in the spectra
-            (default: 10)
+            - noise_threshold: Intensity threshold for filtering out noise peaks (default: 10)
+            - parent_peak_tolerance: Tolerance in Da for merging parent peaks (default: 0.001)
         :type params: dict, optional
-        :raises ValueError:
+        :raises ValueError: If the server returns no data for the sample.
         """
         if isinstance(params, dict):
             self.params = params
         else:
             self.params = {}
 
-        meta = msdk.get_sample_file_metadata(
-            mascope.url, mascope.access_token, sample_file_id
-        )
+        self._mascope = mascope
+        self._sample_item_id = sample_item_id
+        self._ms2 = mascope.samples.ms2(sample_item_id)
 
-        if meta is None:
-            raise ValueError("Failed to retrieve metadata for the sample file.")
-
-        self.stats = pd.DataFrame(meta["stats_per_scan"])
-        centroids_data = meta["centroids_meta"]
-        self.timestamps: list = centroids_data["time"]
-        self.centroids: list = centroids_data["data"]
-
-        # Filter centroids
-        self.centroids = self._filter_centroids()
-
-        # Distinguish MS scans
-        self.ms2_mask = self.stats.loc["MsType"] == "Ms2"
-        self.ms1_mask = ~self.ms2_mask
-
-        # Extract unique parent peaks from MS2 scans
-        self.parent_peaks = self._get_parent_peaks()
-
-        # Calculate average HCD energy for each unique parent peak
-        self.hcd_energy_map = self._get_hcd_energy_map()
-
-        # Build masks for MS2 spectra corresponding to each unique parent peak
-        self._ms2_per_parent_masks = self._get_ms2_masks_per_parent_peak()
-
-        # Extract isolation width (assuming it's the same for all MS2 scans)
-        self.isolation_width = self._get_isolation_width()
-
-        # Build spectra objects
-        self._spectra_objects = self._get_spectra_objects()
-
-        # Extract MS1 and MS2 spectra
-        self.ms1_spectrum, self._ms1_spectra_obj = self._get_ms1_spectra()
-        self.ms2_spectra, self._ms2_spectra_objs = self._get_ms2_spectra()
-
-        # Build mapping from MS2 scan indices to parent MS1 scan indices
-        self.parent_scan_map = self._build_parent_scan_map()
-
-        # Precompute MS1 timeseries
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=FutureWarning,
-            )
-            self.ms1_timeseries = self._ms1_spectra_obj.get_timeseries()
-            self.normalized_ms2_timeseries = self._get_normalized_ms2_timeseries()
-
-        # TIC and parent peak intensities (for fragment table)
-        self.ms1_tic = float(self.ms1_spectrum.intensity.sum())
-        self.ms2_tic = {
-            pp: float(self.ms2_spectra[pp].intensity.sum()) for pp in self.parent_peaks
-        }
-        self.parent_peak_intensities = self._get_parent_peak_intensities()
-        self.ms1_isolation_tic = self._get_ms1_isolation_tic()
-
-    def _filter_centroids(self):
-        """Filter out noise peaks:
-        - Based on minimum signal-to-noise ratio threshold defined in params (default: 10)
-        """
         noise_threshold = self.params.get("noise_threshold", DEFAULT_NOISE_THRESHOLD)
-        filtered_centroids = []
-        for centroid in self.centroids:
-            noise_mask = np.array(centroid["noises"]) >= noise_threshold
-            mask = noise_mask
-            filtered_centroids.append(
-                {
-                    "mzs": np.array(centroid["mzs"])[mask],
-                    "intensities": np.array(centroid["intensities"])[mask],
-                    "noises": np.array(centroid["noises"])[mask],
-                    "resolutions": np.array(centroid["resolutions"])[mask],
-                }
-            )
-        return filtered_centroids
-
-    def _extract_raw_ms2_parent_peaks(self) -> pd.Series:
-        """Extract the parent peak m/z from ScanType for every MS2 scan.
-        Returns a Series with the same column labels as self.stats, restricted to MS2 scans.
-        """
-
-        def extract_parent_peak(scan_type):
-            match = re.search(r"ms2 ([\d.]+)@", scan_type)
-            if match:
-                return float(match.group(1))
-            raise ValueError(
-                f"Failed to extract parent peak from the string: {scan_type}"
-            )
-
-        return self.stats.loc["ScanType"][self.ms2_mask].apply(extract_parent_peak)
-
-    def _get_parent_peaks(self) -> np.ndarray:
-        """Extract unique parent peaks from MS2 scans, merging near-duplicates
-        that arise from instrument float drift in ScanType strings.
-        Peaks within `params['parent_peak_tolerance']` Da of each other
-        are collapsed into a single representative m/z
-        (median of the cluster, rounded to 4 decimal places).
-        """
-        self.raw_ms2_parent_peaks = self._extract_raw_ms2_parent_peaks()
-        tolerance = self.params.get(
+        parent_peak_tolerance = self.params.get(
             "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
         )
 
-        sorted_values = np.sort(self.raw_ms2_parent_peaks.unique())
-        clusters: list[list[float]] = []
-        for value in sorted_values:
-            if clusters and (value - clusters[-1][-1]) <= tolerance:
-                clusters[-1].append(value)
-            else:
-                clusters.append([value])
+        summary = self._ms2.get_summary(parent_peak_tolerance=parent_peak_tolerance)
+        if summary is None:
+            raise ValueError("Failed to retrieve MS2 summary for the sample.")
 
-        return np.array([round(float(np.median(cluster)), 4) for cluster in clusters])
+        self.parent_peaks = np.array(summary["parent_peaks"])
+        self.hcd_energy_map = {
+            float(k): v for k, v in summary["hcd_energy_map"].items()
+        }
+        self.isolation_width = summary["isolation_width"]
 
-    def _get_hcd_energy_map(self):
-        """Calculate the average HCD energy for each unique parent peak.
-        Handles step dissociation where energy values may contain multiple
-        comma-separated values (e.g. "4.5,5.8,10.5"), averaging each step
-        position separately across scans."""
-        tolerance = self.params.get(
-            "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
+        centroids_data = self._ms2.get_averaged_centroids(
+            noise_threshold=noise_threshold,
+            parent_peak_tolerance=parent_peak_tolerance,
         )
-        hcd_energy_per_parent_peak = {}
-        for parent_peak in self.parent_peaks:
-            matching_cols = self.raw_ms2_parent_peaks.index[
-                np.abs(self.raw_ms2_parent_peaks.values - parent_peak) <= tolerance
-            ]
-            raw_values = self.stats.loc["HCD Energy V:"][matching_cols]
-            # Split by comma to handle step dissociation energies
-            step_dissociation_values = [
-                [float(v) for v in str(val).split(",")] for val in raw_values
-            ]
-            # Average each step position across scans
-            max_steps = max(len(row) for row in step_dissociation_values)
-            averaged = []
-            for step_idx in range(max_steps):
-                step_values = [
-                    row[step_idx]
-                    for row in step_dissociation_values
-                    if step_idx < len(row)
-                ]
-                averaged.append(round(float(np.mean(step_values)), 2))
-            hcd_energy_per_parent_peak[parent_peak] = averaged
-        return hcd_energy_per_parent_peak
-
-    def _get_isolation_width(self) -> float:
-        """Extract the isolation width"""
-        isolation_width = self.stats.loc["MS2 Isolation Width:"][self.ms2_mask].unique()
-        if len(isolation_width) == 1:
-            isolation_width = float(isolation_width[0].replace(",", "."))
-        else:
-            raise ValueError("Multiple isolation widths found for MS2 scans.")
-        return isolation_width
-
-    def _get_spectra_objects(self) -> np.ndarray:
-        """Convert centroid data into CentroidedSpectrum objects"""
-        return np.array(
-            [
-                CentroidedSpectrum(
-                    mz=centroid["mzs"],
-                    intensity=centroid["intensities"],
-                    signal_to_noise=centroid["noises"],
-                    resolution=centroid["resolutions"],
+        self.ms2_spectra: dict[float, CentroidedSpectrum] = {}
+        if centroids_data:
+            for pp_str, data in centroids_data.items():
+                pp = float(pp_str)
+                mz = np.array(data["mz"])
+                intensity = np.array(data["intensity"])
+                resolution = np.array(data.get("resolution", []))
+                signal_to_noise = np.array(data.get("signal_to_noise", []))
+                if resolution.size != mz.size:
+                    resolution = np.zeros_like(mz)
+                if signal_to_noise.size != mz.size:
+                    signal_to_noise = np.zeros_like(mz)
+                self.ms2_spectra[pp] = CentroidedSpectrum(
+                    mz=mz,
+                    intensity=intensity,
+                    signal_to_noise=signal_to_noise,
+                    resolution=resolution,
                 )
-                for centroid in self.centroids
-            ]
-        )
+        # Ensure every parent peak has an entry
+        for pp in self.parent_peaks:
+            if pp not in self.ms2_spectra:
+                self.ms2_spectra[pp] = CentroidedSpectrum(
+                    mz=np.array([]),
+                    intensity=np.array([]),
+                    signal_to_noise=np.array([]),
+                    resolution=np.array([]),
+                )
 
-    def _get_ms2_masks_per_parent_peak(self):
-        """Create masks for MS2 spectra corresponding to each unique parent peak.
-        Uses numerical tolerance matching to merge near-duplicate parent m/z values.
-        """
-        tolerance = self.params.get(
-            "parent_peak_tolerance", DEFAULT_PARENT_PEAK_TOLERANCE
-        )
-        result = {}
-        for parent_peak in self.parent_peaks:
-            matching_cols = self.raw_ms2_parent_peaks.index[
-                np.abs(self.raw_ms2_parent_peaks.values - parent_peak) <= tolerance
-            ]
-            mask = pd.Series(False, index=self.stats.columns)
-            mask[matching_cols] = True
-            result[parent_peak] = mask.values
-
-        # Check if number of scans per parent is the same for all parents
-        num_scans_per_parent = {pp: mask.sum() for pp, mask in result.items()}
-        unique_scan_counts = set(num_scans_per_parent.values())
-        if len(unique_scan_counts) > 1:
-            print(
-                "Number of MS2 scans per parent peak is not consistent. "
-                "`parent_peak_tolerance` may be too low or too high."
-            )
-            majority_value = max(
-                unique_scan_counts, key=list(num_scans_per_parent.values()).count
-            )
-            for pp, count in num_scans_per_parent.items():
-                if count != majority_value:
-                    print(
-                        f"Parent peak {pp} has {count} MS2 scans, which differs from the majority count of {majority_value}."
-                    )
-        return result
-
-    def _get_ms1_spectra(self):
-        """Build MS1 spectra from centroid data"""
-
-        ms1_spectra_obj = Spectra(
-            self._spectra_objects[self.ms1_mask].tolist(),
-            np.array(self.timestamps)[self.ms1_mask],
-        )
-        ms1_spectrum = ms1_spectra_obj.compute_sum_spectrum(average=True)
-
-        return ms1_spectrum, ms1_spectra_obj
-
-    def _get_ms2_spectra(self):
-        """Build MS2 spectra for each unique parent peak"""
-        ms2_spectra = {}
-        ms2_spectra_objs = {}
-        for parent_peak in self.parent_peaks:
-            mask = self._ms2_per_parent_masks[parent_peak]
-            spectra_obj = Spectra(
-                self._spectra_objects[mask].tolist(), np.array(self.timestamps)[mask]
-            )
-            ms2_spectra_objs[parent_peak] = spectra_obj
-            ms2_spectra[parent_peak] = spectra_obj.compute_sum_spectrum(average=True)
-
-        return ms2_spectra, ms2_spectra_objs
-
-    def _build_parent_scan_map(self):
-        """Build a mapping from MS2 scan indices to their corresponding parent MS1 scan indices"""
-        return {
-            ms2_index: parent_scan_index
-            for ms2_index, parent_scan_index in self.stats.loc[
-                ["ScanNumber", "Master Scan Number:"]
-            ]
-            .T.astype(int)
-            .values[self.ms2_mask]
+        # MS2 TIC per parent peak
+        self.ms2_tic: dict[float, float] = {
+            pp: float(spec.intensity.sum()) for pp, spec in self.ms2_spectra.items()
         }
 
-    def _get_normalized_ms2_timeseries(self):
-        """
-        For each parent peak, normalize the MS2 fragment timeseries by
-        the parent intensity at the corresponding time
-        """
-        # Map scan number -> position index in centroided_spectra
-        scan_numbers = self.stats.loc["ScanNumber"].values.astype(int)
-        scan_number_to_pos = {sn: i for i, sn in enumerate(scan_numbers)}
+        # Lazy-loaded properties
+        self._ms1_spectrum: CentroidedSpectrum | None = None
+        self._parent_peak_intensities: dict | None = None
+        self._ms1_isolation_tic: dict | None = None
 
-        # Precompute MS2 fragment timeseries per parent peak
-        normalized_ms2_timeseries = {}
-        half_iso = self.isolation_width / 2
-        for pp in self.parent_peaks:
-            frag_ts = self._ms2_spectra_objs[pp].get_timeseries()
-            if frag_ts.empty:
-                normalized_ms2_timeseries[pp] = frag_ts
-                continue
+    @property
+    def ms1_spectrum(self) -> CentroidedSpectrum:
+        """Averaged MS1 spectrum."""
+        if self._ms1_spectrum is None:
+            self._load_ms1_spectrum()
+        assert self._ms1_spectrum is not None
+        return self._ms1_spectrum
 
-            # For each MS2 scan that targeted this parent peak, find parent intensity in its MS1 parent scan
-            ms2_scan_positions = np.where(self._ms2_per_parent_masks[pp])[0]
-            ms2_scan_numbers = scan_numbers[ms2_scan_positions]
+    @property
+    def ms1_tic(self) -> float:
+        """Total ion count from averaged MS1 spectrum."""
+        return float(self.ms1_spectrum.intensity.sum())
 
-            parent_intensities = []
-            parent_timestamps = []
-            for ms2_sn in ms2_scan_numbers:
-                ms1_sn = self.parent_scan_map.get(int(ms2_sn))
-                if ms1_sn is None:
-                    continue
-                ms1_pos = scan_number_to_pos.get(int(ms1_sn))
-                if ms1_pos is None:
-                    continue
-                ms1_spec = self._spectra_objects[ms1_pos]
-                # Find peaks within isolation window around parent m/z
-                within = np.abs(ms1_spec.mz - pp) <= half_iso
-                parent_int = (
-                    float(ms1_spec.intensity[within].sum())
-                    if np.any(within)
-                    else np.nan
-                )
-                parent_intensities.append(parent_int)
-                parent_timestamps.append(
-                    self.timestamps[
-                        ms2_scan_positions[np.where(ms2_scan_numbers == ms2_sn)[0][0]]
-                    ]
-                )
+    @property
+    def parent_peak_intensities(self) -> dict:
+        """Parent peak intensities from averaged MS1 spectrum."""
+        if self._parent_peak_intensities is None:
+            mz = self.ms1_spectrum.mz
+            intensity = self.ms1_spectrum.intensity
+            result = {}
+            for pp in self.parent_peaks:
+                idx = np.argmin(np.abs(mz - pp))
+                result[pp] = float(intensity[idx])
+            self._parent_peak_intensities = result
+        return self._parent_peak_intensities
 
-            parent_series = pd.Series(
-                parent_intensities,
-                index=pd.to_datetime(parent_timestamps, unit="s"),
+    @property
+    def ms1_isolation_tic(self) -> dict:
+        """Sum MS1 intensities within isolation window per parent peak."""
+        if self._ms1_isolation_tic is None:
+            mz = self.ms1_spectrum.mz
+            intensity = self.ms1_spectrum.intensity
+            half_iso = self.isolation_width / 2
+            self._ms1_isolation_tic = {
+                pp: float(intensity[np.abs(mz - pp) <= half_iso].sum())
+                for pp in self.parent_peaks
+            }
+        return self._ms1_isolation_tic
+
+    def _load_ms1_spectrum(self):
+        """Load averaged MS1 centroided spectrum from the server."""
+        ms1_data = self._ms2.get_ms1_centroids()
+        if ms1_data is None or len(ms1_data.get("mz", [])) == 0:
+            self._ms1_spectrum = CentroidedSpectrum(
+                mz=np.array([]),
+                intensity=np.array([]),
+                signal_to_noise=np.array([]),
+                resolution=np.array([]),
             )
+            return
 
-            # Align columns: fragment timeseries columns are MS2 timestamps
-            # Normalize each fragment by parent intensity at matching time
-            aligned_parent = parent_series.reindex(
-                frag_ts.columns, method="nearest", tolerance=pd.Timedelta("2s")
-            )
-            normalized_ms2_timeseries[pp] = frag_ts.div(aligned_parent, axis=1)
-
-        return normalized_ms2_timeseries
-
-    def _get_parent_peak_intensities(self) -> dict:
-        """Look up each parent peak's intensity in the averaged MS1 spectrum"""
-        mz = self.ms1_spectrum.mz
-        intensity = self.ms1_spectrum.intensity
-        result = {}
-        for pp in self.parent_peaks:
-            idx = np.argmin(np.abs(mz - pp))
-            result[pp] = float(intensity[idx])
-        return result
-
-    def _get_ms1_isolation_tic(self) -> dict:
-        """Sum MS1 intensities within the isolation window around each parent peak"""
-        mz = self.ms1_spectrum.mz
-        intensity = self.ms1_spectrum.intensity
-        half_iso = self.isolation_width / 2
-        return {
-            pp: float(intensity[np.abs(mz - pp) <= half_iso].sum())
-            for pp in self.parent_peaks
-        }
+        self._ms1_spectrum = CentroidedSpectrum(
+            mz=np.array(ms1_data["mz"]),
+            intensity=np.array(ms1_data["intensity"]),
+            resolution=np.array(ms1_data.get("resolution", [])),
+            signal_to_noise=np.array(ms1_data.get("signal_to_noise", [])),
+        )
