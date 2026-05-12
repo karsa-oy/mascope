@@ -187,6 +187,8 @@ const filteredDatasets = computed(() => {
     }))
 })
 
+const allowedBatchTypes = computed(() => getAllowedBatchTypes(info.type))
+
 function remove(compound) {
   if (compound.status == '1 create') {
     compounds.created = compounds.created.filter((selected) => !isSameCompound(selected, compound))
@@ -496,12 +498,12 @@ async function loadBatches(dataset, collectionType) {
     batches.loaded = []
     return
   }
-  const allowedBatchTypes = getAllowedBatchTypes(collectionType)
+  const allowed = getAllowedBatchTypes(collectionType)
 
   const latest = await api.http.get(`/sample/batches`, {
     params: {
       dataset_id: dataset.dataset_id,
-      sample_batch_type: allowedBatchTypes
+      sample_batch_type: allowed
     },
     use: 'read',
     type: 'load_batches'
@@ -668,29 +670,40 @@ watch(visible, (value) => {
  * Handle collection type changes.
  * Only active during create/update_batches modes.
  * Resets dataset if it becomes incompatible with new type.
+ * Auto-add focused batch only on first type pick in create mode if it's compatible with collection type.
+ * Removes batch selections that are incompatible with new collection type.
  */
 watch(
   () => info.type,
   (newType, oldType) => {
     // Skip during initialization to avoid clearing initial batch selections
     if (initializing.value) return
+    if (newType === oldType) return
+    if (!['create', 'update_batches'].includes(action.value)) return
 
-    if (oldType && newType !== oldType) {
-      // Only handle for actions that can modify batches
-      if (!['create', 'update_batches'].includes(action.value)) {
-        return
-      }
+    // Reset dataset if incompatible with new collection type
+    if (
+      selected.dataset &&
+      !getAllowedDatasetTypes(newType).includes(selected.dataset.dataset_type)
+    ) {
+      selected.dataset = null
+    }
 
-      // Reset dataset if it's incompatible with new collection type
-      if (selected.dataset) {
-        const allowedDatasetTypes = getAllowedDatasetTypes(newType)
-        if (!allowedDatasetTypes.includes(selected.dataset.dataset_type)) {
-          selected.dataset = null
+    // Drop only batches whose type is no longer allowed
+    const allowed = allowedBatchTypes.value
+    batches.selected = batches.selected.filter((b) => allowed.includes(b.sample_batch_type))
+
+    // Auto-add focused batch only on first type pick (null -> type) in create mode
+    if (action.value === 'create' && !oldType && newType) {
+      const batch = app.data.batch.focused
+      if (batch && allowedBatchTypes.value.includes(batch.sample_batch_type)) {
+        batches.selected = [clone(batch)]
+        // sync selected.dataset so it's visible in the batches tab listbox
+        if (selected.dataset?.dataset_id !== batch.dataset_id) {
+          selected.dataset =
+            app.data.dataset.list.find((d) => d.dataset_id === batch.dataset_id) ?? null
         }
       }
-
-      // Clear batch selections since different types may have different batch types
-      batches.selected = []
     }
   }
 )
