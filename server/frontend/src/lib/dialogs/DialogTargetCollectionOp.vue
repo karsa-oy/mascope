@@ -16,7 +16,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import InlineMessage from 'primevue/inlinemessage'
+import Message from 'primevue/message'
 import Listbox from 'primevue/listbox'
 import Select from 'primevue/select'
 import IconField from 'primevue/iconfield'
@@ -258,6 +258,22 @@ const allCompoundsSelected = computed({
     }
   }
 })
+
+/**
+ * Compact badge styling for status Message components in the changes DataTable.
+ * Targets PrimeVue Message's internal sections (root/content/text/icon) via pt.
+ */
+
+const statusBadgePt = {
+  root: { style: 'width: fit-content; margin: 0;' },
+  content: { style: 'padding: 0.3rem 0.6rem; align-items: center;' },
+  text: { style: 'font-size: 13px; line-height: 1.3;' },
+  icon: { style: 'font-size: 13px;' }
+}
+const removeBadgePt = {
+  ...statusBadgePt,
+  text: { style: 'font-size: 13px; line-height: 1.3; font-weight: 600;' }
+}
 
 function remove(compound) {
   if (compound.status == '1 create') {
@@ -969,31 +985,44 @@ watch(
                         sortable
                       >
                         <template #body="slotProps">
-                          <InlineMessage
-                            v-if="slotProps.data.status == '1 create'"
-                            severity="success"
-                          >
-                            Create
-                          </InlineMessage>
-                          <InlineMessage
-                            v-else-if="slotProps.data.status == '2 add'"
-                            severity="info"
-                          >
-                            Add
-                          </InlineMessage>
-                          <InlineMessage
-                            v-else-if="slotProps.data.status == '3 keep'"
-                            severity="secondary"
-                            icon="pi pi-thumbtack"
-                          >
-                            Keep
-                          </InlineMessage>
-                          <InlineMessage
-                            v-else-if="slotProps.data.status == '4 remove'"
-                            severity="warn"
-                          >
-                            Remove
-                          </InlineMessage>
+                          <div style="display: flex; align-items: center; height: 100%">
+                            <Message
+                              v-if="slotProps.data.status == '1 create'"
+                              severity="success"
+                              icon="pi pi-check"
+                              :closable="false"
+                              :pt="statusBadgePt"
+                            >
+                              Create
+                            </Message>
+                            <Message
+                              v-else-if="slotProps.data.status == '2 add'"
+                              severity="info"
+                              icon="pi pi-plus"
+                              :closable="false"
+                              :pt="statusBadgePt"
+                            >
+                              Add
+                            </Message>
+                            <Message
+                              v-else-if="slotProps.data.status == '3 keep'"
+                              severity="secondary"
+                              icon="pi pi-thumbtack"
+                              :closable="false"
+                              :pt="statusBadgePt"
+                            >
+                              Keep
+                            </Message>
+                            <Message
+                              v-else-if="slotProps.data.status == '4 remove'"
+                              severity="warn"
+                              icon="pi pi-exclamation-triangle"
+                              :closable="false"
+                              :pt="removeBadgePt"
+                            >
+                              Remove
+                            </Message>
+                          </div>
                         </template>
                       </Column>
                       <Column
@@ -1247,11 +1276,16 @@ watch(
     </template>
     <!-- delete -->
     <template v-else-if="action == 'delete'">
-      <InlineMessage severity="warn" style="margin-bottom: 1rem">
+      <Message
+        severity="warn"
+        icon="pi pi-exclamation-triangle"
+        :closable="false"
+        style="margin-bottom: 1rem"
+      >
         <b>This will permanently delete the collection itself.</b> <br />
         To remove a collection from a batch without deleting it, right-click the batch and select
         "Edit batch targets" instead.
-      </InlineMessage>
+      </Message>
       <p style="max-width: 50ch">
         Would you like to keep or remove compounds from {{ info.name }}
         that are not part of any other collection?
@@ -1309,12 +1343,6 @@ watch(
 
 :deep(.p-panel-header) {
   padding-top: 0;
-}
-:deep(.p-message) {
-  margin: 0;
-}
-:deep(.p-inline-message) {
-  font-size: smaller;
 }
 :deep(.p-datatable-column-header-content :not(.custom) + .p-checkbox-box) {
   display: none;
