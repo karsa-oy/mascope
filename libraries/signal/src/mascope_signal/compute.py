@@ -635,7 +635,7 @@ def get_orbi_centroids_per_scan(
 
 async def load_peak_timeseries(
     base_filename: str,
-    mzs: Iterable[float],
+    mzs: list[float],
 ) -> xr.Dataset:
     """Loads peak timeseries from the sample file.
     Computes missing peak timeseries if needed.
@@ -643,13 +643,15 @@ async def load_peak_timeseries(
     :param base_filename: Sample file filename
     :type base_filename: str
     :param mzs: List of target m/z values
-    :type mzs: Iterable[float]
+    :type mzs: list[float]
     :return: The peak timeseries dataset
     :rtype: xr.Dataset
     """
     # --- Load existing peak timeseries from the sample file ---
-    mzs = np.unique(mzs)
-    peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    mzs_arr = np.unique(np.asarray(mzs))
+    peak_timeseries = m_io.load_peak_data(base_filename).sel(
+        mz=mzs_arr, method="nearest"
+    )
     # Remove duplicate m/z values if any
     _, unique_idx = np.unique(peak_timeseries.mz.values, return_index=True)
     peak_timeseries = peak_timeseries.isel(mz=np.sort(unique_idx))
@@ -709,7 +711,9 @@ async def load_peak_timeseries(
     await m_io.write_peaks(update_dataset, base_filename)
 
     # --- Return a clean lazy reference ---
-    peak_timeseries = m_io.load_peak_data(base_filename).sel(mz=mzs, method="nearest")
+    peak_timeseries = m_io.load_peak_data(base_filename).sel(
+        mz=mzs_arr, method="nearest"
+    )
     # Remove duplicate m/z values if any
     _, unique_idx = np.unique(peak_timeseries.mz.values, return_index=True)
     return peak_timeseries.isel(mz=np.sort(unique_idx))
@@ -886,17 +890,23 @@ def align_peak_collection(
     )
     vlm_corrector.fit(peak_collection)
     aligned_peaks = vlm_corrector.transform(peak_collection)
-    if vlm_corrector.points_mz.size < 2:
+    if vlm_corrector.points_mz is None or vlm_corrector.points_mz.size == 0:
         raise ValueError(
-            "Mass alignment failed: fewer than 2 alignment points found. "
+            "Mass alignment failed: no alignment points found. "
             "Check your filtering parameters and input data quality."
         )
+    else:
+        if vlm_corrector.points_mz.size < 2:
+            raise ValueError(
+                "Mass alignment failed: fewer than 2 alignment points found. "
+                "Check your filtering parameters and input data quality."
+            )
 
-    # Min and max aligned m/z
-    vlm_min_mz = vlm_corrector.points_mz.min()
-    vlm_max_mz = vlm_corrector.points_mz.max()
+        # Min and max aligned m/z
+        vlm_min_mz = vlm_corrector.points_mz.min()
+        vlm_max_mz = vlm_corrector.points_mz.max()
 
-    return aligned_peaks, vlm_min_mz, vlm_max_mz
+        return aligned_peaks, vlm_min_mz, vlm_max_mz
 
 
 # --- TODO Refactoring to split logic for different sample types ---

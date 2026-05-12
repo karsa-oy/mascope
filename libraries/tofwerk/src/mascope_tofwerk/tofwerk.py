@@ -386,7 +386,7 @@ def get_peak_timeseries(
     true_mz_axis: Iterable[float],
     t_min: float | None = None,
     t_max: float | None = None,
-) -> xr.Dataset:
+) -> xr.DataArray:
     """Extracts the peak timeseries for the specified m/z values in the time range (t_min, t_max).
 
     :param datafile_path: Path to the Tofwerk HDF5 file (.h5) containing the data.
@@ -399,8 +399,8 @@ def get_peak_timeseries(
     :type t_min: float, optional
     :param t_max: End time [s], defaults to None
     :type t_max: float, optional
-    :return: An xarray Dataset containing the peak timeseries
-    :rtype: xr.Dataset
+    :return: An xarray DataArray containing the peak timeseries
+    :rtype: xr.DataArray
     """
     with open_h5_file(datafile_path) as h5_file:
         # Make sure mzs are numpy array

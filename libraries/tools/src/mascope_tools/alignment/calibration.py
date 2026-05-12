@@ -164,7 +164,9 @@ class Spectra:
         df["cluster_id"] = cluster_assignments
         return df
 
-    def compute_sum_spectrum(self, window_factor=1, average=False) -> "Spectrum":
+    def compute_sum_spectrum(
+        self, window_factor=1, average=False
+    ) -> CentroidedSpectrum:
         """
         Compute sum spectrum, optionally averaged.
         """
