@@ -79,8 +79,7 @@ const selected = reactive({
   search: '',
   tab: 'compounds',
   all: {
-    targets: false,
-    batches: false
+    targets: false
   }
 })
 const add = reactive({
@@ -188,6 +187,41 @@ const filteredDatasets = computed(() => {
 })
 
 const allowedBatchTypes = computed(() => getAllowedBatchTypes(info.type))
+
+/**
+ * Writable boolean tracking whether all currently-loaded batches (for the
+ * selected dataset) are present in the global batches.selected.
+ *
+ * Getter: derives from batches.loaded + batches.selected, so the checkbox
+ * stays in sync with individual row toggles, programmatic selection changes
+ * (auto-add on type pick, init for update_batches), and dataset switches.
+ *
+ * Setter:
+ *   - true  -> append every loaded batch missing from batches.selected
+ *   - false -> remove every loaded batch from batches.selected
+ *
+ * batches.selected spans all datasets; this only affects the loaded subset
+ * (current dataset), leaving selections in other datasets untouched.
+ */
+const allBatchesSelected = computed({
+  get() {
+    return (
+      batches.loaded.length > 0 &&
+      batches.loaded.every((b) =>
+        batches.selected.some((s) => s.sample_batch_id === b.sample_batch_id)
+      )
+    )
+  },
+  set(select) {
+    if (select) {
+      const ids = new Set(batches.selected.map((b) => b.sample_batch_id))
+      batches.selected.push(...batches.loaded.filter((l) => !ids.has(l.sample_batch_id)))
+    } else {
+      const ids = new Set(batches.loaded.map((b) => b.sample_batch_id))
+      batches.selected = batches.selected.filter((s) => !ids.has(s.sample_batch_id))
+    }
+  }
+})
 
 function remove(compound) {
   if (compound.status == '1 create') {
@@ -721,20 +755,11 @@ watch(
     // Skip if no dataset or type (invalid state)
     if (!newDataset || !newType) {
       batches.loaded = []
-      selected.all.batches = false
       return
     }
 
     // Load batches for the new dataset
     await loadBatches(newDataset, newType)
-
-    // Update "select all" checkbox based on what's selected in current dataset
-    selected.all.batches =
-      batches.loaded.length > 0
-        ? batches.loaded.every((batch) =>
-            batches.selected.some((s) => s.sample_batch_id === batch.sample_batch_id)
-          )
-        : false
   }
 )
 
@@ -1173,30 +1198,8 @@ watchEffect(async () => {
                     <template #header>
                       <Checkbox
                         :binary="true"
-                        v-model="selected.all.batches"
+                        v-model="allBatchesSelected"
                         :disabled="batches.loaded.length == 0"
-                        @update:modelValue="
-                          (select) => {
-                            if (select) {
-                              const selected = batches.selected.map(
-                                ({ sample_batch_id }) => sample_batch_id
-                              )
-                              batches.selected.push(
-                                ...batches.loaded.filter(
-                                  (loaded) => !selected.includes(loaded.sample_batch_id)
-                                )
-                              )
-                            } else {
-                              const loaded = batches.loaded.map(
-                                ({ sample_batch_id }) => sample_batch_id
-                              )
-                              batches.selected = batches.selected.filter(
-                                (selected) => !loaded.includes(selected.sample_batch_id)
-                              )
-                            }
-                            key.batches += 1
-                          }
-                        "
                         inputClass="custom"
                       />
                     </template>
