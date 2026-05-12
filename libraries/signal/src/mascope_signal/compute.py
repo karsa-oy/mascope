@@ -7,6 +7,7 @@ from typing import Iterable, Literal
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 import xarray as xr
 import zarr
 
@@ -743,6 +744,132 @@ async def get_ms2_summary(
             raise NotImplementedError(
                 "MS2 summary extraction is only implemented for Orbitrap raw files."
             )
+
+
+async def get_ms2_fragment_timeseries(
+    base_filename: str,
+    parent_peak_mz: float,
+    t_min: float | None = None,
+    t_max: float | None = None,
+    polarity: Literal["+", "-"] | None = None,
+    noise_threshold: float = 10.0,
+    parent_peak_tolerance: float = 0.001,
+    normalize_by: Literal["tic", "none"] = "none",
+) -> dict:
+    """Compute fragment timeseries for a single MS2 parent peak.
+
+    Extracts per-scan centroids for MS2 scans matching the parent peak,
+    applies noise filtering, builds timeseries via peak clustering, and
+    optionally normalizes by TIC.
+
+    :param base_filename: Sample file name (base, not full path).
+    :type base_filename: str
+    :param parent_peak_mz: The parent peak m/z to get timeseries for.
+    :type parent_peak_mz: float
+    :param t_min: Minimum time [s], optional.
+    :type t_min: float | None, optional
+    :param t_max: Maximum time [s], optional.
+    :type t_max: float | None, optional
+    :param polarity: Polarity filter ('+' or '-'), optional.
+    :type polarity: Literal['+', '-'] | None, optional
+    :param noise_threshold: Minimum signal-to-noise ratio threshold.
+    :type noise_threshold: float
+    :param parent_peak_tolerance: Tolerance in Da for matching parent peaks.
+    :type parent_peak_tolerance: float
+    :param normalize_by: Normalization mode. ``"tic"`` normalizes by scan TIC,
+        ``"none"`` returns raw intensities.
+    :type normalize_by: Literal["tic", "none"]
+    :return: Dictionary with mz_values, time, and values arrays.
+    :rtype: dict
+    """
+
+    sample_type = m_name.get_sample_file_type(base_filename)
+    match sample_type:
+        case "orbi_raw":
+            datafile_path = m_name.filename_to_datafile_path(base_filename)
+            centroids, tic_values = await asyncio.to_thread(
+                m_thermo.get_ms2_centroids_per_scan_for_parent,
+                datafile_path,
+                parent_peak_mz,
+                t_min=t_min,
+                t_max=t_max,
+                polarity=polarity,
+                parent_peak_tolerance=parent_peak_tolerance,
+            )
+        case _:
+            raise NotImplementedError(
+                "MS2 timeseries extraction is only for Orbitrap raw files."
+            )
+
+    if not centroids:
+        return {"mz_values": [], "time": [], "values": []}
+
+    # Apply calibration factor to fragment masses
+    props = m_io.read_props(base_filename)
+    calibration = props["mz_calibration"]
+    factor = calibration["par"]["calibration_factor"] if calibration else None
+
+    # Apply noise filtering and calibration, build Spectra
+    spectra_list = []
+    spectra_times = []
+    for scan in centroids:
+        mask = scan["signal_to_noise"] >= noise_threshold
+        mzs = scan["masses"][mask]
+        intensities = scan["intensities"][mask]
+        sn = scan["signal_to_noise"][mask]
+        res = scan["resolutions"][mask]
+        if factor is not None:
+            mzs = mzs * factor
+        if len(mzs) == 0:
+            continue
+        spectra_list.append(
+            CentroidedSpectrum(
+                mz=mzs,
+                intensity=intensities,
+                signal_to_noise=sn,
+                resolution=res,
+            )
+        )
+        spectra_times.append(scan["timestamp"])
+
+    if not spectra_list:
+        return {"mz_values": [], "time": [], "values": []}
+
+    spectra_obj = Spectra(spectra_list, np.array(spectra_times))
+    frag_ts = spectra_obj.get_timeseries()
+
+    if frag_ts.empty:
+        return {"mz_values": [], "time": [], "values": []}
+
+    # TIC normalization
+    if normalize_by == "tic":
+        # Build TIC series aligned to spectra timestamps (only for non-empty scans)
+        filtered_tic_times = []
+        filtered_tic_vals = []
+        for scan, tic in zip(centroids, tic_values):
+            mask = scan["signal_to_noise"] >= noise_threshold
+            if scan["masses"][mask].size > 0:
+                filtered_tic_times.append(scan["timestamp"])
+                filtered_tic_vals.append(tic)
+
+        tic_series = pd.Series(
+            filtered_tic_vals,
+            index=pd.to_datetime(filtered_tic_times, unit="s"),
+        )
+        aligned = tic_series.reindex(
+            frag_ts.columns, method="nearest", tolerance=pd.Timedelta("2s")
+        )
+        frag_ts = frag_ts.div(aligned, axis=1)
+
+    # Serialize
+    time_values = [
+        t.isoformat() if hasattr(t, "isoformat") else float(t) for t in frag_ts.columns
+    ]
+    return {
+        "mz_values": [float(m) for m in frag_ts.index],
+        "time": time_values,
+        "values": frag_ts.values.tolist(),
+    }
 
 
 async def load_peak_timeseries(
