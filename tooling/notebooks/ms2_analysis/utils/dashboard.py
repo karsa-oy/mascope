@@ -5,8 +5,7 @@ import plotly.graph_objects as go
 from colorcet import glasbey_hv as colormap
 from IPython.display import display
 
-from .composition import CompositionMap
-from .config import MAX_FRAGMENT_TRACES
+from .composition import CompositionMap, get_composition_label
 from .data_extractor import DataExtractor
 
 
@@ -41,15 +40,6 @@ class Ms2Dashboard:
             margin=dict(l=60, r=20, t=40, b=40),
         )
 
-        self._fig_timeseries = go.FigureWidget()
-        self._fig_timeseries.update_layout(
-            title="Fragment Timeseries (normalized by parent)",
-            height=350,
-            xaxis_title="Time",
-            yaxis_title="Relative Intensity",
-            margin=dict(l=60, r=20, t=40, b=40),
-        )
-
         # Widgets
         self._parent_dropdown = widgets.Dropdown(
             options=self._parent_peak_options,
@@ -68,24 +58,12 @@ class Ms2Dashboard:
                 ),
                 self._fig_survey,
                 self._fig_fragments,
-                self._fig_timeseries,
             ]
         )
 
-    def show(self, timeseries=False):
-        """Display the dashboard in the notebook."""
+    def show_fragments(self):
+        """Display the MS1 survey and MS2 fragment spectra dashboard."""
         self._update()
-        children = [
-            widgets.HBox(
-                [self._parent_dropdown, self._info_label],
-                layout=widgets.Layout(align_items="center"),
-            ),
-            self._fig_survey,
-            self._fig_fragments,
-        ]
-        if timeseries:
-            children.append(self._fig_timeseries)
-        self._dashboard.children = tuple(children)
         display(self._dashboard)
 
     @staticmethod
@@ -252,45 +230,110 @@ class Ms2Dashboard:
                 self._fig_fragments.update_layout(yaxis_range=[0, ms2_y_max * 1.15])
             self._fig_fragments.update_layout(uirevision=str(pp))
 
-        # --- Fragment timeseries (normalized) ---
-        norm_ts = d.normalized_ms2_timeseries.get(pp, pd.DataFrame())
-        with self._fig_timeseries.batch_update():
-            self._fig_timeseries.data = []
-            if not norm_ts.empty:
-                max_vals = norm_ts.max(axis=1).sort_values(ascending=False)
-                top_mzs = max_vals.head(MAX_FRAGMENT_TRACES).index
+    def show_timeseries(self, n_fragments: int = 3, normalize_by: str | None = "tic"):
+        """Display an interactive timeseries dashboard for MS2 fragments.
+
+        Timeseries data is loaded lazily — only when a parent peak is selected
+        in the dropdown. The top *n_fragments* fragments (by total intensity)
+        are plotted.
+
+        :param n_fragments: Number of top fragments to plot, defaults to 3.
+        :type n_fragments: int
+        :param normalize_by: Normalization mode passed to the server.
+            ``"tic"`` normalizes by scan TIC, ``None`` returns raw intensities.
+        :type normalize_by: str
+        """
+        fig_ts = go.FigureWidget()
+        y_title = "Intensity (TIC-normalized)" if normalize_by == "tic" else "Intensity"
+        fig_ts.update_layout(
+            title="Fragment Timeseries",
+            height=350,
+            xaxis_title="Time",
+            yaxis_title=y_title,
+            margin=dict(l=60, r=20, t=40, b=40),
+        )
+
+        ts_dropdown = widgets.Dropdown(
+            options=self._parent_peak_options,
+            description="Parent peak:",
+            style={"description_width": "auto"},
+            layout=widgets.Layout(width="350px"),
+        )
+
+        d = self._data
+        compositions = self._compositions
+
+        def _on_parent_change(change=None):
+            pp = ts_dropdown.value
+
+            # Lazy fetch: request timeseries for this single parent peak
+            ts_data = d._ms2.get_timeseries(
+                parent_peak_mz=float(pp),
+                noise_threshold=d.params.get("noise_threshold", 10.0),
+                parent_peak_tolerance=d.params.get("parent_peak_tolerance", 0.001),
+                normalize_by=normalize_by,
+            )
+
+            with fig_ts.batch_update():
+                fig_ts.data = []
+                if ts_data is None or not ts_data.get("mz_values"):
+                    fig_ts.update_layout(uirevision=str(pp))
+                    return
+
+                ts_df = pd.DataFrame(
+                    data=ts_data["values"],
+                    index=pd.Index(ts_data["mz_values"], name="mz"),
+                    columns=pd.to_datetime(ts_data["time"]),
+                )
+
+                if ts_df.empty:
+                    fig_ts.update_layout(uirevision=str(pp))
+                    return
+
+                # Select top N fragments by total intensity
+                totals = ts_df.sum(axis=1).sort_values(ascending=False)
+                top_mzs = totals.head(n_fragments).index
+
+                comp_df = compositions.matches.get(pp, pd.DataFrame())
 
                 for i, frag_mz in enumerate(top_mzs):
-                    row = norm_ts.loc[frag_mz]
+                    row = ts_df.loc[frag_mz]
                     rgb = colormap[i % len(colormap)]
-                    color = f"rgb({int(rgb[0] * 255)},{int(rgb[1] * 255)},{int(rgb[2] * 255)})"
+                    color = (
+                        f"rgb({int(rgb[0] * 255)},"
+                        f"{int(rgb[1] * 255)},"
+                        f"{int(rgb[2] * 255)})"
+                    )
                     x_str = [
                         t.isoformat() if hasattr(t, "isoformat") else str(t)
                         for t in row.index
                     ]
 
-                    ion_label = None
-                    if len(comp_mzs) > 0:
-                        idx = np.argmin(np.abs(comp_mzs - frag_mz))
-                        if abs(comp_mzs[idx] - frag_mz) < 0.01:
-                            ion = comp_ions[idx]
-                            if pd.notna(ion) and str(ion).strip() and ion != "---":
-                                ion_label = str(ion).strip()
+                    ion_label = get_composition_label(frag_mz, comp_df)
                     trace_name = (
                         f"{frag_mz:.4f} m/z ({ion_label})"
-                        if ion_label
+                        if ion_label != "---"
                         else f"{frag_mz:.4f} m/z"
                     )
 
-                    self._fig_timeseries.add_trace(
+                    fig_ts.add_trace(
                         go.Scatter(
                             x=x_str,
                             y=row.values.astype(float),
                             mode="lines",
                             name=trace_name,
                             line=dict(color=color, width=1.5),
-                            hovertemplate=f"m/z {frag_mz:.4f}<br>"
-                            "Time: %{x}<br>Rel. Int.: %{y:.4f}<extra></extra>",
+                            hovertemplate=(
+                                f"m/z {frag_mz:.4f}<br>"
+                                "Time: %{x}<br>Intensity: %{y:.4e}<extra></extra>"
+                            ),
                         )
                     )
-            self._fig_timeseries.update_layout(uirevision=str(pp))
+
+                fig_ts.update_layout(uirevision=str(pp))
+
+        ts_dropdown.observe(_on_parent_change, names="value")
+        _on_parent_change()
+
+        dashboard = widgets.VBox([ts_dropdown, fig_ts])
+        display(dashboard)
