@@ -60,8 +60,7 @@ const compounds = reactive({
   loaded: [], // Loaded from selected collection
   selected: [], // Currently selected compounds
   initial: [], // Initial selection snapshot for change tracking
-  created: [], // New compounds created in this dialog
-  deleted: []
+  created: [] // New compounds created in this dialog
 })
 
 // Batches state - spans multiple datasets
@@ -80,7 +79,6 @@ const selected = reactive({
   tab: 'compounds'
 })
 const add = reactive({
-  expanded: false,
   formula: null,
   name: null,
   cas: null
@@ -88,8 +86,7 @@ const add = reactive({
 const deleteOrphans = ref(true)
 
 const key = reactive({
-  targets: 0,
-  batches: 0
+  targets: 0
 })
 
 const columns = [
@@ -173,7 +170,7 @@ const filteredDatasets = computed(() => {
       if (b.dataset_id == app.data.dataset.focusedId) return 1
       return 0
     })
-    .map((dataset, index) => ({
+    .map((dataset) => ({
       // create labels, demarcating the current one
       ...dataset,
       label:
@@ -1230,7 +1227,6 @@ watch(
               <!-- batches -->
               <Panel>
                 <DataTable
-                  :key="key.batches"
                   dataKey="sample_batch_id"
                   v-model:selection="datasetBatchSelection"
                   :value="batches.loaded"
@@ -1346,18 +1342,5 @@ watch(
 }
 :deep(.p-datatable-column-header-content :not(.custom) + .p-checkbox-box) {
   display: none;
-}
-
-.expandable {
-  overflow: hidden;
-  transition: height 1s ease-in-out;
-  margin-bottom: 0.5rem;
-}
-
-.expandable.expanded {
-  height: fit-content;
-}
-.expandable.collapsed {
-  height: 0;
 }
 </style>
