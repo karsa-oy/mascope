@@ -889,7 +889,20 @@ watch(
       <Tabs v-model:value="selected.tab" lazy>
         <TabList>
           <Tab value="compounds" :disabled="action == 'update_batches'">Compounds</Tab>
-          <Tab value="batches" :disabled="action == 'update'">Batches</Tab>
+          <Tab
+            value="batches"
+            :disabled="action == 'update' || (action === 'create' && !info.type)"
+          >
+            <span
+              v-tooltip.top="
+                action === 'create' && !info.type ? 'Please select a collection type first' : null
+              "
+              style="pointer-events: auto; display: inline-block"
+              tabindex="0"
+            >
+              Batches
+            </span>
+          </Tab>
         </TabList>
         <TabPanels>
           <!-- compounds -->
