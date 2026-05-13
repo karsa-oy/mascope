@@ -226,7 +226,6 @@ async def create_target_collection(
     :type target_collection_create: TargetCollectionCreate
     :param independent_transaction: Controls transaction and sio event behavior
     :type independent_transaction: bool
-    :raises ValueError: When no compounds are provided or validation fails
     :return: Created target collection data with success message
     :rtype: dict
     """
@@ -274,11 +273,11 @@ async def create_target_collection(
                 )
 
     # Combine all (created and added) compound IDs
+    # Empty set is valid - allows creating an empty collection to be
+    # populated later via peak assignment or update.
     all_target_compound_ids = set(
         created_target_compound_ids + verified_target_compound_ids
     )
-    if not all_target_compound_ids:
-        raise ValueError("No compounds were provided for the target collection")
 
     # Step 4: Create new target collection with associations
     async with async_session() as session:

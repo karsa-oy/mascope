@@ -81,7 +81,11 @@ class TargetCollectionBase(TargetCollectionBaseValidator, BaseModel):
 
 
 class TargetCollectionCreate(TargetCollectionValidator, TargetCollectionBase):
-    """Model used for target collection creation requests."""
+    """Model used for target collection creation requests.
+
+    Empty collections are allowed - compounds can be assigned later via the
+    peak-assignment UI or by updating the collection.
+    """
 
     target_compounds_create: list[TargetCompoundBase] | None = Field(
         None, description="Compounds to be created and added to the target collection"
@@ -93,13 +97,6 @@ class TargetCollectionCreate(TargetCollectionValidator, TargetCollectionBase):
     sample_batch_ids: list[str] | None = Field(
         None, description="IDs of sample batches where to add the new target collection"
     )
-
-    @model_validator(mode="after")
-    def validate_at_least_one_compound_provided(self):
-        """Validate at least one compound is provided."""
-        if not self.target_compounds_create and not self.target_compound_ids:
-            raise ValueError("At least one compound must be provided.")
-        return self
 
 
 class TargetCollectionUpdate(TargetCollectionValidator, TargetCollectionBase):
@@ -119,23 +116,15 @@ class TargetCollectionUpdate(TargetCollectionValidator, TargetCollectionBase):
     @model_validator(mode="before")
     @classmethod
     def validate_compounds_or_batches(cls, values):
-        """Validate compounds or batches update logic."""
+        """Check compounds and batches are not updated in the same request."""
         compounds_create = values.get("target_compounds_create")
         compound_ids = values.get("target_compound_ids")
         batches = values.get("sample_batch_ids")
 
-        # When updating batches, ensure no compounds are provided
         if batches is not None and (compounds_create or compound_ids):
             raise ValueError(
-                "You cannot update target compounds while simultaneously updating sample batch associations."
+                "Cannot update target compounds and batch associations simultaneously."
             )
-
-        # When not updating batches, ensure at least one compound is provided
-        if batches is None:
-            if not compounds_create and not compound_ids:
-                raise ValueError(
-                    "At least one compound (to create or associate) must be provided when not updating sample batch associations."
-                )
 
         return values
 

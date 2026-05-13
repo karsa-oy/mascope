@@ -343,6 +343,7 @@ function execute() {
     case 'create': {
       const existing = target_compound_ids.length
       const created = target_compounds_create.length
+      const totalCompounds = existing + created
       const focusedBatchId = app.data.batch.focusedId
       const focusedIncluded = focusedBatchId
         ? batches.selected.some((b) => b.sample_batch_id === focusedBatchId)
@@ -364,13 +365,18 @@ function execute() {
         batchSummary = `Not assigned to current batch, but assigned to ${otherCount} other${otherCount === 1 ? '' : 's'}.`
       }
 
+      const compoundSummary =
+        totalCompounds === 0
+          ? 'No compounds yet - assign peaks or update this collection later.'
+          : `Total ${totalCompounds} compounds (${created} new, ${existing} existing from other collections).`
+
       confirm.require({
         icon: 'pi pi-info-circle',
         header: `Creating ${info.name} (${info.type})`,
         message:
           `Please review collection parameters before creating:\n ` +
-          `Total ${existing + created} compounds (${created} new, ${existing} existing from other collections).\n` +
-          batchSummary,
+          `${batchSummary} \n` +
+          `${compoundSummary}`,
         accept: () => {
           app.data.target.collection.create({
             ...common,
@@ -467,7 +473,7 @@ const executeLabel = computed(() => (action.value == 'delete' ? 'Delete' : 'Save
 const invalidated = computed(() => {
   switch (action.value) {
     case 'create':
-      return !info.name || !info.type || compounds.created.length + compounds.selected.length == 0
+      return !info.name || !info.type
 
     case 'update': {
       const infoChanged =
