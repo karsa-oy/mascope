@@ -645,14 +645,6 @@ async function init(mode) {
       info.desc = ''
       info.type = null
       selected.dataset = app.data.dataset.focused
-
-      const focusedBatch = app.data.batch.focused
-      if (
-        focusedBatch &&
-        getAllowedBatchTypes(info.type).includes(focusedBatch.sample_batch_type)
-      ) {
-        batches.selected = [clone(focusedBatch)]
-      }
       break
     }
     case 'update_batches': {
@@ -857,8 +849,6 @@ watch(
 </script>
 
 <template>
-  <!-- <Dialog v-model:visible="visible" :header="title"> -->
-  <!-- <Dialog v-model:visible="visible" :header="title" :style="{ width: '1100px', maxWidth: '95vw' }"> -->
   <Dialog
     v-model:visible="visible"
     :header="title"
