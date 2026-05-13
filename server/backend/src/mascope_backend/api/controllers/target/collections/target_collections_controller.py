@@ -312,8 +312,9 @@ async def create_target_collection(
         await session.refresh(new_collection)
 
     # Step 6: Set rematch status for affected sample batches
+    # Skip when collection is empty - no targets changed
     batch_status_result = None
-    if sample_batch_ids:
+    if sample_batch_ids and all_target_compound_ids:
         batch_status_result = await update_sample_batch_status(
             sample_batch_ids=sample_batch_ids,
             status="rematch",
@@ -551,13 +552,18 @@ async def update_target_collection(
         await session.refresh(target_collection_db)
 
     # Step 7: Set rematch status for affected sample batches
-    # TODO_match If collection type changes, all affected batches need new match_collection, match_sample
+    #   TODO_match If collection type changes, all affected batches need new
+    #   match_collection, match_sample
     needs_rematch = (
         changes["compounds"] or changes["batches"] or changes["collection_type"]
     )
 
+    # Skip rematch when the collection has no compounds and the compound set
+    # didn't change in this request (e.g. batches-only update on an empty collection).
+    empty_no_op = not changes["compounds"] and not target_collection_db.target_compound
+
     batch_status_result = None
-    if needs_rematch and affected_sample_batch_ids:
+    if needs_rematch and affected_sample_batch_ids and not empty_no_op:
         batch_status_result = await update_sample_batch_status(
             sample_batch_ids=list(affected_sample_batch_ids),
             status="rematch",
@@ -700,8 +706,9 @@ async def delete_target_collection(
         await session.commit()
 
     # -- Set rematch status for affected sample batches --
+    # Skip if the deleted collection had no compounds - no targets changed
     batch_status_result = None
-    if affected_sample_batch_ids:
+    if affected_sample_batch_ids and collection_compound_ids:
         batch_status_result = await update_sample_batch_status(
             sample_batch_ids=list(affected_sample_batch_ids),
             status="rematch",
