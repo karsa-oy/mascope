@@ -49,11 +49,19 @@ class DataExtractor:
         if summary is None:
             raise ValueError("Failed to retrieve MS2 summary for the sample.")
 
-        self.parent_peaks = np.array(summary["parent_peaks"])
+        parent_peaks = summary.get("parent_peaks", [])
+        isolation_width = summary.get("isolation_width", None)
+        if not parent_peaks or isolation_width is None:
+            raise ValueError(
+                "No MS2 scans were found for the sample; MS2 analysis requires "
+                "non-empty parent peaks and a valid isolation width."
+            )
+
+        self.parent_peaks = np.array(parent_peaks)
+        self.isolation_width = isolation_width
         self.hcd_energy_map = {
             float(k): v for k, v in summary["hcd_energy_map"].items()
         }
-        self.isolation_width = summary["isolation_width"]
 
         centroids_data = self._ms2.get_averaged_centroids(
             noise_threshold=noise_threshold,
