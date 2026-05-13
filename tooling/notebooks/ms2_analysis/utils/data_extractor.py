@@ -124,6 +124,11 @@ class DataExtractor:
         if self._parent_peak_intensities is None:
             mz = self.ms1_spectrum.mz
             intensity = self.ms1_spectrum.intensity
+            if mz.size == 0 or intensity.size == 0:
+                self._parent_peak_intensities = {
+                    pp: float("nan") for pp in self.parent_peaks
+                }
+                return self._parent_peak_intensities
             result = {}
             for pp in self.parent_peaks:
                 idx = np.argmin(np.abs(mz - pp))
@@ -137,6 +142,9 @@ class DataExtractor:
         if self._ms1_isolation_tic is None:
             mz = self.ms1_spectrum.mz
             intensity = self.ms1_spectrum.intensity
+            if mz.size == 0 or intensity.size == 0:
+                self._ms1_isolation_tic = {pp: float("nan") for pp in self.parent_peaks}
+                return self._ms1_isolation_tic
             half_iso = self.isolation_width / 2
             self._ms1_isolation_tic = {
                 pp: float(intensity[np.abs(mz - pp) <= half_iso].sum())
