@@ -25,7 +25,8 @@ const breadcrumb = computed(() => {
     ? app.data.sample.focused.sample_item_name
     : app.data.batch.focused?.sample_batch_name || null
 
-  if (!entityName) return null
+  // Return empty breadcrumb to keep #menu slot right-aligned when no sample/batch focused
+  if (!entityName) return { items: [] }
 
   return {
     items: [
