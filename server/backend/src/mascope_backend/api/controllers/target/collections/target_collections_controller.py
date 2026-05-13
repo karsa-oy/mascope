@@ -551,6 +551,8 @@ async def update_target_collection(
         await session.commit()
         await session.refresh(target_collection_db)
 
+        post_update_compound_count = len(target_collection_db.target_compound)
+
     # Step 7: Set rematch status for affected sample batches
     #   TODO_match If collection type changes, all affected batches need new
     #   match_collection, match_sample
@@ -560,7 +562,7 @@ async def update_target_collection(
 
     # Skip rematch when the collection has no compounds and the compound set
     # didn't change in this request (e.g. batches-only update on an empty collection).
-    empty_no_op = not changes["compounds"] and not target_collection_db.target_compound
+    empty_no_op = not changes["compounds"] and post_update_compound_count == 0
 
     batch_status_result = None
     if needs_rematch and affected_sample_batch_ids and not empty_no_op:
