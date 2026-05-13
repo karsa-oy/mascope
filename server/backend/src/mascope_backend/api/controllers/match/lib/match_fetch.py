@@ -32,7 +32,8 @@ from mascope_backend.runtime import runtime
 class OrphanedMatchData:
     """
     All orphaned match data target IDs.
-    Set of target references that should be removed when cleaning up orphaned matches.
+    Set of target references that should be removed when cleaning up orphaned
+    matches.
     """
 
     target_isotope_ids: list[str]
@@ -55,14 +56,24 @@ class OrphanedMatchData:
 async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
     """
     Fetches orphaned match data for a specific sample.
-    - Gets existing match_isotopes for the sample
-    - Compares against current target_isotopes that should be associated with the sample
-    - Determines all match data that should be removed
-    - Returns hierarchical target IDs for precise deletion across all match levels.
+
+    Detection model:
+    - A MatchIsotope is orphan if no valid TargetIsotope chain reaches the
+      sample's batch via TargetIon -> TargetCompound ->
+      TargetCompoundInTargetCollection -> batch (with a matching ionization
+      mechanism). The `NOT EXISTS(valid_targets_subquery)` clause captures this.
+
+    NOTE Outer-join model:
+    - The outer query LEFT OUTER joins TargetCompoundInTargetCollection.
+      Inner-joining it would drop MatchIsotope rows whose compound has no
+      junction row at all (e.g. when a compound is removed from a collection
+      but its target_isotope/ion/compound rows still exist). With LEFT OUTER,
+      those rows survive into the result; target_collection_id will be NULL
+      for them and is filtered out before being returned.
 
     :param sample: Sample model object to analyze
     :type sample: Sample
-    :return: Oorphaned match data structure
+    :return: Orphaned match data structure
     :rtype: OrphanedMatchData
     """
     async with async_session() as session:
@@ -70,7 +81,8 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
             sample.sample_item_id
         )
 
-        # subquery for valid target isotopes
+        # subquery for valid target isotopes:
+        # does a valid TargetIsotope chain reach this sample's batch?
         valid_targets_subquery = (
             select(1)
             .select_from(TargetIsotope)
@@ -96,7 +108,10 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
             )
         )
 
-        # Main query: get orphaned matches that don't have valid TargetIsotope associations
+        # Main query: get orphaned matches that don't have valid TargetIsotope
+        # associations. LEFT OUTER on TargetCompoundInTargetCollection preserves
+        # rows whose compound has no junction (the orphan case after
+        # compound-from-collection removal).
         stmt = (
             select(
                 MatchIsotope.target_isotope_id,
@@ -114,7 +129,7 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
                 TargetCompound,
                 TargetCompound.target_compound_id == TargetIon.target_compound_id,
             )
-            .join(
+            .outerjoin(
                 TargetCompoundInTargetCollection,
                 TargetCompoundInTargetCollection.target_compound_id
                 == TargetCompound.target_compound_id,
@@ -132,16 +147,25 @@ async def fetch_sample_orphaned_match_data(sample: Sample) -> OrphanedMatchData:
             )
             return OrphanedMatchData([], [], [], [], [sample.sample_item_id])
 
-        # Extract unique IDs at each hierarchy level
+        # Extract unique IDs. target_collection_id may be NULL for rows where the
+        # compound was disassociated from all collections - skip those for the
+        # collection ID list.
         target_isotope_ids = list({row.target_isotope_id for row in rows})
         target_ion_ids = list({row.target_ion_id for row in rows})
         target_compound_ids = list({row.target_compound_id for row in rows})
-        target_collection_ids = list({row.target_collection_id for row in rows})
+        target_collection_ids = list(
+            {
+                row.target_collection_id
+                for row in rows
+                if row.target_collection_id is not None
+            }
+        )
 
         runtime.logger.info(
             f"Found orphaned match data for sample '{sample.sample_item_name}': "
             f"{len(target_isotope_ids)} isotopes, {len(target_ion_ids)} ions, "
-            f"{len(target_compound_ids)} compounds, {len(target_collection_ids)} collections"
+            f"{len(target_compound_ids)} compounds, "
+            f"{len(target_collection_ids)} collections"
         )
 
         return OrphanedMatchData(
@@ -159,13 +183,22 @@ async def fetch_batch_orphaned_match_data(
     """
     Fetches orphaned match data for all samples in a batch.
 
-    Determines all match data across the batch that should be removed
-    by comparing existing match isotopes against current target isotope
-    associations for the samples in the batch.
+    Detection model:
+    - A MatchIsotope is orphan if no valid TargetIsotope chain reaches the
+      batch via TargetIon -> TargetCompound -> TargetCompoundInTargetCollection
+      -> batch (with a matching ionization mechanism). Captured by
+      `NOT EXISTS(valid_targets_subquery)`.
+
+    NOTE Outer-join model:
+    - The outer query LEFT OUTER joins TargetCompoundInTargetCollection so that
+      orphan MatchIsotope rows whose compound has no junction (e.g. compound
+      removed from a collection) survive into the result. target_collection_id
+      is NULL for those rows and is filtered out of the returned collection-ID
+      list.
 
     :param sample_batch: SampleBatch model object to analyze
     :type sample_batch: SampleBatch
-    :return: Oorphaned match data structure
+    :return: Orphaned match data structure
     :rtype: OrphanedMatchData
     """
     async with async_session() as session:
@@ -173,7 +206,7 @@ async def fetch_batch_orphaned_match_data(
             sample_batch.sample_batch_id
         )
 
-        # Valid targets subquery
+        # Valid targets subquery: does a valid TargetIsotope chain reach this batch?
         valid_targets_subquery = (
             select(1)
             .select_from(TargetIsotope)
@@ -205,13 +238,16 @@ async def fetch_batch_orphaned_match_data(
                 TargetIsotope.target_isotope_id == MatchIsotope.target_isotope_id,
                 TargetCollectionInSampleBatch.sample_batch_id
                 == sample_batch.sample_batch_id,
-                TargetIon.ionization_mechanism_id.in_(
-                    batch_ion_mechanism_ids
-                ),  # TODO: As is, this will only work if all samples in the batch share the same ionization mechanisms
+                # TODO: As is, this will only work if all samples in the batch
+                # share the same ionization mechanisms
+                TargetIon.ionization_mechanism_id.in_(batch_ion_mechanism_ids),
                 Sample.sample_item_id == MatchIsotope.sample_item_id,
             )
         )
 
+        # Outer query: collect orphan MatchIsotope rows with upstream target IDs.
+        # LEFT OUTER on TargetCompoundInTargetCollection preserves rows whose
+        # compound has no junction (compound-removed-from-collection case).
         stmt = (
             select(
                 MatchIsotope.target_isotope_id,
@@ -231,7 +267,7 @@ async def fetch_batch_orphaned_match_data(
                 TargetCompound,
                 TargetCompound.target_compound_id == TargetIon.target_compound_id,
             )
-            .join(
+            .outerjoin(
                 TargetCompoundInTargetCollection,
                 TargetCompoundInTargetCollection.target_compound_id
                 == TargetCompound.target_compound_id,
@@ -251,21 +287,31 @@ async def fetch_batch_orphaned_match_data(
             sample_item_ids = [row[0] for row in await session.execute(sample_ids_stmt)]
 
             runtime.logger.debug(
-                f"No orphaned match data found for batch '{sample_batch.sample_batch_name}'"
+                f"No orphaned match data found for batch "
+                f"'{sample_batch.sample_batch_name}'"
             )
             return OrphanedMatchData([], [], [], [], sample_item_ids)
 
-        # Extract unique IDs and affected samples
+        # Extract unique IDs. target_collection_id may be NULL for rows where the
+        # compound was disassociated from all collections - skip those.
         target_isotope_ids = list({row.target_isotope_id for row in rows})
         target_ion_ids = list({row.target_ion_id for row in rows})
         target_compound_ids = list({row.target_compound_id for row in rows})
-        target_collection_ids = list({row.target_collection_id for row in rows})
+        target_collection_ids = list(
+            {
+                row.target_collection_id
+                for row in rows
+                if row.target_collection_id is not None
+            }
+        )
         sample_item_ids = list({row.sample_item_id for row in rows})
 
         runtime.logger.info(
-            f"Found orphaned match data for sample batch '{sample_batch.sample_batch_name}': "
+            f"Found orphaned match data for sample batch "
+            f"'{sample_batch.sample_batch_name}': "
             f"{len(target_isotope_ids)} isotopes, {len(target_ion_ids)} ions, "
-            f"{len(target_compound_ids)} compounds, {len(target_collection_ids)} collections "
+            f"{len(target_compound_ids)} compounds, "
+            f"{len(target_collection_ids)} collections "
             f"for {len(sample_item_ids)} samples"
         )
 
