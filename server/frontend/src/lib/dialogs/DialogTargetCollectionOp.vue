@@ -857,7 +857,15 @@ watch(
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="title">
+  <!-- <Dialog v-model:visible="visible" :header="title"> -->
+  <!-- <Dialog v-model:visible="visible" :header="title" :style="{ width: '1100px', maxWidth: '95vw' }"> -->
+  <Dialog
+    v-model:visible="visible"
+    :header="title"
+    :style="{ width: '45vw' }"
+    :breakpoints="{ '1400px': '85vw', '960px': '95vw' }"
+    contentStyle="overflow: hidden"
+  >
     <!-- create or update -->
     <template v-if="['create', 'update', 'update_batches'].includes(action)">
       <div class="row">
@@ -1237,7 +1245,7 @@ watch(
           </TabPanel>
           <!-- batches -->
           <TabPanel value="batches">
-            <div class="row" style="height: 400px; align-items: stretch; gap: 0.5rem">
+            <div class="row" style="height: 450px; align-items: stretch; gap: 0.5rem">
               <Listbox
                 v-model="selected.dataset"
                 dataKey="dataset_id"
