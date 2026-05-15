@@ -852,9 +852,8 @@ watch(
   <Dialog
     v-model:visible="visible"
     :header="title"
-    :style="{ width: '45vw' }"
-    :breakpoints="{ '1400px': '85vw', '960px': '95vw' }"
-    contentStyle="overflow: hidden"
+    :style="{ maxWidth: '95vw' }"
+    :contentStyle="{ overflow: 'auto' }"
   >
     <!-- create or update -->
     <template v-if="['create', 'update', 'update_batches'].includes(action)">
@@ -906,9 +905,15 @@ watch(
           <!-- compounds -->
           <TabPanel value="compounds">
             <div class="selector">
-              <div class="row" style="align-items: stretch; height: 450px">
+              <div
+                class="row"
+                style="align-items: stretch; height: 450px; gap: 0.5rem; min-width: 1072px"
+              >
                 <Panel>
-                  <div class="row" style="margin-bottom: 1rem; align-items: flex-start">
+                  <div
+                    class="row"
+                    style="margin-bottom: 1rem; align-items: flex-start; min-width: 500px"
+                  >
                     <h4 style="margin: 0" v-if="action == 'update'">Collection changes</h4>
                     <h4 style="margin: 0" v-else-if="action == 'create'">Collection</h4>
                     <span
@@ -993,7 +998,7 @@ watch(
                       scrollable
                       scrollHeight="360px"
                       :virtualScrollerOptions="{ itemSize: 49.69 }"
-                      style="height: 360px; width: 500px"
+                      style="height: 360px; min-width: 500px"
                     >
                       <Column
                         header="Status"
@@ -1085,10 +1090,22 @@ watch(
                         </template>
                       </Column>
                     </DataTable>
-                    <i v-else style="margin-bottom: 5rem"> No compounds added yet </i>
+                    <div
+                      v-else
+                      style="
+                        width: 100%;
+                        min-width: 500px;
+                        min-height: 360px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                    >
+                      <i>No compounds added yet</i>
+                    </div>
                   </BaseClipboardContext>
                 </Panel>
-                <Panel>
+                <Panel style="flex: 1; min-width: 500px">
                   <div class="row" style="align-items: flex-start">
                     <h4 style="margin-bottom: 0.5rem">Add compounds</h4>
                     <SelectButton
@@ -1167,7 +1184,7 @@ watch(
                     scrollable
                     scrollHeight="310px"
                     :virtualScrollerOptions="{ itemSize: 37.4 }"
-                    style="height: 310px; width: 500px"
+                    style="height: 310px; min-width: 500px"
                   >
                     <Column selectionMode="multiple" header="" headerStyle="width: 3rem">
                       <template #header>
@@ -1235,18 +1252,55 @@ watch(
           </TabPanel>
           <!-- batches -->
           <TabPanel value="batches">
-            <div class="row" style="height: 450px; align-items: stretch; gap: 0.5rem">
-              <Listbox
-                v-model="selected.dataset"
-                dataKey="dataset_id"
-                optionLabel="label"
-                :options="filteredDatasets"
-                scrollHeight="380px"
-                :virtualScrollerOptions="{ itemSize: 28.41 }"
-                style="min-width: 200px; min-height: 350px"
-              />
+            <div
+              class="row"
+              style="height: 450px; align-items: stretch; gap: 0.5rem; min-width: 1072px"
+            >
+              <Panel style="flex: 1; min-width: 500px">
+                <div class="row" style="margin-bottom: 1rem; align-items: flex-start">
+                  <h4 style="margin: 0">Datasets</h4>
+                  <span
+                    :style="{
+                      opacity: 0.5,
+                      fontStyle: 'italic',
+                      maxWidth: '250px',
+                      fontSize: 'smaller',
+                      textAlign: 'right'
+                    }"
+                  >
+                    Pick a dataset to browse and assign its batches.
+                  </span>
+                </div>
+                <Listbox
+                  v-model="selected.dataset"
+                  dataKey="dataset_id"
+                  optionLabel="label"
+                  :options="filteredDatasets"
+                  scrollHeight="350px"
+                  :virtualScrollerOptions="{ itemSize: 28.41 }"
+                  style="width: 100%; min-height: 350px"
+                  :pt="{ root: { style: 'border: 0' } }"
+                />
+              </Panel>
               <!-- batches -->
-              <Panel>
+              <Panel style="flex: 1; min-width: 500px">
+                <div
+                  class="row"
+                  style="margin-bottom: 1rem; align-items: flex-start; min-width: 500px"
+                >
+                  <h4 style="margin: 0">Batches</h4>
+                  <span
+                    :style="{
+                      opacity: 0.5,
+                      fontStyle: 'italic',
+                      maxWidth: '250px',
+                      fontSize: 'smaller',
+                      textAlign: 'right'
+                    }"
+                  >
+                    Toggle to which batches this collection will be assigned.
+                  </span>
+                </div>
                 <DataTable
                   dataKey="sample_batch_id"
                   v-model:selection="datasetBatchSelection"
@@ -1254,8 +1308,7 @@ watch(
                   scrollable
                   scrollHeight="350px"
                   :virtualScrollerOptions="{ itemSize: 36.34 }"
-                  tableStyle="width: 450px;"
-                  style="min-width: 500px"
+                  style="width: 100%; min-width: 500px"
                   sortField="sample_batch_utc_created"
                   :sortOrder="-1"
                 >
