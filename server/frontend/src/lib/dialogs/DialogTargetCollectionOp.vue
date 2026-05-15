@@ -1115,7 +1115,7 @@ watch(
                         justify-content: center;
                       "
                     >
-                      <i>No compounds added yet</i>
+                      <i style="margin-bottom: 5rem">No compounds added yet</i>
                     </div>
                   </BaseClipboardContext>
                 </Panel>
