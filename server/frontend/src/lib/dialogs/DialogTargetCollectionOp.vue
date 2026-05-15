@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 
+import ConfirmDialog from 'primevue/confirmdialog'
 import Dialog from 'primevue/dialog'
 import FloatLabel from 'primevue/floatlabel'
 import SelectButton from 'primevue/selectbutton'
@@ -369,14 +370,14 @@ function execute() {
         totalCompounds === 0
           ? 'No compounds yet - assign peaks or update this collection later.'
           : `Total ${totalCompounds} compounds (${created} new, ${existing} existing from other collections).`
-
       confirm.require({
+        group: 'target-collection-create',
         icon: 'pi pi-info-circle',
         header: `Creating ${info.name} (${info.type})`,
-        message:
-          `Please review collection parameters before creating:\n ` +
-          `${batchSummary} \n` +
-          `${compoundSummary}`,
+        message: {
+          intro: 'Please review collection parameters before creating:',
+          items: [batchSummary, compoundSummary]
+        },
         accept: () => {
           app.data.target.collection.create({
             ...common,
@@ -389,6 +390,7 @@ function execute() {
         acceptProps: { label: 'Create', icon: 'pi pi-check' },
         rejectProps: { label: 'Cancel', severity: 'secondary' }
       })
+
       return
     }
     case 'update': {
@@ -849,6 +851,18 @@ watch(
 </script>
 
 <template>
+  <ConfirmDialog group="target-collection-create">
+    <template #message="slotProps">
+      <div style="display: flex; flex-direction: column; gap: 0.5rem">
+        <p style="margin: 0">{{ slotProps.message.message.intro }}</p>
+        <ul style="margin: 0; padding-left: 1.25rem">
+          <li v-for="(item, i) in slotProps.message.message.items" :key="i">
+            {{ item }}
+          </li>
+        </ul>
+      </div>
+    </template>
+  </ConfirmDialog>
   <Dialog
     v-model:visible="visible"
     :header="title"
