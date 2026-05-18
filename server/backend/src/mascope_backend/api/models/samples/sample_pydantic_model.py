@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -216,3 +217,58 @@ class GetSampleSpectrumQueryParams(CommonValidators, QueryParamsModel):
             raise ValueError("mz_max must be greater than mz_min")
 
         return self
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# MS2 Analysis query params
+# ──────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_PARENT_PEAK_TOLERANCE = 0.001
+DEFAULT_NOISE_THRESHOLD = 10.0
+
+
+class GetMs2SummaryQueryParams(QueryParamsModel):
+    """Query parameters for retrieving MS2 summary data."""
+
+    parent_peak_tolerance: float = Field(
+        DEFAULT_PARENT_PEAK_TOLERANCE,
+        description="Tolerance in Da for merging near-duplicate parent peaks",
+    )
+
+
+class GetMs1CentroidsQueryParams(QueryParamsModel):
+    """Query parameters for retrieving averaged MS1 centroids."""
+
+    ppm: int = Field(1, description="Mass tolerance in ppm for centroid binning")
+
+
+class GetMs2CentroidsQueryParams(QueryParamsModel):
+    """Query parameters for retrieving averaged MS2 centroids."""
+
+    noise_threshold: float = Field(
+        DEFAULT_NOISE_THRESHOLD,
+        description="Minimum signal-to-noise ratio threshold",
+    )
+    parent_peak_tolerance: float = Field(
+        DEFAULT_PARENT_PEAK_TOLERANCE,
+        description="Tolerance in Da for merging near-duplicate parent peaks",
+    )
+
+
+class GetMs2TimeseriesQueryParams(QueryParamsModel):
+    """Query parameters for retrieving fragment timeseries for a parent peak."""
+
+    parent_peak_mz: float = Field(
+        ..., description="Parent peak m/z to get fragment timeseries for"
+    )
+    noise_threshold: float = Field(
+        DEFAULT_NOISE_THRESHOLD,
+        description="Minimum signal-to-noise ratio threshold",
+    )
+    parent_peak_tolerance: float = Field(
+        DEFAULT_PARENT_PEAK_TOLERANCE,
+        description="Tolerance in Da for matching parent peaks",
+    )
+    normalize_by: Literal["tic"] | None = Field(
+        None, description="Normalization mode: 'tic' or None"
+    )

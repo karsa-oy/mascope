@@ -1,5 +1,3 @@
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
 
 from mascope_backend.api.controllers.samples.ms2 import (
@@ -19,6 +17,10 @@ from mascope_backend.api.controllers.samples.samples_controller import (
 )
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.samples.sample_pydantic_model import (
+    GetMs1CentroidsQueryParams,
+    GetMs2CentroidsQueryParams,
+    GetMs2SummaryQueryParams,
+    GetMs2TimeseriesQueryParams,
     GetSamplePeaksQueryParams,
     GetSamplePeakTimeseriesBody,
     GetSampleSpectrumQueryParams,
@@ -186,21 +188,19 @@ async def get_sample_spectrum_route(
 @api_route(token_access=True)
 async def get_ms2_summary_route(
     sample_item_id: str,
-    parent_peak_tolerance: float = Query(
-        0.001, description="Tolerance in Da for merging parent peaks"
-    ),
+    query_params: GetMs2SummaryQueryParams = Depends(),
     user=Depends(guest_user),
 ):
     """Retrieve MS2 summary (parent peaks, HCD map, isolation width).
 
     :param sample_item_id: The unique identifier of the sample.
-    :param parent_peak_tolerance: Tolerance for merging near-duplicate parent peaks.
+    :param query_params: Query parameters for MS2 summary including parent peak tolerance.
     :param user: Authenticated user with guest access.
     :return: MS2 summary data.
     """
     return await get_ms2_summary(
         sample_item_id=sample_item_id,
-        parent_peak_tolerance=parent_peak_tolerance,
+        **query_params.model_dump(),
     )
 
 
@@ -208,19 +208,19 @@ async def get_ms2_summary_route(
 @api_route(token_access=True)
 async def get_ms1_averaged_centroids_route(
     sample_item_id: str,
-    ppm: int = Query(1, description="Mass tolerance in ppm for centroid binning"),
+    query_params: GetMs1CentroidsQueryParams = Depends(),
     user=Depends(guest_user),
 ):
     """Retrieve averaged MS1 centroids for a sample.
 
     :param sample_item_id: The unique identifier of the sample.
-    :param ppm: Mass tolerance in ppm for centroid binning.
+    :param query_params: Query parameters for MS1 centroid retrieval.
     :param user: Authenticated user with guest access.
     :return: Averaged MS1 centroid data.
     """
     return await get_ms1_averaged_centroids(
         sample_item_id=sample_item_id,
-        ppm=ppm,
+        **query_params.model_dump(),
     )
 
 
@@ -228,26 +228,19 @@ async def get_ms1_averaged_centroids_route(
 @api_route(token_access=True)
 async def get_ms2_averaged_centroids_route(
     sample_item_id: str,
-    noise_threshold: float = Query(
-        10.0, description="Minimum signal-to-noise ratio threshold"
-    ),
-    parent_peak_tolerance: float = Query(
-        0.001, description="Tolerance in Da for merging parent peaks"
-    ),
+    query_params: GetMs2CentroidsQueryParams = Depends(),
     user=Depends(guest_user),
 ):
     """Retrieve averaged MS2 centroids for each parent peak.
 
     :param sample_item_id: The unique identifier of the sample.
-    :param noise_threshold: Minimum SNR for peak inclusion.
-    :param parent_peak_tolerance: Tolerance for merging near-duplicate parent peaks.
+    :param query_params: Query parameters for MS2 centroid retrieval.
     :param user: Authenticated user with guest access.
     :return: Averaged MS2 centroids per parent peak.
     """
     return await get_ms2_averaged_centroids(
         sample_item_id=sample_item_id,
-        noise_threshold=noise_threshold,
-        parent_peak_tolerance=parent_peak_tolerance,
+        **query_params.model_dump(),
     )
 
 
@@ -255,34 +248,17 @@ async def get_ms2_averaged_centroids_route(
 @api_route(token_access=True)
 async def get_ms2_timeseries_route(
     sample_item_id: str,
-    parent_peak_mz: float = Query(
-        ..., description="Parent peak m/z to get fragment timeseries for"
-    ),
-    noise_threshold: float = Query(
-        10.0, description="Minimum signal-to-noise ratio threshold"
-    ),
-    parent_peak_tolerance: float = Query(
-        0.001, description="Tolerance in Da for matching parent peaks"
-    ),
-    normalize_by: Literal["tic"] | None = Query(
-        None, description="Normalization mode: 'tic' or None"
-    ),
+    query_params: GetMs2TimeseriesQueryParams = Depends(),
     user=Depends(guest_user),
 ):
     """Retrieve fragment timeseries for a single parent peak.
 
     :param sample_item_id: The unique identifier of the sample.
-    :param parent_peak_mz: Target parent peak m/z value.
-    :param noise_threshold: Minimum SNR for peak inclusion.
-    :param parent_peak_tolerance: Tolerance for matching parent peaks.
-    :param normalize_by: Normalization mode: 'tic' or None.
+    :param query_params: Query parameters for MS2 timeseries retrieval.
     :param user: Authenticated user with guest access.
     :return: Fragment timeseries data.
     """
     return await get_ms2_timeseries(
         sample_item_id=sample_item_id,
-        parent_peak_mz=parent_peak_mz,
-        noise_threshold=noise_threshold,
-        parent_peak_tolerance=parent_peak_tolerance,
-        normalize_by=normalize_by,
+        **query_params.model_dump(),
     )
