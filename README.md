@@ -694,25 +694,9 @@ Agents are small Python programs installed with Pyinstaller on Windows instrumen
 
 ```sh
 agents/           # Agent applications
-  export/             # CSV Export Agent (to export match results into file)
   file/               # File Agent (for ThermoFisher Orbitrap instruments)
   tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
 ```
-
-### CSV Export Agent
-
-The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architectures. It monitors new samples arriving in a specified dataset, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
-
-#### Build
-
-To run the agent build script, execute:
-
-```
-cd agents/export
-./build.ps1
-```
-
-Then run the executable found in `agents/export/dist`. See the agent README for details.
 
 ### File Agent
 
