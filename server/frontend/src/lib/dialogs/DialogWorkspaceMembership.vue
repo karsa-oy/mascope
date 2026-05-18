@@ -47,14 +47,12 @@ const loadMembers = async () => {
   }
 }
 
-// Enrich members with user details from the global user list
+// Enrich members with display data
 const enrichedMembers = computed(() =>
   members.value.map((m) => {
-    const user = app.data.user.list.find((u) => u.id === m.user_id)
     return {
       ...m,
-      username: user?.username ?? `User #${m.user_id}`,
-      email: user?.email ?? '',
+      username: m.username ?? `User #${m.user_id}`,
       pretty_role: prettyWorkspaceRoleName(m.workspace_role)
     }
   })
@@ -183,11 +181,6 @@ watch(visible, (v) => {
         <Column header="Username" field="username">
           <template #body="{ data }">
             {{ data.username }}
-          </template>
-        </Column>
-        <Column header="Email" field="email">
-          <template #body="{ data }">
-            {{ data.email }}
           </template>
         </Column>
         <Column header="Role" field="workspace_role">

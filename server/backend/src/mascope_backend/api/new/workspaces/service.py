@@ -264,15 +264,17 @@ async def delete_workspace(workspace_id: str) -> dict:
 
 @api_controller()
 async def get_workspace_members(workspace_id: str) -> dict:
-    """List all members of a workspace."""
+    """List all members of a workspace with usernames."""
     async with async_session() as session:
         result = await session.execute(
-            select(WorkspaceMember).where(WorkspaceMember.workspace_id == workspace_id)
+            select(WorkspaceMember, User.username)
+            .join(User, WorkspaceMember.user_id == User.id)
+            .where(WorkspaceMember.workspace_id == workspace_id)
         )
-        members = result.scalars().all()
+        rows = result.all()
         return {
-            "data": [m.to_dict() for m in members],
-            "total": len(members),
+            "data": [{**m.to_dict(), "username": username} for m, username in rows],
+            "total": len(rows),
         }
 
 
