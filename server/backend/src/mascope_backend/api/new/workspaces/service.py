@@ -360,6 +360,11 @@ async def update_workspace_member(
     """
     _enforce_role_ceiling(caller_role, workspace_role)
     async with async_session() as session:
+        # Validate workspace exists
+        workspace = await session.get(Workspace, workspace_id)
+        if workspace is None:
+            raise WorkspaceNotFoundException(workspace_id)
+
         result = await session.execute(
             select(WorkspaceMember).where(
                 WorkspaceMember.workspace_id == workspace_id,
@@ -387,6 +392,11 @@ async def update_workspace_member(
 async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
     """Remove a user from a workspace."""
     async with async_session() as session:
+        # Validate workspace exists
+        workspace = await session.get(Workspace, workspace_id)
+        if workspace is None:
+            raise WorkspaceNotFoundException(workspace_id)
+
         result = await session.execute(
             select(WorkspaceMember).where(
                 WorkspaceMember.workspace_id == workspace_id,
