@@ -161,13 +161,35 @@ async def test_remove_member_as_admin(admin_client, outsider_user, ws_alpha):
 
 
 @pytest.mark.asyncio
-async def test_remove_owner_member_forbidden(admin_client, outsider_user, ws_alpha):
-    """Admin cannot remove the owner from the workspace."""
-
-    resp = await admin_client.delete(
+async def test_remove_last_owner_forbidden(owner_client, ws_alpha):
+    """The last owner of a workspace cannot remove themselves (403)."""
+    resp = await owner_client.delete(
         _members_url(ws_alpha["workspace_id"], ws_alpha["members"]["owner"].id),
     )
     assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_remove_owner(
+    admin_client, owner_client, outsider_user, ws_alpha
+):
+    """Admin cannot remove an owner even when multiple owners exist (role ceiling)."""
+    # Add outsider as a second owner
+    await owner_client.post(
+        _members_url(ws_alpha["workspace_id"]),
+        json={"user_id": outsider_user.id, "workspace_role": "owner"},
+    )
+
+    # Admin tries to remove the second owner — should be blocked by role ceiling
+    resp = await admin_client.delete(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+    )
+    assert resp.status_code == 403
+
+    # Clean up: owner removes the second owner
+    await owner_client.delete(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+    )
 
 
 @pytest.mark.asyncio

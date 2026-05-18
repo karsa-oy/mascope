@@ -162,4 +162,5 @@ async def remove_workspace_member_route(
     return await remove_workspace_member(
         workspace_id=workspace_id,
         user_id=user_id,
+        caller_role=membership.workspace_role,
     )

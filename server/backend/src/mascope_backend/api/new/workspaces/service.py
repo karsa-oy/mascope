@@ -389,8 +389,17 @@ async def update_workspace_member(
 
 
 @api_controller()
-async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
-    """Remove a user from a workspace."""
+async def remove_workspace_member(
+    workspace_id: str, user_id: int, caller_role: str
+) -> dict:
+    """Remove a user from a workspace.
+
+    :param workspace_id: The workspace containing the member.
+    :param user_id: The ID of the member to remove.
+    :param caller_role: The workspace role of the caller. Enforces a role
+        ceiling, the caller cannot remove a member whose role exceeds
+        their own (e.g. admin cannot remove owner).
+    """
     async with async_session() as session:
         # Validate workspace exists
         workspace = await session.get(Workspace, workspace_id)
@@ -408,6 +417,9 @@ async def remove_workspace_member(workspace_id: str, user_id: int) -> dict:
             raise WorkspaceMemberNotFoundException(
                 f"User {user_id} is not a member of workspace {workspace_id}."
             )
+
+        # Enforce role ceiling: caller cannot remove a higher-ranked member
+        _enforce_role_ceiling(caller_role, member.workspace_role)
 
         if member.workspace_role == "owner":
             await _check_last_owner(session, workspace_id)
