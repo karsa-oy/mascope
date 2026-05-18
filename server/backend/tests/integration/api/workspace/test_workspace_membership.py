@@ -201,6 +201,100 @@ async def test_remove_member_as_guest_forbidden(guest_client, test_users, ws_alp
     assert resp.status_code == 403
 
 
+# ============= Role ceiling enforcement =============
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_add_owner(admin_client, outsider_user, ws_alpha):
+    """Admin cannot assign the owner role (exceeds their own level)."""
+    resp = await admin_client.post(
+        _members_url(ws_alpha["workspace_id"]),
+        json={"user_id": outsider_user.id, "workspace_role": "owner"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_promote_to_owner(admin_client, outsider_user, ws_alpha):
+    """Admin cannot promote a member to owner (exceeds their own level)."""
+    # Add outsider as guest first
+    await admin_client.post(
+        _members_url(ws_alpha["workspace_id"]),
+        json={"user_id": outsider_user.id, "workspace_role": "guest"},
+    )
+
+    # Attempt to promote to owner
+    resp = await admin_client.patch(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+        json={"workspace_role": "owner"},
+    )
+    assert resp.status_code == 403
+
+    # Clean up
+    await admin_client.delete(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+    )
+
+
+@pytest.mark.asyncio
+async def test_owner_can_assign_owner(owner_client, outsider_user, ws_alpha):
+    """Owner can assign the owner role to another member."""
+    # Add outsider as guest first
+    await owner_client.post(
+        _members_url(ws_alpha["workspace_id"]),
+        json={"user_id": outsider_user.id, "workspace_role": "guest"},
+    )
+
+    # Promote to owner
+    resp = await owner_client.patch(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+        json={"workspace_role": "owner"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["workspace_role"] == "owner"
+
+    # Clean up
+    await owner_client.delete(
+        _members_url(ws_alpha["workspace_id"], outsider_user.id),
+    )
+
+
+# ============= Self-removal =============
+
+
+@pytest.mark.asyncio
+async def test_member_can_remove_self(guest_client, test_users, ws_alpha, admin_client):
+    """Any member can remove themselves from a workspace."""
+    # Use admin to add the outsider as a guest we can control
+    # Instead, use the guest user who is already a member - but we need to re-add them after
+    # So let's use a different approach: add outsider, create a client, self-remove
+
+    # Add outsider as editor
+    outsider_user_id = test_users["guest"].id
+
+    # Guest removing themselves
+    resp = await guest_client.delete(
+        _members_url(ws_alpha["workspace_id"], outsider_user_id),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["removed"] is True
+
+    # Re-add guest for other tests
+    await admin_client.post(
+        _members_url(ws_alpha["workspace_id"]),
+        json={"user_id": outsider_user_id, "workspace_role": "guest"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_guest_cannot_remove_others(guest_client, test_users, ws_alpha):
+    """Guest cannot remove other members (only self)."""
+    resp = await guest_client.delete(
+        _members_url(ws_alpha["workspace_id"], test_users["editor"].id),
+    )
+    assert resp.status_code == 403
+
+
 @pytest.mark.asyncio
 async def test_remove_member_as_editor_forbidden(editor_client, test_users, ws_alpha):
     """Editor cannot remove members."""
