@@ -17,7 +17,7 @@ class WorkspacesResource(BaseResource):
 
         from mascope_sdk import MascopeClient
 
-        mascope = MascopeClient()
+        mascope = MascopeClient(workspace="My Workspace")
 
         # List all workspaces
         workspaces = mascope.workspaces.list()

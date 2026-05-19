@@ -103,7 +103,6 @@ def run(
       mascope test run -v                   # Run tests with verbose output\n
       mascope test run -m unit              # Run only unit tests\n
       mascope test run -n dataset_model     # Run a specific test by name\n
-      mascope test run -m migrations        # Run only Alembic stairway tests\n
       mascope test run -m migrations        # Run Alembic migration tests\n
     """
     # Default to backend if no components specified
