@@ -74,11 +74,15 @@ watchEffect(() => {
 const canClose = computed(() => !!app.data.workspace.focused)
 
 // PrimeVue's Drawer closes on any document click outside its DOM tree.
-// Dialogs with appendTo="body" are teleported out of the Drawer, so clicking
-// inside them triggers the Drawer's outside-click handler. We block the close
-// when a PrimeVue dialog mask is present in the DOM.
+// Dialogs and overlays with appendTo="body" are teleported out of the Drawer,
+// so clicking inside them triggers the Drawer's outside-click handler. We block
+// the close when any PrimeVue overlay layer is present in the DOM.
 const onDrawerVisibleUpdate = (val) => {
-  if (!val && document.querySelector('.p-dialog-mask')) return
+  if (
+    !val &&
+    document.querySelector('.p-dialog-mask, .p-overlay-mask, [data-pc-section="overlay"]')
+  )
+    return
   sidebarMenu.open = val
 }
 
