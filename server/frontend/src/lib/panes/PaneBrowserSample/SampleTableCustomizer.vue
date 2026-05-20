@@ -17,9 +17,6 @@ const app = useApp()
 const customizer = useCustomizerPopover()
 
 const popoverRef = ref()
-onMounted(() => {
-  customizer.popover = popoverRef.value
-})
 
 const tab = ref('All')
 
@@ -63,26 +60,45 @@ const isInitialized = computed(() => JSON.stringify(customizer.config) !== '{}')
 
 // local storage persistence
 
-const storageKey = computed(() => `sample-browser-batch[${app.data.batch.focused.sample_batch_id}]`)
+const STORAGE_KEY = 'mascope.browser.sample.tableConfig'
+
+// Clean up legacy per-batch localStorage keys (runs once on component mount)
+// TODO: Remove this function and associated code after a few releases
+function cleanupLegacyKeys() {
+  const keysToRemove = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith('sample-browser-batch[')) {
+      keysToRemove.push(key)
+    }
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key))
+}
 
 // write to local storage
 function writeConfig() {
   if (isInitialized.value && !isDefault.value) {
     const newState = JSON.stringify(customizer.config)
-    localStorage.setItem(storageKey.value, newState)
+    localStorage.setItem(STORAGE_KEY, newState)
   }
 }
 // read from local storage, falling back on default
 function readConfig() {
-  const storedState = localStorage.getItem(storageKey.value)
+  const storedState = localStorage.getItem(STORAGE_KEY)
   const defaultState = JSON.stringify(defaultConfig.value)
   customizer.config = JSON.parse(storedState ?? defaultState)
 }
 // reset to default config and clear local storage
 function resetConfig() {
   customizer.config = defaultConfig.value
-  localStorage.removeItem(storageKey.value)
+  localStorage.removeItem(STORAGE_KEY)
 }
+
+// one-time legacy cleanup on mount
+onMounted(() => {
+  customizer.popover = popoverRef.value
+  cleanupLegacyKeys()
+})
 
 // write to local storage when any options update
 watch(() => customizer.config, writeConfig, { deep: true })
