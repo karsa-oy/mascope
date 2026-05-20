@@ -27,11 +27,7 @@ watch(
   peakTable,
   (newTableRef) => {
     if (newTableRef) {
-      scroller.bind(
-        newTableRef,
-        () => app.data.peak.list,
-        () => ({ sortField: 'height', sortOrder: -1 })
-      )
+      scroller.bind(newTableRef, () => app.data.peak.list)
     }
   },
   { immediate: true }
@@ -58,11 +54,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  scroller.bind(
-    null,
-    () => [],
-    () => ({ sortField: 'height', sortOrder: -1 })
-  )
+  scroller.bind(null, () => [])
 })
 </script>
 
@@ -99,8 +91,9 @@ onBeforeUnmount(() => {
       selectionMode="single"
       :metaKeySelection="false"
       v-model:selection="app.data.peak.focused"
-      sortField="height"
-      :sortOrder="-1"
+      :sortField="scroller.sortField"
+      :sortOrder="scroller.sortOrder"
+      @sort="(e) => scroller.setSort(e.sortField, e.sortOrder)"
       size="small"
       scrollable
       :scrollHeight="`${height}px`"

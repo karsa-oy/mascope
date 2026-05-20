@@ -1,11 +1,25 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
+const SORT_STORAGE_KEY = 'mascope.browser.peak.sort'
+
+function loadSortConfig() {
+  try {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return { sortField: 'height', sortOrder: -1 }
+}
+
 export const usePeakScroller = defineStore('browser.peak.scroller', () => {
   // Component refs and data getters bound from PaneBrowserPeak
   const tableRef = ref(null)
   const getPeaks = ref(() => [])
-  const getSortConfig = ref(() => ({ sortField: 'height', sortOrder: -1 }))
+
+  // Persistent sort state
+  const initialSort = loadSortConfig()
+  const sortField = ref(initialSort.sortField)
+  const sortOrder = ref(initialSort.sortOrder)
 
   /**
    * Get sorted/filtered data matching DataTable's actual display order.
@@ -19,15 +33,18 @@ export const usePeakScroller = defineStore('browser.peak.scroller', () => {
 
     // Fallback: manually sort using current config
     const peaks = getPeaks.value()
-    const { sortField, sortOrder } = getSortConfig.value()
+    const { sortField: field, sortOrder: order } = {
+      sortField: sortField.value,
+      sortOrder: sortOrder.value
+    }
 
-    if (!sortField) return peaks
+    if (!field) return peaks
 
     return [...peaks].sort((a, b) => {
       // Navigate nested properties (e.g., 'match.match_score')
       const getValue = (obj, path) => path.split('.').reduce((val, key) => val?.[key], obj)
-      const aVal = getValue(a, sortField)
-      const bVal = getValue(b, sortField)
+      const aVal = getValue(a, field)
+      const bVal = getValue(b, field)
 
       // Handle null/undefined
       if (aVal == null && bVal == null) return 0
@@ -35,8 +52,8 @@ export const usePeakScroller = defineStore('browser.peak.scroller', () => {
       if (bVal == null) return -1
 
       // Apply sort direction
-      const order = sortOrder || -1
-      return aVal < bVal ? -1 * order : aVal > bVal ? 1 * order : 0
+      const dir = order || -1
+      return aVal < bVal ? -1 * dir : aVal > bVal ? 1 * dir : 0
     })
   })
 
@@ -97,16 +114,29 @@ export const usePeakScroller = defineStore('browser.peak.scroller', () => {
   }
 
   /**
+   * Update sort field and order, persisting to localStorage.
+   */
+  function setSort(field, order) {
+    sortField.value = field
+    sortOrder.value = order
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify({ sortField: field, sortOrder: order }))
+    } catch {}
+  }
+
+  /**
    * Bind component refs and data from PaneBrowserPeak.
    * Pass getter functions to maintain reactivity across component updates.
    */
-  function bind(table, peaksGetter, sortConfigGetter) {
+  function bind(table, peaksGetter) {
     tableRef.value = table
     getPeaks.value = peaksGetter || (() => [])
-    getSortConfig.value = sortConfigGetter || (() => ({ sortField: 'height', sortOrder: -1 }))
   }
 
   return {
+    sortField,
+    sortOrder,
+    setSort,
     bind,
     scrollToPeak
   }
