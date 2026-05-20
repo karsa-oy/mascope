@@ -21,6 +21,7 @@ from sqlalchemy import (
     Boolean,
     Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -92,7 +93,7 @@ class Workspace(Base):
     __tablename__ = "workspace"
 
     workspace_id: Mapped[str] = mapped_column(String(16), primary_key=True)
-    workspace_name: Mapped[str] = mapped_column(String(256), unique=True)
+    workspace_name: Mapped[str] = mapped_column(String(256))
     workspace_description: Mapped[Optional[str]] = mapped_column(Text)
     workspace_status: Mapped[str] = mapped_column(
         String(20), server_default=text("'active'")
@@ -106,6 +107,14 @@ class Workspace(Base):
     )
     workspace_utc_modified: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_workspace_name_ci",
+            func.lower(workspace_name),
+            unique=True,
+        ),
     )
 
     # Relationships

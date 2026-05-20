@@ -34,7 +34,7 @@ workspaces_router = APIRouter(prefix="/api/workspaces", tags=["Workspaces"])
 @workspaces_router.get("")
 @api_route(token_access=True)
 async def get_workspaces_route(
-    workspace_status: str = Query(None),
+    workspace_status: str | None = Query(None),
     user: User = Depends(current_active_user),
 ):
     """List workspaces the current user has access to."""
