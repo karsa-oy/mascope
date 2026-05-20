@@ -9,6 +9,7 @@ classifiers = [
 authors = [
     { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" },
     { name = "Philip Chernonog", email = "philip.chernonog@karsa.fi" },
+    { name = "Konstantin Tumashevich", email = "konstantin.tumashevich@karsa.fi" },
     ]
 maintainers = [
     { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" },
