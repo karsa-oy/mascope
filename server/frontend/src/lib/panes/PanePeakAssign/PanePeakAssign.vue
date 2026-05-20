@@ -24,6 +24,22 @@ const app = useApp()
 
 const preview = usePreview()
 
+const PARAMS_STORAGE_KEY = 'mascope.peakAssign.params'
+
+function loadStoredParams() {
+  try {
+    const stored = localStorage.getItem(PARAMS_STORAGE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return null
+}
+
+function saveParams(mzPrecision, formulaRange) {
+  try {
+    localStorage.setItem(PARAMS_STORAGE_KEY, JSON.stringify({ mzPrecision, formulaRange }))
+  } catch {}
+}
+
 const props = defineProps({
   height: {
     type: Number,
@@ -70,11 +86,12 @@ onMounted(() => {
     .then(({ data }) => {
       // Store the cheminfo config
       chemConfig.value = data?.data?.params?.cheminfo_config
-      // Initialize parameters with values from API response
+      // Initialize parameters: prefer localStorage, fall back to API defaults
       if (chemConfig.value) {
-        params.mzPrecision = chemConfig.value.DEFAULT_MZ_PRECISION
-        params.formulaRange = chemConfig.value.DEFAULT_FORMULA_RANGE
-        formulaRangeModel.value = chemConfig.value.DEFAULT_FORMULA_RANGE
+        const stored = loadStoredParams()
+        params.mzPrecision = stored?.mzPrecision ?? chemConfig.value.DEFAULT_MZ_PRECISION
+        params.formulaRange = stored?.formulaRange ?? chemConfig.value.DEFAULT_FORMULA_RANGE
+        formulaRangeModel.value = params.formulaRange
       }
     })
     .catch((err) => {
@@ -129,6 +146,16 @@ watch(
   (newValue) => {
     if (formulaRangeModel.value !== newValue) {
       formulaRangeModel.value = newValue
+    }
+  }
+)
+
+// Persist params to localStorage when they change
+watch(
+  () => ({ mzPrecision: params.mzPrecision, formulaRange: params.formulaRange }),
+  ({ mzPrecision, formulaRange }) => {
+    if (mzPrecision != null && formulaRange && FORMULA_RANGE_PATTERN.test(formulaRange.trim())) {
+      saveParams(mzPrecision, formulaRange)
     }
   }
 )
