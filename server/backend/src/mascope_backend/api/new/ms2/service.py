@@ -1,6 +1,6 @@
-"""MS2 analysis controller.
+"""MS2 analysis service.
 
-Provides endpoints for server-side MS2 data extraction and aggregation,
+Provides server-side MS2 data extraction and aggregation,
 delegating heavy computation to thread workers to avoid blocking the async event loop.
 """
 
@@ -8,10 +8,8 @@ from typing import Literal
 
 import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
-from mascope_backend.api.lib.api_features import api_controller
 
 
-@api_controller()
 async def get_ms2_summary(
     sample_item_id: str,
     parent_peak_tolerance: float = 0.001,
@@ -21,11 +19,8 @@ async def get_ms2_summary(
     Returns parent peaks, HCD energy map, isolation width, and scan counts.
 
     :param sample_item_id: Unique identifier for the sample.
-    :type sample_item_id: str
     :param parent_peak_tolerance: Tolerance in Da for merging duplicate parent peaks.
-    :type parent_peak_tolerance: float
     :return: Dictionary with MS2 summary data.
-    :rtype: dict
     """
     sample = await fetch_sample(sample_item_id)
 
@@ -43,7 +38,6 @@ async def get_ms2_summary(
     }
 
 
-@api_controller()
 async def get_ms2_averaged_centroids(
     sample_item_id: str,
     noise_threshold: float = 10.0,
@@ -55,13 +49,9 @@ async def get_ms2_averaged_centroids(
     and centroid averaging.
 
     :param sample_item_id: Unique identifier for the sample.
-    :type sample_item_id: str
     :param noise_threshold: Minimum signal-to-noise ratio threshold.
-    :type noise_threshold: float
     :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
-    :type parent_peak_tolerance: float
     :return: Dictionary with averaged MS2 centroids keyed by parent peak m/z.
-    :rtype: dict
     """
     sample = await fetch_sample(sample_item_id)
 
@@ -99,7 +89,6 @@ async def get_ms2_averaged_centroids(
     }
 
 
-@api_controller()
 async def get_ms1_averaged_centroids(
     sample_item_id: str,
     ppm: int = 1,
@@ -110,11 +99,8 @@ async def get_ms1_averaged_centroids(
     averaged centroided MS1 spectrum over the sample's time range.
 
     :param sample_item_id: Unique identifier for the sample.
-    :type sample_item_id: str
     :param ppm: Mass tolerance in ppm for centroid binning.
-    :type ppm: int
     :return: Dictionary with mz, intensity, resolution, and signal_to_noise arrays.
-    :rtype: dict
     """
     sample = await fetch_sample(sample_item_id)
 
@@ -143,7 +129,6 @@ async def get_ms1_averaged_centroids(
     }
 
 
-@api_controller()
 async def get_ms2_timeseries(
     sample_item_id: str,
     parent_peak_mz: float,
@@ -154,18 +139,12 @@ async def get_ms2_timeseries(
     """Retrieve fragment timeseries for a single parent peak.
 
     :param sample_item_id: Unique identifier for the sample.
-    :type sample_item_id: str
     :param parent_peak_mz: The parent peak m/z to get timeseries for.
-    :type parent_peak_mz: float
     :param noise_threshold: Minimum signal-to-noise ratio threshold.
-    :type noise_threshold: float
     :param parent_peak_tolerance: Tolerance in Da for matching parent peaks.
-    :type parent_peak_tolerance: float
     :param normalize_by: Normalization mode. ``"tic"`` normalizes by scan TIC,
         ``None`` returns raw intensities.
-    :type normalize_by: Literal["tic"] | None
     :return: Dictionary with fragment timeseries data.
-    :rtype: dict
     """
     sample = await fetch_sample(sample_item_id)
 
