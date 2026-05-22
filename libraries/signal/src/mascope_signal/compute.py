@@ -646,6 +646,8 @@ async def get_orbi_ms2_centroids_by_parent(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
     parent_peak_tolerance: float = 0.001,
     ppm: int = 1,
     average: bool = True,
@@ -660,6 +662,10 @@ async def get_orbi_ms2_centroids_by_parent(
     :type t_max: float | None, optional
     :param polarity: Polarity filter ('+' or '-'), optional.
     :type polarity: Literal['+', '-'] | None, optional
+    :param mz_min: Minimum parent peak m/z to include, optional.
+    :type mz_min: float | None, optional
+    :param mz_max: Maximum parent peak m/z to include, optional.
+    :type mz_max: float | None, optional
     :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
     :type parent_peak_tolerance: float
     :param ppm: Mass tolerance in ppm for centroid binning, defaults to 1.
@@ -679,6 +685,8 @@ async def get_orbi_ms2_centroids_by_parent(
                 t_min=t_min,
                 t_max=t_max,
                 polarity=polarity,
+                mz_min=mz_min,
+                mz_max=mz_max,
                 parent_peak_tolerance=parent_peak_tolerance,
                 ppm=ppm,
                 average=average,

@@ -831,6 +831,8 @@ def get_ms2_centroids_by_parent(
     t_min: float | None = None,
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
+    mz_min: float | None = None,
+    mz_max: float | None = None,
     parent_peak_tolerance: float = 0.001,
     ppm: int = 1,
     average: bool = True,
@@ -848,6 +850,12 @@ def get_ms2_centroids_by_parent(
     :type t_max: float | None, optional
     :param polarity: Polarity filter ('+' or '-'), optional.
     :type polarity: Literal['+', '-'] | None, optional
+    :param mz_min: Minimum parent peak m/z to include, optional.
+                   Only parent peaks with m/z >= mz_min are processed.
+    :type mz_min: float | None, optional
+    :param mz_max: Maximum parent peak m/z to include, optional.
+                   Only parent peaks with m/z <= mz_max are processed.
+    :type mz_max: float | None, optional
     :param parent_peak_tolerance: Tolerance in Da for merging parent peaks.
     :type parent_peak_tolerance: float
     :param ppm: Mass tolerance in ppm for centroid binning, defaults to 1.
@@ -869,6 +877,18 @@ def get_ms2_centroids_by_parent(
         )
         if not parent_peak_mapping:
             return {}
+
+        # Filter parent peaks by m/z range
+        if mz_min is not None or mz_max is not None:
+            low = mz_min if mz_min is not None else -np.inf
+            high = mz_max if mz_max is not None else np.inf
+            parent_peak_mapping = {
+                pp: indices
+                for pp, indices in parent_peak_mapping.items()
+                if low <= pp <= high
+            }
+            if not parent_peak_mapping:
+                return {}
 
         centroid_mapping: dict[
             float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
