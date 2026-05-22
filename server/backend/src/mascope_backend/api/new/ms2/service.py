@@ -14,12 +14,14 @@ from typing import Literal
 
 import mascope_signal.compute as m_compute
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
+from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 
 
 DEFAULT_TIMEOUT = 120  # seconds
 
 
+@api_controller()
 async def get_ms2_summary(
     sample_item_id: str,
     parent_peak_tolerance: float = 0.001,
@@ -60,6 +62,7 @@ async def get_ms2_summary(
     }
 
 
+@api_controller()
 async def get_ms2_averaged_centroids(
     sample_item_id: str,
     noise_threshold: float = 10.0,
@@ -123,6 +126,7 @@ async def get_ms2_averaged_centroids(
     }
 
 
+@api_controller()
 async def get_ms1_averaged_centroids(
     sample_item_id: str,
     ppm: int = 1,
@@ -175,6 +179,7 @@ async def get_ms1_averaged_centroids(
     }
 
 
+@api_controller()
 async def get_ms2_timeseries(
     sample_item_id: str,
     parent_peak_mz: float,
