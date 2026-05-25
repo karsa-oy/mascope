@@ -172,6 +172,10 @@ def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Datase
     :rtype: xr.Dataset
     """
     peak_data = load_array(base_filename, var="peak_timeseries")
+    # Ensure backwards compatibility: add is_sparse if missing
+    if "is_sparse" not in peak_data.data_vars:
+        ensure_is_sparse_exists(base_filename)
+        peak_data = load_array(base_filename, var="peak_timeseries")
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
         peak_data = peak_data.sel(mz=peak_data.mz.values[~bad_peak_mask])
@@ -729,7 +733,9 @@ def ensure_is_sparse_exists(base_filename: str) -> bool:
     :return: True if the variable was created (migration occurred), False if already present
     :rtype: bool
     """
-    peak_timeseries_path = m_name.filename_to_zarr_path(base_filename, "peak_timeseries")
+    peak_timeseries_path = m_name.filename_to_zarr_path(
+        base_filename, "peak_timeseries"
+    )
     if not os.path.exists(peak_timeseries_path):
         return False
 
@@ -762,7 +768,11 @@ def ensure_is_sparse_exists(base_filename: str) -> bool:
     with write_lock:
         z = zarr.open(peak_timeseries_path, mode="r+", synchronizer=synchronizer)
         # Get chunk size from existing 1D variables
-        mz_chunk_size = z["is_timeseries_computed"].chunks[0] if z["is_timeseries_computed"].chunks else mz_size
+        mz_chunk_size = (
+            z["is_timeseries_computed"].chunks[0]
+            if z["is_timeseries_computed"].chunks
+            else mz_size
+        )
         z.create_dataset(
             "is_sparse",
             data=is_sparse_values,

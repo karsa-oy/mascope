@@ -894,9 +894,6 @@ async def load_peak_timeseries(
     :return: The peak timeseries dataset
     :rtype: xr.Dataset
     """
-    # --- Ensure backwards compatibility: add is_sparse if missing ---
-    m_io.ensure_is_sparse_exists(base_filename)
-
     # --- Load existing peak timeseries from the sample file ---
     mzs_arr = np.unique(np.asarray(mzs))
     peak_timeseries = m_io.load_peak_data(base_filename).sel(
