@@ -347,7 +347,7 @@ class TestWritePeaksEdgeCases:
         assert not np.allclose(first_values, second_values)
 
 
-class TestEnsureIsSparseExists:
+class TestEnsureSparsityExists:
     """Tests for ensure_sparsity_exists backwards compatibility function."""
 
     def test_returns_false_when_sparsity_already_present(
@@ -382,10 +382,10 @@ class TestEnsureIsSparseExists:
         z = zarr.open(peak_timeseries_zarr_path, mode="r")
         assert "sparsity" in z
         assert z["sparsity"].shape == (TEST_MZ_SIZE,)
-        assert z["sparsity"].dtype == bool
+        assert z["sparsity"].dtype == np.float64
 
-        # All should be False since no timeseries was computed
-        assert not np.any(z["sparsity"][:])
+        # All should be 0.0 since no timeseries was computed
+        assert np.all(z["sparsity"][:] == 0.0)
 
         # Verify xarray dimension metadata
         assert z["sparsity"].attrs["_ARRAY_DIMENSIONS"] == ["mz"]
@@ -425,12 +425,13 @@ class TestEnsureIsSparseExists:
         # Verify results
         z = zarr.open(peak_timeseries_zarr_path, mode="r")
         sparsity = z["sparsity"][:]
+        n_time = ds.sizes["time"]
 
-        assert sparsity[0] is np.True_  # has zero height
-        assert sparsity[1] is np.True_  # has negative height
-        assert sparsity[2] is np.False_  # all positive
-        # Uncomputed peaks default to False
-        assert not np.any(sparsity[3:])
+        assert sparsity[0] == pytest.approx(1.0 / n_time)  # 1 zero height
+        assert sparsity[1] == pytest.approx(1.0 / n_time)  # 1 negative height
+        assert sparsity[2] == 0.0  # all positive
+        # Uncomputed peaks default to 0.0
+        assert np.all(sparsity[3:] == 0.0)
 
         # Cleanup
         shutil.rmtree(peak_timeseries_zarr_path)
@@ -467,13 +468,16 @@ class TestEnsureIsSparseExists:
         update_ds["peak_heights"].values[0, 2] = -1.0
 
         # Add sparsity to the update dataset
-        sparsity_vals = np.any(update_ds["peak_heights"].values <= 0, axis=1)
+        sparsity_vals = (
+            np.sum(update_ds["peak_heights"].values <= 0, axis=1)
+            / update_ds.sizes["time"]
+        )
         update_ds["sparsity"] = (["mz"], sparsity_vals)
 
         await write_peaks(update_ds, TEST_FILENAME, overwrite=False)
 
         # Verify
         updated = xr.open_zarr(existing_peak_timeseries_zarr)
-        assert updated["sparsity"].isel(mz=3).values == True  # noqa: E712
-        assert updated["sparsity"].isel(mz=7).values == False  # noqa: E712
+        assert updated["sparsity"].isel(mz=3).values > 0.0  # has negative height
+        assert updated["sparsity"].isel(mz=7).values == 0.0  # all positive
         updated.close()

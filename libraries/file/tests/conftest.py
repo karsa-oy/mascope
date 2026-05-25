@@ -135,7 +135,7 @@ def create_peak_timeseries_dataset():
         is_satellite = np.zeros(n_mz, dtype=bool)
         is_weak = np.zeros(n_mz, dtype=bool)
         is_timeseries_computed = np.zeros(n_mz, dtype=bool)
-        sparsity = np.zeros(n_mz, dtype=bool)
+        sparsity = np.zeros(n_mz, dtype=np.float64)
         sum_peak_areas = np.nansum(peak_areas, axis=1)
         sum_peak_heights = np.nansum(peak_heights, axis=1)
         signal_to_noise = rng.uniform(5, 100, n_mz)

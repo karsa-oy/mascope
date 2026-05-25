@@ -11,8 +11,8 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray
-from scipy.signal._peak_finding_utils import (
-    _select_by_peak_distance,  # ty:ignore[unresolved-import]
+from scipy.signal._peak_finding_utils import (  # ty:ignore[unresolved-import]
+    _select_by_peak_distance,
 )
 
 import mascope_file.io as m_io
@@ -113,7 +113,7 @@ class BasePeakDetector(ABC):
         peak_areas = da.full(data_shape, np.nan, dtype=np.float64)
         peak_heights = da.full(data_shape, np.nan, dtype=np.float64)
         peak_timeseries_computed = da.full(peaks.mz.size, False, dtype=bool)
-        sparsity = da.full(peaks.mz.size, False, dtype=bool)
+        sparsity = da.full(peaks.mz.size, 0.0, dtype=np.float64)
         data_vars = {
             "peak_areas": (("mz", "time"), peak_areas),
             "peak_heights": (("mz", "time"), peak_heights),

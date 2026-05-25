@@ -725,8 +725,8 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
 
     For backwards compatibility with older zarr files that lack the variable,
     this function creates 'sparsity' if missing. For peaks with computed
-    timeseries, it derives the value from existing peak_heights data.
-    For uncomputed peaks, it defaults to False.
+    timeseries, it derives the fraction of scans with peak_heights <= 0.
+    For uncomputed peaks, it defaults to 0.0.
 
     :param base_filename: Sample file filename
     :type base_filename: str
@@ -753,7 +753,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
     # Compute sparsity for all peaks
     mz_size = z["mz"].shape[0]
     is_computed = z["is_timeseries_computed"][:]
-    sparsity_values = np.zeros(mz_size, dtype=bool)
+    sparsity_values = np.zeros(mz_size, dtype=np.float64)
 
     # For computed peaks, derive from peak_heights
     computed_indices = np.where(is_computed)[0]
@@ -761,8 +761,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
         peak_heights = z["peak_heights"]
         for idx in computed_indices:
             row = peak_heights[idx, :]
-            if np.any(row <= 0):
-                sparsity_values[idx] = True
+            sparsity_values[idx] = np.sum(row <= 0) / row.shape[0]
 
     # Write the new variable under the write lock
     with write_lock:
@@ -777,7 +776,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
             "sparsity",
             data=sparsity_values,
             chunks=(mz_chunk_size,),
-            dtype=bool,
+            dtype=np.float64,
             overwrite=True,
         )
         # Write .zattrs for xarray compatibility (dimension metadata)

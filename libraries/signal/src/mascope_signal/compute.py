@@ -937,8 +937,8 @@ async def load_peak_timeseries(
     new_peak_areas = new_peak_timeseries_norm * sum_peak_areas[:, np.newaxis]
     new_peak_heights = new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
 
-    # Determine sparsity: True if any peak_heights value is <= 0
-    sparsity_values = np.any(new_peak_heights <= 0, axis=1)
+    # Determine sparsity: fraction of scans where peak_heights <= 0
+    sparsity_values = np.sum(new_peak_heights <= 0, axis=1) / new_peak_heights.shape[1]
 
     # --- Create a dataset for the update ---
     # This contains only the changed values, fully in memory

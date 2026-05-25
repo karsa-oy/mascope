@@ -26,7 +26,7 @@ class PeakData:
     mz_values: list[float]
     areas: list[float] | None = None
     heights: list[float] | None = None
-    sparsity: list[bool] | None = None
+    sparsity: list[float] | None = None
     warnings: list[str] = field(default_factory=list)
 
     @property
