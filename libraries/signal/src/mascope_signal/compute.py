@@ -894,6 +894,9 @@ async def load_peak_timeseries(
     :return: The peak timeseries dataset
     :rtype: xr.Dataset
     """
+    # --- Ensure backwards compatibility: add is_sparse if missing ---
+    m_io.ensure_is_sparse_exists(base_filename)
+
     # --- Load existing peak timeseries from the sample file ---
     mzs_arr = np.unique(np.asarray(mzs))
     peak_timeseries = m_io.load_peak_data(base_filename).sel(
@@ -937,6 +940,9 @@ async def load_peak_timeseries(
     new_peak_areas = new_peak_timeseries_norm * sum_peak_areas[:, np.newaxis]
     new_peak_heights = new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
 
+    # Determine sparsity: True if any peak_heights value is <= 0
+    is_sparse_values = np.any(new_peak_heights <= 0, axis=1)
+
     # --- Create a dataset for the update ---
     # This contains only the changed values, fully in memory
     update_dataset = xr.Dataset(
@@ -947,6 +953,7 @@ async def load_peak_timeseries(
                 ["mz"],
                 np.ones(len(mzs_to_compute), dtype=bool),
             ),
+            "is_sparse": (["mz"], is_sparse_values),
         },
         coords={
             "mz": mzs_to_compute,
