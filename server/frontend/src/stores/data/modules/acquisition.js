@@ -7,6 +7,9 @@ import { runtime } from '@/lib/runtime'
 
 import { useInstrument } from './instrument'
 
+// --- pagination: default page size; rows-per-page options live in the pane.
+const DEFAULT_ROWS = 100
+
 export const useAcquisition = defineStore('app.data.acquisition', () => {
   const instrument = useInstrument()
 
@@ -15,15 +18,10 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     icon: '🗃️'
   })
 
+  // --- list state
   const list = ref([])
   const selected = ref([])
-  const focused = computed(() => {
-    if (selected.value.length === 1) {
-      return selected.value[0]
-    } else {
-      return null
-    }
-  })
+  const focused = computed(() => (selected.value.length === 1 ? selected.value[0] : null))
   const multiselected = computed(() => selected.value.length > 1)
   const unfocus = () => {
     selected.value = []
@@ -33,10 +31,20 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     filename: null
   })
 
+  // --- pagination state
+  // DataTable lazy mode binds `first` (offset in rows) and `rows` (page size).
+  // The API expects `page = first / rows` and `limit = rows`.
+  const first = ref(0)
+  const rows = ref(DEFAULT_ROWS)
+  const total = ref(0)
+
+  // --- time filter
   const time = reactive(initTime())
   const days = computed(() =>
     time.mode == 'range' ? null : time.mode == 'Last 24 hours' ? 1 : Number(time.mode.split(' ')[1])
   )
+  // Coerce mode to 'range' when an explicit range is set, and back to a
+  // recent preset when both ends are cleared.
   watchEffect(() => {
     if (time.range.min || time.range.max) {
       time.mode = 'range'
@@ -44,35 +52,30 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       time.mode = 'Last 24 hours'
     }
   })
-  watch(time, () => unfocus())
+  // Single watcher: reset paginator + selection, then reload. Ordering
+  // matters - the reload must see first=0 to fetch page 0.
+  watch(time, async () => {
+    unfocus()
+    first.value = 0
+    await load()
+  })
 
-  // instrument
-
+  // --- instrument: reset to page 0 + reload on change; manage socket rooms.
   watch(
     computed(() => instrument.focused?.instrument),
     async () => {
+      first.value = 0
       await load()
     }
   )
-
   watch(
     () => instrument.focused,
     (next, prev) => {
-      // clear selection
       unfocus()
-      // update socket subscriptions
-      if (prev) {
-        api.socket.emit('unsubscribe', prev.instrument)
-      }
-      if (next) {
-        api.socket.emit('subscribe', next.instrument)
-      }
+      if (prev) api.socket.emit('unsubscribe', prev.instrument)
+      if (next) api.socket.emit('subscribe', next.instrument)
     }
   )
-
-  // acquisitions
-
-  watch(time, load)
 
   async function load() {
     if (time.mode.startsWith('Last')) {
@@ -82,73 +85,72 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     }
   }
 
+  // Raw axios call (no `use: read` handler) so we can read both `data` and
+  // `results` from the unified response envelope for the paginator total.
+  async function loadRecent(daysCount = 7) {
+    try {
+      const response = await api.http.get('/sample/files/recent', {
+        params: {
+          instrument: instrument.focused?.instrument,
+          sort: 'datetime_utc',
+          order: 'asc',
+          days: daysCount,
+          page: Math.floor(first.value / rows.value),
+          limit: rows.value
+        },
+        type: 'load_recent_sample_files'
+      })
+      const { data: items = [], results = 0 } = response.data ?? {}
+      list.value = items
+      total.value = results
+    } catch (err) {
+      logger.error(`failed to load recent sample files: ${err}`)
+    }
+  }
+
   async function loadRange(range) {
-    const sampleFiles = await api.http.get(`/sample/files`, {
-      params: {
-        datetime_min: range.min?.toISOString(),
-        datetime_max: range.max?.toISOString(),
-        instrument: instrument.focused?.instrument,
-        sort: 'datetime_utc',
-        order: 'asc'
-      },
-      use: 'read',
-      type: 'load_sample_file_range'
-    })
-    if (sampleFiles) {
-      list.value = sampleFiles
+    try {
+      const response = await api.http.get('/sample/files', {
+        params: {
+          datetime_min: range.min?.toISOString(),
+          datetime_max: range.max?.toISOString(),
+          instrument: instrument.focused?.instrument,
+          sort: 'datetime_utc',
+          order: 'asc',
+          page: Math.floor(first.value / rows.value),
+          limit: rows.value
+        },
+        type: 'load_sample_file_range'
+      })
+      const { data: items = [], results = 0 } = response.data ?? {}
+      list.value = items
+      total.value = results
+    } catch (err) {
+      logger.error(`failed to load sample file range: ${err}`)
     }
   }
 
-  async function loadRecent(days = 7) {
-    const recent = await api.http.get(`/sample/files/recent`, {
-      params: {
-        instrument: instrument.focused?.instrument,
-        sort: 'datetime_utc',
-        order: 'asc',
-        days
-      },
-      use: 'read',
-      type: 'load_recent_sample_files'
-    })
-    if (recent) {
-      list.value = recent
-    }
+  // --- paginator handler wired to DataTable's @page event
+  // Skip reload when neither offset nor page size changed (guards against
+  // PrimeVue's spurious @page emission on mount with lazy + :first bound).
+  function setPage(event) {
+    if (event.first === first.value && event.rows === rows.value) return
+    first.value = event.first
+    rows.value = event.rows
+    load()
   }
 
-  // Socket event listeners for record updates
+  // --- socket events: refetch current page on create/delete to keep page
+  // contents and total count consistent; update in place on update.
   api.socket.on('acquisition_created', (payload) => {
     const { record } = payload
-
-    // Check if this file belongs to the currently focused instrument
     if (record.instrument === instrument.focused?.instrument) {
-      // Add to list if within current time filter
-      const fileDate = new Date(record.datetime_utc)
-      const shouldInclude = (() => {
-        if (time.mode.startsWith('Last')) {
-          const daysAgo = new Date()
-          daysAgo.setDate(daysAgo.getDate() - days.value)
-          return fileDate >= daysAgo
-        } else if (time.mode === 'range') {
-          if (time.range.min && fileDate < time.range.min) return false
-          if (time.range.max && fileDate > time.range.max) return false
-          return true
-        }
-        return false
-      })()
-
-      if (shouldInclude) {
-        list.value = [...list.value, record]
-        logger.log(`added ${record.filename}`)
-      } else {
-        logger.debug(`ignoring ${record.filename} (outside time filter)`)
-      }
+      load()
     }
   })
 
   api.socket.on('acquisition_updated', (payload) => {
     const { record_id, record } = payload
-
-    // Find and update the acquisition
     const index = list.value.findIndex((f) => f.sample_file_id === record_id)
     if (index >= 0) {
       list.value[index] = record
@@ -158,25 +160,17 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   api.socket.on('acquisition_deleted', (payload) => {
     const { record_id } = payload
-
-    // Remove from list if present
-    const index = list.value.findIndex((f) => f.sample_file_id === record_id)
-    if (index >= 0) {
-      const filename = list.value[index].filename
-      list.value = list.value.filter((_, i) => i !== index)
-      logger.log(`removed ${filename}`)
-
-      // Unfocus if deleted file was selected
+    if (list.value.some((f) => f.sample_file_id === record_id)) {
       if (selected.value.some((s) => s.sample_file_id === record_id)) {
         unfocus()
       }
+      load()
     }
   })
 
-  // mz calibration
-
   const resetFilters = () => {
     selected.value = []
+    first.value = 0
     time.mode = initTime().mode
     time.range = initTime().range
   }
@@ -190,8 +184,12 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     unfocus,
     ready,
     time,
+    first,
+    rows,
+    total,
     // actions
     load,
+    setPage,
     resetFilters
   }
 })
@@ -202,29 +200,13 @@ function initTime() {
   const configured = runtime.config.acquisition_filter
   if (configured) {
     if (typeof configured == 'string') {
-      return {
-        mode: configured,
-        range: {
-          min: null,
-          max: null
-        }
-      }
+      return { mode: configured, range: { min: null, max: null } }
     } else if (typeof configured == 'object') {
       return {
         mode: 'range',
-        range: {
-          min: toDate(configured.min),
-          max: toDate(configured.max)
-        }
-      }
-    }
-  } else {
-    return {
-      mode: 'Last 24 hours',
-      range: {
-        min: null,
-        max: null
+        range: { min: toDate(configured.min), max: toDate(configured.max) }
       }
     }
   }
+  return { mode: 'Last 24 hours', range: { min: null, max: null } }
 }
