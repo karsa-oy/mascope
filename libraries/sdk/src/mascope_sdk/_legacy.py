@@ -238,6 +238,7 @@ def api_post_file(
     path: str,
     access_token: str,
     filepath: str,
+    upload_filename: str | None = None,
 ):
     """Send a POST request to the specified API endpoint with a path file to be uploaded.
 
@@ -249,6 +250,9 @@ def api_post_file(
     :type access_token: str
     :param filepath: Path to the file to be uploaded.
     :type filepath: str
+    :param upload_filename: Optional filename override for the uploaded file.
+        If provided, the server will see this filename instead of the one on disk.
+    :type upload_filename: str, optional
     :return: The response object if the request was successful, otherwise None.
     :rtype: requests.Response or None
     """
@@ -259,9 +263,13 @@ def api_post_file(
             "X-Service-Name": _get_service_name(),
         }
         with open(filepath, "rb") as file:
+            if upload_filename:
+                files = [("files", (upload_filename, file))]
+            else:
+                files = [("files", file)]
             resp = requests.post(
                 full_url,
-                files=[("files", file)],
+                files=files,
                 headers=headers,
                 verify=False,
                 timeout=60,

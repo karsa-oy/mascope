@@ -108,6 +108,9 @@ color = "pink"
 # settings
 host = 'localhost'
 access_token = ''
+# filename_prefix = ''
+# filename_suffix = ''
+
 # scripts
 run = "uv run mascope agent tof"
 
@@ -121,6 +124,9 @@ timeout = 10
 source = './agents/file'
 host = 'localhost'
 access_token = ''
+# filename_prefix = ''
+# filename_suffix = ''
+
 # scripts
 run = "uv run mascope agent file"
 

@@ -336,6 +336,10 @@ class TofAgentConfig(ModuleConfig):
 
     host: str  # URL of the backend
     access_token: str  # API access token
+    filename_prefix: str | None = (
+        None  # optional prefix prepended to filename on upload
+    )
+    filename_suffix: str | None = None  # optional suffix appended to filename on upload
 
 
 class FileAgentConfig(ModuleConfig):
@@ -348,6 +352,10 @@ class FileAgentConfig(ModuleConfig):
     source: str  # folder to monitor in the instrument machine
     host: str  # URL of the backend
     access_token: str  # API access token
+    filename_prefix: str | None = (
+        None  # optional prefix prepended to filename on upload
+    )
+    filename_suffix: str | None = None  # optional suffix appended to filename on upload
 
 
 class DatetimeRange(BaseModel):

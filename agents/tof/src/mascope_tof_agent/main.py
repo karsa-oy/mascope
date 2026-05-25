@@ -44,6 +44,8 @@ DEFAULT_CONFIG = textwrap.dedent(
     # settings
     host = 'localhost'
     access_token = ''
+    # filename_prefix = ''
+    # filename_suffix = ''
 
     [tofwerk-lib]
     tags = ['lib']
@@ -66,6 +68,26 @@ SHUTDOWN_EVENT = Event()
 runtime = None
 sio = socketio.AsyncClient(logger=False, ssl_verify=False)
 executor = ThreadPoolExecutor(max_workers=3)
+
+
+def get_upload_filename(filepath: str) -> str | None:
+    """Compute the upload filename by applying configured prefix and/or suffix.
+
+    Returns the modified filename if prefix or suffix is configured,
+    otherwise returns None (indicating the original filename should be used).
+
+    :param filepath: Full path to the file
+    :type filepath: str
+    :return: Modified filename or None
+    :rtype: str | None
+    """
+    prefix = runtime.config.filename_prefix
+    suffix = runtime.config.filename_suffix
+    if not prefix and not suffix:
+        return None
+    basename = os.path.basename(filepath)
+    stem, ext = os.path.splitext(basename)
+    return f"{prefix or ''}{stem}{suffix or ''}{ext}"
 
 
 def process_file_upload(filepath: str, max_retries: int = 10) -> None:
@@ -122,11 +144,17 @@ def upload_sample_file(filepath: str) -> None:
 
     # Make file upload request
     runtime.logger.debug(f"Making an upload request to {URL} for file {filepath}")
+    upload_filename = get_upload_filename(filepath)
+    if upload_filename:
+        runtime.logger.info(
+            f"Uploading file {os.path.basename(filepath)} as {upload_filename}"
+        )
     resp = api_post_file(
         url=URL,
         path="sample/files/upload",
         access_token=runtime.config.access_token,
         filepath=filepath,
+        upload_filename=upload_filename,
     )
 
     if resp is not None:
