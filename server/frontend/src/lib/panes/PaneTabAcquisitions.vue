@@ -187,6 +187,15 @@ const acquisitions = computed(
     ) ?? []
 )
 
+// Client-side filter narrows only the visible page - when filtering actually trims
+// something display a hint to user so  that an empty search result
+// is not mistaken for "no matches anywhere".
+const filterActive = computed(
+  () => search.value !== '' || !['', '+-'].includes(polarityDropdown.value)
+)
+const filteredCount = computed(() => acquisitions.value.length)
+const pageCount = computed(() => app.data.acquisition.list?.length ?? 0)
+
 const clearFilters = () => {
   app.data.acquisition.resetFilters()
   search.value = ''
@@ -297,14 +306,19 @@ const currentPageReportTemplate =
         style="max-width: 100px"
         placeholder="Polarity"
       />
-      <FloatLabel style="flex-grow: 1; max-width: 250px">
-        <IconField class="full">
-          <InputIcon>
-            <i class="pi pi-search" />
-          </InputIcon>
-          <InputText v-model="search" placeholder="Search filenames" style="width: 100%" />
-        </IconField>
-      </FloatLabel>
+      <div class="search-cell">
+        <FloatLabel style="width: 100%">
+          <IconField class="full">
+            <InputIcon>
+              <i class="pi pi-search" />
+            </InputIcon>
+            <InputText v-model="search" placeholder="Search filenames" style="width: 100%" />
+          </IconField>
+        </FloatLabel>
+        <small :class="['filter-hint', { hidden: !filterActive }]">
+          {{ filteredCount }} of {{ pageCount }} shown (filtered)
+        </small>
+      </div>
       <Button
         icon="pi pi-filter-slash"
         @click="clearFilters"
@@ -331,6 +345,7 @@ const currentPageReportTemplate =
               dataKey="filename"
               :metaKeySelection="true"
               :virtualScrollerOptions="{ itemSize: 28 }"
+              tableStyle="table-layout: fixed; width: 100%"
               lazy
               paginator
               :first="app.data.acquisition.first"
@@ -355,9 +370,19 @@ const currentPageReportTemplate =
                 }
               "
             >
-              <Column header="Filename" field="filename" sortable />
-              <Column header="Polarity" field="polarity" sortable />
-              <Column header="Datetime" field="datetime" sortable />
+              <Column
+                header="Filename"
+                field="filename"
+                sortable
+                style="width: 60%"
+                bodyClass="ellipsis-cell"
+              >
+                <template #body="{ data }">
+                  <span :title="data.filename">{{ data.filename }}</span>
+                </template>
+              </Column>
+              <Column header="Polarity" field="polarity" sortable style="width: 90px" />
+              <Column header="Datetime" field="datetime" sortable style="width: 180px" />
               <template #paginatorstart>
                 <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
                   {{ app.data.acquisition.selected.length }} files selected
@@ -463,6 +488,28 @@ const currentPageReportTemplate =
   flex-direction: column;
 }
 
+.search-cell {
+  position: relative;
+  flex-grow: 1;
+  max-width: 250px;
+  margin-bottom: 1.2em;
+}
+
+.filter-hint {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.15rem;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.6;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.filter-hint.hidden {
+  visibility: hidden;
+}
+
 .uppy-container {
   display: flex;
   flex-direction: column;
@@ -484,6 +531,13 @@ const currentPageReportTemplate =
 .table-container :deep(.p-datatable-table-container) {
   flex: 1;
   min-height: 0;
+}
+
+.table-container :deep(.ellipsis-cell) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0;
 }
 
 /* --- Paginator: drop border + background, pin controls to true center
