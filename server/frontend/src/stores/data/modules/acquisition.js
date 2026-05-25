@@ -175,12 +175,10 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
 
   api.socket.on('acquisition_deleted', (payload) => {
     const { record_id } = payload
-    if (list.value.some((f) => f.sample_file_id === record_id)) {
-      if (selected.value.some((s) => s.sample_file_id === record_id)) {
-        unfocus()
-      }
-      load()
+    if (selected.value.some((s) => s.sample_file_id === record_id)) {
+      unfocus()
     }
+    load()
   })
 
   const resetFilters = () => {
