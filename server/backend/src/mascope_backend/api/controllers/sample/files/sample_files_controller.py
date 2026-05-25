@@ -11,14 +11,14 @@ from sqlalchemy import (
 )
 
 import mascope_signal.compute as m_compute
-from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
-    fetch_affected_sample_data,
-)
-from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.controllers.dataset.acquisition.service import (
     create_acquisition_datasets,
     delete_acquisition_datasets,
 )
+from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data import (
+    fetch_affected_sample_data,
+)
+from mascope_backend.api.controllers.samples.samples_controller import get_samples
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -947,10 +947,10 @@ async def get_sample_file_peaks(
             response_data["mz"] = peak_heights.mz.values.tolist()
         response_data["height"] = peak_heights.values.tolist()
 
-    # Include is_sparse flag
+    # Include sparsity flag
     if "mz" not in response_data:
         response_data["mz"] = sample_file_data.mz.values.tolist()
-    response_data["is_sparse"] = sample_file_data.is_sparse.values.tolist()
+    response_data["sparsity"] = sample_file_data.sparsity.values.tolist()
 
     # Step 5: Format the response for the case where no peaks were detected
     if not response_data["mz"]:
@@ -966,7 +966,7 @@ async def get_sample_file_peaks(
                 "mz": [],
                 "area": [] if areas else None,
                 "height": [] if heights else None,
-                "is_sparse": [],
+                "sparsity": [],
             },
         }
 

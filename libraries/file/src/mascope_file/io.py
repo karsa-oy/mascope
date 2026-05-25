@@ -154,7 +154,7 @@ def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Datase
     - tof (mz)
     Data variables:
     - is_satellite (mz)
-    - is_sparse (mz)
+    - sparsity (mz)
     - is_timeseries_computed (mz)
     - is_weak (mz)
     - peak_areas (mz, time)
@@ -172,9 +172,9 @@ def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Datase
     :rtype: xr.Dataset
     """
     peak_data = load_array(base_filename, var="peak_timeseries")
-    # Ensure backwards compatibility: add is_sparse if missing
-    if "is_sparse" not in peak_data.data_vars:
-        ensure_is_sparse_exists(base_filename)
+    # Ensure backwards compatibility: add sparsity if missing
+    if "sparsity" not in peak_data.data_vars:
+        ensure_sparsity_exists(base_filename)
         peak_data = load_array(base_filename, var="peak_timeseries")
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
@@ -720,11 +720,11 @@ def _update_zarr_variable(
         zarr_array[chunk_start:chunk_end, :] = chunk_data
 
 
-def ensure_is_sparse_exists(base_filename: str) -> bool:
-    """Ensure the 'is_sparse' variable exists in peak_timeseries.zarr.
+def ensure_sparsity_exists(base_filename: str) -> bool:
+    """Ensure the 'sparsity' variable exists in peak_timeseries.zarr.
 
     For backwards compatibility with older zarr files that lack the variable,
-    this function creates 'is_sparse' if missing. For peaks with computed
+    this function creates 'sparsity' if missing. For peaks with computed
     timeseries, it derives the value from existing peak_heights data.
     For uncomputed peaks, it defaults to False.
 
@@ -743,17 +743,17 @@ def ensure_is_sparse_exists(base_filename: str) -> bool:
     write_lock = get_zarr_write_lock(peak_timeseries_path)
 
     z = zarr.open(peak_timeseries_path, mode="r", synchronizer=synchronizer)
-    if "is_sparse" in z:
+    if "sparsity" in z:
         return False
 
     runtime.logger.info(
-        f"Migrating peak_timeseries.zarr: adding 'is_sparse' variable for {base_filename}"
+        f"Migrating peak_timeseries.zarr: adding 'sparsity' variable for {base_filename}"
     )
 
-    # Compute is_sparse for all peaks
+    # Compute sparsity for all peaks
     mz_size = z["mz"].shape[0]
     is_computed = z["is_timeseries_computed"][:]
-    is_sparse_values = np.zeros(mz_size, dtype=bool)
+    sparsity_values = np.zeros(mz_size, dtype=bool)
 
     # For computed peaks, derive from peak_heights
     computed_indices = np.where(is_computed)[0]
@@ -762,7 +762,7 @@ def ensure_is_sparse_exists(base_filename: str) -> bool:
         for idx in computed_indices:
             row = peak_heights[idx, :]
             if np.any(row <= 0):
-                is_sparse_values[idx] = True
+                sparsity_values[idx] = True
 
     # Write the new variable under the write lock
     with write_lock:
@@ -774,17 +774,17 @@ def ensure_is_sparse_exists(base_filename: str) -> bool:
             else mz_size
         )
         z.create_dataset(
-            "is_sparse",
-            data=is_sparse_values,
+            "sparsity",
+            data=sparsity_values,
             chunks=(mz_chunk_size,),
             dtype=bool,
             overwrite=True,
         )
         # Write .zattrs for xarray compatibility (dimension metadata)
-        is_sparse_attrs = {"_ARRAY_DIMENSIONS": ["mz"]}
-        z["is_sparse"].attrs.update(is_sparse_attrs)
+        sparsity_attrs = {"_ARRAY_DIMENSIONS": ["mz"]}
+        z["sparsity"].attrs.update(sparsity_attrs)
 
-    runtime.logger.info(f"Migration complete: 'is_sparse' added to {base_filename}")
+    runtime.logger.info(f"Migration complete: 'sparsity' added to {base_filename}")
     return True
 
 

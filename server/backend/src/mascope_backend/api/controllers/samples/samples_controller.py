@@ -353,7 +353,7 @@ async def get_sample_peaks(
                 "mz": [],
                 "area": [] if areas else None,
                 "height": [] if heights else None,
-                "is_sparse": [],
+                "sparsity": [],
                 "match": [] if matches else None,
             },
         }
@@ -362,7 +362,7 @@ async def get_sample_peaks(
     response_data: dict = {
         "peak_id": peak_data.peak_ids,
         "mz": peak_data.mz_values,
-        "is_sparse": peak_data.is_sparse,
+        "sparsity": peak_data.sparsity,
     }
     if areas:
         response_data["area"] = peak_data.areas

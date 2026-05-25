@@ -11,7 +11,7 @@ import xarray as xr
 import zarr
 from conftest import TEST_FILENAME, TEST_MZ_SIZE, TEST_TIME_SIZE
 
-from mascope_file.io import ensure_is_sparse_exists, write_peaks
+from mascope_file.io import ensure_sparsity_exists, write_peaks
 
 
 class TestWritePeaks:
@@ -348,59 +348,59 @@ class TestWritePeaksEdgeCases:
 
 
 class TestEnsureIsSparseExists:
-    """Tests for ensure_is_sparse_exists backwards compatibility function."""
+    """Tests for ensure_sparsity_exists backwards compatibility function."""
 
-    def test_returns_false_when_is_sparse_already_present(
+    def test_returns_false_when_sparsity_already_present(
         self,
         existing_peak_timeseries_zarr,
     ):
-        """Test that no migration occurs if is_sparse already exists."""
-        # The fixture now includes is_sparse, so it should already be present
-        result = ensure_is_sparse_exists(TEST_FILENAME)
+        """Test that no migration occurs if sparsity already exists."""
+        # The fixture now includes sparsity, so it should already be present
+        result = ensure_sparsity_exists(TEST_FILENAME)
         assert result is False
 
-    def test_creates_is_sparse_for_zarr_without_it(
+    def test_creates_sparsity_for_zarr_without_it(
         self,
         peak_timeseries_zarr_path,
         create_peak_timeseries_dataset,
     ):
-        """Test that is_sparse is created when missing from zarr file."""
-        # Create a dataset WITHOUT is_sparse to simulate an old zarr
+        """Test that sparsity is created when missing from zarr file."""
+        # Create a dataset WITHOUT sparsity to simulate an old zarr
         ds = create_peak_timeseries_dataset(fill_with_nan=True)
-        ds = ds.drop_vars("is_sparse")
+        ds = ds.drop_vars("sparsity")
         ds.to_zarr(peak_timeseries_zarr_path, mode="w")
 
-        # Verify is_sparse is missing
+        # Verify sparsity is missing
         z = zarr.open(peak_timeseries_zarr_path, mode="r")
-        assert "is_sparse" not in z
+        assert "sparsity" not in z
 
         # Run migration
-        result = ensure_is_sparse_exists(TEST_FILENAME)
+        result = ensure_sparsity_exists(TEST_FILENAME)
         assert result is True
 
-        # Verify is_sparse was created
+        # Verify sparsity was created
         z = zarr.open(peak_timeseries_zarr_path, mode="r")
-        assert "is_sparse" in z
-        assert z["is_sparse"].shape == (TEST_MZ_SIZE,)
-        assert z["is_sparse"].dtype == bool
+        assert "sparsity" in z
+        assert z["sparsity"].shape == (TEST_MZ_SIZE,)
+        assert z["sparsity"].dtype == bool
 
         # All should be False since no timeseries was computed
-        assert not np.any(z["is_sparse"][:])
+        assert not np.any(z["sparsity"][:])
 
         # Verify xarray dimension metadata
-        assert z["is_sparse"].attrs["_ARRAY_DIMENSIONS"] == ["mz"]
+        assert z["sparsity"].attrs["_ARRAY_DIMENSIONS"] == ["mz"]
 
         # Cleanup
         shutil.rmtree(peak_timeseries_zarr_path)
 
-    def test_computes_is_sparse_for_computed_peaks_with_gaps(
+    def test_computes_sparsity_for_computed_peaks_with_gaps(
         self,
         peak_timeseries_zarr_path,
         create_peak_timeseries_dataset,
     ):
-        """Test that is_sparse=True for computed peaks with heights <= 0."""
+        """Test that sparsity=True for computed peaks with heights <= 0."""
         ds = create_peak_timeseries_dataset(fill_with_nan=False)
-        ds = ds.drop_vars("is_sparse")
+        ds = ds.drop_vars("sparsity")
 
         # Mark some peaks as computed
         ds["is_timeseries_computed"].values[0] = True
@@ -419,18 +419,18 @@ class TestEnsureIsSparseExists:
         ds.to_zarr(peak_timeseries_zarr_path, mode="w")
 
         # Run migration
-        result = ensure_is_sparse_exists(TEST_FILENAME)
+        result = ensure_sparsity_exists(TEST_FILENAME)
         assert result is True
 
         # Verify results
         z = zarr.open(peak_timeseries_zarr_path, mode="r")
-        is_sparse = z["is_sparse"][:]
+        sparsity = z["sparsity"][:]
 
-        assert is_sparse[0] is np.True_  # has zero height
-        assert is_sparse[1] is np.True_  # has negative height
-        assert is_sparse[2] is np.False_  # all positive
+        assert sparsity[0] is np.True_  # has zero height
+        assert sparsity[1] is np.True_  # has negative height
+        assert sparsity[2] is np.False_  # all positive
         # Uncomputed peaks default to False
-        assert not np.any(is_sparse[3:])
+        assert not np.any(sparsity[3:])
 
         # Cleanup
         shutil.rmtree(peak_timeseries_zarr_path)
@@ -444,16 +444,16 @@ class TestEnsureIsSparseExists:
         # Ensure the zarr file does not exist
         if os.path.exists(peak_timeseries_zarr_path):
             shutil.rmtree(peak_timeseries_zarr_path)
-        result = ensure_is_sparse_exists(TEST_FILENAME)
+        result = ensure_sparsity_exists(TEST_FILENAME)
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_partial_update_includes_is_sparse(
+    async def test_partial_update_includes_sparsity(
         self,
         existing_peak_timeseries_zarr,
         create_update_dataset,
     ):
-        """Test that partial updates correctly write is_sparse values."""
+        """Test that partial updates correctly write sparsity values."""
         existing = xr.open_zarr(existing_peak_timeseries_zarr)
         base_mz = existing["mz"].values
         time_vals = existing["time"].values
@@ -466,14 +466,14 @@ class TestEnsureIsSparseExists:
         # Make peak at index 0 of the update (mz index 3) sparse
         update_ds["peak_heights"].values[0, 2] = -1.0
 
-        # Add is_sparse to the update dataset
-        is_sparse_vals = np.any(update_ds["peak_heights"].values <= 0, axis=1)
-        update_ds["is_sparse"] = (["mz"], is_sparse_vals)
+        # Add sparsity to the update dataset
+        sparsity_vals = np.any(update_ds["peak_heights"].values <= 0, axis=1)
+        update_ds["sparsity"] = (["mz"], sparsity_vals)
 
         await write_peaks(update_ds, TEST_FILENAME, overwrite=False)
 
         # Verify
         updated = xr.open_zarr(existing_peak_timeseries_zarr)
-        assert updated["is_sparse"].isel(mz=3).values == True  # noqa: E712
-        assert updated["is_sparse"].isel(mz=7).values == False  # noqa: E712
+        assert updated["sparsity"].isel(mz=3).values == True  # noqa: E712
+        assert updated["sparsity"].isel(mz=7).values == False  # noqa: E712
         updated.close()

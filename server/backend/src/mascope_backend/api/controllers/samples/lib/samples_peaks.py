@@ -26,7 +26,7 @@ class PeakData:
     mz_values: list[float]
     areas: list[float] | None = None
     heights: list[float] | None = None
-    is_sparse: list[bool] | None = None
+    sparsity: list[bool] | None = None
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -86,7 +86,7 @@ def _aggregate_full_sample(
             if heights
             else None
         ),
-        is_sparse=data.is_sparse.values.tolist(),
+        sparsity=data.sparsity.values.tolist(),
     )
 
 
@@ -120,7 +120,12 @@ def _aggregate_time_range(
 
     if data.mz.size == 0:
         return PeakData(
-            peak_ids=[], mz_values=[], areas=[], heights=[], is_sparse=[], warnings=warnings
+            peak_ids=[],
+            mz_values=[],
+            areas=[],
+            heights=[],
+            sparsity=[],
+            warnings=warnings,
         )
 
     # Get scan timestamps in the requested time range
@@ -133,7 +138,7 @@ def _aggregate_time_range(
             mz_values=data.mz.values.tolist(),
             areas=[0.0] * data.mz.size if areas else None,
             heights=[0.0] * data.mz.size if heights else None,
-            is_sparse=data.is_sparse.values.tolist(),
+            sparsity=data.sparsity.values.tolist(),
             warnings=warnings,
         )
 
@@ -156,7 +161,7 @@ def _aggregate_time_range(
             if heights
             else None
         ),
-        is_sparse=data.is_sparse.values.tolist(),
+        sparsity=data.sparsity.values.tolist(),
         warnings=warnings,
     )
 
@@ -210,7 +215,7 @@ def extract_peaks(
             mz_values=[],
             areas=[] if areas else None,
             heights=[] if heights else None,
-            is_sparse=[],
+            sparsity=[],
         )
 
     has_time_filter = t_min is not None or t_max is not None

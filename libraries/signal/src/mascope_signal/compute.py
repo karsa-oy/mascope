@@ -938,7 +938,7 @@ async def load_peak_timeseries(
     new_peak_heights = new_peak_timeseries_norm * sum_peak_heights[:, np.newaxis]
 
     # Determine sparsity: True if any peak_heights value is <= 0
-    is_sparse_values = np.any(new_peak_heights <= 0, axis=1)
+    sparsity_values = np.any(new_peak_heights <= 0, axis=1)
 
     # --- Create a dataset for the update ---
     # This contains only the changed values, fully in memory
@@ -950,7 +950,7 @@ async def load_peak_timeseries(
                 ["mz"],
                 np.ones(len(mzs_to_compute), dtype=bool),
             ),
-            "is_sparse": (["mz"], is_sparse_values),
+            "sparsity": (["mz"], sparsity_values),
         },
         coords={
             "mz": mzs_to_compute,

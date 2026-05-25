@@ -113,12 +113,12 @@ class BasePeakDetector(ABC):
         peak_areas = da.full(data_shape, np.nan, dtype=np.float64)
         peak_heights = da.full(data_shape, np.nan, dtype=np.float64)
         peak_timeseries_computed = da.full(peaks.mz.size, False, dtype=bool)
-        is_sparse = da.full(peaks.mz.size, False, dtype=bool)
+        sparsity = da.full(peaks.mz.size, False, dtype=bool)
         data_vars = {
             "peak_areas": (("mz", "time"), peak_areas),
             "peak_heights": (("mz", "time"), peak_heights),
             "is_timeseries_computed": (("mz"), peak_timeseries_computed),
-            "is_sparse": (("mz"), is_sparse),
+            "sparsity": (("mz"), sparsity),
         }
 
         peak_timeseries = xarray.Dataset(
