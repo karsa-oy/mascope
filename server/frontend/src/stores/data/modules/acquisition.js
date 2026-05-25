@@ -38,6 +38,13 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
   const rows = ref(DEFAULT_ROWS)
   const total = ref(0)
 
+  // --- sort state: bound to DataTable; @sort event triggers reload.
+  // API field names match SampleFile columns; `datetime` UI column maps to
+  // `datetime_utc` server-side
+  const SORT_FIELD_MAP = { datetime: 'datetime_utc' }
+  const sortField = ref('datetime')
+  const sortOrder = ref(-1)
+
   // --- time filter
   const time = reactive(initTime())
   const days = computed(() =>
@@ -92,8 +99,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
       const response = await api.http.get('/sample/files/recent', {
         params: {
           instrument: instrument.focused?.instrument,
-          sort: 'datetime_utc',
-          order: 'asc',
+          sort: SORT_FIELD_MAP[sortField.value] ?? sortField.value,
+          order: sortOrder.value === 1 ? 'asc' : 'desc',
           days: daysCount,
           page: Math.floor(first.value / rows.value),
           limit: rows.value
@@ -115,8 +122,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
           datetime_min: range.min?.toISOString(),
           datetime_max: range.max?.toISOString(),
           instrument: instrument.focused?.instrument,
-          sort: 'datetime_utc',
-          order: 'asc',
+          sort: SORT_FIELD_MAP[sortField.value] ?? sortField.value,
+          order: sortOrder.value === 1 ? 'asc' : 'desc',
           page: Math.floor(first.value / rows.value),
           limit: rows.value
         },
@@ -137,6 +144,14 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     if (event.first === first.value && event.rows === rows.value) return
     first.value = event.first
     rows.value = event.rows
+    load()
+  }
+
+  // --- sort handler wired to DataTable's @sort event.
+  function setSort(event) {
+    sortField.value = event.sortField ?? 'datetime'
+    sortOrder.value = event.sortOrder ?? -1
+    first.value = 0
     load()
   }
 
@@ -190,6 +205,9 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     // actions
     load,
     setPage,
+    sortField,
+    sortOrder,
+    setSort,
     resetFilters
   }
 })

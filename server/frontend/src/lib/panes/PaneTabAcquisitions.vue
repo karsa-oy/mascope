@@ -338,8 +338,9 @@ const currentPageReportTemplate =
               :value="acquisitions"
               scrollable
               scrollHeight="flex"
-              sortField="datetime"
-              :sortOrder="-1"
+              :sortField="app.data.acquisition.sortField"
+              :sortOrder="app.data.acquisition.sortOrder"
+              @sort="app.data.acquisition.setSort"
               size="small"
               selectionMode="multiple"
               dataKey="filename"
