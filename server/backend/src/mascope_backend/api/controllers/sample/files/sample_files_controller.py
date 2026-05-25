@@ -947,6 +947,11 @@ async def get_sample_file_peaks(
             response_data["mz"] = peak_heights.mz.values.tolist()
         response_data["height"] = peak_heights.values.tolist()
 
+    # Include is_sparse flag
+    if "mz" not in response_data:
+        response_data["mz"] = sample_file_data.mz.values.tolist()
+    response_data["is_sparse"] = sample_file_data.is_sparse.values.tolist()
+
     # Step 5: Format the response for the case where no peaks were detected
     if not response_data["mz"]:
         message = (
@@ -961,6 +966,7 @@ async def get_sample_file_peaks(
                 "mz": [],
                 "area": [] if areas else None,
                 "height": [] if heights else None,
+                "is_sparse": [],
             },
         }
 
