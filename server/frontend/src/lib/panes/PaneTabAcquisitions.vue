@@ -173,6 +173,8 @@ const contextMenuRow = ref(null)
 const search = ref('')
 const polarityDropdown = ref('')
 
+// Client-side filters narrow the current page. Cross-page search/polarity
+// requires server-side filter push-down - tracked as a follow-up to #1354.
 const acquisitions = computed(
   () =>
     app.data.acquisition.list?.filter(
@@ -183,13 +185,6 @@ const acquisitions = computed(
           polarity === polarityDropdown.value ||
           polarity === '+-')
     ) ?? []
-)
-watch(
-  acquisitions,
-  () => {
-    app.data.acquisition.selected = []
-  },
-  { deep: true }
 )
 
 const clearFilters = () => {
@@ -236,6 +231,15 @@ const derivedPolarity = computed(() => {
     return null
   }
 })
+
+// --- paginator configuration
+// Plain string template - the object-based responsive form has long-standing
+// PrimeVue bugs that crash the Paginator on update (issues #5604, #6595).
+const rowsPerPageOptions = [10, 50, 100, 200, 500]
+const paginatorTemplate =
+  'FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport'
+const currentPageReportTemplate =
+  '{first}-{last} of {totalRecords} · page {currentPage}/{totalPages}'
 </script>
 
 <template>
@@ -314,11 +318,10 @@ const derivedPolarity = computed(() => {
         <div id="uppy-drop-target" class="uppy-container">
           <div class="table-container">
             <DataTable
-              v-if="acquisitions?.length"
+              v-show="acquisitions?.length"
               v-model:selection="app.data.acquisition.selected"
               v-model:contextMenuSelection="contextMenuRow"
               :value="acquisitions"
-              :totalRecords="acquisitions.length"
               scrollable
               scrollHeight="flex"
               sortField="datetime"
@@ -327,6 +330,16 @@ const derivedPolarity = computed(() => {
               selectionMode="multiple"
               dataKey="filename"
               :metaKeySelection="true"
+              :virtualScrollerOptions="{ itemSize: 28 }"
+              lazy
+              paginator
+              :first="app.data.acquisition.first"
+              :rows="app.data.acquisition.rows"
+              :totalRecords="app.data.acquisition.total"
+              :rowsPerPageOptions="rowsPerPageOptions"
+              :paginatorTemplate="paginatorTemplate"
+              :currentPageReportTemplate="currentPageReportTemplate"
+              @page="app.data.acquisition.setPage"
               @rowContextmenu="
                 (event) => {
                   contextMenuRow = event.data
@@ -341,44 +354,33 @@ const derivedPolarity = computed(() => {
                   contextMenuRef?.show(event.originalEvent)
                 }
               "
-              :virtualScrollerOptions="{ itemSize: 28 }"
             >
               <Column header="Filename" field="filename" sortable />
               <Column header="Polarity" field="polarity" sortable />
               <Column header="Datetime" field="datetime" sortable />
-              <template #footer>
-                <div
-                  style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 0.5rem;
-                  "
-                >
-                  <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
-                    {{ app.data.acquisition.selected.length }} files selected
-                  </strong>
-                  <div v-else style="min-width: 11ch" />
-
-                  <div class="info-text">
-                    <span v-if="!app.data.batch.focused">
-                      <span class="pi pi-info-circle" />
-                      Select a batch to process the files.
-                    </span>
-                    <span v-else-if="hasBothPolarities">
-                      <span class="pi pi-info-circle" />
-                      Cannot process files with both "+" and "-" polarities selected.
-                    </span>
-                    <span v-else-if="onlyMixedPolaritySelected">
-                      <span class="pi pi-info-circle" />
-                      Only mixed polarity files selected. Please choose a polarity from the
-                      dropdown.
-                    </span>
-                  </div>
+              <template #paginatorstart>
+                <strong v-if="app.data.acquisition.multiselected" style="font-style: italic">
+                  {{ app.data.acquisition.selected.length }} files selected
+                </strong>
+              </template>
+              <template #paginatorend>
+                <div class="info-text">
+                  <span v-if="!app.data.batch.focused">
+                    <span class="pi pi-info-circle" />
+                    Select a batch to process the files.
+                  </span>
+                  <span v-else-if="hasBothPolarities">
+                    <span class="pi pi-info-circle" />
+                    Cannot process files with both "+" and "-" polarities selected.
+                  </span>
+                  <span v-else-if="onlyMixedPolaritySelected">
+                    <span class="pi pi-info-circle" />
+                    Only mixed polarity files selected. Please choose a polarity from the dropdown.
+                  </span>
                 </div>
               </template>
             </DataTable>
-            <div v-else class="center" style="min-height: 150px">
+            <div v-if="!acquisitions?.length" class="center" style="min-height: 150px">
               <i class="info-line">
                 <span class="pi pi-inbox" /><span>No acquisitions found</span>
               </i>
@@ -482,6 +484,27 @@ const derivedPolarity = computed(() => {
 .table-container :deep(.p-datatable-table-container) {
   flex: 1;
   min-height: 0;
+}
+
+/* --- Paginator: drop border + background, pin controls to true center
+   regardless of paginatorstart/paginatorend slot widths. */
+.table-container :deep(.p-paginator) {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0;
+  justify-content: center;
+}
+
+/* The paginator-start / -end wrappers sit absolute on the sides so they
+   don't shift the centered controls when their content width changes. */
+.table-container :deep(.p-paginator-content-start) {
+  position: absolute;
+  left: 0.5rem;
+}
+.table-container :deep(.p-paginator-content-end) {
+  position: absolute;
+  right: 0.5rem;
 }
 
 .bottom-section {
