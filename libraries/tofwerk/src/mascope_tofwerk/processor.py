@@ -164,8 +164,8 @@ class H5Processor(BaseFileProcessor):
         :return: m/z range
         :rtype: list
         """
-        # Return a list of 1st and last m/z values
-        return self.file_handle["FullSpectra"]["MassAxis"][:].tolist()
+        mass_axis = self.file_handle["FullSpectra"]["MassAxis"][:]
+        return [float(mass_axis[0]), float(mass_axis[-1])]
 
     @property
     @with_file_context
