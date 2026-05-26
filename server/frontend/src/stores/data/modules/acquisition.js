@@ -137,21 +137,24 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     }
   }
 
-  // --- paginator handler wired to DataTable's @page event
+  // --- paginator handler wired to DataTable's @page event, clears selection.
   // Skip reload when neither offset nor page size changed (guards against
   // PrimeVue's spurious @page emission on mount with lazy + :first bound).
+
   function setPage(event) {
     if (event.first === first.value && event.rows === rows.value) return
     first.value = event.first
     rows.value = event.rows
+    unfocus()
     load()
   }
 
-  // --- sort handler wired to DataTable's @sort event.
+  // --- sort handler wired to DataTable's @sort event, clears selection and resets paginator.
   function setSort(event) {
     sortField.value = event.sortField ?? 'datetime'
     sortOrder.value = event.sortOrder ?? -1
     first.value = 0
+    unfocus()
     load()
   }
 
