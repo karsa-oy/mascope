@@ -241,6 +241,22 @@ const derivedPolarity = computed(() => {
   }
 })
 
+// --- "Process selected" button tooltip and disabled state.
+const processBlockedReason = computed(() => {
+  if (!app.data.batch.focused) return 'Select a batch to process the files.'
+  if (app.data.acquisition.selected?.length === 0) {
+    return 'Select acquisitions to process.'
+  }
+  if (hasBothPolarities.value) {
+    return 'Cannot process files with both "+" and "-" polarities selected.'
+  }
+  if (onlyMixedPolaritySelected.value) {
+    return 'Only mixed polarity files selected. Choose a polarity from the dropdown.'
+  }
+  return null
+})
+const processDisabled = computed(() => processBlockedReason.value !== null)
+
 // --- paginator configuration
 // Plain string template - the object-based responsive form has long-standing
 // PrimeVue bugs that crash the Paginator on update (issues #5604, #6595).
@@ -389,22 +405,6 @@ const currentPageReportTemplate =
                   {{ app.data.acquisition.selected.length }} files selected
                 </strong>
               </template>
-              <template #paginatorend>
-                <div class="info-text">
-                  <span v-if="!app.data.batch.focused">
-                    <span class="pi pi-info-circle" />
-                    Select a batch to process the files.
-                  </span>
-                  <span v-else-if="hasBothPolarities">
-                    <span class="pi pi-info-circle" />
-                    Cannot process files with both "+" and "-" polarities selected.
-                  </span>
-                  <span v-else-if="onlyMixedPolaritySelected">
-                    <span class="pi pi-info-circle" />
-                    Only mixed polarity files selected. Please choose a polarity from the dropdown.
-                  </span>
-                </div>
-              </template>
             </DataTable>
             <div v-if="!acquisitions?.length" class="center" style="min-height: 150px">
               <i class="info-line">
@@ -424,19 +424,10 @@ const currentPageReportTemplate =
                 @click=""
               />
               <Button
+                v-tooltip.top="processBlockedReason"
                 label="Process selected"
                 icon="pi pi-file-plus"
-                :disabled="
-                  app.data.acquisition.selected?.length == 0 ||
-                  !app.data.batch.focused ||
-                  hasBothPolarities ||
-                  onlyMixedPolaritySelected
-                "
-                :tooltip="
-                  !app.data.batch.focused || app.data.acquisition.selected.length === 0
-                    ? 'Select acquisitions and a batch in order to process sample files'
-                    : ''
-                "
+                :disabled="processDisabled"
                 @click="
                   () => {
                     if (app.data.acquisition.focused) {
@@ -630,16 +621,5 @@ menu :deep(.full) {
   opacity: 0.5;
   gap: 0.5rem;
   margin: 0.5rem;
-}
-
-.info-text .pi {
-  display: inline-flex;
-  align-items: center;
-  font-size: 1.2em;
-  vertical-align: middle;
-}
-
-.info-text {
-  font-style: italic;
 }
 </style>
