@@ -161,10 +161,10 @@ class H5Processor(BaseFileProcessor):
     def range(self) -> list:
         """m/z range of the sample file
 
-        :return: m/z range
+        :return: m/z range [first, last]
         :rtype: list
         """
-        mass_axis = self.file_handle["FullSpectra"]["MassAxis"][:]
+        mass_axis = self.file_handle["FullSpectra"]["MassAxis"]
         return [float(mass_axis[0]), float(mass_axis[-1])]
 
     @property
