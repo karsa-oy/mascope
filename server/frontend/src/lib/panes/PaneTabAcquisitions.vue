@@ -196,6 +196,11 @@ const filterActive = computed(
 const filteredCount = computed(() => acquisitions.value.length)
 const pageCount = computed(() => app.data.acquisition.list?.length ?? 0)
 
+// Force DataTable remount on page/page-size change so PrimeVue's internal
+// selection anchor resets. Without this the anchor from a previous page
+// can carry over and produce range-select artifacts.
+const tableKey = computed(() => `${app.data.acquisition.first}-${app.data.acquisition.rows}`)
+
 const clearFilters = () => {
   app.data.acquisition.resetFilters()
   search.value = ''
@@ -341,6 +346,7 @@ const currentPageReportTemplate =
         <div id="uppy-drop-target" class="uppy-container">
           <div class="table-container">
             <DataTable
+              :key="tableKey"
               v-show="acquisitions?.length"
               :selection="app.data.acquisition.selected"
               @update:selection="
@@ -514,6 +520,7 @@ const currentPageReportTemplate =
   height: 100%;
   display: flex;
   flex-direction: column;
+  user-select: none;
 }
 
 .table-container :deep(.p-datatable-table-container) {
