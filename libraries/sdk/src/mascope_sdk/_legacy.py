@@ -24,6 +24,7 @@ Migration Guide:
 
 import functools
 import json
+import os
 import warnings
 
 import requests
@@ -264,7 +265,12 @@ def api_post_file(
         }
         with open(filepath, "rb") as file:
             if upload_filename:
-                files = [("files", (upload_filename, file))]
+                sanitized = os.path.basename(upload_filename)
+                if sanitized != upload_filename:
+                    raise ValueError(
+                        f"upload_filename contains path components: {upload_filename!r}"
+                    )
+                files = [("files", (sanitized, file))]
             else:
                 files = [("files", file)]
             resp = requests.post(

@@ -73,13 +73,16 @@ def get_upload_filename(filepath: str) -> str | None:
     :return: Modified filename or None
     :rtype: str | None
     """
-    prefix = runtime.config.filename_prefix
-    suffix = runtime.config.filename_suffix
+    prefix = runtime.config.filename_prefix or ""
+    suffix = runtime.config.filename_suffix or ""
     if not prefix and not suffix:
         return None
+    for label, value in (("filename_prefix", prefix), ("filename_suffix", suffix)):
+        if any(sep in value for sep in ("/", "\\", os.sep) if sep) or ".." in value:
+            raise ValueError(f"{label} contains invalid characters: {value!r}")
     basename = os.path.basename(filepath)
     stem, ext = os.path.splitext(basename)
-    return f"{prefix or ''}{stem}{suffix or ''}{ext}"
+    return f"{prefix}{stem}{suffix}{ext}"
 
 
 def process_file_upload(filepath: str, max_retries: int = 10) -> None:
