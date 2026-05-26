@@ -204,15 +204,15 @@ const clearFilters = () => {
 
 // Check if files with both "+" and "-" polarities are selected
 const hasBothPolarities = computed(() => {
-  const hasPositive = app.data.acquisition.selected.some(({ polarity }) => polarity === '+')
-  const hasNegative = app.data.acquisition.selected.some(({ polarity }) => polarity === '-')
-  return hasPositive && hasNegative
+  const polarities = app.data.acquisition.selected.filter(Boolean).map((s) => s.polarity)
+  return polarities.includes('+') && polarities.includes('-')
 })
 
 // We consider "+-" as a mixed polarity type
 const onlyMixedPolaritySelected = computed(() => {
-  const allMixed = app.data.acquisition.selected.every(({ polarity }) => polarity === '+-')
-  const moreThanOneSelected = app.data.acquisition.selected.length > 1
+  const selected = app.data.acquisition.selected.filter(Boolean)
+  const allMixed = selected.every(({ polarity }) => polarity === '+-')
+  const moreThanOneSelected = selected.length > 1
   const polarityNotSpecified = ['', '+-'].includes(polarityDropdown.value)
   return allMixed && moreThanOneSelected && polarityNotSpecified
 })
@@ -226,19 +226,12 @@ const derivedPolarity = computed(() => {
   if (['+', '-'].includes(polarityDropdown.value)) {
     return polarityDropdown.value
   }
-  const positive = app.data.acquisition.selected.every(({ polarity }) =>
-    ['+', '+-'].includes(polarity)
-  )
-  const negative = app.data.acquisition.selected.every(({ polarity }) =>
-    ['-', '+-'].includes(polarity)
-  )
-  if (positive) {
-    return '+'
-  } else if (negative) {
-    return '-'
-  } else {
-    return null
-  }
+  const selected = app.data.acquisition.selected.filter(Boolean)
+  const positive = selected.every(({ polarity }) => ['+', '+-'].includes(polarity))
+  const negative = selected.every(({ polarity }) => ['-', '+-'].includes(polarity))
+  if (positive) return '+'
+  if (negative) return '-'
+  return null
 })
 
 // --- "Process selected" button tooltip and disabled state.
@@ -349,7 +342,10 @@ const currentPageReportTemplate =
           <div class="table-container">
             <DataTable
               v-show="acquisitions?.length"
-              v-model:selection="app.data.acquisition.selected"
+              :selection="app.data.acquisition.selected"
+              @update:selection="
+                (sel) => (app.data.acquisition.selected = (sel ?? []).filter(Boolean))
+              "
               v-model:contextMenuSelection="contextMenuRow"
               :value="acquisitions"
               scrollable
