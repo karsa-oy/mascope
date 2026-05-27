@@ -6,6 +6,7 @@ New user-facing code should use :class:`MascopeClient` instead.
 """
 
 import json
+import os
 import sys
 
 import requests
@@ -35,6 +36,7 @@ def api_post_file(
     path: str,
     access_token: str,
     filepath: str,
+    upload_filename: str | None = None,
 ):
     """Send a POST request with a file upload.
 
@@ -42,6 +44,9 @@ def api_post_file(
     :param path: The API path to append to the base URL.
     :param access_token: Authorization token for API access.
     :param filepath: Path to the file to upload.
+    :param upload_filename: Optional filename override for the uploaded file.
+        If provided, the server will see this filename instead of the one on disk.
+    :type upload_filename: str, optional
     :return: The response object on success, otherwise None.
     :rtype: requests.Response | None
     """
@@ -52,9 +57,18 @@ def api_post_file(
             "X-Service-Name": _get_service_name(),
         }
         with open(filepath, "rb") as file:
+            if upload_filename:
+                sanitized = os.path.basename(upload_filename)
+                if sanitized != upload_filename:
+                    raise ValueError(
+                        f"upload_filename contains path components: {upload_filename!r}"
+                    )
+                files = [("files", (sanitized, file))]
+            else:
+                files = [("files", file)]
             resp = requests.post(
                 full_url,
-                files=[("files", file)],
+                files=files,
                 headers=headers,
                 verify=False,
                 timeout=60,
