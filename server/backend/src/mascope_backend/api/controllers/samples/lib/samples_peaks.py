@@ -122,8 +122,8 @@ def _aggregate_time_range(
         return PeakData(
             peak_ids=[],
             mz_values=[],
-            areas=[],
-            heights=[],
+            areas=[] if areas else None,
+            heights=[] if heights else None,
             sparsity=[],
             warnings=warnings,
         )
