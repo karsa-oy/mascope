@@ -947,10 +947,15 @@ async def get_sample_file_peaks(
             response_data["mz"] = peak_heights.mz.values.tolist()
         response_data["height"] = peak_heights.values.tolist()
 
-    # Include sparsity flag
+    # Include sparsity aligned to the same mz coordinate as the response
     if "mz" not in response_data:
         response_data["mz"] = sample_file_data.mz.values.tolist()
-    response_data["sparsity"] = sample_file_data.sparsity.values.tolist()
+        response_data["sparsity"] = sample_file_data.sparsity.values.tolist()
+    else:
+        filtered_mz = peak_areas.mz if areas else peak_heights.mz
+        response_data["sparsity"] = sample_file_data.sparsity.sel(
+            mz=filtered_mz
+        ).values.tolist()
 
     # Step 5: Format the response for the case where no peaks were detected
     if not response_data["mz"]:
