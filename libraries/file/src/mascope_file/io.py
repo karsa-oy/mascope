@@ -176,6 +176,9 @@ def load_peak_data(base_filename: str, drop_bad_peaks: bool = True) -> xr.Datase
     if "sparsity" not in peak_data.data_vars:
         ensure_sparsity_exists(base_filename)
         peak_data = load_array(base_filename, var="peak_timeseries")
+    # Replace any NaN sparsity values with 0.0 (can occur if zarr chunks were
+    # never physically written — xarray uses fill_value=NaN for float64 by default)
+    peak_data["sparsity"] = peak_data.sparsity.fillna(0.0)
     if drop_bad_peaks:
         bad_peak_mask = peak_data.is_weak | peak_data.is_satellite
         peak_data = peak_data.sel(mz=peak_data.mz.values[~bad_peak_mask])
@@ -465,7 +468,10 @@ async def _full_overwrite_peaks(
                     raise
 
             peak_timeseries.to_zarr(
-                peak_timeseries_path, mode="w", synchronizer=synchronizer
+                peak_timeseries_path,
+                mode="w",
+                synchronizer=synchronizer,
+                encoding={"sparsity": {"_FillValue": 0.0}},
             )
 
     try:
