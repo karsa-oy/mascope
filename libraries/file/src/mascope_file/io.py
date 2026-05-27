@@ -745,6 +745,8 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
     # Quick check outside the lock to avoid locking in the common case
     z = zarr.open(peak_timeseries_path, mode="r", synchronizer=synchronizer)
     if "sparsity" in z:
+        # Reconsolidate in case .zmetadata is stale (xr.open_zarr reads from it)
+        zarr.consolidate_metadata(peak_timeseries_path)
         return False
 
     runtime.logger.info(
@@ -760,9 +762,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
     computed_indices = np.where(is_computed)[0]
     if len(computed_indices) > 0:
         peak_heights = z["peak_heights"]
-        mz_chunk_size = (
-            peak_heights.chunks[0] if peak_heights.chunks else mz_size
-        )
+        mz_chunk_size = peak_heights.chunks[0] if peak_heights.chunks else mz_size
         n_time = peak_heights.shape[1]
 
         for chunk_start in range(0, mz_size, mz_chunk_size):
@@ -786,6 +786,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
 
         # Re-check inside the lock — another thread may have created it
         if "sparsity" in z:
+            zarr.consolidate_metadata(peak_timeseries_path)
             return False
 
         # Get chunk size from existing 1D variables
@@ -803,6 +804,9 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
         # Write .zattrs for xarray compatibility (dimension metadata)
         sparsity_attrs = {"_ARRAY_DIMENSIONS": ["mz"]}
         z["sparsity"].attrs.update(sparsity_attrs)
+
+        # Reconsolidate metadata so xr.open_zarr sees the new variable
+        zarr.consolidate_metadata(peak_timeseries_path)
 
     runtime.logger.info(f"Migration complete: 'sparsity' added to {base_filename}")
     return True
