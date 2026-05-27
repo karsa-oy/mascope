@@ -776,8 +776,9 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
             # Single bulk read for the entire chunk
             chunk_data = peak_heights[chunk_start:chunk_end, :]
             # Vectorized sparsity computation
+            # ~(> 0) counts NaN as missing (sparse)
             sparsity_values[indices_in_chunk] = (
-                np.sum(chunk_data[local_indices] <= 0, axis=1) / n_time
+                np.sum(~(chunk_data[local_indices] > 0), axis=1) / n_time
             )
 
     # Write the new variable under the write lock with a re-check

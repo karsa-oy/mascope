@@ -416,6 +416,9 @@ class TestEnsureSparsityExists:
         # Peak 2 remains all positive (not sparse)
         ds["peak_heights"].values[2, :] = np.abs(ds["peak_heights"].values[2, :]) + 1.0
 
+        # Make peak 0 also have a NaN height (counts as sparse)
+        ds["peak_heights"].values[0, 6] = np.nan
+
         ds.to_zarr(peak_timeseries_zarr_path, mode="w")
 
         # Run migration
@@ -427,7 +430,7 @@ class TestEnsureSparsityExists:
         sparsity = z["sparsity"][:]
         n_time = ds.sizes["time"]
 
-        assert sparsity[0] == pytest.approx(1.0 / n_time)  # 1 zero height
+        assert sparsity[0] == pytest.approx(2.0 / n_time)  # 1 zero + 1 NaN height
         assert sparsity[1] == pytest.approx(1.0 / n_time)  # 1 negative height
         assert sparsity[2] == 0.0  # all positive
         # Uncomputed peaks default to 0.0
