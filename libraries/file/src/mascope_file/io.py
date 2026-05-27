@@ -742,6 +742,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
     synchronizer = get_zarr_synchronizer(peak_timeseries_path)
     write_lock = get_zarr_write_lock(peak_timeseries_path)
 
+    # Quick check outside the lock to avoid locking in the common case
     z = zarr.open(peak_timeseries_path, mode="r", synchronizer=synchronizer)
     if "sparsity" in z:
         return False
@@ -750,7 +751,7 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
         f"Migrating peak_timeseries.zarr: adding 'sparsity' variable for {base_filename}"
     )
 
-    # Compute sparsity for all peaks
+    # Compute sparsity for all peaks (read-only, safe outside lock)
     mz_size = z["mz"].shape[0]
     is_computed = z["is_timeseries_computed"][:]
     sparsity_values = np.zeros(mz_size, dtype=np.float64)
@@ -763,9 +764,14 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
             row = peak_heights[idx, :]
             sparsity_values[idx] = np.sum(row <= 0) / row.shape[0]
 
-    # Write the new variable under the write lock
+    # Write the new variable under the write lock with a re-check
     with write_lock:
         z = zarr.open(peak_timeseries_path, mode="r+", synchronizer=synchronizer)
+
+        # Re-check inside the lock — another thread may have created it
+        if "sparsity" in z:
+            return False
+
         # Get chunk size from existing 1D variables
         mz_chunk_size = (
             z["is_timeseries_computed"].chunks[0]
@@ -777,7 +783,6 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
             data=sparsity_values,
             chunks=(mz_chunk_size,),
             dtype=np.float64,
-            overwrite=True,
         )
         # Write .zattrs for xarray compatibility (dimension metadata)
         sparsity_attrs = {"_ARRAY_DIMENSIONS": ["mz"]}
