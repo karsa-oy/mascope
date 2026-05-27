@@ -756,13 +756,29 @@ def ensure_sparsity_exists(base_filename: str) -> bool:
     is_computed = z["is_timeseries_computed"][:]
     sparsity_values = np.zeros(mz_size, dtype=np.float64)
 
-    # For computed peaks, derive from peak_heights
+    # For computed peaks, derive from peak_heights using chunk-aligned reads
     computed_indices = np.where(is_computed)[0]
     if len(computed_indices) > 0:
         peak_heights = z["peak_heights"]
-        for idx in computed_indices:
-            row = peak_heights[idx, :]
-            sparsity_values[idx] = np.sum(row <= 0) / row.shape[0]
+        mz_chunk_size = (
+            peak_heights.chunks[0] if peak_heights.chunks else mz_size
+        )
+        n_time = peak_heights.shape[1]
+
+        for chunk_start in range(0, mz_size, mz_chunk_size):
+            chunk_end = min(chunk_start + mz_chunk_size, mz_size)
+            # Find computed indices within this chunk
+            mask = (computed_indices >= chunk_start) & (computed_indices < chunk_end)
+            if not np.any(mask):
+                continue
+            indices_in_chunk = computed_indices[mask]
+            local_indices = indices_in_chunk - chunk_start
+            # Single bulk read for the entire chunk
+            chunk_data = peak_heights[chunk_start:chunk_end, :]
+            # Vectorized sparsity computation
+            sparsity_values[indices_in_chunk] = (
+                np.sum(chunk_data[local_indices] <= 0, axis=1) / n_time
+            )
 
     # Write the new variable under the write lock with a re-check
     with write_lock:
