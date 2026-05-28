@@ -24,7 +24,8 @@ export const useDatasetContextMenu = defineStore('browser.sample.datasetCtxMenu'
     () =>
       clipboard.op === 'cut' &&
       clipboard.dataset !== null &&
-      clipboard.dataset.workspace_id !== app.data.workspace.focusedId
+      clipboard.dataset.workspace_id !== app.data.workspace.focusedId &&
+      !app.data.workspace.focused?.is_system
   )
 
   // actions
