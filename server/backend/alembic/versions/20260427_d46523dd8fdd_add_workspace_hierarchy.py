@@ -63,7 +63,12 @@ def upgrade() -> None:
         sa.Column("workspace_utc_created", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("workspace_utc_modified", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("workspace_id", name=op.f("pk_workspace")),
-        sa.UniqueConstraint("workspace_name", name=op.f("uq_workspace_workspace_name")),
+    )
+    op.create_index(
+        "ix_workspace_name_ci",
+        "workspace",
+        [sa.literal_column("lower(workspace_name)")],
+        unique=True,
     )
 
     # ===================================================================
