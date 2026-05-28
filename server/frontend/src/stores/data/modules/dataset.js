@@ -52,6 +52,12 @@ export const useDataset = defineStore('app.data.dataset', () => {
       api.http.delete(`${path()}/${dataset.dataset_id}`, {
         use: 'delete',
         type: 'delete_dataset'
-      })
+      }),
+    move: ({ dataset_id, source_workspace_id, target_workspace_id }) =>
+      api.http.post(
+        `/workspaces/${source_workspace_id}/datasets/${dataset_id}/move`,
+        { target_workspace_id },
+        { use: 'update', type: 'move_dataset' }
+      )
   }
 })
