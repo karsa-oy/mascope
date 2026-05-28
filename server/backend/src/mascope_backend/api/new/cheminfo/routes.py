@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user, guest_user
 from mascope_backend.api.new.cheminfo.schema import (
     CheminfoMatchedQueryBody,
     CheminfoQueryBody,
@@ -10,6 +10,8 @@ from mascope_backend.api.new.cheminfo.service import (
     match_compositions_by_mz,
     retrieve_compositions_by_mz,
 )
+from mascope_backend.api.new.workspaces.dependencies import require_sample_role
+from mascope_backend.db import User
 from mascope_backend.db.id import gen_id
 
 
@@ -28,7 +30,8 @@ async def retrieve_compositions_by_mz_route(
     that match the provided m/z value within the specified precision. Results can be
     filtered by formula ranges and ionization mechanisms.
 
-    :param body: Query parameters including m/z value, precision, formula ranges, and ionization mechanisms
+    :param body: Query parameters including m/z value, precision, formula ranges, and
+        ionization mechanisms
     :type body: CheminfoQueryBody
     :return: List of potential molecular formulas matching the m/z value
     :rtype: dict
@@ -42,7 +45,8 @@ async def match_compositions_by_mz_route(
     sample_item_id: str,
     body: CheminfoMatchedQueryBody,
     background_tasks: BackgroundTasks,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ) -> dict:
     """
     Find and match molecular compositions for a given m/z value.
@@ -50,9 +54,14 @@ async def match_compositions_by_mz_route(
     This endpoint finds potential molecular formulas matching the given m/z
     using Mascope Tools, then matches these formulas against a specific sample.
 
+    :param sample_item_id: The unique identifier of the sample to match against.
     :param body: request query options; the only required field is `mz`
-    :type body: CheminfoQueryBody
-    :rtype dict:
+    :type body: CheminfoMatchedQueryBody
+    :param user: The current authenticated user. Requires workspace guest role.
+    :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
+    :rtype: dict
     """
     # Get the socket ID from request headers for notifications
     process_id = gen_id(8)
@@ -72,6 +81,6 @@ async def match_compositions_by_mz_route(
     )
 
     return {
-        "message": f"Matching potential molecular formulas for m/z {body.mz}, please wait.",
+        "message": f"Matching potential formulae for m/z {body.mz}, please wait",
         "process_id": process_id,
     }
