@@ -9,20 +9,16 @@ import Button from 'primevue/button'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
-import ContextMenu from 'primevue/contextmenu'
 
 import { BaseTabbedPanel, BaseCopyableField } from '@/lib/base'
-import { DialogDatasetOp } from '@/lib/dialogs'
 import { useApp } from '@/stores'
 
-import { useDatasetTableConfig } from './stores'
+import DatasetContextMenu from './DatasetContextMenu.vue'
+import { useDatasetContextMenu, useDatasetTableConfig } from './stores'
 
 const app = useApp()
+const contextMenu = useDatasetContextMenu()
 const datasetTable = useDatasetTableConfig()
-
-const dialog = ref()
-const selectedDataset = ref(null)
-const datasetContextMenu = ref()
 
 // Track filtered count for display
 const filteredCount = ref(0)
@@ -46,14 +42,16 @@ const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
 </script>
 
-<template v-if="app.data.dataset.list">
+<template>
   <BaseTabbedPanel
+    v-if="app.data.dataset.list"
     :label="
       datasetTable.config.filters?.global?.value
         ? `Datasets (${filteredCount}/${app.data.dataset.list?.length})`
         : `Datasets (${app.data.dataset.list?.length})`
     "
     icon="pi ph ph-folders"
+    :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`
         <h1>Sample Browser: Datasets</h1>
@@ -64,7 +62,8 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
 
         <p>Click on a dataset to open it and see the batches within.</p>
 
-        <p>Right click on a dataset to edit or delete it.</p>
+        <p>Right click on a dataset to cut, edit or delete it. Right click
+        on empty space to paste a cut dataset into this workspace.</p>
       `)
     "
   >
@@ -89,7 +88,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
           size="small"
           @click="
             () => {
-              dialog = 'create'
+              contextMenu.dialog.op = 'create'
             }
           "
         />
@@ -101,14 +100,13 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       selectionMode="single"
       :metaKeySelection="false"
       v-model:selection="app.data.dataset.focused"
-      v-model:contextMenuSelection="selectedDataset"
+      v-model:contextMenuSelection="contextMenu.selection"
       contextMenu
       @rowContextmenu="
-        (event) => {
+        async (event) => {
           event.originalEvent.stopPropagation()
           event.originalEvent.preventDefault()
-          selectedDataset = event.data
-          datasetContextMenu.toggle(event.originalEvent)
+          await contextMenu.onClick(event)
         }
       "
       resizableColumns
@@ -140,25 +138,5 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
       </Column>
     </DataTable>
   </BaseTabbedPanel>
-  <ContextMenu
-    ref="datasetContextMenu"
-    appendTo="self"
-    :model="[
-      {
-        label: 'Edit dataset',
-        icon: 'pi pi-pen-to-square',
-        command: () => {
-          dialog = 'edit'
-        }
-      },
-      {
-        label: 'Delete dataset',
-        icon: 'pi pi-trash',
-        command: () => {
-          dialog = 'delete'
-        }
-      }
-    ]"
-  />
-  <DialogDatasetOp v-model:action="dialog" :dataset="selectedDataset" />
+  <DatasetContextMenu />
 </template>
