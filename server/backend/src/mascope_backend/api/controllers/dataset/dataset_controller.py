@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func, select
 
 from mascope_backend.api.lib.api_features import api_controller
@@ -10,11 +11,15 @@ from mascope_backend.api.models.dataset.dataset_pydantic_model import (
     DatasetRead,
     DatasetUpdate,
 )
-from mascope_backend.db import Dataset, async_session
+from mascope_backend.api.new.workspaces.exceptions import (
+    WorkspaceNotFoundException,
+)
+from mascope_backend.db import Dataset, Workspace, async_session
 from mascope_backend.db.id import gen_id
 from mascope_backend.socket.records import (
     emit_record_created,
     emit_record_deleted,
+    emit_record_reload,
     emit_record_updated,
 )
 
@@ -344,4 +349,91 @@ async def delete_dataset(
 
     return {
         "message": f"Dataset '{dataset_name}' deleted successfully.",
+    }
+
+
+@api_controller()
+async def move_dataset(
+    dataset_id: str,
+    target_workspace_id: str,
+    independent_transaction: bool = False,
+) -> dict:
+    """
+    Move a dataset into another workspace by reassigning its workspace_id.
+
+    No child rows are modified: batches and samples reference the dataset, and
+    workspace ACL resolves dataset -> workspace at query time, so the entire
+    subtree's access flips on this single foreign-key write.
+
+    Steps:
+    - Fetch the dataset by ID.
+    - Reject ACQUISITION datasets, which are auto-managed across workspaces.
+    - Reject a no-op move where the target equals the current workspace.
+    - Validate the target workspace exists, is non-system and active.
+    - Reassign workspace_id, bump the modified timestamp and commit.
+    - Broadcast a dataset reload so clients re-fetch their workspace list.
+
+    :param dataset_id: The unique identifier of the dataset to move.
+    :type dataset_id: str
+    :param target_workspace_id: The workspace to move the dataset into.
+    :type target_workspace_id: str
+    :param independent_transaction: Emit a socket reload when standalone,
+                                    defaults to False.
+    :type independent_transaction: bool, optional
+    :raises NotFoundException: If no dataset is found with the provided ID.
+    :raises WorkspaceNotFoundException: If the target workspace does not exist.
+    :raises HTTPException: 400 for ACQUISITION datasets, no-op moves, or an
+                           inactive target; 403 for a system target.
+    :return: The moved dataset's details.
+    :rtype: dict
+    """
+    async with async_session() as session:
+        # --- Fetch the dataset ---
+        dataset = await session.get(Dataset, dataset_id)
+        if not dataset:
+            raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
+
+        # --- Acquisition datasets are auto-managed - never relocate ---
+        if dataset.dataset_type == "ACQUISITION":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Acquisition datasets cannot be moved between workspaces.",
+            )
+
+        # --- Reject no-op move explicitly (client error, not silent pass) ---
+        if target_workspace_id == dataset.workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Dataset is already in the target workspace.",
+            )
+
+        # --- Validate the target workspace exists and is active/non-system ---
+        target = await session.get(Workspace, target_workspace_id)
+        if target is None:
+            raise WorkspaceNotFoundException(target_workspace_id)
+        if target.is_system:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot move datasets into a system workspace.",
+            )
+        if target.workspace_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot move datasets into an archived workspace.",
+            )
+
+        # --- Reassign workspace and bump modification timestamp ---
+        dataset.workspace_id = target_workspace_id
+        dataset.dataset_utc_modified = datetime.now(timezone.utc)
+        await session.commit()
+        await session.refresh(dataset)
+
+    # --- Reload so both source and target workspace lists re-fetch updated data ---
+    dataset_data = DatasetRead.model_validate(dataset).model_dump()
+    if independent_transaction:
+        await emit_record_reload(record_type="dataset")
+
+    return {
+        "message": f"Dataset '{dataset.dataset_name}' moved successfully.",
+        "data": dataset_data,
     }
