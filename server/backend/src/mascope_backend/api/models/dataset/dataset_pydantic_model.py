@@ -193,3 +193,11 @@ class GetDatasetsQueryParams(DatasetBaseValidator, QueryParamsModel):
                         f"Must be one of: {dataset_config.DATASET_TYPES}"
                     )
         return dataset_types
+
+
+class DatasetMoveBody(BaseModel):
+    """Request body for moving a dataset into another workspace."""
+
+    target_workspace_id: str = Field(
+        ..., description="ID of the workspace to move the dataset into"
+    )

@@ -174,6 +174,27 @@ async def _enforce(
 # ---------------------------------------------------------------------------
 
 
+async def check_workspace_access(
+    workspace_id: str,
+    user: User,
+    min_role: str,
+) -> WorkspaceMember:
+    """Check workspace-level ACL given a workspace_id directly.
+
+    For routes where the target workspace_id comes from the request body
+    (e.g. a dataset move target) rather than a path param. Unlike
+    check_dataset_access, no resolution is needed - the workspace_id is
+    already in hand.
+
+    :param workspace_id: The workspace to check membership against.
+    :param user: The authenticated user.
+    :param min_role: Minimum workspace role required.
+    :raises ForbiddenAccessException: If user lacks the required workspace role.
+    :return: The user's WorkspaceMember record (synthetic for superusers).
+    """
+    return await _enforce(workspace_id, user, _role_levels[min_role])
+
+
 async def check_dataset_access(
     dataset_id: str,
     user: User,
