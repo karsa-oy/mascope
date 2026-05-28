@@ -15,17 +15,22 @@ from mascope_backend.api.controllers.dataset.dataset_controller import (
     delete_dataset,
     get_dataset,
     get_datasets,
+    move_dataset,
     update_dataset,
 )
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.dataset.dataset_pydantic_model import (
     DatasetCreate,
+    DatasetMoveBody,
     DatasetUpdate,
     GetDatasetsQueryParams,
 )
 from mascope_backend.api.new.auth.access_rules import locked_access
 from mascope_backend.api.new.auth.dependencies import current_active_user
-from mascope_backend.api.new.workspaces.dependencies import require_workspace_role
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_workspace_access,
+    require_workspace_role,
+)
 from mascope_backend.db import Dataset
 
 
@@ -171,5 +176,46 @@ async def delete_dataset_route(
     return await delete_dataset(
         dataset_id=dataset_id,
         workspace_id=workspace_id,
+        independent_transaction=True,
+    )
+
+
+@dataset_router.post("/{dataset_id}/move")
+@api_route()
+async def move_dataset_route(
+    body: DatasetMoveBody,
+    dataset_id: str,
+    workspace_id: str = Path(...),
+    user=Depends(current_active_user),
+    membership=Depends(require_workspace_role("editor")),
+):
+    """Move a dataset from this workspace into another workspace.
+
+    Source membership (editor) is enforced by require_workspace_role on the
+    path workspace_id. The dataset is verified to belong to that source
+    workspace, locked datasets require global admin (matching update/delete),
+    and target membership (editor) is checked explicitly since the target
+    comes from the body.
+
+    :param body: The move request carrying the target workspace ID.
+    :type body: DatasetMoveBody
+    :param dataset_id: The unique identifier of the dataset to move.
+    :type dataset_id: str
+    :param workspace_id: The source workspace the dataset currently belongs to.
+    :type workspace_id: str
+    :param membership: Source workspace membership (injected by
+                       require_workspace_role).
+    :return: A dictionary containing the moved dataset's details.
+    :rtype: dict
+    """
+    # Verify the dataset belongs to the source workspace before anything else
+    await get_dataset(dataset_id, workspace_id=workspace_id)
+    # Locked datasets: only global admins can move (consistent with update/delete)
+    await locked_access(user, Dataset, dataset_id, min_role="admin")
+    # Target-side RBAC - body param, so checked explicitly not as a dependency
+    await check_workspace_access(body.target_workspace_id, user, "editor")
+    return await move_dataset(
+        dataset_id=dataset_id,
+        target_workspace_id=body.target_workspace_id,
         independent_transaction=True,
     )
