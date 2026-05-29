@@ -1,7 +1,6 @@
 import os
 import shutil
 from datetime import datetime, timedelta, timezone
-from typing import Callable
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
 from tuspyserver import create_tus_router
@@ -39,7 +38,11 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from mascope_backend.api.new.auth.access_token.service import get_access_token
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_sample_file_access_bulk,
+    require_acquisition_workspace_role,
+)
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 
@@ -50,34 +53,42 @@ sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"
 @sample_files_router.get("")
 @api_route(token_access=True)
 async def get_sample_files_route(
-    query_params: GetSampleFilesQueryParams = Depends(), user=Depends(guest_user)
+    query_params: GetSampleFilesQueryParams = Depends(),
+    user=Depends(current_active_user),
 ):
     """Retrieve a list of sample files with optional filtering and pagination.
 
+    Results are filtered to files the user has access to via workspace membership.
+    Superusers see all files.
+
     :param query_params: Query parameters for filtering, sorting, and pagination.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: A dictionary with total count and list of sample files.
     """
-    return await get_sample_files(**query_params.model_dump())
+    return await get_sample_files(
+        **query_params.model_dump(),
+        user_id=None if user.is_superuser else user.id,
+    )
 
 
 @sample_files_router.get("/recent")
 @api_route()
 async def get_recent_sample_files_route(
-    query_params: GetRecentSampleFilesQueryParams = Depends(), user=Depends(guest_user)
+    query_params: GetRecentSampleFilesQueryParams = Depends(),
+    user=Depends(current_active_user),
 ):
     """Retrieve recent sample files within a specified date range.
 
     :param query_params: Query parameters including date range in days.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: A dictionary with recent sample files matching criteria.
     """
     datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
     query_params_dict = query_params.model_dump(exclude={"days"})
-    # Update the dictionary with calculated datetime_min
     query_params_dict.update(
         {
             "datetime_min": datetime_min,
+            "user_id": None if user.is_superuser else user.id,
         }
     )
 
@@ -86,13 +97,17 @@ async def get_recent_sample_files_route(
 
 @sample_files_router.get("/{sample_file_id}")
 @api_route()
-async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
+async def get_sample_file_route(
+    sample_file_id: str,
+    user=Depends(current_active_user),
+):
     """Retrieve details of a specific sample file by ID.
 
     :param sample_file_id: ID of the sample file to retrieve.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: Details of the specified sample file.
     """
+    await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file(sample_file_id)
 
 
@@ -101,7 +116,8 @@ async def get_sample_file_route(sample_file_id: str, user=Depends(guest_user)):
 async def create_sample_file_route(
     sample_file_create: SampleFileCreate,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Create a new sample file record.
 
@@ -121,7 +137,10 @@ async def create_sample_file_route(
 @sample_files_router.patch("/{sample_file_id}")
 @api_route()
 async def update_sample_file_route(
-    sample_file_id: str, sample_file: SampleFileUpdate, user=Depends(editor_user)
+    sample_file_id: str,
+    sample_file: SampleFileUpdate,
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Update details of an existing sample file.
 
@@ -135,7 +154,11 @@ async def update_sample_file_route(
 
 @sample_files_router.delete("/{sample_file_id}")
 @api_route()
-async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user)):
+async def delete_sample_file_route(
+    sample_file_id: str,
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
+):
     """Delete a specific sample file by ID.
 
     :param sample_file_id: ID of the sample file to delete.
@@ -148,7 +171,9 @@ async def delete_sample_file_route(sample_file_id: str, user=Depends(editor_user
 @sample_files_router.post("/delete")
 @api_route(token_access=True)
 async def delete_sample_files_route(
-    body: DeleteSampleFilesBody, user=Depends(editor_user)
+    body: DeleteSampleFilesBody,
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Delete multiple sample files by their IDs or filenames.
 
@@ -167,15 +192,16 @@ async def delete_sample_files_route(
 async def get_sample_file_peaks_route(
     sample_file_id: str,
     query_params: GetSampleFilePeaksQueryParams = Depends(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
 ):
     """Retrieve peaks for a specific sample file.
 
     :param sample_file_id: ID of the sample file.
     :param query_params: Parameters for retrieving peaks.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: Peak data for the sample file.
     """
+    await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_peaks(sample_file_id, **query_params.model_dump())
 
 
@@ -184,7 +210,8 @@ async def get_sample_file_peaks_route(
 async def compute_sample_file_peaks_route(
     sample_file_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Delegate peak computation for a sample file to the File Converter service.
 
@@ -217,15 +244,18 @@ async def compute_sample_file_peaks_route(
 @sample_files_router.post("/{sample_file_id}/peaks/timeseries")
 @api_route(token_access=True)
 async def get_sample_file_peak_timeseries_route(
-    sample_file_id: str, body: GetSampleFilePeakTimeseriesBody, user=Depends(guest_user)
+    sample_file_id: str,
+    body: GetSampleFilePeakTimeseriesBody,
+    user=Depends(current_active_user),
 ):
     """Retrieve timeseries for a specific peak in a sample file.
 
     :param sample_file_id: ID of the sample file.
     :param body: Data including peak m/z and tolerance.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: Timeseries data for the specified peak.
     """
+    await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_peak_timeseries(
         sample_file_id=sample_file_id,
         peak_mz=body.peak_mz,
@@ -238,15 +268,16 @@ async def get_sample_file_peak_timeseries_route(
 async def get_sample_file_spectrum_route(
     sample_file_id: str,
     query_params: GetSpectrumQueryParams = Depends(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
 ):
     """Retrieve spectrum data for a sample file within a specific range.
 
     :param sample_file_id: ID of the sample file.
     :param query_params: Parameters for spectrum range.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: Spectrum data for the sample file.
     """
+    await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
 
 
@@ -254,15 +285,16 @@ async def get_sample_file_spectrum_route(
 @api_route(token_access=True)
 async def get_sample_file_metadata_route(
     sample_file_id: str,
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
 ):
     """
     Retrieve metadata for a specific sample file.
 
     :param sample_file_id: ID of the sample file.
-    :param user: Authenticated user with guest access.
+    :param user: Authenticated user.
     :return: Metadata for the sample file.
     """
+    await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_metadata(sample_file_id)
 
 
@@ -271,7 +303,8 @@ async def get_sample_file_metadata_route(
 async def process_sample_item_route(
     sample_file_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Process a sample item, including creation, calibration, and matching.
 
@@ -305,7 +338,8 @@ async def process_sample_item_route(
 async def reprocess_sample_files_route(
     body: ReprocessSampleFilesBody,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Reprocess sample files, including calibration and matching.
 
@@ -335,7 +369,8 @@ async def reprocess_sample_files_route(
 @api_route(status_code=201, token_access=True)
 async def upload_sample_files_route(
     files: list[UploadFile] = File(..., description="Multiple files to upload"),
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
 ) -> dict:
     """
     Uploads multiple sample files to the server in a single batch operation.
@@ -364,8 +399,9 @@ async def upload_sample_files_route(
 
 
 def get_upload_handler(
-    user=Depends(editor_user),
-) -> Callable[[str, dict], None]:
+    user=Depends(current_active_user),
+    membership=Depends(require_acquisition_workspace_role("editor")),
+):
     """Get the upload handler for processing file uploads.
 
     :param user: The current authenticated user with editor permissions.

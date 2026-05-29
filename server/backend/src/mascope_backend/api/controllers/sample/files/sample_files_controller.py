@@ -6,6 +6,7 @@ from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy import (
     asc,
     desc,
+    exists,
     func,
     select,
 )
@@ -33,7 +34,15 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from mascope_backend.api.new.instruments import get_instruments
-from mascope_backend.db import SampleFile, User, async_session
+from mascope_backend.db import (
+    Dataset,
+    SampleBatch,
+    SampleFile,
+    SampleItem,
+    User,
+    WorkspaceMember,
+    async_session,
+)
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket import event_emitter
@@ -58,17 +67,19 @@ FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 @api_controller()
 async def get_sample_files(
-    datetime_min: datetime = None,
-    datetime_max: datetime = None,
-    instrument: str = None,
-    filename: str = None,
+    datetime_min: datetime | None = None,
+    datetime_max: datetime | None = None,
+    instrument: str | None = None,
+    filename: str | None = None,
     sort: str = "datetime_utc",
     order: str = "asc",
     page: int | None = None,
     limit: int | None = None,
+    user_id: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of sample files, optionally filtered by date range, instrument, or filename, and sorted by a specified column.
+    Retrieves a paginated list of sample files, optionally filtered by date range,
+    instrument, or filename, and sorted by a specified column.
 
     Steps:
     - Construct a query to select all sample files.
@@ -88,13 +99,15 @@ async def get_sample_files(
     :type filename: str, optional
     :param sort: Column to sort by, defaults to "datetime_utc".
     :type sort: str, optional
-    :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
+    :param order: Sorting order, "asc" for ascending or "desc" for descending,
+                  defaults to "asc".
     :type order: str, optional
     :param page: Page number for pagination, defaults to None (no pagination).
     :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (no pagination).
     :type limit: int | None, optional
-    :return: A dictionary containing the total count of filtered sample files and a list of sample file details.
+    :return: A dictionary containing the total count of filtered sample files and a list
+             of sample file details.
     :rtype: dict
     """
     async with async_session() as session:
@@ -102,6 +115,25 @@ async def get_sample_files(
         stmt = select(SampleFile)
 
         # --- Apply filters
+        if user_id is not None:
+            stmt = stmt.where(
+                exists(
+                    select(SampleItem.sample_item_id)
+                    .join(
+                        SampleBatch,
+                        SampleBatch.sample_batch_id == SampleItem.sample_batch_id,
+                    )
+                    .join(Dataset, Dataset.dataset_id == SampleBatch.dataset_id)
+                    .join(
+                        WorkspaceMember,
+                        WorkspaceMember.workspace_id == Dataset.workspace_id,
+                    )
+                    .where(
+                        SampleItem.sample_file_id == SampleFile.sample_file_id,
+                        WorkspaceMember.user_id == user_id,
+                    )
+                )
+            )
         if datetime_min:
             stmt = stmt.where(SampleFile.datetime_utc >= datetime_min)
         if datetime_max:

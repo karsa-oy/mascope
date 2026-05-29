@@ -20,6 +20,7 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``check_batch_access_bulk``:  list of sample_batch_ids (single query)
 - ``check_sample_access``:      sample_item_id from request body / other source
 - ``check_sample_access_bulk``: list of sample_item_ids (single query)
+- ``check_sample_file_access_bulk``: list of sample_file_ids via items (single query)
 
 All return ``WorkspaceMember`` on success or raise ``ForbiddenAccessException``.
 """
@@ -291,6 +292,54 @@ async def check_sample_access_bulk(
     min_level = _role_levels[min_role]
     for workspace_id in workspace_ids:
         await _enforce(workspace_id, user, min_level)
+
+
+async def check_sample_file_access_bulk(
+    sample_file_ids: list[str],
+    user: User,
+    min_role: str,
+) -> None:
+    """Check workspace-level ACL for a list of sample_file_ids via sample items.
+
+    For each requested file, verifies that at least one sample_item referencing
+    it belongs to a workspace where the user has the required role.  This
+    correctly handles the one-to-many relationship between sample files and
+    sample items — a file is accessible if ANY of its sample items is in an
+    accessible workspace.
+
+    :raises ForbiddenAccessException: If any file has no sample item in an
+        accessible workspace, or if any file has no sample items at all.
+    """
+    if user.is_superuser:
+        return
+
+    min_level = _role_levels[min_role]
+    async with async_session() as session:
+        # Find which of the requested file IDs have at least one sample item
+        # in a workspace where the user has sufficient membership.
+        result = await session.execute(
+            select(SampleItem.sample_file_id)
+            .distinct()
+            .join(
+                SampleBatch, SampleBatch.sample_batch_id == SampleItem.sample_batch_id
+            )
+            .join(Dataset, Dataset.dataset_id == SampleBatch.dataset_id)
+            .join(
+                WorkspaceMember,
+                WorkspaceMember.workspace_id == Dataset.workspace_id,
+            )
+            .where(
+                SampleItem.sample_file_id.in_(sample_file_ids),
+                WorkspaceMember.user_id == user.id,
+                WorkspaceMember.workspace_role.in_(
+                    [r for r, lvl in _role_levels.items() if lvl >= min_level]
+                ),
+            )
+        )
+        accessible_ids = set(result.scalars().all())
+
+    if not set(sample_file_ids).issubset(accessible_ids):
+        raise ForbiddenAccessException()
 
 
 # ---------------------------------------------------------------------------
