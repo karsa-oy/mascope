@@ -192,10 +192,11 @@ async def move_dataset_route(
     """Move a dataset from this workspace into another workspace.
 
     Source membership (editor) is enforced by require_workspace_role on the
-    path workspace_id. The dataset is verified to belong to that source
-    workspace, locked datasets require global admin (matching update/delete),
-    and target membership (editor) is checked explicitly since the target
-    comes from the body.
+    path workspace_id, and the controller re-verifies the dataset's
+    ownership in the source workspace inside the move transaction (closing
+    the TOCTOU window between authorization and mutation). Locked datasets
+    require global admin, matching update/delete. Target membership (editor)
+    is checked explicitly since the target comes from the body.
 
     :param body: The move request carrying the target workspace ID.
     :type body: DatasetMoveBody
@@ -208,14 +209,13 @@ async def move_dataset_route(
     :return: A dictionary containing the moved dataset's details.
     :rtype: dict
     """
-    # Verify the dataset belongs to the source workspace before anything else
-    await get_dataset(dataset_id, workspace_id=workspace_id)
     # Locked datasets: only global admins can move (consistent with update/delete)
     await locked_access(user, Dataset, dataset_id, min_role="admin")
     # Target-side RBAC - body param, so checked explicitly not as a dependency
     await check_workspace_access(body.target_workspace_id, user, "editor")
     return await move_dataset(
         dataset_id=dataset_id,
+        source_workspace_id=workspace_id,
         target_workspace_id=body.target_workspace_id,
         independent_transaction=True,
     )

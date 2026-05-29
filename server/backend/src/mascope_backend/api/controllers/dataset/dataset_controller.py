@@ -355,6 +355,7 @@ async def delete_dataset(
 @api_controller()
 async def move_dataset(
     dataset_id: str,
+    source_workspace_id: str,
     target_workspace_id: str,
     independent_transaction: bool = False,
 ) -> dict:
@@ -365,22 +366,29 @@ async def move_dataset(
     workspace ACL resolves dataset -> workspace at query time, so the entire
     subtree's access flips on this single foreign-key write.
 
+    Source ownership is re-verified inside this transaction (not only at the
+    route level) to close a TOCTOU window between authorization and mutation.
+
     Steps:
-    - Fetch the dataset by ID.
+    - Fetch the dataset and verify it still belongs to the source workspace.
     - Reject ACQUISITION datasets, which are auto-managed across workspaces.
-    - Reject a no-op move where the target equals the current workspace.
+    - Reject a no-op move where the target equals the source.
     - Validate the target workspace exists, is non-system and active.
     - Reassign workspace_id, bump the modified timestamp and commit.
     - Broadcast a dataset reload so clients re-fetch their workspace list.
 
     :param dataset_id: The unique identifier of the dataset to move.
     :type dataset_id: str
+    :param source_workspace_id: The workspace the dataset must currently belong
+                                to (verified inside the move transaction).
+    :type source_workspace_id: str
     :param target_workspace_id: The workspace to move the dataset into.
     :type target_workspace_id: str
     :param independent_transaction: Emit a socket reload when standalone,
                                     defaults to False.
     :type independent_transaction: bool, optional
-    :raises NotFoundException: If no dataset is found with the provided ID.
+    :raises NotFoundException: If the dataset is missing or no longer in the
+                               source workspace.
     :raises WorkspaceNotFoundException: If the target workspace does not exist.
     :raises HTTPException: 400 for ACQUISITION datasets, no-op moves, or an
                            inactive target; 403 for a system target.
@@ -388,9 +396,9 @@ async def move_dataset(
     :rtype: dict
     """
     async with async_session() as session:
-        # --- Fetch the dataset ---
+        # --- Fetch and verify source ownership in the same transaction ---
         dataset = await session.get(Dataset, dataset_id)
-        if not dataset:
+        if not dataset or dataset.workspace_id != source_workspace_id:
             raise NotFoundException(f"Dataset with ID '{dataset_id}' not found")
 
         # --- Acquisition datasets are auto-managed - never relocate ---
@@ -401,7 +409,7 @@ async def move_dataset(
             )
 
         # --- Reject no-op move explicitly (client error, not silent pass) ---
-        if target_workspace_id == dataset.workspace_id:
+        if target_workspace_id == source_workspace_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Dataset is already in the target workspace.",
