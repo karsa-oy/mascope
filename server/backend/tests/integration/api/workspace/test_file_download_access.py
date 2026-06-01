@@ -1,10 +1,9 @@
 """
-Tests: check_sample_file_access_bulk via file download endpoint.
+Tests: file download access control via ``POST /api/file/download``.
 
-Verifies that ``POST /api/file/download`` correctly enforces workspace ACL
-through the ``check_sample_file_access_bulk`` dependency, which checks that
-each requested file has at least one sample item in a workspace where the
-user has sufficient membership.
+Verifies that the download endpoint enforces workspace ACL through
+``check_sample_file_access_bulk``, with an Acquisitions member bypass
+consistent with the sample file read routes.
 
 Fixtures used:
 - ``sample_file`` — linked to ``alpha_item`` (ws_alpha, all users are members)
@@ -47,7 +46,7 @@ async def test_download_inaccessible_file(guest_client, beta_sample_file, beta_i
 
 @pytest.mark.asyncio
 async def test_download_orphan_file(guest_client, orphan_sample_file):
-    """File with no sample items is inaccessible to everyone except superusers."""
+    """File with no sample items is inaccessible to non-Acquisitions members."""
     resp = await guest_client.post(
         "/api/file/download",
         json={"sample_file_ids": [orphan_sample_file]},
@@ -81,6 +80,21 @@ async def test_download_as_outsider(outsider_client, sample_file, alpha_item):
         json={"sample_file_ids": [sample_file]},
     )
     assert resp.status_code == 403
+
+
+# ============= Acquisitions member bypasses check =============
+
+
+@pytest.mark.asyncio
+async def test_download_as_acq_member(
+    acq_guest_client, beta_sample_file, orphan_sample_file, beta_item
+):
+    """Acquisitions member can download any file, including orphaned ones."""
+    resp = await acq_guest_client.post(
+        "/api/file/download",
+        json={"sample_file_ids": [beta_sample_file, orphan_sample_file]},
+    )
+    assert resp.status_code == 202
 
 
 # ============= Superuser bypasses check =============
