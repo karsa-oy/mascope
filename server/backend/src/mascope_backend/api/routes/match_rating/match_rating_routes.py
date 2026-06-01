@@ -36,8 +36,9 @@ async def get_match_ratings_route(
     :return: A dictionary containing total count and list of match ratings.
     :rtype: dict
     """
-    if query_params.sample_item_id:
-        await check_sample_access(query_params.sample_item_id, user, "guest")
+    if not query_params.sample_item_id:
+        raise ValueError("sample_item_id is required.")
+    await check_sample_access(query_params.sample_item_id, user, "guest")
     return await get_match_ratings(**query_params.model_dump())
 
 
