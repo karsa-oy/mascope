@@ -48,8 +48,9 @@ async def get_samples_route(
         await check_batch_access(query_params.sample_batch_id, user, "guest")
     elif query_params.sample_item_id:
         await check_sample_access(query_params.sample_item_id, user, "guest")
+    else:
+        raise ValueError("Either sample_batch_id or sample_item_id must be provided.")
     return await get_samples(**query_params.model_dump())
-
 
 @samples_router.get("/centroids")
 @api_route(token_access=True)
