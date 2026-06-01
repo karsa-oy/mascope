@@ -291,15 +291,17 @@ async def alpha_item(async_session_factory, alpha_batch, sample_file):
 
 
 # ---------------------------------------------------------------------------
-# Sample item in beta_batch
+# Sample file for beta workspace (exposed separately for ACL tests)
 # ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture(scope="session")
-async def beta_item(async_session_factory, beta_batch, sample_file):
-    """A sample item inside the Beta batch (only owner can access)."""
-    item_id = gen_id()
-    # Need a separate file because of the unique filename constraint
+async def beta_sample_file(async_session_factory):
+    """A sample file record that will be linked to beta_item.
+
+    Exposed as a separate fixture so ACL tests can reference the file ID
+    independently of the sample item.
+    """
     file_id = gen_id()
     async with async_session_factory() as session:
         sf = SampleFile(
@@ -313,12 +315,24 @@ async def beta_item(async_session_factory, beta_batch, sample_file):
             polarity="+",
         )
         session.add(sf)
-        await session.flush()
+        await session.commit()
+    return file_id
 
+
+# ---------------------------------------------------------------------------
+# Sample item in beta_batch
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def beta_item(async_session_factory, beta_batch, beta_sample_file):
+    """A sample item inside the Beta batch (only owner can access)."""
+    item_id = gen_id()
+    async with async_session_factory() as session:
         item = SampleItem(
             sample_item_id=item_id,
             sample_batch_id=beta_batch,
-            sample_file_id=file_id,
+            sample_file_id=beta_sample_file,
             sample_item_name="Beta Item",
             sample_item_type="ANALYSIS",
             sample_item_attributes={},
@@ -391,3 +405,151 @@ async def global_target_collection(async_session_factory):
         session.add(tc)
         await session.commit()
     return tc_id
+
+
+# ---------------------------------------------------------------------------
+# Orphan sample file — no sample items reference it
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def orphan_sample_file(async_session_factory):
+    """A sample file with no sample items — invisible to non-superusers."""
+    file_id = gen_id()
+    async with async_session_factory() as session:
+        sf = SampleFile(
+            sample_file_id=file_id,
+            filename=f"test_orphan_{file_id}.h5",
+            instrument="test-instrument",
+            datetime=_NOW_NAIVE,
+            datetime_utc=_NOW,
+            length=60.0,
+            range={"min": 0, "max": 500},
+            polarity="+",
+        )
+        session.add(sf)
+        await session.commit()
+    return file_id
+
+
+# ---------------------------------------------------------------------------
+# Acquisitions workspace — system workspace for sample file mutations
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def acquisitions_workspace(async_session_factory):
+    """The system Acquisitions workspace (is_system=True).
+
+    ``require_acquisition_workspace_role`` resolves this workspace by
+    name + is_system flag.
+    """
+    workspace_id = gen_id()
+    async with async_session_factory() as session:
+        workspace = Workspace(
+            workspace_id=workspace_id,
+            workspace_name="Acquisitions",
+            workspace_description="System acquisitions workspace",
+            workspace_status="active",
+            is_system=True,
+            workspace_utc_created=_NOW,
+            workspace_utc_modified=_NOW,
+        )
+        session.add(workspace)
+        await session.commit()
+    return workspace_id
+
+
+# ---------------------------------------------------------------------------
+# Users + clients for Acquisitions workspace ACL tests
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def acq_editor_user(async_session_factory, roles, acquisitions_workspace):
+    """A user who is an editor of the Acquisitions workspace."""
+    async with async_session_factory() as session:
+        user = User(
+            email="acq_editor@test.com",
+            username="acq_editor_user",
+            hashed_password="123456",
+            is_active=True,
+            is_verified=False,
+            role_id=roles["editor"].role_id,
+        )
+        session.add(user)
+        await session.flush()
+
+        member = WorkspaceMember(
+            workspace_member_id=gen_id(),
+            workspace_id=acquisitions_workspace,
+            user_id=user.id,
+            workspace_role="editor",
+            granted_at=_NOW,
+            granted_by=user.id,
+        )
+        session.add(member)
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+
+@pytest_asyncio.fixture(scope="session")
+async def acq_guest_user(async_session_factory, roles, acquisitions_workspace):
+    """A user who is a guest of the Acquisitions workspace."""
+    async with async_session_factory() as session:
+        user = User(
+            email="acq_guest@test.com",
+            username="acq_guest_user",
+            hashed_password="123456",
+            is_active=True,
+            is_verified=False,
+            role_id=roles["guest"].role_id,
+        )
+        session.add(user)
+        await session.flush()
+
+        member = WorkspaceMember(
+            workspace_member_id=gen_id(),
+            workspace_id=acquisitions_workspace,
+            user_id=user.id,
+            workspace_role="guest",
+            granted_at=_NOW,
+            granted_by=user.id,
+        )
+        session.add(member)
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+
+@pytest_asyncio.fixture
+async def acq_editor_client(acq_editor_user, create_jwt_auth_token):
+    """AsyncClient authenticated as an Acquisitions workspace editor."""
+    from httpx import ASGITransport, AsyncClient
+
+    from mascope_backend.app.fast import fast
+
+    token = create_jwt_auth_token(acq_editor_user)
+    async with AsyncClient(
+        transport=ASGITransport(app=fast),
+        base_url="http://test",
+        cookies={auth_settings.COOKIE_NAME: token},
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
+async def acq_guest_client(acq_guest_user, create_jwt_auth_token):
+    """AsyncClient authenticated as an Acquisitions workspace guest."""
+    from httpx import ASGITransport, AsyncClient
+
+    from mascope_backend.app.fast import fast
+
+    token = create_jwt_auth_token(acq_guest_user)
+    async with AsyncClient(
+        transport=ASGITransport(app=fast),
+        base_url="http://test",
+        cookies={auth_settings.COOKIE_NAME: token},
+    ) as client:
+        yield client
