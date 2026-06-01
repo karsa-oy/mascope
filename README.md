@@ -978,7 +978,7 @@ async def rematch_batches_route(
     ...
 ```
 
-Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`.
+Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`, `check_sample_file_access_bulk`.
 
 > [!IMPORTANT]
 > The `@api_route()` decorator **requires** a parameter named `user` in the route signature (it raises `ValueError` otherwise). When using workspace ACL, always keep `user: User = Depends(current_active_user)` as a separate parameter alongside the membership dependency.
@@ -1001,7 +1001,6 @@ Each API resource uses one of the two authorization layers. The table below docu
 | Match management                                                       | Workspace ACL | editor / admin | Rematch, compute, remove                           |
 | Match sub-resources                                                    | Workspace ACL | guest / editor | Collections, compounds, ions, isotopes, samples    |
 | Match aggregates                                                       | Workspace ACL | guest / editor | Batch and sample aggregations                      |
-| Match targets (batch)                                                  | Workspace ACL | guest          | Target collections per batch                       |
 | Match ratings                                                          | Workspace ACL | guest          | User match ratings                                 |
 | Match records                                                          | Workspace ACL | guest          | Read-only match record queries                     |
 | MS2 analysis                                                           | Workspace ACL | guest          | MS2 summary, centroids, timeseries                 |
