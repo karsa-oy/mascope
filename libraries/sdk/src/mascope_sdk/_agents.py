@@ -6,7 +6,6 @@ New user-facing code should use :class:`MascopeClient` instead.
 """
 
 import json
-import os
 import sys
 
 import requests
@@ -58,7 +57,9 @@ def api_post_file(
         }
         with open(filepath, "rb") as file:
             if upload_filename:
-                sanitized = os.path.basename(upload_filename)
+                from pathlib import PurePosixPath, PureWindowsPath
+
+                sanitized = PurePosixPath(PureWindowsPath(upload_filename).name).name
                 if sanitized != upload_filename:
                     raise ValueError(
                         f"upload_filename contains path components: {upload_filename!r}"
