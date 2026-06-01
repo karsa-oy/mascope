@@ -41,6 +41,7 @@ from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.workspaces.dependencies import (
     check_sample_file_access_bulk,
+    is_acquisitions_member,
     require_acquisition_workspace_role,
 )
 from mascope_backend.db.id import gen_id
@@ -58,16 +59,17 @@ async def get_sample_files_route(
 ):
     """Retrieve a list of sample files with optional filtering and pagination.
 
-    Results are filtered to files the user has access to via workspace membership.
-    Superusers see all files.
+    Results are filtered to files linked to the user's workspaces via sample items.
+    Superusers and Acquisitions workspace members see all files.
 
     :param query_params: Query parameters for filtering, sorting, and pagination.
     :param user: Authenticated user.
     :return: A dictionary with total count and list of sample files.
     """
+    skip_filter = user.is_superuser or await is_acquisitions_member(user)
     return await get_sample_files(
         **query_params.model_dump(),
-        user_id=None if user.is_superuser else user.id,
+        user_id=None if skip_filter else user.id,
     )
 
 
@@ -85,10 +87,11 @@ async def get_recent_sample_files_route(
     """
     datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
     query_params_dict = query_params.model_dump(exclude={"days"})
+    skip_filter = user.is_superuser or await is_acquisitions_member(user)
     query_params_dict.update(
         {
             "datetime_min": datetime_min,
-            "user_id": None if user.is_superuser else user.id,
+            "user_id": None if skip_filter else user.id,
         }
     )
 
@@ -107,7 +110,8 @@ async def get_sample_file_route(
     :param user: Authenticated user.
     :return: Details of the specified sample file.
     """
-    await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    if not await is_acquisitions_member(user):
+        await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file(sample_file_id)
 
 
@@ -201,7 +205,8 @@ async def get_sample_file_peaks_route(
     :param user: Authenticated user.
     :return: Peak data for the sample file.
     """
-    await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    if not await is_acquisitions_member(user):
+        await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_peaks(sample_file_id, **query_params.model_dump())
 
 
@@ -255,7 +260,8 @@ async def get_sample_file_peak_timeseries_route(
     :param user: Authenticated user.
     :return: Timeseries data for the specified peak.
     """
-    await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    if not await is_acquisitions_member(user):
+        await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_peak_timeseries(
         sample_file_id=sample_file_id,
         peak_mz=body.peak_mz,
@@ -277,7 +283,8 @@ async def get_sample_file_spectrum_route(
     :param user: Authenticated user.
     :return: Spectrum data for the sample file.
     """
-    await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    if not await is_acquisitions_member(user):
+        await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
 
 
@@ -294,7 +301,8 @@ async def get_sample_file_metadata_route(
     :param user: Authenticated user.
     :return: Metadata for the sample file.
     """
-    await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    if not await is_acquisitions_member(user):
+        await check_sample_file_access_bulk([sample_file_id], user, "guest")
     return await get_sample_file_metadata(sample_file_id)
 
 

@@ -175,6 +175,23 @@ async def _enforce(
 # ---------------------------------------------------------------------------
 
 
+async def is_acquisitions_member(user: User) -> bool:
+    """Check if user is a member of the system Acquisitions workspace.
+
+    Returns True for superusers (they bypass all membership checks) or if the
+    user has any role in the Acquisitions workspace.  Used by sample file read
+    routes to let Acquisitions members see all files, including orphaned ones
+    with no sample items.
+    """
+    if user.is_superuser:
+        return True
+    workspace_id = await _get_acquisition_workspace_id()
+    if workspace_id is None:
+        return False
+    membership = await _get_workspace_membership(workspace_id, user)
+    return membership is not None
+
+
 async def check_workspace_access(
     workspace_id: str,
     user: User,
