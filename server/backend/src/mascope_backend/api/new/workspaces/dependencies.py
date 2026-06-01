@@ -330,6 +330,9 @@ async def check_sample_file_access_bulk(
     if user.is_superuser:
         return
 
+    if not sample_file_ids:
+        raise ForbiddenAccessException()
+
     min_level = _role_levels[min_role]
     async with async_session() as session:
         # Find which of the requested file IDs have at least one sample item
