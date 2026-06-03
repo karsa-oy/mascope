@@ -155,9 +155,34 @@ function install_mascope() {
 
     uv tool install --force .
     uv tool update-shell
+
+    write_section "ENABLING SYSTEMD SERVICE"
+
+    MASCOPE_BIN=$(command -v mascope)
+    if [[ -z "${MASCOPE_BIN}" ]]; then
+        write_line "ERROR: mascope binary not found on PATH after install"
+        exit 1
+    fi
+
+    sed -e "s|@@USER@@|${USER}|g" \
+        -e "s|@@MASCOPE_BIN@@|${MASCOPE_BIN}|g" \
+        "${ROOT_PATH}/tooling/mascope.service" \
+        | sudo tee /etc/systemd/system/mascope.service > /dev/null
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable mascope.service
+    write_line "mascope.service enabled for user '${USER}' (bin: ${MASCOPE_BIN})"
 }
 
 function uninstall_mascope() {
+    write_section "DISABLING SYSTEMD SERVICE"
+
+    sudo systemctl stop mascope.service || true
+    sudo systemctl disable mascope.service || true
+    sudo rm -f /etc/systemd/system/mascope.service
+    sudo systemctl daemon-reload
+    write_line "mascope.service disabled and removed"
+
     write_section "UNINSTALLING MASCOPE BINARIES"
 
     uv tool uninstall --all

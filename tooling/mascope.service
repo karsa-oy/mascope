@@ -1,0 +1,16 @@
+[Unit]
+Description=Mascope Application
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=@@USER@@
+EnvironmentFile=/etc/environment
+ExecStart=@@MASCOPE_BIN@@ prod up --detach
+ExecStop=@@MASCOPE_BIN@@ prod down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
