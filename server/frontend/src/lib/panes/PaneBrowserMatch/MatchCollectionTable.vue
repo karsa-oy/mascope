@@ -148,9 +148,24 @@ const breadcrumb = computed(() => {
         <template #body="{ data }">
           <div :id="data.target_collection_id" class="row" style="justify-content: flex-start">
             <span
+              v-if="!data.workspace_id"
+              v-tooltip.top="{
+                value: 'Global collection (shared across all workspaces)',
+                showDelay: 500
+              }"
+              class="pi ph ph-globe scope-badge scope-global"
+            />
+            <span
+              v-else
+              v-tooltip.top="{
+                value: `Workspace: ${app.data.workspace.list.find((w) => w.workspace_id === data.workspace_id)?.workspace_name ?? 'Unknown'}`,
+                showDelay: 500
+              }"
+              class="pi ph ph-briefcase scope-badge scope-workspace"
+            />
+            <span
               :class="collectionTypeIcons[data.target_collection_type]"
               v-tooltip.top="data.target_collection_type.toLowerCase()"
-              style="margin-right: 0.5rem"
             />
             <BaseCopyableField :field="data.target_collection_name" />
           </div>
@@ -166,5 +181,19 @@ const breadcrumb = computed(() => {
   visibility: visible !important;
   color: var(--p-button-text-info-color);
   opacity: 0.7;
+}
+
+.scope-badge {
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.scope-global {
+  color: var(--p-primary-color);
+}
+
+.scope-workspace {
+  color: var(--p-primary-color);
 }
 </style>

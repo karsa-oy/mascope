@@ -17,10 +17,7 @@ onMounted(() => {
 
 <template>
   <ContextMenu ref="contextMenuRef" :model="contextMenu.entries" @hide="contextMenu.clear" />
-  <DialogTargetCollectionOp
-    v-model:action="contextMenu.dialog.op"
-    :visible="contextMenu.dialog.op && contextMenu.dialog.op !== 'update_targets'"
-  />
+  <DialogTargetCollectionOp v-model:action="contextMenu.dialog.op" />
   <DialogBatchOp
     v-model:action="contextMenu.dialog.op"
     :visible="contextMenu.dialog.op === 'update_targets'"

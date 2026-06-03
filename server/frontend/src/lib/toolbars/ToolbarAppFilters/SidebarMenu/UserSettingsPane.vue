@@ -10,7 +10,7 @@ import { api } from '@/api'
 import { useApp } from '@/stores'
 import { BaseCopyableField, BaseEditableField } from '@/lib/base'
 import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
-import { prettyRoleName } from '@/lib/roles'
+import { prettyRoleName, ROLES } from '@/lib/roles'
 
 import { useSidebarMenu } from './state.js'
 
@@ -202,7 +202,7 @@ const vHelpLayer = app.ui.help.directive(layer)
     </div>
   </section>
   <section
-    v-if="app.auth.user.role_id >= 300"
+    v-if="app.auth.user.role_id >= ROLES.admin"
     v-help-layer.right="
       `
   <b>Admin Settings</b>

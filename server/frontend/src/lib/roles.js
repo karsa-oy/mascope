@@ -24,3 +24,6 @@ export const prettyWorkspaceRoleName = (role) =>
 
 export const roleLevel = (roleName) =>
   roleDefinitions.find(({ name }) => name === roleName)?.level ?? 0
+
+// Numeric role levels keyed by name, e.g. ROLES.admin === 300
+export const ROLES = Object.fromEntries(roleDefinitions.map(({ name, level }) => [name, level]))
