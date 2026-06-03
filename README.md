@@ -987,49 +987,49 @@ Available check functions: `check_dataset_access`, `check_batch_access`, `check_
 
 Each API resource uses one of the two authorization layers. The table below documents the intended scope for every resource area.
 
-| Resource                                                               | Auth          | Min Role       | Rationale                                          |
-| ---------------------------------------------------------------------- | ------------- | -------------- | -------------------------------------------------- |
-| **Workspace-scoped (data under Workspace → Dataset → Batch → Sample)** |               |                |                                                    |
-| Workspaces                                                             | Workspace ACL | guest / editor | Direct workspace operations                        |
-| Workspace membership                                                   | Workspace ACL | admin          | Add, remove, update workspace members              |
-| Datasets                                                               | Workspace ACL | guest / editor | Workspace children                                 |
-| Dataset acquisitions                                                   | Workspace ACL | guest / editor | System "Acquisitions" workspace                    |
-| Sample batches                                                         | Workspace ACL | guest / editor | Under datasets                                     |
-| Sample batch export                                                    | Workspace ACL | guest          | Export scoped to batch                             |
-| Sample items                                                           | Workspace ACL | guest / editor | Under batches                                      |
-| Samples (data loading)                                                 | Workspace ACL | guest          | Peaks, spectra, centroids, timeseries              |
-| Match management                                                       | Workspace ACL | editor / admin | Rematch, compute, remove                           |
-| Match sub-resources                                                    | Workspace ACL | guest / editor | Collections, compounds, ions, isotopes, samples    |
-| Match aggregates                                                       | Workspace ACL | guest / editor | Batch and sample aggregations                      |
-| Match ratings                                                          | Workspace ACL | guest          | User match ratings                                 |
-| Match records                                                          | Workspace ACL | guest          | Read-only match record queries                     |
-| MS2 analysis                                                           | Workspace ACL | guest          | MS2 summary, centroids, timeseries                 |
-| Cheminfo (match)                                                       | Workspace ACL | guest          | `/mz/match/sample/{id}` — sample-scoped            |
-| Visualization                                                          | Workspace ACL | guest          | Ion focus visualization                            |
-| Target collections                                                     | Global RBAC   | guest / editor | Planned: workspace ACL (separate PR)               |
-| Target compounds                                                       | Global RBAC   | guest / editor | Planned: workspace ACL (separate PR)               |
-| Target ions                                                            | Global RBAC   | guest / editor | Planned: workspace ACL (separate PR)               |
-| Target isotopes                                                        | Global RBAC   | guest          | Planned: workspace ACL (separate PR)               |
-| Target associations                                                    | Global RBAC   | guest          | Planned: workspace ACL (separate PR)               |
-| **Global (shared system resources)**                                   |               |                |                                                    |
-| Instruments                                                            | Global RBAC   | guest          | Shared hardware definitions                        |
-| Instrument configs                                                     | Global RBAC   | guest / editor | Shared instrument configuration                    |
-| Ionization modes                                                       | Global RBAC   | guest / editor | Shared chemistry reference data                    |
-| Ionization mechanisms                                                  | Global RBAC   | guest / editor | Shared chemistry reference data                    |
-| Attribute templates                                                    | Global RBAC   | guest / editor | Shared metadata schemas                            |
-| Calibration (read)                                                     | Global RBAC   | guest          | View calibration state                             |
-| Calibration (mutations)                                                | Global RBAC   | admin          | Global operation, affects all associated samples   |
-| Cheminfo (query)                                                       | Global RBAC   | guest          | Stateless formula lookup                           |
-| Params                                                                 | Global RBAC   | guest          | Application parameters                             |
-| Sample files (read)                                                    | Workspace ACL | guest          | Filtered by accessible workspaces via sample items |
-| Sample files (mutations)                                               | Workspace ACL | editor         | Requires Acquisitions workspace membership         |
-| File download                                                          | Workspace ACL | guest          | Via sample items in accessible workspaces          |
-| Temp files                                                             | Global RBAC   | guest          | Temporary file serving                             |
-| **Admin (system management)**                                          |               |                |                                                    |
-| Users (admin/owner)                                                    | Global RBAC   | admin / owner  | User management                                    |
-| Users (self)                                                           | Authenticated | —              | Own profile                                        |
-| Roles                                                                  | Global RBAC   | admin / owner  | Role definitions                                   |
-| Auth / tokens                                                          | Authenticated | —              | JWT and access tokens                              |
+| Resource                                                               | Auth          | Min Role       | Rationale                                             |
+| ---------------------------------------------------------------------- | ------------- | -------------- | ----------------------------------------------------- |
+| **Workspace-scoped (data under Workspace → Dataset → Batch → Sample)** |               |                |                                                       |
+| Workspaces                                                             | Workspace ACL | guest / editor | Direct workspace operations                           |
+| Workspace membership                                                   | Workspace ACL | admin          | Add, remove, update workspace members                 |
+| Datasets                                                               | Workspace ACL | guest / editor | Workspace children                                    |
+| Dataset acquisitions                                                   | Workspace ACL | guest / editor | System "Acquisitions" workspace                       |
+| Sample batches                                                         | Workspace ACL | guest / editor | Under datasets                                        |
+| Sample batch export                                                    | Workspace ACL | guest          | Export scoped to batch                                |
+| Sample items                                                           | Workspace ACL | guest / editor | Under batches                                         |
+| Samples (data loading)                                                 | Workspace ACL | guest          | Peaks, spectra, centroids, timeseries                 |
+| Match management                                                       | Workspace ACL | editor / admin | Rematch, compute, remove                              |
+| Match sub-resources                                                    | Workspace ACL | guest / editor | Collections, compounds, ions, isotopes, samples       |
+| Match aggregates                                                       | Workspace ACL | guest / editor | Batch and sample aggregations                         |
+| Match ratings                                                          | Workspace ACL | guest          | User match ratings                                    |
+| Match records                                                          | Workspace ACL | guest          | Read-only match record queries                        |
+| MS2 analysis                                                           | Workspace ACL | guest          | MS2 summary, centroids, timeseries                    |
+| Cheminfo (match)                                                       | Workspace ACL | guest          | `/mz/match/sample/{id}` — sample-scoped               |
+| Visualization                                                          | Workspace ACL | guest          | Ion focus visualization                               |
+| Target collections                                                     | Workspace ACL | guest / editor | Collection → workspace; global (null) readable by all |
+| Target associations                                                    | Workspace ACL | guest          | Scoped via collection or batch workspace              |
+| Sample files (read)                                                    | Workspace ACL | guest          | Filtered by accessible workspaces via sample items    |
+| Sample files (mutations)                                               | Workspace ACL | editor         | Requires Acquisitions workspace membership            |
+| File download                                                          | Workspace ACL | guest          | Via sample items in accessible workspaces             |
+| **Global (shared system resources)**                                   |               |                |                                                       |
+| Instruments                                                            | Global RBAC   | guest          | Shared hardware definitions                           |
+| Instrument configs                                                     | Global RBAC   | guest / editor | Shared instrument configuration                       |
+| Ionization modes                                                       | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Ionization mechanisms                                                  | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Attribute templates                                                    | Global RBAC   | guest / editor | Shared metadata schemas                               |
+| Target compounds                                                       | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target ions                                                            | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target isotopes                                                        | Global RBAC   | guest          | Shared reference data (cross-workspace)               |
+| Calibration (read)                                                     | Global RBAC   | guest          | View calibration state                                |
+| Calibration (mutations)                                                | Global RBAC   | admin          | Global operation, affects all associated samples      |
+| Cheminfo (query)                                                       | Global RBAC   | guest          | Stateless formula lookup                              |
+| Params                                                                 | Global RBAC   | guest          | Application parameters                                |
+| Temp files                                                             | Global RBAC   | guest          | Temporary file serving                                |
+| **Admin (system management)**                                          |               |                |                                                       |
+| Users (admin/owner)                                                    | Global RBAC   | admin / owner  | User management                                       |
+| Users (self)                                                           | Authenticated | —              | Own profile                                           |
+| Roles                                                                  | Global RBAC   | admin / owner  | Role definitions                                      |
+| Auth / tokens                                                          | Authenticated | —              | JWT and access tokens                                 |
 
 ### API Response Format
 
