@@ -8,6 +8,7 @@ from mascope_backend.api.controllers.sample.batches.status.service import (
 )
 from mascope_backend.api.controllers.target.collections.lib.util import (
     detect_target_collection_changes,
+    validate_scope_change,
 )
 from mascope_backend.api.controllers.target.compounds.target_compounds_controller import (
     create_target_compound,
@@ -47,6 +48,7 @@ async def get_target_collections(
     sample_batch_id: str | None = None,
     target_collection_type: list[str] | None = None,
     workspace_id: str | None = None,
+    accessible_workspace_ids: set[str] | None = None,
     sort: str | None = None,
     order: str | None = None,
     page: int | None = None,
@@ -121,6 +123,16 @@ async def get_target_collections(
                     TargetCollection.workspace_id.is_(None),
                 )
             )
+
+        # Restrict to collections the caller can see (workspace ACL).
+        # accessible_workspace_ids is None for superusers (no restriction).
+        if accessible_workspace_ids is not None:
+            stmt = stmt.where(
+                or_(
+                    TargetCollection.workspace_id.in_(accessible_workspace_ids),
+                    TargetCollection.workspace_id.is_(None),
+                )
+            )
         # Apply sorting if specified
         if sort:
             if order == "desc":
@@ -129,7 +141,7 @@ async def get_target_collections(
                 stmt = stmt.order_by(asc(getattr(TargetCollection, sort)))
 
         # Get total count for pagination
-        count_stmt = select(func.count()).select_from(stmt)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
         total = await session.scalar(count_stmt)
 
         # Apply pagination
@@ -427,6 +439,12 @@ async def update_target_collection(
         association.sample_batch_id for association in target_collection_db.sample_batch
     }
 
+    # Step 1b: Validate scope change against existing batch associations
+    if "workspace_id" in target_collection_update.model_fields_set:
+        await validate_scope_change(
+            target_collection_db, target_collection_update.workspace_id
+        )
+
     # Step 2: Validate sample batch type constraints for new sample batch assignments
     if sample_batches_update is not None:
         # Use new collection type if being updated, otherwise existing
@@ -501,7 +519,7 @@ async def update_target_collection(
     if any([changes["collection_type"], changes["basic_fields"]]):
         # For basic field changes, all batches (current + new) need rematch
         affected_sample_batch_ids.update(sample_batches_db)
-        if changes["batches"]:
+        if changes["batches"] and target_collection_update.sample_batch_ids:
             affected_sample_batch_ids.update(target_collection_update.sample_batch_ids)
 
     # Step 6: Update collection data and associations
@@ -515,6 +533,10 @@ async def update_target_collection(
                 joinedload(TargetCollection.target_compound),
             ],
         )
+        if not target_collection_db:
+            raise NotFoundException(
+                f"Target collection '{target_collection_id}' not found"
+            )
 
         # Update basic fields
         basic_fields = target_collection_update.model_dump(
@@ -702,9 +724,8 @@ async def delete_target_collection(
     if affected_ionization_modes:
         mode_names = [mode.ionization_mode_name for mode in affected_ionization_modes]
         raise ValueError(
-            f"Cannot delete collection '{target_collection.target_collection_name}' "
-            f"because it is used as a calibration or diagnostic collection by ionization mode(s): "
-            f"{', '.join(mode_names)}. Remove the association first."
+            f"Cannot delete '{target_collection.target_collection_name}' because "
+            f"it is associated with ionization modes: {', '.join(mode_names)}."
         )
 
     # -- Identify orphan compounds if their deletion is requested --

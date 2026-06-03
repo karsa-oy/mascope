@@ -7,7 +7,11 @@ from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     GetTargetCompoundInTargetCollectionQueryParams,
 )
-from mascope_backend.api.new.auth.dependencies import guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_target_collection_access,
+)
 
 
 target_compound_in_target_collection_router = APIRouter(
@@ -20,12 +24,22 @@ target_compound_in_target_collection_router = APIRouter(
 @api_route()
 async def get_target_compound_in_target_collections_route(
     query_params: GetTargetCompoundInTargetCollectionQueryParams = Depends(),
-    user=Depends(guest_user),
+    user=Depends(current_active_user),
 ):
     """Retrieve target compound ids associated with a target collection.
 
+    ``target_collection_id`` must be provided so that workspace ACL can be
+    enforced.  Querying by ``target_compound_id`` alone is not allowed because
+    compounds are shared reference data and the results could span workspaces.
+
     :param query_params: Query parameters for filtering, sorting, and pagination.
-    :param user: The current authenticated user with guest permissions.
-    :return: A dictionary containing the total count and list of target compounds in target collection.
+    :param user: The current authenticated user.
+    :return: A dictionary containing the total count and list of target compounds in
+             target collection.
     """
+    if not query_params.target_collection_id:
+        raise ForbiddenAccessException()
+    await check_target_collection_access(
+        query_params.target_collection_id, user, "guest"
+    )
     return await get_target_compound_in_target_collection(**query_params.model_dump())

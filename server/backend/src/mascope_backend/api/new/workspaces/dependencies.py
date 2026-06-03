@@ -21,6 +21,8 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``check_sample_access``:      sample_item_id from request body / other source
 - ``check_sample_access_bulk``: list of sample_item_ids (single query)
 - ``check_sample_file_access_bulk``: list of sample_file_ids via items (single query)
+- ``check_target_collection_access``:  target_collection_id → workspace_id
+- ``accessible_workspace_ids_for_user``: set of workspace_ids user is a member of
 
 All return ``WorkspaceMember`` on success or raise ``ForbiddenAccessException``.
 """
@@ -35,6 +37,7 @@ from mascope_backend.db import (
     Dataset,
     SampleBatch,
     SampleItem,
+    TargetCollection,
     User,
     Workspace,
     WorkspaceMember,
@@ -93,6 +96,23 @@ async def _get_workspace_id_from_sample(sample_item_id: str) -> str | None:
             .where(SampleItem.sample_item_id == sample_item_id)
         )
         return result.scalar_one_or_none()
+
+
+async def _get_workspace_id_from_collection(target_collection_id: str) -> str | None:
+    """Resolve target_collection_id → workspace_id (may be None for global).
+
+    :raises ValueError: If the collection does not exist.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(TargetCollection.workspace_id).where(
+                TargetCollection.target_collection_id == target_collection_id
+            )
+        )
+        row = result.one_or_none()
+        if row is None:
+            raise ValueError(f"Target collection {target_collection_id} not found")
+        return row[0]
 
 
 async def _get_acquisition_workspace_id() -> str | None:
@@ -360,6 +380,60 @@ async def check_sample_file_access_bulk(
 
     if not set(sample_file_ids).issubset(accessible_ids):
         raise ForbiddenAccessException()
+
+
+async def check_target_collection_access(
+    target_collection_id: str,
+    user: User,
+    min_role: str,
+) -> WorkspaceMember | None:
+    """Check workspace-level ACL given a target_collection_id.
+
+    Resolves collection → workspace_id, then checks membership.
+
+    - **Global collections** (workspace_id is NULL): readable by any
+      authenticated user; mutations (editor+) require global admin role.
+    - **Workspace collections**: standard ``_enforce`` membership check.
+
+    :raises ForbiddenAccessException: If user lacks the required workspace role
+        or collection not found.
+    :return: The user's WorkspaceMember record, or *None* for global
+        collections readable by the caller.
+    """
+    try:
+        workspace_id = await _get_workspace_id_from_collection(target_collection_id)
+    except ValueError:
+        raise ForbiddenAccessException()
+
+    if workspace_id is None:
+        # Global collection – anyone can read, admins+ can mutate.
+        min_level = _role_levels[min_role]
+        if min_level > _role_levels["guest"]:
+            if not user.is_superuser and (
+                user.role_id is None or user.role_id < _role_levels["admin"]
+            ):
+                raise ForbiddenAccessException()
+        return None
+
+    return await _enforce(workspace_id, user, _role_levels[min_role])
+
+
+async def accessible_workspace_ids_for_user(user: User) -> set[str]:
+    """Return the set of workspace_ids the user is a member of.
+
+    Superusers get all workspace_ids.  Used by list endpoints that need to
+    filter results by workspace membership.
+    """
+    async with async_session() as session:
+        if user.is_superuser:
+            result = await session.execute(select(Workspace.workspace_id))
+        else:
+            result = await session.execute(
+                select(WorkspaceMember.workspace_id).where(
+                    WorkspaceMember.user_id == user.id
+                )
+            )
+        return set(result.scalars().all())
 
 
 # ---------------------------------------------------------------------------
