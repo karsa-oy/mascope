@@ -18,6 +18,7 @@ from mascope_backend.db import (
     SampleFile,
     SampleItem,
     TargetCollection,
+    TargetCollectionInSampleBatch,
     TargetCompound,
     User,
     Workspace,
@@ -388,6 +389,26 @@ async def alpha_target_collection(async_session_factory, ws_alpha):
 
 
 # ---------------------------------------------------------------------------
+# Target collection scoped to ws_beta (only owner has access)
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def beta_target_collection(async_session_factory, ws_beta):
+    """A target collection scoped to workspace Beta (only owner can access)."""
+    tc_id = gen_id()
+    async with async_session_factory() as session:
+        tc = TargetCollection(
+            target_collection_id=tc_id,
+            target_collection_name="Beta Target Collection",
+            workspace_id=ws_beta["workspace_id"],
+        )
+        session.add(tc)
+        await session.commit()
+    return tc_id
+
+
+# ---------------------------------------------------------------------------
 # Global target collection (no workspace)
 # ---------------------------------------------------------------------------
 
@@ -405,6 +426,26 @@ async def global_target_collection(async_session_factory):
         session.add(tc)
         await session.commit()
     return tc_id
+
+
+# ---------------------------------------------------------------------------
+# Association: alpha_target_collection ↔ alpha_batch
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture(scope="session")
+async def alpha_collection_in_batch(
+    async_session_factory, alpha_target_collection, alpha_batch
+):
+    """Link alpha_target_collection to alpha_batch for association tests."""
+    async with async_session_factory() as session:
+        link = TargetCollectionInSampleBatch(
+            target_collection_id=alpha_target_collection,
+            sample_batch_id=alpha_batch,
+        )
+        session.add(link)
+        await session.commit()
+    return (alpha_target_collection, alpha_batch)
 
 
 # ---------------------------------------------------------------------------
