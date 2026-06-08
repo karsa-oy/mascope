@@ -84,7 +84,7 @@ function install_tooling() {
     write_section "INSTALLING TOOLING"
 
     sudo apt update
-    sudo apt install -y curl build-essential
+    sudo apt install -y curl build-essential python3-dev pkg-config
     
     if [[ -z $(command -v uv) ]]; then
         write_line "uv not detected, installing..."
