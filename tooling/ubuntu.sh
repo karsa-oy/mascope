@@ -158,7 +158,11 @@ function install_tooling() {
 function install_mascope() {
     write_section "INSTALLING MASCOPE BINARIES"
 
-    uv tool install --force .
+    # Force C17 standard to avoid GCC 15+ / C23 incompatibilities with
+    # native extensions (e.g. numcodecs blosc typedef bool).
+    # Pin Python 3.12 so uv downloads a managed interpreter matching
+    # the project's requires-python constraint (<3.13).
+    CFLAGS="-std=c17" uv tool install --force --python 3.12 .
     uv tool update-shell
 
     write_section "ENABLING SYSTEMD SERVICE"
