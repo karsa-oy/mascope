@@ -209,6 +209,7 @@ async def create_dataset(
             record_type="dataset",
             record_id=new_dataset.dataset_id,
             record=dataset_data,
+            room=workspace_id,
         )
 
     # Step 4: Return the new dataset details
@@ -297,6 +298,7 @@ async def update_dataset(
             record_type="dataset",
             record_id=dataset_id,
             record=dataset_data,
+            room=workspace_id,
         )
 
     return {
@@ -345,6 +347,7 @@ async def delete_dataset(
         await emit_record_deleted(
             record_type="dataset",
             record_id=dataset_id,
+            room=workspace_id,
         )
 
     return {
@@ -439,7 +442,8 @@ async def move_dataset(
     # --- Reload so both source and target workspace lists re-fetch updated data ---
     dataset_data = DatasetRead.model_validate(dataset).model_dump()
     if independent_transaction:
-        await emit_record_reload(record_type="dataset")
+        await emit_record_reload(record_type="dataset", room=source_workspace_id)
+        await emit_record_reload(record_type="dataset", room=target_workspace_id)
 
     return {
         "message": f"Dataset '{dataset.dataset_name}' moved successfully.",
