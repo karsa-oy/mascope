@@ -93,12 +93,7 @@ async function execute() {
      * - Sets up a one-time watcher to focus on the new dataset after the current one is deleted.
      */
     case 'delete': {
-      if (app.data.dataset.list.length > 1) {
-        app.data.dataset.delete(original.value)
-      } else {
-        info.message =
-          'You cannot delete the last remaining dataset in the database. Create a new dataset before deleting this one.'
-      }
+      app.data.dataset.delete(original.value)
       break
     }
   }
