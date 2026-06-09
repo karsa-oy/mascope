@@ -9,7 +9,10 @@ Adds:
 - dataset.workspace_id FK to workspace
 - target_collection.workspace_id FK to workspace
 
-Backfills existing data into "Default Workspace" and "Acquisitions" workspaces.
+Backfills existing data:
+- Non-acquisition datasets → "Default Workspace" (system)
+- Acquisition datasets → one system workspace per instrument, with year-based
+  datasets replacing the former per-instrument acquisition datasets.
 
 Revision ID: d46523dd8fdd
 Revises: 8a57effe5414
@@ -147,46 +150,143 @@ def upgrade() -> None:
             "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
         ).bindparams(
             wid=default_workspace_id,
-            wname="Default Workspace",
-            wdesc="System workspace for pre-existing datasets. Cannot be deleted.",
+            wname="System Workspace",
+            wdesc="Workspace for pre-existing datasets. Cannot be deleted.",
         )
     )
 
-    acquisitions_workspace_id = _gen_id()
-    conn.execute(
+    # --- Per-instrument acquisition workspaces ---
+    # Collect all instruments that have acquisition datasets
+    acq_instruments = conn.execute(
         sa.text(
-            "INSERT INTO workspace "
-            "(workspace_id, workspace_name, workspace_description, "
-            " workspace_status, is_system, workspace_utc_created, workspace_utc_modified) "
-            "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
-        ).bindparams(
-            wid=acquisitions_workspace_id,
-            wname="Acquisitions",
-            wdesc="System workspace for instrument acquisition datasets. Cannot be deleted.",
+            "SELECT DISTINCT instrument FROM dataset "
+            "WHERE dataset_type = 'ACQUISITION' AND instrument IS NOT NULL"
         )
-    )
+    ).fetchall()
 
-    # Assign acquisition datasets to the system workspace
-    conn.execute(
-        sa.text(
-            "UPDATE dataset SET workspace_id = :wid WHERE dataset_type = 'ACQUISITION'"
-        ).bindparams(wid=acquisitions_workspace_id)
-    )
+    # Global role_id mapping: 100=guest, 200=editor, 300=admin, 400=owner
+    ROLE_MAP = {100: "guest", 200: "editor", 300: "admin", 400: "owner"}
+    users = conn.execute(sa.text('SELECT id, role_id FROM "user"')).fetchall()
 
-    # Assign all remaining datasets to the default workspace
+    # Track all workspace IDs for user membership seeding
+    all_workspace_ids = [default_workspace_id]
+
+    for (instrument,) in acq_instruments:
+        instr_ws_id = _gen_id()
+        all_workspace_ids.append(instr_ws_id)
+
+        conn.execute(
+            sa.text(
+                "INSERT INTO workspace "
+                "(workspace_id, workspace_name, workspace_description, "
+                " workspace_status, is_system, workspace_utc_created, workspace_utc_modified) "
+                "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
+            ).bindparams(
+                wid=instr_ws_id,
+                wname=f"Acquisitions {instrument}",
+                wdesc=f"System workspace for {instrument} acquisition data.",
+            )
+        )
+
+        # Restructure: split the per-instrument dataset into year-based datasets.
+        # Extract years from batch names (format: "YYYY-MM-DD <mode> acquisition").
+        # We use the batch name rather than sample_batch_utc_created because
+        # retrospectively processed data would have a creation timestamp that
+        # doesn't match the actual acquisition date.
+        year_rows = conn.execute(
+            sa.text(
+                "SELECT DISTINCT SUBSTRING(sb.sample_batch_name FROM '^(\\d{4})')::int AS yr "
+                "FROM sample_batch sb "
+                "JOIN dataset d ON d.dataset_id = sb.dataset_id "
+                "WHERE d.dataset_type = 'ACQUISITION' AND d.instrument = :instr "
+                "  AND sb.sample_batch_name ~ '^\\d{4}-' "
+                "ORDER BY yr"
+            ).bindparams(instr=instrument)
+        ).fetchall()
+
+        if not year_rows:
+            # Dataset exists but has no batches — just reassign it as
+            # the current-year dataset under the instrument workspace.
+            conn.execute(
+                sa.text(
+                    "UPDATE dataset SET workspace_id = :wid, "
+                    "  dataset_name = :dname, "
+                    "  dataset_description = :ddesc "
+                    "WHERE dataset_type = 'ACQUISITION' AND instrument = :instr"
+                ).bindparams(
+                    wid=instr_ws_id,
+                    dname="2026",
+                    ddesc=f"2026 acquisitions for {instrument}",
+                    instr=instrument,
+                )
+            )
+        else:
+            years = [row[0] for row in year_rows]
+
+            # Get the original dataset ID
+            orig_dataset_id = conn.execute(
+                sa.text(
+                    "SELECT dataset_id FROM dataset "
+                    "WHERE dataset_type = 'ACQUISITION' AND instrument = :instr "
+                    "LIMIT 1"
+                ).bindparams(instr=instrument)
+            ).scalar_one()
+
+            # Repurpose the original dataset for the first year
+            first_year = years[0]
+            conn.execute(
+                sa.text(
+                    "UPDATE dataset SET workspace_id = :wid, "
+                    "  dataset_name = :dname, "
+                    "  dataset_description = :ddesc "
+                    "WHERE dataset_id = :did"
+                ).bindparams(
+                    wid=instr_ws_id,
+                    dname=str(first_year),
+                    ddesc=f"{first_year} acquisitions for {instrument}",
+                    did=orig_dataset_id,
+                )
+            )
+
+            # For each additional year, create a new dataset and move batches
+            for year in years[1:]:
+                new_dataset_id = _gen_id()
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO dataset "
+                        "(dataset_id, workspace_id, dataset_name, dataset_description, "
+                        " dataset_type, instrument, locked, dataset_utc_created) "
+                        "VALUES (:did, :wid, :dname, :ddesc, 'ACQUISITION', :instr, 1, NOW())"
+                    ).bindparams(
+                        did=new_dataset_id,
+                        wid=instr_ws_id,
+                        dname=str(year),
+                        ddesc=f"{year} acquisitions for {instrument}",
+                        instr=instrument,
+                    )
+                )
+                # Move batches from original dataset to new year dataset
+                conn.execute(
+                    sa.text(
+                        "UPDATE sample_batch SET dataset_id = :new_did "
+                        "WHERE dataset_id = :orig_did "
+                        "AND SUBSTRING(sample_batch_name FROM '^(\\d{4})')::int = :yr"
+                    ).bindparams(
+                        new_did=new_dataset_id, orig_did=orig_dataset_id, yr=year
+                    )
+                )
+
+    # Assign all remaining datasets (non-acquisition) to default workspace
     conn.execute(
         sa.text(
             "UPDATE dataset SET workspace_id = :wid WHERE workspace_id IS NULL"
         ).bindparams(wid=default_workspace_id)
     )
 
-    # Add all existing users to both workspaces, mapping global role
-    # Global role_id mapping: 100=guest, 200=editor, 300=admin, 400=owner
-    ROLE_MAP = {100: "guest", 200: "editor", 300: "admin", 400: "owner"}
-    users = conn.execute(sa.text('SELECT id, role_id FROM "user"')).fetchall()
+    # Add all existing users to all workspaces, mapping global role
     for user_id, role_id in users:
         ws_role = ROLE_MAP.get(role_id, "guest")
-        for wid in (default_workspace_id, acquisitions_workspace_id):
+        for wid in all_workspace_ids:
             conn.execute(
                 sa.text(
                     "INSERT INTO workspace_member "
