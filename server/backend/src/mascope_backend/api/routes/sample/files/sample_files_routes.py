@@ -347,13 +347,13 @@ async def reprocess_sample_files_route(
     body: ReprocessSampleFilesBody,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
+    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Reprocess sample files, including calibration and matching.
 
     :param body: Request body containing sample file IDs to reprocess.
     :param background_tasks: Background tasks for processing the files.
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user with admin permissions.
     :return: A dictionary confirming the processing has started.
     """
     # Get data for notifications
