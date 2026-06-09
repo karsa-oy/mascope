@@ -72,7 +72,8 @@ export const useData = (
     { records, selection, detailed },
     { sync, reloadRecord },
     events,
-    logger
+    logger,
+    deps
   )
 
   // Initialization, all root stores initialize themselves
