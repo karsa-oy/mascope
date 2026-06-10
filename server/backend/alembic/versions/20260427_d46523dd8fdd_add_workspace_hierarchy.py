@@ -207,6 +207,9 @@ def upgrade() -> None:
         if not year_rows:
             # Dataset exists but has no batches — just reassign it as
             # the current-year dataset under the instrument workspace.
+            current_year = conn.execute(
+                sa.text("SELECT EXTRACT(YEAR FROM NOW())::int")
+            ).scalar_one()
             conn.execute(
                 sa.text(
                     "UPDATE dataset SET workspace_id = :wid, "
@@ -215,8 +218,8 @@ def upgrade() -> None:
                     "WHERE dataset_type = 'ACQUISITION' AND instrument = :instr"
                 ).bindparams(
                     wid=instr_ws_id,
-                    dname="2026",
-                    ddesc=f"2026 acquisitions for {instrument}",
+                    dname=str(current_year),
+                    ddesc=f"{current_year} acquisitions for {instrument}",
                     instr=instrument,
                 )
             )
@@ -396,8 +399,8 @@ def downgrade() -> None:
 
         # Delete the now-empty extra datasets
         conn.execute(
-            sa.text("DELETE FROM dataset WHERE dataset_id = ANY(:ids)").bindparams(
-                ids=extra_ids
+            sa.text("DELETE FROM dataset WHERE dataset_id IN :ids").bindparams(
+                sa.bindparam("ids", value=tuple(extra_ids), expanding=True)
             )
         )
 
