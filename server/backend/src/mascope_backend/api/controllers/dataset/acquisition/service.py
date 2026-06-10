@@ -4,6 +4,7 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.exc import IntegrityError
 
 from mascope_backend.api.controllers.dataset.dataset_controller import (
     delete_dataset,
@@ -70,37 +71,53 @@ async def _ensure_instrument_workspace(
 
     # Create workspace and seed membership for admins/owners
     ws_id = gen_id(16)
-    async with async_session() as session:
-        session.add(
-            Workspace(
-                workspace_id=ws_id,
-                workspace_name=workspace_name,
-                workspace_description=f"System workspace for {instrument} acquisitions",
-                workspace_status="active",
-                is_system=True,
-            )
-        )
-
-        users = (await session.execute(select(User.id, User.role_id))).all()
-        added = 0
-        for user_id, role_id in users:
-            if user_id == owner_user_id:
-                ws_role = "owner"
-            else:
-                ws_role = _ROLE_MAP.get(role_id)
-                if ws_role is None:
-                    continue
+    try:
+        async with async_session() as session:
             session.add(
-                WorkspaceMember(
-                    workspace_member_id=gen_id(16),
+                Workspace(
                     workspace_id=ws_id,
-                    user_id=user_id,
-                    workspace_role=ws_role,
+                    workspace_name=workspace_name,
+                    workspace_description=f"System workspace for {instrument} acquisitions",
+                    workspace_status="active",
+                    is_system=True,
                 )
             )
-            added += 1
 
-        await session.commit()
+            users = (await session.execute(select(User.id, User.role_id))).all()
+            added = 0
+            for user_id, role_id in users:
+                if user_id == owner_user_id:
+                    ws_role = "owner"
+                else:
+                    ws_role = _ROLE_MAP.get(role_id)
+                    if ws_role is None:
+                        continue
+                session.add(
+                    WorkspaceMember(
+                        workspace_member_id=gen_id(16),
+                        workspace_id=ws_id,
+                        user_id=user_id,
+                        workspace_role=ws_role,
+                    )
+                )
+                added += 1
+
+            await session.commit()
+    except IntegrityError:
+        # Another worker created the workspace concurrently - fetch its ID.
+        async with async_session() as session:
+            ws_id = (
+                await session.execute(
+                    select(Workspace.workspace_id).where(
+                        Workspace.workspace_name == workspace_name,
+                        Workspace.is_system.is_(True),
+                    )
+                )
+            ).scalar_one()
+        runtime.logger.debug(
+            f"Workspace '{workspace_name}' created concurrently, reusing {ws_id}"
+        )
+        return ws_id
 
     runtime.logger.info(
         f"Created instrument workspace '{workspace_name}' with {added} members"
