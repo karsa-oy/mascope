@@ -10,7 +10,7 @@ dependencies = [
     "mascope_sdk",
     "mascope_tofwerk",
     "python-socketio~=5.11",
-    "aiohttp>=3.11.11,<4",
+    "aiohttp>=3.14.0,<4",
 ]
 
 [project.scripts]
