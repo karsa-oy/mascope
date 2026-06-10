@@ -244,12 +244,6 @@ async def delete_workspace(workspace_id: str) -> dict:
         if workspace is None:
             raise WorkspaceNotFoundException(workspace_id)
 
-        if workspace.is_system:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="System workspaces cannot be deleted.",
-            )
-
         await session.delete(workspace)
         await session.commit()
 

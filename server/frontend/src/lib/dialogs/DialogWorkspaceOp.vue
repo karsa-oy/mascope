@@ -122,9 +122,13 @@ const invalid = computed(() =>
       </template>
       <template v-else>
         <p v-if="info.message">{{ info.message }}</p>
-        <p v-else>
-          Are you sure you want to delete the '{{ info.initial?.workspace_name }}' workspace?
-        </p>
+        <template v-else>
+          <p v-if="info.initial?.is_system" style="color: var(--p-red-400); font-weight: bold">
+            Warning: This is a system workspace. Deleting it will remove all associated acquisition
+            datasets and sample data. This action cannot be undone.
+          </p>
+          <p>Are you sure you want to delete the '{{ info.initial?.workspace_name }}' workspace?</p>
+        </template>
       </template>
     </section>
     <menu>
