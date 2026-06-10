@@ -269,7 +269,7 @@ async def create_sample_file(
 
         if new_sample_file.instrument not in initial_instruments:
             # New instrument detected - create datasets and emit instrument events
-            await create_acquisition_datasets()
+            await create_acquisition_datasets(user_id=user_id)
 
         # Step 6: Trigger automatic processing of the sample file
         from mascope_backend.api.controllers.sample.files.process.service import (
@@ -662,7 +662,9 @@ async def delete_sample_files(
 
 @api_controller()
 async def update_sample_file(
-    sample_file_id: str, sample_file_update_data: SampleFileUpdate
+    sample_file_id: str,
+    sample_file_update_data: SampleFileUpdate,
+    user_id: int | None = None,
 ) -> dict:
     """
     Updates an existing sample file with new data.
@@ -707,7 +709,7 @@ async def update_sample_file(
     )
     # Handle instrument changes and handle acquisition datasets creation/deletion
     if final_instruments > initial_instruments:  # Check for added instruments
-        await create_acquisition_datasets()
+        await create_acquisition_datasets(user_id=user_id)
     if initial_instruments > final_instruments:  # Check for removed instruments
         await delete_acquisition_datasets()
 

@@ -24,6 +24,7 @@ from mascope_backend.runtime import runtime
 from mascope_backend.socket.records.service import (
     emit_record_created,
     emit_record_deleted,
+    emit_record_reload,
 )
 from mascope_file.name import resolve_instrument_type
 
@@ -104,6 +105,7 @@ async def _ensure_instrument_workspace(
     runtime.logger.info(
         f"Created instrument workspace '{workspace_name}' with {added} members"
     )
+    await emit_record_reload(record_type="workspace")
     return ws_id
 
 
@@ -196,7 +198,7 @@ async def get_acquisition_dataset(
 
 
 @api_controller()
-async def create_acquisition_datasets() -> dict:
+async def create_acquisition_datasets(user_id: int | None = None) -> dict:
     """
     Auto-creates missing per-instrument workspaces and current-year ACQUISITION
     datasets for all instruments that have sample files.
@@ -221,7 +223,9 @@ async def create_acquisition_datasets() -> dict:
     created_datasets = []
 
     for instrument in instruments:
-        result = await get_acquisition_dataset(instrument=instrument, year=current_year)
+        result = await get_acquisition_dataset(
+            instrument=instrument, year=current_year, user_id=user_id
+        )
         # get_acquisition_dataset is get-or-create; collect only newly created ones
         # (We can't easily distinguish here, but the function is idempotent.)
         created_datasets.append(result["data"])

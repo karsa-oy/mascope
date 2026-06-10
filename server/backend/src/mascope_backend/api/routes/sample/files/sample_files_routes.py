@@ -163,7 +163,7 @@ async def update_sample_file_route(
     :param user: Authenticated user with admin access.
     :return: Updated details of the sample file.
     """
-    return await update_sample_file(sample_file_id, sample_file)
+    return await update_sample_file(sample_file_id, sample_file, user_id=user.id)
 
 
 @sample_files_router.delete("/{sample_file_id}")
