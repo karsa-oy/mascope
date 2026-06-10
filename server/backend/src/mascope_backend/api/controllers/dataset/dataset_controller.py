@@ -288,7 +288,7 @@ async def update_dataset(
             record_type="dataset",
             record_id=dataset_id,
             record=dataset_data,
-            room=workspace_id,
+            room=existing_dataset.workspace_id,
         )
 
     return {
@@ -337,7 +337,7 @@ async def delete_dataset(
         await emit_record_deleted(
             record_type="dataset",
             record_id=dataset_id,
-            room=workspace_id,
+            room=dataset.workspace_id,
         )
 
     return {
