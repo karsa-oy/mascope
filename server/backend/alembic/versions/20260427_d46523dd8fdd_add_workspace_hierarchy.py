@@ -184,7 +184,7 @@ def upgrade() -> None:
             ).bindparams(
                 wid=instr_ws_id,
                 wname=f"Acquisitions {instrument}",
-                wdesc=f"System workspace for {instrument} acquisition data.",
+                wdesc=f"System workspace for {instrument} acquisitions",
             )
         )
 

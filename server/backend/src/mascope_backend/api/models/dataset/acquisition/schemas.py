@@ -21,6 +21,10 @@ class GetAcquisitionDatasetQueryParams(QueryParamsModel):
         None,
         description="Filter by instrument associated with the acquisition dataset.",
     )
+    year: int | None = Field(
+        None,
+        description="Calendar year for the acquisition dataset. Defaults to current year.",
+    )
 
     @field_validator("instrument")
     @classmethod
