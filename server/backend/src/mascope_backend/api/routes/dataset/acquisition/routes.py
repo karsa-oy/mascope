@@ -16,9 +16,9 @@ from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.dataset.acquisition.schemas import (
     GetAcquisitionDatasetQueryParams,
 )
-from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.auth.dependencies import admin_user, current_active_user
 from mascope_backend.api.new.workspaces.dependencies import (
-    require_acquisition_workspace_role,
+    check_instrument_workspace_access,
 )
 
 
@@ -32,7 +32,6 @@ acquisition_datasets_router = APIRouter(
 async def get_acquisition_dataset_route(
     query_params: GetAcquisitionDatasetQueryParams = Query(),
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("guest")),
 ):
     """Retrieve a list of datasets.
 
@@ -44,14 +43,15 @@ async def get_acquisition_dataset_route(
     :return: A dictionary containing total count and list of datasets.
     :rtype: dict
     """
+    if query_params.instrument:
+        await check_instrument_workspace_access(query_params.instrument, user, "guest")
     return await get_acquisition_dataset(**query_params.model_dump())
 
 
 @acquisition_datasets_router.post("")
 @api_route(status_code=201)
 async def create_acquisition_datasets_route(
-    user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
+    user=Depends(admin_user),
 ):
     """Auto-create missing acquisition datasets for all instruments.
 
@@ -73,8 +73,7 @@ async def create_acquisition_datasets_route(
 @acquisition_datasets_router.delete("")
 @api_route()
 async def delete_acquisition_datasets_route(
-    user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
+    user=Depends(admin_user),
 ):
     """Auto-delete orphaned acquisition datasets for instruments that no longer exist.
 

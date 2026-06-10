@@ -12,7 +12,8 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``require_batch_role``:      resolves ``sample_batch_id`` **path** param → workspace
 - ``require_sample_role``:       resolves ``sample_item_id`` **path** param → workspace
 
-**Explicit check functions** (call in route handler body):
+**Explicit check functions** (call in route handler body, preferred for
+acquisition/instrument routes):
 
 - ``check_dataset_access``:   dataset_id from request body / other source
 - ``check_batch_access``:     sample_batch_id from request body / other source
@@ -21,6 +22,7 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``check_sample_access_bulk``: list of sample_item_ids (single query)
 - ``check_sample_file_access_bulk``: list of sample_file_ids via items (single query)
 - ``check_sample_file_instrument_access``: sample_file_id via instrument → workspace
+- ``check_sample_file_instrument_access_bulk``: list of sample_file_ids via instruments
 - ``check_instrument_workspace_access``: instrument name → workspace
 - ``accessible_acquisition_instruments``: set of instruments user can access
 - ``check_target_collection_access``:  target_collection_id → workspace_id
@@ -116,26 +118,6 @@ async def _get_workspace_id_from_collection(target_collection_id: str) -> str | 
         if row is None:
             raise ValueError(f"Target collection {target_collection_id} not found")
         return row[0]
-
-
-async def _get_acquisition_workspace_ids() -> list[str]:
-    """Resolve all system workspaces that hold ACQUISITION datasets.
-
-    Returns workspace IDs for every ``is_system=True`` workspace whose name
-    starts with the acquisition prefix (e.g. ``"Acquisitions Orbion"``).
-    """
-    from mascope_backend.api.models.dataset.config import dataset_config
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(Workspace.workspace_id).where(
-                Workspace.workspace_name.like(
-                    f"{dataset_config.ACQUISITION_NAME_PREFIX} %"
-                ),
-                Workspace.is_system.is_(True),
-            )
-        )
-        return list(result.scalars().all())
 
 
 async def _get_workspace_id_from_instrument(instrument: str) -> str | None:
@@ -302,6 +284,47 @@ async def check_sample_file_instrument_access(
         user_id=user.id,
         workspace_role=min_role,
     )
+
+
+async def check_sample_file_instrument_access_bulk(
+    sample_file_ids: list[str],
+    user: User,
+    min_role: str,
+) -> None:
+    """Check per-instrument workspace ACL for a list of sample file IDs.
+
+    Resolves the unique instruments from the given files in a single query,
+    then verifies the user has at least *min_role* in each instrument's
+    system workspace.
+
+    :raises ForbiddenAccessException: If any file's instrument workspace
+        denies access, or if any file ID does not exist.
+    """
+    if user.is_superuser or (
+        user.role_id is not None and user.role_id >= _role_levels["admin"]
+    ):
+        return
+
+    if not sample_file_ids:
+        raise ForbiddenAccessException()
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleFile.instrument)
+            .distinct()
+            .where(SampleFile.sample_file_id.in_(sample_file_ids))
+        )
+        instruments = set(result.scalars().all())
+
+    if not instruments:
+        raise ForbiddenAccessException()
+
+    min_level = _role_levels[min_role]
+    for instrument in instruments:
+        workspace_id = await _get_workspace_id_from_instrument(instrument)
+        if workspace_id is None:
+            raise ForbiddenAccessException()
+        await _enforce(workspace_id, user, min_level)
 
 
 async def check_instrument_workspace_access(
@@ -667,38 +690,5 @@ def require_sample_role(min_role: str):
     ) -> WorkspaceMember:
         workspace_id = await _get_workspace_id_from_sample(sample_item_id)
         return await _enforce(workspace_id, user, min_level)
-
-    return dependency
-
-
-def require_acquisition_workspace_role(min_role: str):
-    """Enforce minimum workspace role on any system acquisition workspace.
-
-    Checks all per-instrument ``"Acquisitions <instrument>"`` system workspaces and
-    succeeds if the caller meets ``min_role`` in **at least one** of them.
-
-    Used as a coarse-grained gate on sample file mutation routes (update,
-    delete, process, reprocess) where the file ID is a path parameter and
-    the instrument cannot be resolved before body parsing.  For upload and
-    create routes, prefer ``check_instrument_workspace_access`` which
-    validates the exact instrument.
-    """
-    min_level = _role_levels[min_role]
-
-    async def dependency(
-        user: User = Depends(current_active_user),
-    ) -> WorkspaceMember:
-        if user.is_superuser:
-            return _superuser_member("__acquisitions__", user)
-
-        workspace_ids = await _get_acquisition_workspace_ids()
-        for wid in workspace_ids:
-            membership = await _get_workspace_membership(wid, user)
-            if membership is not None:
-                user_level = _role_levels[membership.workspace_role]
-                if user_level >= min_level:
-                    return membership
-
-        raise ForbiddenAccessException()
 
     return dependency

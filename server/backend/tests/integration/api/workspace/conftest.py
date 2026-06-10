@@ -482,8 +482,8 @@ async def orphan_sample_file(async_session_factory):
 async def acquisitions_workspace(async_session_factory):
     """A per-instrument system Acquisitions workspace (is_system=True).
 
-    ``require_acquisition_workspace_role`` resolves all workspaces whose
-    name starts with ``"Acquisitions "`` and ``is_system=True``.
+    Used by ``check_instrument_workspace_access`` and related helpers
+    to enforce per-instrument ACL.
     """
     workspace_id = gen_id()
     async with async_session_factory() as session:

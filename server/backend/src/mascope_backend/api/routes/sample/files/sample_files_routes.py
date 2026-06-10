@@ -43,7 +43,7 @@ from mascope_backend.api.new.workspaces.dependencies import (
     accessible_acquisition_instruments,
     check_instrument_workspace_access,
     check_sample_file_instrument_access,
-    require_acquisition_workspace_role,
+    check_sample_file_instrument_access_bulk,
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
@@ -154,15 +154,15 @@ async def update_sample_file_route(
     sample_file_id: str,
     sample_file: SampleFileUpdate,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Update details of an existing sample file.
 
     :param sample_file_id: ID of the sample file to update.
     :param sample_file: Data for updating the sample file.
-    :param user: Authenticated user with admin access.
+    :param user: Authenticated user with admin access to the file's instrument.
     :return: Updated details of the sample file.
     """
+    await check_sample_file_instrument_access(sample_file_id, user, "admin")
     return await update_sample_file(sample_file_id, sample_file, user_id=user.id)
 
 
@@ -171,14 +171,14 @@ async def update_sample_file_route(
 async def delete_sample_file_route(
     sample_file_id: str,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delete a specific sample file by ID.
 
     :param sample_file_id: ID of the sample file to delete.
-    :param user: Authenticated user with admin access.
+    :param user: Authenticated user with admin access to the file's instrument.
     :return: Confirmation message on deletion.
     """
+    await check_sample_file_instrument_access(sample_file_id, user, "admin")
     await delete_sample_file(sample_file_id)
 
 
@@ -187,7 +187,6 @@ async def delete_sample_file_route(
 async def delete_sample_files_route(
     body: DeleteSampleFilesBody,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delete multiple sample files by their IDs or filenames.
 
@@ -195,9 +194,17 @@ async def delete_sample_files_route(
     Returns information about which files were deleted and which were skipped.
 
     :param body: Request body containing either list of IDs or filenames to delete.
-    :param user: Authenticated user with admin access.
+    :param user: Authenticated user with admin access to each file's instrument.
     :return: Information about deleted and skipped files.
     """
+    if body.sample_file_ids:
+        await check_sample_file_instrument_access_bulk(
+            body.sample_file_ids, user, "admin"
+        )
+    elif body.filenames:
+        instruments = {get_instrument_name(f) for f in body.filenames}
+        for instrument in instruments:
+            await check_instrument_workspace_access(instrument, user, "admin")
     return await delete_sample_files(**body.model_dump())
 
 
@@ -225,15 +232,15 @@ async def compute_sample_file_peaks_route(
     sample_file_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delegate peak computation for a sample file to the File Converter service.
 
     :param sample_file_id: ID of the sample file to compute peaks for.
     :param background_tasks: FastAPI background task manager
-    :param user: Authenticated user with admin access.
+    :param user: Authenticated user with admin access to the file's instrument.
     :return: Process initiation message.
     """
+    await check_sample_file_instrument_access(sample_file_id, user, "admin")
     process_id = gen_id(8)
     access_token = await get_access_token(user=user, service_name="file-converter")
 
@@ -318,7 +325,6 @@ async def process_sample_item_route(
     sample_file_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Process a sample item, including creation, calibration, and matching.
 
@@ -327,6 +333,8 @@ async def process_sample_item_route(
     :param user: The current authenticated user with editor permissions.
     :return: A dictionary confirming the processing has started.
     """
+    await check_sample_file_instrument_access(sample_file_id, user, "editor")
+
     # Verify the existence of sample file
     sample_file = (await get_sample_file(sample_file_id)).get("data")
 
@@ -353,7 +361,6 @@ async def reprocess_sample_files_route(
     body: ReprocessSampleFilesBody,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Reprocess sample files, including calibration and matching.
 
@@ -362,6 +369,8 @@ async def reprocess_sample_files_route(
     :param user: The current authenticated user with admin permissions.
     :return: A dictionary confirming the processing has started.
     """
+    await check_sample_file_instrument_access_bulk(body.sample_file_ids, user, "admin")
+
     # Get data for notifications
     process_id = gen_id(8)
 
