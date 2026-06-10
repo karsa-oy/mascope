@@ -334,7 +334,85 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove workspace hierarchy tables."""
+    """Remove workspace hierarchy tables.
+
+    Merges year-based acquisition datasets back into a single per-instrument
+    dataset before dropping workspace infrastructure, so a subsequent
+    re-upgrade can split them cleanly again.
+    """
+
+    conn = op.get_bind()
+
+    # -----------------------------------------------------------------
+    # Merge year-based acquisition datasets back to one per instrument.
+    # For each instrument, keep the oldest dataset and move all batches
+    # from the newer year-datasets into it, then delete the extras.
+    # -----------------------------------------------------------------
+    instruments = conn.execute(
+        sa.text(
+            "SELECT DISTINCT instrument FROM dataset "
+            "WHERE dataset_type = 'ACQUISITION' AND instrument IS NOT NULL"
+        )
+    ).fetchall()
+
+    for (instrument,) in instruments:
+        # Get all acquisition datasets for this instrument, ordered by name
+        # (year string) so the first one is the oldest.
+        ds_rows = conn.execute(
+            sa.text(
+                "SELECT dataset_id FROM dataset "
+                "WHERE dataset_type = 'ACQUISITION' AND instrument = :instr "
+                "ORDER BY dataset_name ASC"
+            ).bindparams(instr=instrument)
+        ).fetchall()
+
+        if len(ds_rows) <= 1:
+            # Already a single dataset — just restore name to instrument
+            if ds_rows:
+                conn.execute(
+                    sa.text(
+                        "UPDATE dataset SET dataset_name = :instr, "
+                        "  dataset_description = :ddesc "
+                        "WHERE dataset_id = :did"
+                    ).bindparams(
+                        instr=instrument,
+                        ddesc=f"Acquisition data for {instrument}",
+                        did=ds_rows[0][0],
+                    )
+                )
+            continue
+
+        keep_id = ds_rows[0][0]
+        extra_ids = [row[0] for row in ds_rows[1:]]
+
+        # Move all batches from extra datasets into the keeper
+        for eid in extra_ids:
+            conn.execute(
+                sa.text(
+                    "UPDATE sample_batch SET dataset_id = :keep "
+                    "WHERE dataset_id = :extra"
+                ).bindparams(keep=keep_id, extra=eid)
+            )
+
+        # Delete the now-empty extra datasets
+        conn.execute(
+            sa.text("DELETE FROM dataset WHERE dataset_id = ANY(:ids)").bindparams(
+                ids=extra_ids
+            )
+        )
+
+        # Rename the surviving dataset back to per-instrument style
+        conn.execute(
+            sa.text(
+                "UPDATE dataset SET dataset_name = :instr, "
+                "  dataset_description = :ddesc "
+                "WHERE dataset_id = :did"
+            ).bindparams(
+                instr=instrument,
+                ddesc=f"Acquisition data for {instrument}",
+                did=keep_id,
+            )
+        )
 
     # Remove FK and column from target_collection
     op.drop_constraint(
