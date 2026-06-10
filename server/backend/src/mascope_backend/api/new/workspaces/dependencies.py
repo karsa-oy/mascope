@@ -11,7 +11,6 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``require_dataset_query_role``: resolves ``dataset_id`` **query** param → workspace
 - ``require_batch_role``:      resolves ``sample_batch_id`` **path** param → workspace
 - ``require_sample_role``:       resolves ``sample_item_id`` **path** param → workspace
-- ``require_acquisition_workspace_role``: resolves system Acquisitions workspace
 
 **Explicit check functions** (call in route handler body):
 
@@ -21,6 +20,9 @@ at the endpoint level, complementing the global RBAC in auth/dependencies.py.
 - ``check_sample_access``:      sample_item_id from request body / other source
 - ``check_sample_access_bulk``: list of sample_item_ids (single query)
 - ``check_sample_file_access_bulk``: list of sample_file_ids via items (single query)
+- ``check_sample_file_instrument_access``: sample_file_id via instrument → workspace
+- ``check_instrument_workspace_access``: instrument name → workspace
+- ``accessible_acquisition_instruments``: set of instruments user can access
 - ``check_target_collection_access``:  target_collection_id → workspace_id
 - ``accessible_workspace_ids_for_user``: set of workspace_ids user is a member of
 
@@ -36,6 +38,7 @@ from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_backend.db import (
     Dataset,
     SampleBatch,
+    SampleFile,
     SampleItem,
     TargetCollection,
     User,
@@ -115,12 +118,35 @@ async def _get_workspace_id_from_collection(target_collection_id: str) -> str | 
         return row[0]
 
 
-async def _get_acquisition_workspace_id() -> str | None:
-    """Resolve the system workspace that holds ACQUISITION datasets."""
+async def _get_acquisition_workspace_ids() -> list[str]:
+    """Resolve all system workspaces that hold ACQUISITION datasets.
+
+    Returns workspace IDs for every ``is_system=True`` workspace whose name
+    starts with the acquisition prefix (e.g. ``"Acquisitions Orbion"``).
+    """
+    from mascope_backend.api.models.dataset.config import dataset_config
+
     async with async_session() as session:
         result = await session.execute(
             select(Workspace.workspace_id).where(
-                Workspace.workspace_name == "Acquisitions",
+                Workspace.workspace_name.like(
+                    f"{dataset_config.ACQUISITION_NAME_PREFIX} %"
+                ),
+                Workspace.is_system.is_(True),
+            )
+        )
+        return list(result.scalars().all())
+
+
+async def _get_workspace_id_from_instrument(instrument: str) -> str | None:
+    """Resolve an instrument name to its system acquisition workspace ID."""
+    from mascope_backend.api.models.dataset.config import dataset_config
+
+    workspace_name = f"{dataset_config.ACQUISITION_NAME_PREFIX} {instrument}"
+    async with async_session() as session:
+        result = await session.execute(
+            select(Workspace.workspace_id).where(
+                Workspace.workspace_name == workspace_name,
                 Workspace.is_system.is_(True),
             )
         )
@@ -195,21 +221,124 @@ async def _enforce(
 # ---------------------------------------------------------------------------
 
 
-async def is_acquisitions_member(user: User) -> bool:
-    """Check if user is a member of the system Acquisitions workspace.
+async def accessible_acquisition_instruments(user: User) -> set[str] | None:
+    """Return the set of instrument names the user may access, or *None* if
+    the user has full visibility (superuser, global admin, or global owner).
 
-    Returns True for superusers (they bypass all membership checks) or if the
-    user has any role in the Acquisitions workspace.  Used by sample file read
-    routes to let Acquisitions members see all files, including orphaned ones
-    with no sample items.
+    Resolves instrument names from the user's acquisition workspace
+    memberships by stripping the workspace name prefix.
+    """
+    from mascope_backend.api.models.dataset.config import dataset_config
+
+    if user.is_superuser or (
+        user.role_id is not None and user.role_id >= _role_levels["admin"]
+    ):
+        return None
+
+    prefix = f"{dataset_config.ACQUISITION_NAME_PREFIX} "
+    async with async_session() as session:
+        result = await session.execute(
+            select(Workspace.workspace_name)
+            .join(
+                WorkspaceMember,
+                WorkspaceMember.workspace_id == Workspace.workspace_id,
+            )
+            .where(
+                WorkspaceMember.user_id == user.id,
+                Workspace.is_system.is_(True),
+                Workspace.workspace_name.like(f"{prefix}%"),
+            )
+        )
+        return {name.removeprefix(prefix) for name in result.scalars().all()}
+
+
+async def check_sample_file_instrument_access(
+    sample_file_id: str,
+    user: User,
+    min_role: str,
+) -> WorkspaceMember:
+    """Check workspace-level ACL for a sample file via its instrument.
+
+    Checks (in order):
+    1. Global admin/owner bypass: full visibility.
+    2. Instrument workspace: the user is a member of the system workspace
+       for this file's instrument.
+    3. Item-based: the file is linked to a sample item in a workspace
+       the user has access to.
+
+    :raises ForbiddenAccessException: If no path grants access.
+    """
+    if user.is_superuser or (
+        user.role_id is not None and user.role_id >= _role_levels["admin"]
+    ):
+        return _superuser_member("__admin__", user)
+
+    async with async_session() as session:
+        instrument = (
+            await session.execute(
+                select(SampleFile.instrument).where(
+                    SampleFile.sample_file_id == sample_file_id
+                )
+            )
+        ).scalar_one_or_none()
+
+    if instrument is None:
+        raise ForbiddenAccessException()
+
+    # Path 1: instrument workspace membership
+    workspace_id = await _get_workspace_id_from_instrument(instrument)
+    if workspace_id is not None:
+        membership = await _get_workspace_membership(workspace_id, user)
+        if membership is not None:
+            user_level = _role_levels[membership.workspace_role]
+            if user_level >= _role_levels[min_role]:
+                return membership
+
+    # Path 2: item-based workspace membership
+    await check_sample_file_access_bulk([sample_file_id], user, min_role)
+    return WorkspaceMember(
+        workspace_member_id="__fallback__",
+        workspace_id="__fallback__",
+        user_id=user.id,
+        workspace_role=min_role,
+    )
+
+
+async def check_instrument_workspace_access(
+    instrument: str,
+    user: User,
+    min_role: str,
+) -> WorkspaceMember:
+    """Check workspace-level ACL for an instrument's acquisition workspace.
+
+    Resolves the instrument name to its system workspace and checks that the
+    user has at least *min_role*.  If no workspace exists yet for this
+    instrument the check passes (the workspace will be created during
+    auto-processing and the uploading user will be made owner).
+
+    :param instrument: Instrument name (e.g. ``"Orbion"``).
+    :param user: The authenticated user.
+    :param min_role: Minimum workspace role required (e.g. ``"editor"``).
+    :raises ForbiddenAccessException: If the workspace exists and the user
+        lacks the required role.
+    :return: The user's WorkspaceMember record (synthetic for superusers or
+        when no workspace exists yet).
     """
     if user.is_superuser:
-        return True
-    workspace_id = await _get_acquisition_workspace_id()
+        return _superuser_member("__instrument__", user)
+
+    workspace_id = await _get_workspace_id_from_instrument(instrument)
     if workspace_id is None:
-        return False
-    membership = await _get_workspace_membership(workspace_id, user)
-    return membership is not None
+        # No workspace exists for this instrument. Allow for auto-processing to create
+        # and assign the user as owner.
+        return WorkspaceMember(
+            workspace_member_id="__new_instrument__",
+            workspace_id="__new_instrument__",
+            user_id=user.id,
+            workspace_role=min_role,
+        )
+
+    return await _enforce(workspace_id, user, _role_levels[min_role])
 
 
 async def check_workspace_access(
@@ -543,18 +672,33 @@ def require_sample_role(min_role: str):
 
 
 def require_acquisition_workspace_role(min_role: str):
-    """Enforce minimum workspace role on the system Acquisitions workspace.
+    """Enforce minimum workspace role on any system acquisition workspace.
 
-    Resolves the ``Acquisitions`` system workspace and checks the caller's
-    membership role.  Used by acquisition dataset endpoints that are not
-    scoped to a specific dataset or workspace path parameter.
+    Checks all per-instrument ``"Acquisitions <instrument>"`` system workspaces and
+    succeeds if the caller meets ``min_role`` in **at least one** of them.
+
+    Used as a coarse-grained gate on sample file mutation routes (update,
+    delete, process, reprocess) where the file ID is a path parameter and
+    the instrument cannot be resolved before body parsing.  For upload and
+    create routes, prefer ``check_instrument_workspace_access`` which
+    validates the exact instrument.
     """
     min_level = _role_levels[min_role]
 
     async def dependency(
         user: User = Depends(current_active_user),
     ) -> WorkspaceMember:
-        workspace_id = await _get_acquisition_workspace_id()
-        return await _enforce(workspace_id, user, min_level)
+        if user.is_superuser:
+            return _superuser_member("__acquisitions__", user)
+
+        workspace_ids = await _get_acquisition_workspace_ids()
+        for wid in workspace_ids:
+            membership = await _get_workspace_membership(wid, user)
+            if membership is not None:
+                user_level = _role_levels[membership.workspace_role]
+                if user_level >= min_level:
+                    return membership
+
+        raise ForbiddenAccessException()
 
     return dependency
