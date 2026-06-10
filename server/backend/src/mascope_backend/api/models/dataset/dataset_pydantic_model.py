@@ -102,14 +102,6 @@ class DatasetCreate(DatasetBase):
             if not self.instrument:
                 raise ValueError("Acquisition datasets must specify an instrument")
 
-            # Validate name ends with instrument (case-insensitive)
-            if not self.dataset_name.lower().endswith(self.instrument.lower()):
-                raise ValueError(
-                    f"Acquisition dataset name should end with the instrument name. "
-                    f"Suggested: '{dataset_config.ACQUISITION_NAME_PREFIX} "
-                    f"{self.instrument}'"
-                )
-
         return self
 
 

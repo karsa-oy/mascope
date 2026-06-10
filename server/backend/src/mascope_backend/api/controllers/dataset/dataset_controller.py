@@ -265,20 +265,10 @@ async def update_dataset(
             existing_dataset.dataset_type == "ACQUISITION"
             and "dataset_name" in update_data
         ):
-            new_name = update_data.get("dataset_name", None)
-            instrument = existing_dataset.instrument
-
-            if instrument is None:
-                raise ValueError(
-                    "Acquisition dataset must have an associated instrument."
-                )
-
-            if new_name and not new_name.lower().endswith(instrument.lower()):
-                raise ValueError(
-                    f"Acquisition dataset name should end with the instrument name. "
-                    "Suggested: "
-                    f"{dataset_config.ACQUISITION_NAME_PREFIX} {instrument}"
-                )
+            # Acquisition datasets are system-managed; prevent renaming.
+            raise ValueError(
+                "Acquisition dataset names are managed by the system and cannot be renamed."
+            )
 
         # Step 3: Update the dataset properties
         for key, value in update_data.items():
