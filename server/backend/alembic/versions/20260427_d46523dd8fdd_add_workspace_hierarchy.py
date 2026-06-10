@@ -10,7 +10,7 @@ Adds:
 - target_collection.workspace_id FK to workspace
 
 Backfills existing data:
-- Non-acquisition datasets → "Default Workspace" (system)
+- Non-acquisition datasets → "System Workspace"
 - Acquisition datasets → one system workspace per instrument, with year-based
   datasets replacing the former per-instrument acquisition datasets.
 
@@ -276,7 +276,7 @@ def upgrade() -> None:
                     )
                 )
 
-    # Assign all remaining datasets (non-acquisition) to default workspace
+    # Assign all remaining datasets (non-acquisition) to system workspace
     conn.execute(
         sa.text(
             "UPDATE dataset SET workspace_id = :wid WHERE workspace_id IS NULL"
