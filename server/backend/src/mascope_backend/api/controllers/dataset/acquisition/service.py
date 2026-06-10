@@ -26,7 +26,7 @@ from mascope_backend.socket.records.service import (
     emit_record_deleted,
     emit_record_reload,
 )
-from mascope_file.name import resolve_instrument_type
+from mascope_file.name import resolve_instrument_type, validate_instrument_name
 
 
 # Maps global role_id → workspace_role for auto-created system workspaces.
@@ -132,6 +132,8 @@ async def get_acquisition_dataset(
     """
     if instrument is None:
         raise NotFoundException("Instrument must be provided")
+
+    validate_instrument_name(instrument)
 
     if year is None:
         year = datetime.now(timezone.utc).year
