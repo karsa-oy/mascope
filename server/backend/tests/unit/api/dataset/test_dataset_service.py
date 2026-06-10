@@ -255,7 +255,7 @@ async def test_create_dataset(
     call_args = mock_emit_dataset.created.call_args
     assert call_args.kwargs["record_type"] == "dataset"
     assert call_args.kwargs["record_id"] == dataset_data["dataset_id"]
-    assert call_args.kwargs.get("room") is None  # Broadcasts to all
+    assert call_args.kwargs.get("room") == unit_test_workspace.workspace_id
 
 
 @pytest.mark.asyncio
@@ -273,6 +273,7 @@ async def test_update_dataset(
     should_exist,
     mock_emit_dataset,
     async_session_factory,
+    unit_test_workspace,
 ):
     """Test updating an existing dataset.
 
@@ -319,7 +320,7 @@ async def test_update_dataset(
         call_args = mock_emit_dataset.updated.call_args
         assert call_args.kwargs["record_type"] == "dataset"
         assert call_args.kwargs["record_id"] == dataset_id
-        assert call_args.kwargs.get("room") is None  # Broadcasts to all
+        assert call_args.kwargs.get("room") == unit_test_workspace.workspace_id
 
         # Verify dataset was actually updated in the database
         async with async_session_factory() as session:
@@ -461,6 +462,7 @@ async def test_delete_dataset(
     should_exist,
     mock_emit_dataset,
     async_session_factory,
+    unit_test_workspace,
 ):
     """Test deleting a dataset.
 
@@ -498,7 +500,7 @@ async def test_delete_dataset(
         call_args = mock_emit_dataset.deleted.call_args
         assert call_args.kwargs["record_type"] == "dataset"
         assert call_args.kwargs["record_id"] == dataset_id
-        assert call_args.kwargs.get("room") is None
+        assert call_args.kwargs.get("room") == unit_test_workspace.workspace_id
 
         # Verify dataset was actually deleted from the database
         async with async_session_factory() as session:
