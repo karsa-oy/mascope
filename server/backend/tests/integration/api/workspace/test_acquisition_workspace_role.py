@@ -1,16 +1,15 @@
 """
-Tests: Acquisitions workspace role dependency.
+Tests: Acquisitions workspace role — per-instrument access control.
 
-Verifies that ``require_acquisition_workspace_role("editor")`` blocks users who
-are not editors (or above) of the system "Acquisitions" workspace from mutating
-sample files.
+Verifies that ``check_instrument_workspace_access(instrument, user, "editor")``
+blocks users who are not editors (or above) of the specific instrument's system
+workspace from creating sample files for that instrument.
 
 The test suite uses the ``POST /api/sample/files`` (create) endpoint as a
-representative mutation route.  The dependency is identical on all mutation
-routes so testing one is sufficient.
+representative mutation route.
 
 Fixtures used:
-- ``acquisitions_workspace`` — system workspace with ``is_system=True``
+- ``acquisitions_workspace`` — system workspace "Acquisitions test-instrument"
 - ``acq_editor_client`` — user who IS an editor of the Acquisitions workspace
 - ``acq_guest_client`` — user who IS a guest of the Acquisitions workspace
 - ``outsider_client`` — user with no workspace memberships
@@ -27,8 +26,8 @@ async def test_create_file_as_acquisitions_editor(acq_editor_client):
     """Acquisitions editor can hit the create endpoint (ACL passes).
 
     We expect 409 (duplicate) or 201 — NOT 403.  The point is that the
-    ``require_acquisition_workspace_role("editor")`` dependency lets the
-    request through.
+    per-instrument check lets the request through for an editor of the
+    instrument's workspace.
     """
     resp = await acq_editor_client.post(
         "/api/sample/files",
@@ -38,7 +37,7 @@ async def test_create_file_as_acquisitions_editor(acq_editor_client):
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
-            "range": {"min": 0, "max": 500},
+            "range": [0, 500],
             "polarity": "+",
         },
     )
@@ -61,7 +60,7 @@ async def test_create_file_as_acquisitions_guest_forbidden(acq_guest_client):
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
-            "range": {"min": 0, "max": 500},
+            "range": [0, 500],
             "polarity": "+",
         },
     )
@@ -82,7 +81,7 @@ async def test_create_file_as_outsider_forbidden(outsider_client):
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
-            "range": {"min": 0, "max": 500},
+            "range": [0, 500],
             "polarity": "+",
         },
     )
@@ -103,7 +102,7 @@ async def test_create_file_as_alpha_editor_forbidden(editor_client):
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
-            "range": {"min": 0, "max": 500},
+            "range": [0, 500],
             "polarity": "+",
         },
     )

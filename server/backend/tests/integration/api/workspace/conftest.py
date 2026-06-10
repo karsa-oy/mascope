@@ -474,23 +474,23 @@ async def orphan_sample_file(async_session_factory):
 
 
 # ---------------------------------------------------------------------------
-# Acquisitions workspace — system workspace for sample file mutations
+# Acquisitions workspace: system workspace for sample file mutations
 # ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture(scope="session")
 async def acquisitions_workspace(async_session_factory):
-    """The system Acquisitions workspace (is_system=True).
+    """A per-instrument system Acquisitions workspace (is_system=True).
 
-    ``require_acquisition_workspace_role`` resolves this workspace by
-    name + is_system flag.
+    ``require_acquisition_workspace_role`` resolves all workspaces whose
+    name starts with ``"Acquisitions "`` and ``is_system=True``.
     """
     workspace_id = gen_id()
     async with async_session_factory() as session:
         workspace = Workspace(
             workspace_id=workspace_id,
-            workspace_name="Acquisitions",
-            workspace_description="System acquisitions workspace",
+            workspace_name="Acquisitions test-instrument",
+            workspace_description="System acquisitions workspace for test-instrument",
             workspace_status="active",
             is_system=True,
             workspace_utc_created=_NOW,
