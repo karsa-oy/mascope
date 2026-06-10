@@ -959,7 +959,7 @@ async def get_sample_data(
     ...
 ```
 
-Available factories: `require_workspace_role`, `require_dataset_role`, `require_dataset_query_role`, `require_batch_role`, `require_sample_role`, `require_acquisition_workspace_role`.
+Available factories: `require_workspace_role`, `require_dataset_role`, `require_dataset_query_role`, `require_batch_role`, `require_sample_role`.
 
 **Pattern 2: Body/query-parameter routes** (resource ID comes from request body or query):
 
