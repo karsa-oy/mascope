@@ -40,12 +40,14 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
 from mascope_backend.api.new.auth.access_token.service import get_access_token
 from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.workspaces.dependencies import (
-    check_sample_file_access_bulk,
-    is_acquisitions_member,
+    accessible_acquisition_instruments,
+    check_instrument_workspace_access,
+    check_sample_file_instrument_access,
     require_acquisition_workspace_role,
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
+from mascope_file.name import get_instrument_name
 
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -59,17 +61,19 @@ async def get_sample_files_route(
 ):
     """Retrieve a list of sample files with optional filtering and pagination.
 
-    Results are filtered to files linked to the user's workspaces via sample items.
-    Superusers and Acquisitions workspace members see all files.
+    Results include files whose instrument belongs to an acquisition workspace
+    the user is a member of, plus files linked to sample items in any workspace
+    the user has access to.  Superusers see all files.
 
     :param query_params: Query parameters for filtering, sorting, and pagination.
     :param user: Authenticated user.
     :return: A dictionary with total count and list of sample files.
     """
-    skip_filter = user.is_superuser or await is_acquisitions_member(user)
+    allowed = await accessible_acquisition_instruments(user)
     return await get_sample_files(
         **query_params.model_dump(),
-        user_id=None if skip_filter else user.id,
+        allowed_instruments=allowed,
+        user_id=None if allowed is None else user.id,
     )
 
 
@@ -87,11 +91,12 @@ async def get_recent_sample_files_route(
     """
     datetime_min = datetime.now(timezone.utc) - timedelta(days=query_params.days)
     query_params_dict = query_params.model_dump(exclude={"days"})
-    skip_filter = user.is_superuser or await is_acquisitions_member(user)
+    allowed = await accessible_acquisition_instruments(user)
     query_params_dict.update(
         {
             "datetime_min": datetime_min,
-            "user_id": None if skip_filter else user.id,
+            "allowed_instruments": allowed,
+            "user_id": None if allowed is None else user.id,
         }
     )
 
@@ -110,8 +115,7 @@ async def get_sample_file_route(
     :param user: Authenticated user.
     :return: Details of the specified sample file.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    await check_sample_file_instrument_access(sample_file_id, user, "guest")
     return await get_sample_file(sample_file_id)
 
 
@@ -121,15 +125,21 @@ async def create_sample_file_route(
     sample_file_create: SampleFileCreate,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
     """Create a new sample file record.
 
+    Checks that the user has editor access to the instrument's acquisition
+    workspace before creating the record and triggering auto-processing.
+
     :param sample_file_create: Data required for creating a sample file.
-    :param background_tasks: Background tasks for triggering an automatic processing for sample file after creation.
-    :param user: Authenticated user with editor access.
+    :param background_tasks: Background tasks for triggering an automatic processing for
+                             sample file after creation.
+    :param user: Authenticated user with editor access to the instrument workspace.
     :return: The created sample file's details.
     """
+    await check_instrument_workspace_access(
+        sample_file_create.instrument, user, "editor"
+    )
     return await create_sample_file(
         sample_file_create=sample_file_create,
         background_tasks=background_tasks,
@@ -144,13 +154,13 @@ async def update_sample_file_route(
     sample_file_id: str,
     sample_file: SampleFileUpdate,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
+    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Update details of an existing sample file.
 
     :param sample_file_id: ID of the sample file to update.
     :param sample_file: Data for updating the sample file.
-    :param user: Authenticated user with editor access.
+    :param user: Authenticated user with admin access.
     :return: Updated details of the sample file.
     """
     return await update_sample_file(sample_file_id, sample_file)
@@ -161,12 +171,12 @@ async def update_sample_file_route(
 async def delete_sample_file_route(
     sample_file_id: str,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
+    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delete a specific sample file by ID.
 
     :param sample_file_id: ID of the sample file to delete.
-    :param user: Authenticated user with editor access.
+    :param user: Authenticated user with admin access.
     :return: Confirmation message on deletion.
     """
     await delete_sample_file(sample_file_id)
@@ -177,15 +187,15 @@ async def delete_sample_file_route(
 async def delete_sample_files_route(
     body: DeleteSampleFilesBody,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
+    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delete multiple sample files by their IDs or filenames.
 
     Only deletes files that don't have existing sample items associated with them.
     Returns information about which files were deleted and which were skipped.
 
-    :param body: Request body containing either list of sample file IDs or filenames to delete.
-    :param user: Authenticated user with editor access.
+    :param body: Request body containing either list of IDs or filenames to delete.
+    :param user: Authenticated user with admin access.
     :return: Information about deleted and skipped files.
     """
     return await delete_sample_files(**body.model_dump())
@@ -205,8 +215,7 @@ async def get_sample_file_peaks_route(
     :param user: Authenticated user.
     :return: Peak data for the sample file.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    await check_sample_file_instrument_access(sample_file_id, user, "guest")
     return await get_sample_file_peaks(sample_file_id, **query_params.model_dump())
 
 
@@ -216,13 +225,13 @@ async def compute_sample_file_peaks_route(
     sample_file_id: str,
     background_tasks: BackgroundTasks,
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
+    membership=Depends(require_acquisition_workspace_role("admin")),
 ):
     """Delegate peak computation for a sample file to the File Converter service.
 
     :param sample_file_id: ID of the sample file to compute peaks for.
     :param background_tasks: FastAPI background task manager
-    :param user: Authenticated user with editor access.
+    :param user: Authenticated user with admin access.
     :return: Process initiation message.
     """
     process_id = gen_id(8)
@@ -260,8 +269,7 @@ async def get_sample_file_peak_timeseries_route(
     :param user: Authenticated user.
     :return: Timeseries data for the specified peak.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    await check_sample_file_instrument_access(sample_file_id, user, "guest")
     return await get_sample_file_peak_timeseries(
         sample_file_id=sample_file_id,
         peak_mz=body.peak_mz,
@@ -283,8 +291,7 @@ async def get_sample_file_spectrum_route(
     :param user: Authenticated user.
     :return: Spectrum data for the sample file.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    await check_sample_file_instrument_access(sample_file_id, user, "guest")
     return await get_sample_file_spectrum(sample_file_id, **query_params.model_dump())
 
 
@@ -301,8 +308,7 @@ async def get_sample_file_metadata_route(
     :param user: Authenticated user.
     :return: Metadata for the sample file.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk([sample_file_id], user, "guest")
+    await check_sample_file_instrument_access(sample_file_id, user, "guest")
     return await get_sample_file_metadata(sample_file_id)
 
 
@@ -336,7 +342,7 @@ async def process_sample_item_route(
     )
 
     return {
-        "message": f"Processing sample file '{sample_file.get('filename')}', please wait.",
+        "message": f"Processing file '{sample_file.get('filename')}', please wait.",
         "process_id": process_id,
     }
 
@@ -378,21 +384,22 @@ async def reprocess_sample_files_route(
 async def upload_sample_files_route(
     files: list[UploadFile] = File(..., description="Multiple files to upload"),
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
 ) -> dict:
     """
     Uploads multiple sample files to the server in a single batch operation.
 
-    This route takes an uploaded files from a form field and saves it in the `filestreams` directory
-    on the server. Files are validated for size and extension before processing.
+    Checks that the user has editor access to each file's instrument workspace
+    before uploading.  The instrument is derived from the filename prefix.
 
     :param files: List of files to be uploaded via multipart form data
-    :type files: list[UploadFile]
-    :param user: The authenticated user from dependency injection
-    :type user: User
-    :return: A dict response with sample files upload results including success/failure details
-    :rtype: dict
+    :param user: The authenticated user
+    :return: A dict response with sample files upload results
     """
+    # Check per-instrument access for each file
+    for f in files:
+        instrument = get_instrument_name(f.filename)
+        await check_instrument_workspace_access(instrument, user, "editor")
+
     # Validate files using Pydantic model
     validated_files = SampleFilesUpload(files=files)
 
@@ -408,19 +415,24 @@ async def upload_sample_files_route(
 
 def get_upload_handler(
     user=Depends(current_active_user),
-    membership=Depends(require_acquisition_workspace_role("editor")),
 ):
-    """Get the upload handler for processing file uploads.
+    """Get the upload handler for TUS file uploads.
 
-    :param user: The current authenticated user with editor permissions.
-    :type user: _type_, optional
+    Checks that the user has editor access to the instrument workspace
+    derived from the uploaded filename before processing.
+
+    :param user: The current authenticated user.
     :return: A callable that handles the file upload.
-    :rtype: Callable[[str, dict], None]
     """
 
     async def handler(file_path: str, metadata: dict):
         # Sanitize filename to prevent path traversal
         safe_filename = os.path.basename(metadata["filename"])
+
+        # Check per-instrument access
+        instrument = get_instrument_name(safe_filename)
+        await check_instrument_workspace_access(instrument, user, "editor")
+
         # Rename file from temporary name back to original
         dest_path = os.path.join(os.path.dirname(file_path), safe_filename)
         shutil.move(file_path, dest_path)

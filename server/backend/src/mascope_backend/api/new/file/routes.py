@@ -5,8 +5,7 @@ from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.file.schema import FileDownloadBody
 from mascope_backend.api.new.file.service import download_files
 from mascope_backend.api.new.workspaces.dependencies import (
-    check_sample_file_access_bulk,
-    is_acquisitions_member,
+    check_sample_file_instrument_access,
 )
 from mascope_backend.db import User
 from mascope_backend.db.id import gen_id
@@ -24,17 +23,16 @@ async def download_file_route(
 ):
     """Download one or more sample files if available.
 
-    Acquisitions-workspace members can download any file. Otherwise
-    checks that the user has guest-level access to at least one sample item
-    referencing each requested file via workspace membership.
+    Checks that the user has guest-level access to the instrument workspace
+    for each requested file.
 
     :param body: The request body containing sample file IDs to download.
     :type body: FileDownloadBody
     :param user: The authenticated user.
     :return: Dictionary containing a message and the process ID.
     """
-    if not await is_acquisitions_member(user):
-        await check_sample_file_access_bulk(body.sample_file_ids, user, "guest")
+    for fid in body.sample_file_ids:
+        await check_sample_file_instrument_access(fid, user, "guest")
 
     process_id = gen_id(8)
 

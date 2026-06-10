@@ -8,6 +8,7 @@ from sqlalchemy import (
     desc,
     exists,
     func,
+    or_,
     select,
 )
 
@@ -75,48 +76,40 @@ async def get_sample_files(
     order: str = "asc",
     page: int | None = None,
     limit: int | None = None,
+    allowed_instruments: set[str] | None = None,
     user_id: int | None = None,
 ) -> dict:
     """
     Retrieves a paginated list of sample files, optionally filtered by date range,
     instrument, or filename, and sorted by a specified column.
 
-    Steps:
-    - Construct a query to select all sample files.
-    - Apply filtering based on provided date range, instrument, and filename parameters.
-    - Apply sorting based on the provided sort and order parameters.
-    - Apply pagination based on the provided page and limit parameters.
-    - Execute the query and fetch the results.
-    - Convert the results into a list of dictionaries for JSON serialization.
-
     :param datetime_min: Minimum date and time for filtering sample files, optional.
-    :type datetime_min: datetime, optional
     :param datetime_max: Maximum date and time for filtering sample files, optional.
-    :type datetime_max: datetime, optional
     :param instrument: Instrument name for filtering sample files, optional.
-    :type instrument: str, optional
     :param filename: Filename for filtering sample files, optional.
-    :type filename: str, optional
     :param sort: Column to sort by, defaults to "datetime_utc".
-    :type sort: str, optional
-    :param order: Sorting order, "asc" for ascending or "desc" for descending,
-                  defaults to "asc".
-    :type order: str, optional
+    :param order: Sorting order, "asc" for ascending or "desc" for descending.
     :param page: Page number for pagination, defaults to None (no pagination).
-    :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (no pagination).
-    :type limit: int | None, optional
-    :return: A dictionary containing the total count of filtered sample files and a list
-             of sample file details.
-    :rtype: dict
+    :param allowed_instruments: Set of instrument names the user may see via
+        acquisition workspace membership.  ``None`` means no filtering (superuser).
+    :param user_id: When set, also includes files linked to sample items in
+        workspaces the user is a member of (item-based access).
+    :return: A dictionary containing the total count and list of sample files.
     """
     async with async_session() as session:
         # --- Construct query
         stmt = select(SampleFile)
 
-        # --- Apply filters
-        if user_id is not None:
-            stmt = stmt.where(
+        # --- Apply access filters
+        if allowed_instruments is not None:
+            # Build OR: instrument in allowed set, or file linked to user's workspaces
+            instrument_filter = (
+                SampleFile.instrument.in_(allowed_instruments)
+                if allowed_instruments
+                else None
+            )
+            item_filter = (
                 exists(
                     select(SampleItem.sample_item_id)
                     .join(
@@ -133,7 +126,17 @@ async def get_sample_files(
                         WorkspaceMember.user_id == user_id,
                     )
                 )
+                if user_id is not None
+                else None
             )
+            conditions = [c for c in (instrument_filter, item_filter) if c is not None]
+            if not conditions:
+                return {
+                    "message": "Sample files retrieved successfully.",
+                    "results": 0,
+                    "data": [],
+                }
+            stmt = stmt.where(or_(*conditions))
         if datetime_min:
             stmt = stmt.where(SampleFile.datetime_utc >= datetime_min)
         if datetime_max:
