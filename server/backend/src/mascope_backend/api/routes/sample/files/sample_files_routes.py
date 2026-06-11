@@ -163,6 +163,11 @@ async def update_sample_file_route(
     :return: Updated details of the sample file.
     """
     await check_sample_file_instrument_access(sample_file_id, user, "admin")
+
+    # If the instrument is being changed, also require admin on the target
+    if sample_file.instrument:
+        await check_instrument_workspace_access(sample_file.instrument, user, "admin")
+
     return await update_sample_file(sample_file_id, sample_file, user_id=user.id)
 
 
