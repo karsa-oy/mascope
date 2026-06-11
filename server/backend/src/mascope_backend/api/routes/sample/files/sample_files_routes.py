@@ -47,7 +47,7 @@ from mascope_backend.api.new.workspaces.dependencies import (
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
-from mascope_file.name import get_instrument_name
+from mascope_file.name import get_instrument_name, validate_instrument_name
 
 
 sample_files_router = APIRouter(prefix="/api/sample/files", tags=["Sample Files"])
@@ -411,7 +411,12 @@ async def upload_sample_files_route(
     """
     # Check per-instrument access for each file
     for f in files:
+        if not f.filename:
+            raise ValueError("Upload filename must not be empty")
+        # Normalize to basename to prevent path traversal
+        f.filename = os.path.basename(f.filename)
         instrument = get_instrument_name(f.filename)
+        validate_instrument_name(instrument)
         await check_instrument_workspace_access(instrument, user, "editor")
 
     # Validate files using Pydantic model
@@ -445,6 +450,7 @@ def get_upload_handler(
 
         # Check per-instrument access
         instrument = get_instrument_name(safe_filename)
+        validate_instrument_name(instrument)
         await check_instrument_workspace_access(instrument, user, "editor")
 
         # Rename file from temporary name back to original
