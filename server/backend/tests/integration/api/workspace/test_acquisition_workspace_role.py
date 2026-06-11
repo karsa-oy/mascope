@@ -9,7 +9,7 @@ The test suite uses the ``POST /api/sample/files`` (create) endpoint as a
 representative mutation route.
 
 Fixtures used:
-- ``acquisitions_workspace`` — system workspace "Acquisitions test-instrument"
+- ``acquisitions_workspace`` — system workspace "Acquisitions test-orbion"
 - ``acq_editor_client`` — user who IS an editor of the Acquisitions workspace
 - ``acq_guest_client`` — user who IS a guest of the Acquisitions workspace
 - ``outsider_client`` — user with no workspace memberships
@@ -32,8 +32,8 @@ async def test_create_file_as_acquisitions_editor(acq_editor_client):
     resp = await acq_editor_client.post(
         "/api/sample/files",
         json={
-            "filename": "acq_test_editor.h5",
-            "instrument": "test-instrument",
+            "filename": "test-orbion_editor.raw",
+            "instrument": "test-orbion",
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
@@ -55,8 +55,8 @@ async def test_create_file_as_acquisitions_guest_forbidden(acq_guest_client):
     resp = await acq_guest_client.post(
         "/api/sample/files",
         json={
-            "filename": "acq_test_guest.h5",
-            "instrument": "test-instrument",
+            "filename": "test-orbion_guest.raw",
+            "instrument": "test-orbion",
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
@@ -76,8 +76,8 @@ async def test_create_file_as_outsider_forbidden(outsider_client):
     resp = await outsider_client.post(
         "/api/sample/files",
         json={
-            "filename": "acq_test_outsider.h5",
-            "instrument": "test-instrument",
+            "filename": "test-orbion_outsider.raw",
+            "instrument": "test-orbion",
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,
@@ -97,8 +97,8 @@ async def test_create_file_as_alpha_editor_forbidden(editor_client):
     resp = await editor_client.post(
         "/api/sample/files",
         json={
-            "filename": "acq_test_alpha_editor.h5",
-            "instrument": "test-instrument",
+            "filename": "test-orbion_alpha_editor.raw",
+            "instrument": "test-orbion",
             "datetime": "2026-01-01T00:00:00",
             "datetime_utc": "2026-01-01T00:00:00Z",
             "length": 60.0,

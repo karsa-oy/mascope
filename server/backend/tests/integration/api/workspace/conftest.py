@@ -250,8 +250,8 @@ async def sample_file(async_session_factory):
     async with async_session_factory() as session:
         sf = SampleFile(
             sample_file_id=file_id,
-            filename=f"test_{file_id}.h5",
-            instrument="test-instrument",
+            filename=f"test-orbion_{file_id}.raw",
+            instrument="test-orbion",
             datetime=_NOW_NAIVE,
             datetime_utc=_NOW,
             length=60.0,
@@ -307,8 +307,8 @@ async def beta_sample_file(async_session_factory):
     async with async_session_factory() as session:
         sf = SampleFile(
             sample_file_id=file_id,
-            filename=f"test_beta_{file_id}.h5",
-            instrument="test-instrument",
+            filename=f"test-orbion_{file_id}.raw",
+            instrument="test-orbion",
             datetime=_NOW_NAIVE,
             datetime_utc=_NOW,
             length=60.0,
@@ -460,8 +460,8 @@ async def orphan_sample_file(async_session_factory):
     async with async_session_factory() as session:
         sf = SampleFile(
             sample_file_id=file_id,
-            filename=f"test_orphan_{file_id}.h5",
-            instrument="test-instrument",
+            filename=f"test-orbion_{file_id}.raw",
+            instrument="test-orbion",
             datetime=_NOW_NAIVE,
             datetime_utc=_NOW,
             length=60.0,
@@ -489,8 +489,8 @@ async def acquisitions_workspace(async_session_factory):
     async with async_session_factory() as session:
         workspace = Workspace(
             workspace_id=workspace_id,
-            workspace_name="Acquisitions test-instrument",
-            workspace_description="System acquisitions workspace for test-instrument",
+            workspace_name="Acquisitions test-orbion",
+            workspace_description="System acquisitions workspace for test-orbion",
             workspace_status="active",
             is_system=True,
             workspace_utc_created=_NOW,
