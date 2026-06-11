@@ -322,7 +322,6 @@ async def check_sample_file_instrument_access_bulk(
         raise ForbiddenAccessException()
 
     instruments = {row.instrument for row in rows}
-        raise ForbiddenAccessException()
 
     min_level = _role_levels[min_role]
     for instrument in instruments:
@@ -336,21 +335,26 @@ async def check_instrument_workspace_access(
     instrument: str,
     user: User,
     min_role: str,
+    *,
+    allow_new: bool = False,
 ) -> WorkspaceMember:
     """Check workspace-level ACL for an instrument's acquisition workspace.
 
     Resolves the instrument name to its system workspace and checks that the
-    user has at least *min_role*.  If no workspace exists yet for this
-    instrument the check passes (the workspace will be created during
-    auto-processing and the uploading user will be made owner).
+    user has at least *min_role*.
 
     :param instrument: Instrument name (e.g. ``"Orbion"``).
     :param user: The authenticated user.
     :param min_role: Minimum workspace role required (e.g. ``"editor"``).
+    :param allow_new: If ``True``, allow access when no workspace exists yet
+        (used by upload routes where auto-processing will create the workspace
+        and assign the uploading user as owner).  Callers should validate the
+        instrument name before setting this flag.
     :raises ForbiddenAccessException: If the workspace exists and the user
-        lacks the required role.
-    :return: The user's WorkspaceMember record (synthetic for superusers or
-        when no workspace exists yet).
+        lacks the required role, or if no workspace exists and *allow_new*
+        is ``False``.
+    :return: The user's WorkspaceMember record (synthetic for superusers,
+        global admins/owners, or when *allow_new* applies).
     """
     if user.is_superuser or (
         user.role_id is not None and user.role_id >= _role_levels["admin"]
@@ -359,14 +363,14 @@ async def check_instrument_workspace_access(
 
     workspace_id = await _get_workspace_id_from_instrument(instrument)
     if workspace_id is None:
-        # No workspace exists for this instrument. Allow for auto-processing to create
-        # and assign the user as owner.
-        return WorkspaceMember(
-            workspace_member_id="__new_instrument__",
-            workspace_id="__new_instrument__",
-            user_id=user.id,
-            workspace_role=min_role,
-        )
+        if allow_new:
+            return WorkspaceMember(
+                workspace_member_id="__new_instrument__",
+                workspace_id="__new_instrument__",
+                user_id=user.id,
+                workspace_role=min_role,
+            )
+        raise ForbiddenAccessException()
 
     return await _enforce(workspace_id, user, _role_levels[min_role])
 

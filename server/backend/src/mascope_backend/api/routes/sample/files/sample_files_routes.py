@@ -138,7 +138,7 @@ async def create_sample_file_route(
     :return: The created sample file's details.
     """
     await check_instrument_workspace_access(
-        sample_file_create.instrument, user, "editor"
+        sample_file_create.instrument, user, "editor", allow_new=True
     )
     return await create_sample_file(
         sample_file_create=sample_file_create,
@@ -418,7 +418,9 @@ async def upload_sample_files_route(
         f.filename = os.path.basename(f.filename)
         instrument = get_instrument_name(f.filename)
         validate_instrument_name(instrument)
-        await check_instrument_workspace_access(instrument, user, "editor")
+        await check_instrument_workspace_access(
+            instrument, user, "editor", allow_new=True
+        )
 
     # Validate files using Pydantic model
     validated_files = SampleFilesUpload(files=files)
@@ -452,7 +454,9 @@ def get_upload_handler(
         # Check per-instrument access
         instrument = get_instrument_name(safe_filename)
         validate_instrument_name(instrument)
-        await check_instrument_workspace_access(instrument, user, "editor")
+        await check_instrument_workspace_access(
+            instrument, user, "editor", allow_new=True
+        )
 
         # Rename file from temporary name back to original
         dest_path = os.path.join(os.path.dirname(file_path), safe_filename)
