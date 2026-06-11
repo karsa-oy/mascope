@@ -978,7 +978,7 @@ async def rematch_batches_route(
     ...
 ```
 
-Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`, `check_sample_file_access_bulk`.
+Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`, `check_sample_file_access_bulk`, `check_workspace_access`, `check_instrument_workspace_access`, `check_sample_file_instrument_access`, `check_sample_file_instrument_access_bulk`, `check_target_collection_access`, `accessible_acquisition_instruments`, `accessible_workspace_ids_for_user`.
 
 > [!IMPORTANT]
 > The `@api_route()` decorator **requires** a parameter named `user` in the route signature (it raises `ValueError` otherwise). When using workspace ACL, always keep `user: User = Depends(current_active_user)` as a separate parameter alongside the membership dependency.
