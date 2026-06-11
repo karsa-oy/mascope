@@ -310,13 +310,18 @@ async def check_sample_file_instrument_access_bulk(
 
     async with async_session() as session:
         result = await session.execute(
-            select(SampleFile.instrument)
-            .distinct()
-            .where(SampleFile.sample_file_id.in_(sample_file_ids))
+            select(
+                SampleFile.sample_file_id,
+                SampleFile.instrument,
+            ).where(SampleFile.sample_file_id.in_(sample_file_ids))
         )
-        instruments = set(result.scalars().all())
+        rows = result.all()
 
-    if not instruments:
+    # Reject if any requested ID was not found
+    if len(rows) != len(set(sample_file_ids)):
+        raise ForbiddenAccessException()
+
+    instruments = {row.instrument for row in rows}
         raise ForbiddenAccessException()
 
     min_level = _role_levels[min_role]
