@@ -137,6 +137,7 @@ async def create_sample_file_route(
     :param user: Authenticated user with editor access to the instrument workspace.
     :return: The created sample file's details.
     """
+    validate_instrument_name(sample_file_create.instrument)
     await check_instrument_workspace_access(
         sample_file_create.instrument, user, "editor", allow_new=True
     )

@@ -20,6 +20,7 @@ acquisition/instrument routes):
 - ``check_batch_access_bulk``:  list of sample_batch_ids (single query)
 - ``check_sample_access``:      sample_item_id from request body / other source
 - ``check_sample_access_bulk``: list of sample_item_ids (single query)
+- ``check_workspace_access``:     workspace_id from request body / other source
 - ``check_sample_file_access_bulk``: list of sample_file_ids via items (single query)
 - ``check_sample_file_instrument_access``: sample_file_id via instrument → workspace
 - ``check_sample_file_instrument_access_bulk``: list of sample_file_ids via instruments
@@ -253,7 +254,12 @@ async def check_sample_file_instrument_access(
     if user.is_superuser or (
         user.role_id is not None and user.role_id >= _role_levels["admin"]
     ):
-        return _superuser_member("__admin__", user)
+        return WorkspaceMember(
+            workspace_member_id="__admin__",
+            workspace_id="__admin__",
+            user_id=user.id,
+            workspace_role=min_role,
+        )
 
     async with async_session() as session:
         instrument = (
@@ -359,7 +365,12 @@ async def check_instrument_workspace_access(
     if user.is_superuser or (
         user.role_id is not None and user.role_id >= _role_levels["admin"]
     ):
-        return _superuser_member("__instrument__", user)
+        return WorkspaceMember(
+            workspace_member_id="__admin__",
+            workspace_id="__admin__",
+            user_id=user.id,
+            workspace_role=min_role,
+        )
 
     workspace_id = await _get_workspace_id_from_instrument(instrument)
     if workspace_id is None:
