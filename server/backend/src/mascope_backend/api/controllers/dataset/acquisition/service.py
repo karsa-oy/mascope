@@ -10,9 +10,6 @@ from mascope_backend.api.controllers.dataset.dataset_controller import (
     delete_dataset,
 )
 from mascope_backend.api.lib.api_features import api_controller
-from mascope_backend.api.lib.exceptions.api_exceptions import (
-    NotFoundException,
-)
 from mascope_backend.api.models.dataset.config import dataset_config
 from mascope_backend.api.models.dataset.dataset_pydantic_model import (
     DatasetRead,
@@ -128,7 +125,7 @@ async def _ensure_instrument_workspace(
 
 @api_controller()
 async def get_acquisition_dataset(
-    instrument: str | None,
+    instrument: str,
     year: int | None = None,
     user_id: int | None = None,
 ) -> dict:
@@ -144,26 +141,28 @@ async def get_acquisition_dataset(
     :param year: Calendar year for the dataset (defaults to current UTC year)
     :param user_id: User who triggered the request (becomes workspace owner
         when a new workspace is created)
-    :raises NotFoundException: When *instrument* is ``None``
     :return: dict with ``"data"`` key holding the dataset
     """
-    if instrument is None:
-        raise NotFoundException("Instrument must be provided")
-
     validate_instrument_name(instrument)
 
     if year is None:
         year = datetime.now(timezone.utc).year
     year_str = str(year)
 
-    # --- Try to find existing year-dataset ---
+    # --- Try to find existing year-dataset in the system workspace ---
+    workspace_id = await _ensure_instrument_workspace(instrument, owner_user_id=user_id)
+
     async with async_session() as session:
         dataset = (
             await session.execute(
-                select(Dataset).where(
+                select(Dataset)
+                .join(Workspace, Workspace.workspace_id == Dataset.workspace_id)
+                .where(
                     Dataset.dataset_type == "ACQUISITION",
                     Dataset.instrument == instrument,
                     Dataset.dataset_name == year_str,
+                    Dataset.workspace_id == workspace_id,
+                    Workspace.is_system.is_(True),
                 )
             )
         ).scalar_one_or_none()
@@ -176,9 +175,6 @@ async def get_acquisition_dataset(
             "message": f"Acquisition dataset '{year_str}' retrieved for {instrument}",
             "data": DatasetRead.model_validate(dataset).model_dump(),
         }
-
-    # --- Create workspace (if needed) and year-dataset ---
-    workspace_id = await _ensure_instrument_workspace(instrument, owner_user_id=user_id)
 
     async with async_session() as session:
         new_dataset = Dataset(

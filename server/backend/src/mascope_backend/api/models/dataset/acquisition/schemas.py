@@ -17,9 +17,9 @@ class GetAcquisitionDatasetQueryParams(QueryParamsModel):
     endpoint
     """
 
-    instrument: str | None = Field(
-        None,
-        description="Filter by instrument associated with the acquisition dataset.",
+    instrument: str = Field(
+        ...,
+        description="Instrument associated with the acquisition dataset.",
     )
     year: int | None = Field(
         None,
@@ -28,8 +28,8 @@ class GetAcquisitionDatasetQueryParams(QueryParamsModel):
 
     @field_validator("instrument")
     @classmethod
-    def validate_instrument(cls, instrument: str | None) -> str | None:
+    def validate_instrument(cls, instrument: str) -> str:
         """Validate instrument is not empty."""
-        if instrument is not None and instrument.strip() == "":
+        if instrument.strip() == "":
             raise ValueError("Instrument cannot be empty or contain only whitespace")
         return instrument
