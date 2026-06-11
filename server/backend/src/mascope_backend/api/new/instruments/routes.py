@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.auth.dependencies import guest_user
 from mascope_backend.api.new.instruments.service import get_instruments
 from mascope_backend.api.new.workspaces.dependencies import (
     accessible_acquisition_instruments,
@@ -13,7 +13,7 @@ instruments_router = APIRouter(prefix="/api/instruments", tags=["Instruments"])
 
 @instruments_router.get("")
 @api_route(status_code=200)
-async def get_instruments_route(user=Depends(current_active_user)):
+async def get_instruments_route(user=Depends(guest_user)):
     """Retrieve a list of available instruments.
 
     Each instrument includes a ``disabled`` flag indicating whether the

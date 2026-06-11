@@ -33,18 +33,17 @@ async def get_acquisition_dataset_route(
     query_params: GetAcquisitionDatasetQueryParams = Query(),
     user=Depends(current_active_user),
 ):
-    """Retrieve a list of datasets.
+    """Get or create the year-based acquisition dataset for an instrument.
 
-    :param query_params: Query parameters for sorting and pagination, defaults to
-                         Depends().
-    :type query_params: GetDatasetsQueryParams, optional
-    :param user: The current authenticated user, defaults to Depends(guest_user).
-    :type user: User, optional
-    :return: A dictionary containing total count and list of datasets.
+    :param query_params: Query parameters including instrument (required) and
+                         optional year (defaults to current UTC year).
+    :type query_params: GetAcquisitionDatasetQueryParams
+    :param user: The current authenticated user.
+    :type user: User
+    :return: A dictionary containing the acquisition dataset.
     :rtype: dict
     """
-    if query_params.instrument:
-        await check_instrument_workspace_access(query_params.instrument, user, "guest")
+    await check_instrument_workspace_access(query_params.instrument, user, "guest")
     return await get_acquisition_dataset(**query_params.model_dump())
 
 
@@ -61,11 +60,12 @@ async def create_acquisition_datasets_route(
     - Testing and development
     - Manual dataset creation when automatic creation fails
 
-    :param membership: Workspace membership with admin role or higher.
-    :type membership: WorkspaceMember
+    Requires global admin role.
+
+    :param user: The current authenticated user (must be a global admin).
+    :type user: User
     :return: A dictionary containing the summary of created datasets.
     :rtype: dict
-    :raises ForbiddenAccessException: If user doesn't have admin role in the Acquisitions workspace.
     """
     return await create_acquisition_datasets()
 
@@ -88,10 +88,11 @@ async def delete_acquisition_datasets_route(
     - Does not affect datasets with valid existing instruments
     - Cannot accidentally delete datasets with data
 
-    :param membership: Workspace membership with admin role or higher.
-    :type membership: WorkspaceMember
+    Requires global admin role.
+
+    :param user: The current authenticated user (must be a global admin).
+    :type user: User
     :return: A dictionary containing the summary of deleted datasets.
     :rtype: dict
-    :raises ForbiddenAccessException: If user doesn't have admin role in the Acquisitions workspace.
     """
     return await delete_acquisition_datasets()
