@@ -207,8 +207,9 @@ async def delete_sample_files_route(
             body.sample_file_ids, user, "admin"
         )
     elif body.filenames:
-        instruments = {get_instrument_name(f) for f in body.filenames}
+        instruments = {get_instrument_name(os.path.basename(f)) for f in body.filenames}
         for instrument in instruments:
+            validate_instrument_name(instrument)
             await check_instrument_workspace_access(instrument, user, "admin")
     return await delete_sample_files(**body.model_dump())
 
