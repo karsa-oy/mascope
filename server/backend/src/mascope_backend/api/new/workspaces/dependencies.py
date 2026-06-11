@@ -347,7 +347,9 @@ async def check_instrument_workspace_access(
     :return: The user's WorkspaceMember record (synthetic for superusers or
         when no workspace exists yet).
     """
-    if user.is_superuser:
+    if user.is_superuser or (
+        user.role_id is not None and user.role_id >= _role_levels["admin"]
+    ):
         return _superuser_member("__instrument__", user)
 
     workspace_id = await _get_workspace_id_from_instrument(instrument)
