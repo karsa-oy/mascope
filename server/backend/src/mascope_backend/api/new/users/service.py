@@ -112,7 +112,11 @@ async def get_users(
         admin_level = auth_settings.ROLE_ACCESS_LEVELS["admin"]
         schema = (
             UserRead
-            if caller and (caller.is_superuser or caller.role_id >= admin_level)
+            if caller
+            and (
+                caller.is_superuser
+                or (caller.role_id is not None and caller.role_id >= admin_level)
+            )
             else UserPublic
         )
         users = []
