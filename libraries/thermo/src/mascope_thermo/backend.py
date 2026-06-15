@@ -791,10 +791,74 @@ class OpenTFRawBackend:
             "Thermo scan-statistics fields are not exposed by OpenTFRaw (Phase 4)."
         )
 
-    def centroids_per_scan(self, *args, **kwargs) -> list[dict]:
-        raise NotImplementedError(
-            "Per-peak resolution / S:N are not decoded by OpenTFRaw (gap 5.1)."
-        )
+    def _require_centroid_labels(self) -> None:
+        """Gap 5.1 is only closed if the installed OpenTFRaw exposes the
+        per-peak label accessor. The released wheel does not, so fall back to
+        ``NotImplementedError`` (the contract suite xfails) rather than an
+        ``AttributeError``.
+        """
+        if not hasattr(self._raw, "centroid_labels"):
+            raise NotImplementedError(
+                "Per-peak resolution / S:N require "
+                "opentfraw.RawFile.centroid_labels (gap 5.1); not available in "
+                "this opentfraw build."
+            )
+
+    def _validate_mz_range(
+        self, mz_min: float | None, mz_max: float | None
+    ) -> tuple[float, float]:
+        from mascope_thermo.thermo import InvalidRangeError
+
+        low, high = self.mass_range()
+        low = low if mz_min is None else mz_min
+        high = high if mz_max is None else mz_max
+        if low > high:
+            raise InvalidRangeError(
+                f"Invalid m/z range: mz_min={low}, mz_max={high}, "
+                "where mz_min > mz_max"
+            )
+        return low, high
+
+    def centroids_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = None,
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> list[dict]:
+        self._require_centroid_labels()
+        mz_min, mz_max = self._validate_mz_range(mz_min, mz_max)
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+
+        out: list[dict] = []
+        for s in selected:
+            labels = self._raw.centroid_labels(int(s["scan_number"]))
+            masses = np.asarray(labels["mz"], dtype=np.float64)
+            intensities = np.asarray(labels["intensity"], dtype=np.float64)
+            resolutions = np.asarray(labels["resolution"], dtype=np.float64)
+            signal_to_noise = np.asarray(
+                labels["signal_to_noise"], dtype=np.float64
+            )
+            # Keep only FT label peaks (finite resolution / S:N), mirroring
+            # Thermo, where non-FT scans return no centroid label peaks at all.
+            mask = (
+                (mz_min <= masses)
+                & (masses <= mz_max)
+                & np.isfinite(resolutions)
+                & np.isfinite(signal_to_noise)
+            )
+            out.append(
+                {
+                    "masses": masses[mask],
+                    "intensities": intensities[mask],
+                    "resolutions": resolutions[mask],
+                    "signal_to_noise": signal_to_noise[mask],
+                    "timestamp": s["retention_time"] * _SECONDS_PER_MINUTE,
+                }
+            )
+        return out
 
     def average_centroids(self, *args, **kwargs):
         raise NotImplementedError(
@@ -802,9 +866,31 @@ class OpenTFRawBackend:
         )
 
     def centroids_meta(self) -> dict:
-        raise NotImplementedError(
-            "Per-peak resolution / noise are not decoded by OpenTFRaw (gap 5.1)."
-        )
+        self._require_centroid_labels()
+        result = {"time": [], "data": []}
+        for s in self._all_scans():
+            labels = self._raw.centroid_labels(int(s["scan_number"]))
+            mzs = np.asarray(labels["mz"], dtype=np.float64)
+            intensities = np.asarray(labels["intensity"], dtype=np.float64)
+            resolutions = np.asarray(labels["resolution"], dtype=np.float64)
+            noises = np.asarray(labels["noise"], dtype=np.float64)
+
+            valid = (
+                np.isfinite(resolutions)
+                & (resolutions > 0)
+                & np.isfinite(intensities)
+                & (intensities > 0)
+            )
+            result["time"].append(s["retention_time"] * _SECONDS_PER_MINUTE)
+            result["data"].append(
+                {
+                    "intensities": intensities[valid].tolist(),
+                    "mzs": mzs[valid].tolist(),
+                    "resolutions": resolutions[valid].tolist(),
+                    "noises": noises[valid].tolist(),
+                }
+            )
+        return result
 
     def profile_per_scan(self, *args, **kwargs):
         raise NotImplementedError(

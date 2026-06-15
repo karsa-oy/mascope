@@ -40,6 +40,11 @@ MAX_XIC_TARGETS = int(os.environ.get("MASCOPE_PARITY_MAX_XIC_TARGETS", "200"))
 # published 1.1.0 wheel does not; a maturin build of the accessor branch does.
 _OTF_HAS_PROFILE = hasattr(opentfraw.RawFile, "profile")
 
+# Per-peak label parity (resolution / S:N) needs an opentfraw build exposing
+# RawFile.centroid_labels(). Same story as profile: a maturin build of the
+# decoder branch, not the published wheel.
+_OTF_HAS_LABELS = hasattr(opentfraw.RawFile, "centroid_labels")
+
 
 def _run_under(monkeypatch, backend, fn, *args, **kwargs):
     monkeypatch.setenv("MASCOPE_THERMO_BACKEND", backend)
@@ -109,6 +114,49 @@ def test_clean_mappings_match_thermo(monkeypatch, path):
     ot_ts, ot_tic = _run_under(monkeypatch, "opentfraw", tic, path)
     np.testing.assert_allclose(ot_ts, th_ts, rtol=1e-6, atol=1e-6)
     np.testing.assert_allclose(ot_tic, th_tic, rtol=1e-4, atol=1e-3)
+
+
+@pytest.mark.skipif(
+    not _OTF_HAS_LABELS,
+    reason="installed opentfraw lacks RawFile.centroid_labels() (decoder build)",
+)
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_centroids_per_scan_matches_thermo(monkeypatch, path):
+    """OpenTFRaw's decoded per-peak labels must match Thermo's CentroidStream.
+
+    Pins the values behind ``get_centroids_per_scan`` under both backends:
+    per FT scan, the peak count must match and masses / resolution / S:N must
+    agree. Resolution is decoded verbatim (exact); S:N is
+    ``(intensity - baseline) / (noise - baseline)`` (matches Thermo to f32).
+    Works on Exploris too, unlike the profile m/z.
+    """
+    path = str(path)
+
+    th = _run_under(monkeypatch, "thermo", m_thermo.get_centroids_per_scan, path)
+    ot = _run_under(monkeypatch, "opentfraw", m_thermo.get_centroids_per_scan, path)
+
+    assert len(ot) == len(th), "per-scan centroid list length differs"
+
+    compared = 0
+    for t, o in zip(th, ot):
+        assert o["masses"].size == t["masses"].size, (
+            f"peak count differs: OpenTFRaw {o['masses'].size} vs "
+            f"Thermo {t['masses'].size}"
+        )
+        if t["masses"].size == 0:
+            continue
+        compared += 1
+        np.testing.assert_allclose(o["masses"], t["masses"], rtol=0, atol=1e-3)
+        np.testing.assert_allclose(
+            o["resolutions"], t["resolutions"], rtol=1e-5, atol=1.0
+        )
+        np.testing.assert_allclose(
+            o["signal_to_noise"], t["signal_to_noise"], rtol=1e-4, atol=1e-3
+        )
+        np.testing.assert_allclose(o["timestamp"], t["timestamp"], rtol=1e-6)
+
+    if compared == 0:
+        pytest.skip("no FT centroid scans to compare")
 
 
 @pytest.mark.skipif(
