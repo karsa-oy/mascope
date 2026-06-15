@@ -27,10 +27,20 @@ def test_backend_name_is_case_insensitive(monkeypatch):
     assert isinstance(m_backend.open_backend("dummy.raw"), m_backend.ThermoBackend)
 
 
-def test_opentfraw_backend_not_implemented_yet(monkeypatch):
+def test_opentfraw_backend_selected(monkeypatch):
     monkeypatch.setenv(m_backend.ENV_BACKEND, "opentfraw")
+    be = m_backend.open_backend("dummy.raw")
+    assert isinstance(be, m_backend.OpenTFRawBackend)
+    assert isinstance(be, m_backend.ReaderBackend)
+
+
+def test_opentfraw_unimplemented_capability_raises(monkeypatch):
+    # Capabilities OpenTFRaw can't satisfy yet must raise NotImplementedError
+    # (so the contract suite xfails them), not AttributeError.
+    monkeypatch.setenv(m_backend.ENV_BACKEND, "opentfraw")
+    be = m_backend.open_backend("dummy.raw")
     with pytest.raises(NotImplementedError):
-        m_backend.open_backend("dummy.raw")
+        be.profile_per_scan()
 
 
 def test_unknown_backend_raises(monkeypatch):

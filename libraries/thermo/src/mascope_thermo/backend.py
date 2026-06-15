@@ -33,6 +33,10 @@ ENV_BACKEND = "MASCOPE_THERMO_BACKEND"
 Polarity = Literal["+", "-"]
 MsType = Literal["Ms", "Ms2"]
 
+# Scan times are reported in minutes by both backends but the public API returns
+# seconds (matching the Thermo path's StartTime * 60).
+_SECONDS_PER_MINUTE = 60
+
 
 @runtime_checkable
 class ReaderBackend(Protocol):
@@ -627,6 +631,207 @@ class ThermoBackend:
         return centroids, tic_values
 
 
+class OpenTFRawBackend:
+    """:class:`ReaderBackend` backed by the open-source OpenTFRaw reader.
+
+    Built incrementally (migration step 4+). Capabilities OpenTFRaw 1.1.0 exposes
+    cleanly are implemented; the rest raise ``NotImplementedError`` referencing
+    the relevant gap, so the dual-backend contract suite xfails them until they
+    land (decode/fork work or NumPy reimplementations).
+    """
+
+    def __init__(self, datafile_path: str):
+        self.datafile_path = datafile_path
+        self._raw = None
+        self._scans: list[dict] | None = None
+
+    def __enter__(self) -> OpenTFRawBackend:
+        import opentfraw
+
+        self._raw = opentfraw.RawFile(self.datafile_path)
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._raw = None
+        self._scans = None
+
+    # -- scan selection: mirrors thermo.ScanSelector over OpenTFRaw scan dicts --
+
+    def _all_scans(self) -> list[dict]:
+        if self._scans is None:
+            self._scans = list(self._raw.iter_scans())
+        return self._scans
+
+    def _selected(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> list[dict]:
+        from mascope_thermo.thermo import (
+            InvalidRangeError,
+            NoScansFoundError,
+            PolarityError,
+            ScanTypeError,
+        )
+
+        scans = self._all_scans()
+        mask = np.ones(len(scans), dtype=bool)
+
+        if polarity:
+            if polarity not in ("-", "+"):
+                raise PolarityError(
+                    f"Invalid polarity '{polarity}' provided. "
+                    "Polarity must be '+' or '-'."
+                )
+            mask &= np.array([s["polarity"] == polarity for s in scans])
+
+        if t_min is not None or t_max is not None:
+            start_s = np.array(
+                [s["retention_time"] * _SECONDS_PER_MINUTE for s in scans]
+            )
+            low = start_s.min() if t_min is None else t_min
+            high = start_s.max() if t_max is None else t_max
+            if low > high:
+                raise InvalidRangeError(
+                    f"Invalid time range: t_min={low} s > t_max={high} s"
+                )
+            eps = np.finfo(np.float64).eps * high
+            mask &= (low - eps < start_s) & (start_s < high + eps)
+
+        if ms_type:
+            level = {"Ms": 1, "Ms2": 2}.get(ms_type)
+            if level is None:
+                raise ScanTypeError(
+                    f"Invalid scan type '{ms_type}' provided. "
+                    "MS scan type must be 'Ms' or 'Ms2'."
+                )
+            mask &= np.array([int(s["ms_level"]) == level for s in scans])
+
+        selected = [s for s, keep in zip(scans, mask) if keep]
+        if not selected:
+            raise NoScansFoundError(
+                "No scans found matching the specified filters: "
+                f"polarity='{polarity}', time_range=({t_min}, {t_max}), "
+                f"ms_type='{ms_type}'"
+            )
+        return selected
+
+    # -- clean mappings (implemented) --
+
+    def polarities(self) -> set[str]:
+        return {s["polarity"] for s in self._all_scans() if s["polarity"] in ("+", "-")}
+
+    def scan_times(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> np.ndarray:
+        return np.array(
+            [
+                s["retention_time"] * _SECONDS_PER_MINUTE
+                for s in self._selected(polarity, t_min, t_max, ms_type)
+            ]
+        )
+
+    def tic_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+        times = np.array(
+            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
+        )
+        tic = np.array([s["total_ion_current"] for s in selected], dtype=np.float64)
+        return times, tic
+
+    def num_scans(self) -> int:
+        return int(self._raw.num_scans)
+
+    def scan_indices(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> list[int]:
+        return [
+            int(s["scan_number"])
+            for s in self._selected(polarity, t_min, t_max, ms_type)
+        ]
+
+    def mass_range(self) -> tuple[float, float]:
+        scans = self._all_scans()
+        return (
+            float(min(s["low_mz"] for s in scans)),
+            float(max(s["high_mz"] for s in scans)),
+        )
+
+    # -- not yet available (raise NotImplementedError → contract tests xfail) --
+
+    def instrument_details(self) -> dict:
+        raise NotImplementedError(
+            "OpenTFRaw exposes only instrument_model, not the full instrument "
+            "details table (Phase 4 metadata remap)."
+        )
+
+    def scan_acquisition_settings(self, *args, **kwargs) -> dict:
+        raise NotImplementedError(
+            "Per-scan trailer table is not exposed by OpenTFRaw (Phase 4)."
+        )
+
+    def scan_statistics(self, *args, **kwargs) -> dict:
+        raise NotImplementedError(
+            "Thermo scan-statistics fields are not exposed by OpenTFRaw (Phase 4)."
+        )
+
+    def centroids_per_scan(self, *args, **kwargs) -> list[dict]:
+        raise NotImplementedError(
+            "Per-peak resolution / S:N are not decoded by OpenTFRaw (gap 5.1)."
+        )
+
+    def average_centroids(self, *args, **kwargs):
+        raise NotImplementedError(
+            "ppm-binned centroid averaging not yet reimplemented (gap 5.3, step 5)."
+        )
+
+    def centroids_meta(self) -> dict:
+        raise NotImplementedError(
+            "Per-peak resolution / noise are not decoded by OpenTFRaw (gap 5.1)."
+        )
+
+    def profile_per_scan(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Profile / SegmentedScan arrays are not exposed by OpenTFRaw (gap 5.2)."
+        )
+
+    def average_profile(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Profile + ppm averaging not yet available (gaps 5.2 / 5.3)."
+        )
+
+    def xic(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Arbitrary-m/z XIC not yet reimplemented (gap 5.4, step 5)."
+        )
+
+    def ms2_precursor_by_scan(self, *args, **kwargs) -> dict[int, float]:
+        raise NotImplementedError(
+            "MS² precursor m/z is returned as None by OpenTFRaw (gap 5.1b)."
+        )
+
+    def ms2_centroids_for_scans(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Per-peak resolution / S:N are not decoded by OpenTFRaw (gap 5.1)."
+        )
+
+
 def open_backend(datafile_path: str) -> ReaderBackend:
     """Open ``datafile_path`` with the backend selected by ``MASCOPE_THERMO_BACKEND``.
 
@@ -637,10 +842,7 @@ def open_backend(datafile_path: str) -> ReaderBackend:
     if name == "thermo":
         return ThermoBackend(datafile_path)
     if name == "opentfraw":
-        raise NotImplementedError(
-            "OpenTFRaw backend is not implemented yet "
-            "(see OpenTFRaw_migration_execution_plan.md, step 4)."
-        )
+        return OpenTFRawBackend(datafile_path)
     raise ValueError(
         f"Unknown {ENV_BACKEND}={name!r}; expected 'thermo' or 'opentfraw'."
     )
