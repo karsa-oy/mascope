@@ -22,10 +22,12 @@ the whole m/z range and varied peak densities in a second or two per file.
 import os
 
 import numpy as np
+import opentfraw
 import pytest
 from conftest import TEST_FILES_DIR
 
 import mascope_thermo.thermo as m_thermo
+from mascope_thermo.backend import open_backend
 
 
 RAW_FILES = sorted(TEST_FILES_DIR.glob("*.raw"))
@@ -33,6 +35,10 @@ RAW_FILES = sorted(TEST_FILES_DIR.glob("*.raw"))
 # Cap on XIC targets per file (even spread across m/z). Override to widen
 # coverage (e.g. MASCOPE_PARITY_MAX_XIC_TARGETS=1000) at the cost of runtime.
 MAX_XIC_TARGETS = int(os.environ.get("MASCOPE_PARITY_MAX_XIC_TARGETS", "200"))
+
+# Profile parity needs an opentfraw build that exposes RawFile.profile(). The
+# published 1.1.0 wheel does not; a maturin build of the accessor branch does.
+_OTF_HAS_PROFILE = hasattr(opentfraw.RawFile, "profile")
 
 
 def _run_under(monkeypatch, backend, fn, *args, **kwargs):
@@ -103,3 +109,56 @@ def test_clean_mappings_match_thermo(monkeypatch, path):
     ot_ts, ot_tic = _run_under(monkeypatch, "opentfraw", tic, path)
     np.testing.assert_allclose(ot_ts, th_ts, rtol=1e-6, atol=1e-6)
     np.testing.assert_allclose(ot_tic, th_tic, rtol=1e-4, atol=1e-3)
+
+
+@pytest.mark.skipif(
+    not _OTF_HAS_PROFILE,
+    reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
+)
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_profile_matches_thermo(request, monkeypatch, path):
+    """OpenTFRaw's profile spectrum must match Thermo's SegmentedScan.
+
+    Guards the profile path so a structural-only check (e.g. get_signal's
+    size>0) can't mask wrong m/z. Compares the first MS1 scan's non-zero profile
+    points: count must match, and the base-peak m/z must agree within a coarse
+    tolerance. (On Q Exactive the m/z agrees to ~20 ppm - a lock-mass-level
+    offset - hence 50 ppm, not sub-ppm.)
+
+    OpenTFRaw mis-calibrates Exploris profile m/z (the bins/intensities decode,
+    but the frequency->m/z coefficients don't), so Exploris is xfailed pending
+    the upstream fix; the non-zero *count* still matches there.
+    """
+    path = str(path)
+    raw = opentfraw.RawFile(path)
+    if "exploris" in (raw.instrument_model or "").lower():
+        request.applymarker(
+            pytest.mark.xfail(
+                reason="OpenTFRaw profile m/z mis-calibrated on Exploris (upstream)",
+                strict=False,
+            )
+        )
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "thermo")
+    with open_backend(path) as backend:
+        first_ms1 = backend.scan_indices(ms_type="Ms")[0]
+        mzs, specs, _ = backend.profile_per_scan(ms_type="Ms")
+    tmz = np.asarray(mzs[0], dtype=float)
+    tint = np.asarray(specs[0], dtype=float)
+
+    omz, oint = (np.asarray(a, dtype=float) for a in raw.profile(first_ms1))
+
+    om, tm = omz[oint > 0], tmz[tint > 0]
+    oi, ti = oint[oint > 0], tint[tint > 0]
+    if om.size == 0 or tm.size == 0:
+        pytest.skip("no profile signal in the first MS1 scan")
+
+    assert om.size == tm.size, (
+        f"non-zero profile point count: OpenTFRaw {om.size} vs Thermo {tm.size}"
+    )
+    bp_otf = om[np.argmax(oi)]
+    bp_thermo = tm[np.argmax(ti)]
+    ppm = abs(bp_otf - bp_thermo) / bp_thermo * 1e6
+    assert ppm <= 50, (
+        f"base-peak m/z {bp_otf:.4f} vs Thermo {bp_thermo:.4f} ({ppm:.0f} ppm)"
+    )
