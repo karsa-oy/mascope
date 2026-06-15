@@ -27,6 +27,13 @@ This is a **backrest**, not just a Phase 0 spike. Two kinds of test:
 outright. That is the same condition under which `mascope_thermo` can drop the
 Thermo backend. The suite is the checklist.
 
+> This directory is the **direct-read** parity harness (it compares its own
+> reader functions in `parity.py`, Thermo vs OpenTFRaw, at the scan level). The
+> migration's primary backrest is elsewhere: the dual-backend **contract suite**
+> (`tests/test_thermo_*.py` run under the `backend` fixture) and the
+> function-level **value parity** in `tests/test_backend_parity.py`. See
+> `../../OpenTFRaw_migration_execution_plan.md` for how they fit together.
+
 ## Requirements
 
 Run on a machine / venv that has **both** backends:

@@ -40,6 +40,10 @@ def _run_under(monkeypatch, backend, fn, *args, **kwargs):
     return fn(*args, **kwargs)
 
 
+def _num_of_scans(path):
+    return m_thermo.RawFileMetadataLegacy(path).num_of_scans
+
+
 @pytest.mark.skipif(not RAW_FILES, reason="no .raw files in test_files/")
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_xic_matches_thermo(monkeypatch, path):
@@ -69,3 +73,33 @@ def test_xic_matches_thermo(monkeypatch, path):
 
     assert otf_xic.shape == thermo_xic.shape
     np.testing.assert_allclose(otf_xic, thermo_xic, rtol=1e-4, atol=1e-3)
+
+
+@pytest.mark.skipif(not RAW_FILES, reason="no .raw files in test_files/")
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_clean_mappings_match_thermo(monkeypatch, path):
+    """Regression-guard the OpenTFRaw capabilities that already work.
+
+    The contract suite only xpasses these under ``strict=False`` — a regression
+    would silently turn XPASS into xfail and stay green. Comparing the values
+    through the real public functions under both backends protects them.
+    """
+    path = str(path)
+
+    th_pol = _run_under(monkeypatch, "thermo", m_thermo.get_polarity_options, path)
+    ot_pol = _run_under(monkeypatch, "opentfraw", m_thermo.get_polarity_options, path)
+    assert th_pol == ot_pol
+
+    th_n = _run_under(monkeypatch, "thermo", _num_of_scans, path)
+    ot_n = _run_under(monkeypatch, "opentfraw", _num_of_scans, path)
+    assert th_n == ot_n
+
+    th_t = _run_under(monkeypatch, "thermo", m_thermo.get_scan_timestamps, path)
+    ot_t = _run_under(monkeypatch, "opentfraw", m_thermo.get_scan_timestamps, path)
+    np.testing.assert_allclose(ot_t, th_t, rtol=1e-6, atol=1e-6)
+
+    tic = m_thermo.get_tic_per_scan
+    th_ts, th_tic = _run_under(monkeypatch, "thermo", tic, path)
+    ot_ts, ot_tic = _run_under(monkeypatch, "opentfraw", tic, path)
+    np.testing.assert_allclose(ot_ts, th_ts, rtol=1e-6, atol=1e-6)
+    np.testing.assert_allclose(ot_tic, th_tic, rtol=1e-4, atol=1e-3)
