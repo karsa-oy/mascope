@@ -138,6 +138,39 @@ class ReaderBackend(Protocol):
         "data": [{"mzs", "intensities", "resolutions", "noises"}]}``."""
         ...
 
+    def mass_range(self) -> tuple[float, float]:
+        """Run-level ``(low_mass, high_mass)`` from the run header."""
+        ...
+
+    def profile_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> tuple[list[np.ndarray], list[np.ndarray], np.ndarray]:
+        """Per-scan profile spectra: ``(scan_mzs, scan_intensities, scan_times)``,
+        the m/z and intensity arrays already restricted to ``[mz_min, mz_max]``.
+
+        Gap 5.2: OpenTFRaw's Python bindings expose centroids only; an
+        OpenTFRaw backend needs the profile arrays surfaced (fork/upstream)."""
+        ...
+
+    def average_profile(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, int]:
+        """Multi-scan ppm-binned averaged profile spectrum:
+        ``(mz, intensities, scans_combined)``. With ``average=False`` the
+        intensities are scaled back up by the combined-scan count (sum signal).
+
+        Combines gaps 5.2 (profile) and 5.3 (ppm averaging)."""
+        ...
+
 
 # Field set returned by GetInstrumentData (excluding non-serializable
 # ChannelLabels / Units). Kept here so every backend reports the same shape.
@@ -416,6 +449,59 @@ class ThermoBackend:
                 }
             )
         return result
+
+    def mass_range(self) -> tuple[float, float]:
+        header = self._raw.RunHeaderEx
+        return header.LowMass, header.HighMass
+
+    def profile_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> tuple[list[np.ndarray], list[np.ndarray], np.ndarray]:
+        from mascope_thermo.thermo import _validate_mz_range
+
+        mz_min, mz_max = _validate_mz_range(self._raw, mz_min, mz_max)
+        selector = self._selector(polarity, t_min, t_max, ms_type)
+
+        scan_mzs: list[np.ndarray] = []
+        scan_specs: list[np.ndarray] = []
+        for scan in selector.scans:
+            positions = np.frombuffer(scan.SegmentedScan.Positions)
+            intensities = np.frombuffer(scan.SegmentedScan.Intensities)
+            mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
+            scan_mzs.append(positions[mz_mask])
+            scan_specs.append(intensities[mz_mask])
+        return scan_mzs, scan_specs, selector.scan_times
+
+    def average_profile(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, int]:
+        from System.Collections.Generic import List
+        from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
+        from ThermoFisher.CommonCore.Data.Business import MassOptions
+
+        dotnet_indices = List[int]()
+        for index in scan_indices:
+            dotnet_indices.Add(index)
+
+        average_scan = Extensions.AverageScans(
+            self._raw, dotnet_indices, MassOptions(ppm, ToleranceUnits.ppm)
+        )
+        segmented = average_scan.SegmentedScan
+        num_combined = average_scan.ScansCombined
+        mz = np.frombuffer(segmented.Positions)
+        intensities = np.frombuffer(segmented.Intensities)
+        if not average:
+            intensities = intensities * num_combined
+        return mz, intensities, num_combined
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:

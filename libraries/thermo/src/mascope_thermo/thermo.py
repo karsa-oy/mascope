@@ -325,50 +325,38 @@ def get_signal(
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
     """
-    with RawFileManager(datafile_path) as RawFile:
-        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
-        scan_selector = ScanSelector(RawFile, polarity, t_min, t_max)
-        scan_time = scan_selector.scan_times
-
-        scan_mzs, scan_specs = [], []
-        for scan in scan_selector.scans:
-            intensities = np.frombuffer(scan.SegmentedScan.Intensities)
-            positions = np.frombuffer(scan.SegmentedScan.Positions)
-
-            # Filter by m/z range
-            mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
-            scan_mzs.append(positions[mz_mask])
-            scan_specs.append(intensities[mz_mask])
+    with open_backend(datafile_path) as backend:
+        scan_mzs, scan_specs, scan_time = backend.profile_per_scan(
+            polarity=polarity, t_min=t_min, t_max=t_max, mz_min=mz_min, mz_max=mz_max
+        )
 
         if not scan_mzs:
-            low_mass = RawFile.RunHeaderEx.LowMass
-            high_mass = RawFile.RunHeaderEx.HighMass
-
+            low_mass, high_mass = backend.mass_range()
             raise InvalidRangeError(
                 f"""No data found in the specified m/z range.
                 M/z range of the raw file: {low_mass} - {high_mass}
                 """
             )
 
-        # Create a sorted union of all unique m/z values
-        all_mzs = np.unique(np.concatenate(scan_mzs))
+    # Create a sorted union of all unique m/z values
+    all_mzs = np.unique(np.concatenate(scan_mzs))
 
-        # Initialize output array
-        signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
+    # Initialize output array
+    signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
 
-        # Fill the 2D array using exact mz matching
-        for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
-            # Find indices where the current scan mz values appear in all_mzs
-            indices = np.searchsorted(all_mzs, mz)
-            # Only fill values that exist in this scan
-            signal_array[indices, scan_idx] = intensity
+    # Fill the 2D array using exact mz matching
+    for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
+        # Find indices where the current scan mz values appear in all_mzs
+        indices = np.searchsorted(all_mzs, mz)
+        # Only fill values that exist in this scan
+        signal_array[indices, scan_idx] = intensity
 
-        signal_dask = da.from_array(signal_array, chunks="auto")
+    signal_dask = da.from_array(signal_array, chunks="auto")
 
-        return xr.Dataset(
-            {"signal": (("mz", "time"), signal_dask)},
-            coords={"mz": all_mzs, "time": scan_time},
-        )
+    return xr.Dataset(
+        {"signal": (("mz", "time"), signal_dask)},
+        coords={"mz": all_mzs, "time": scan_time},
+    )
 
 
 def compute_sum_signal(
@@ -400,33 +388,23 @@ def compute_sum_signal(
     :return: The sum signal and the number of combined scans
     :rtype: tuple[xr.DataArray, float]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        # Setup mz tolerance - counts within ppm are binned
-        mass_option = MassOptions(ppm, ToleranceUnits.ppm)
-
-        scan_selector = ScanSelector(RawFile, polarity, t_min, t_max)
+    with open_backend(datafile_path) as backend:
+        indices = backend.scan_indices(polarity=polarity, t_min=t_min, t_max=t_max)
         runtime.logger.debug(
-            f"Selected {len(scan_selector.scan_indices_1based)} scans "
-            "for sum signal computation. "
+            f"Selected {len(indices)} scans for sum signal computation. "
             f"Polarity: {polarity}, binning ppm: {ppm}."
         )
-        average_scan = Extensions.AverageScans(
-            RawFile, scan_selector.scan_indices_dotnet, mass_option
-        )
-        averaged_spec = average_scan.SegmentedScan
-
-        # Extract averaged signal, multiply by number of combined scans
-        # to restore sum signal.
-        num_of_combined_scans = average_scan.ScansCombined
-        mz = np.frombuffer(averaged_spec.Positions)
-        sum_signal = np.frombuffer(averaged_spec.Intensities) * num_of_combined_scans
-
-        sum_signal_dask = da.from_array(sum_signal, chunks="auto")
-        sum_signal = xr.DataArray(
-            data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
+        # average=False restores the sum signal (averaged * scans combined).
+        mz, sum_signal, num_of_combined_scans = backend.average_profile(
+            indices, ppm=ppm, average=False
         )
 
-        return sum_signal, num_of_combined_scans
+    sum_signal_dask = da.from_array(sum_signal, chunks="auto")
+    sum_signal = xr.DataArray(
+        data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
+    )
+
+    return sum_signal, num_of_combined_scans
 
 
 def get_tic_per_scan(
