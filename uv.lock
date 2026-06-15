@@ -1809,6 +1809,7 @@ dependencies = [
     { name = "mascope-file" },
     { name = "mascope-runtime" },
     { name = "numpy" },
+    { name = "opentfraw" },
     { name = "pythonnet" },
     { name = "xarray" },
 ]
@@ -1818,6 +1819,7 @@ requires-dist = [
     { name = "mascope-file", editable = "libraries/file" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
     { name = "numpy", specifier = "~=1.26" },
+    { name = "opentfraw", specifier = "~=1.1" },
     { name = "pythonnet", specifier = "~=3.0" },
     { name = "xarray", specifier = ">=2025.6.1" },
 ]
@@ -2090,6 +2092,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
+]
+
+[[package]]
+name = "opentfraw"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1e/aa/ff4b9dd09099f12f6faedf5bc7e2abb01a8a09110aff29699af3fb56218a/opentfraw-1.1.0.tar.gz", hash = "sha256:bcb94a01bf8a49995a26938dfdce62aea46fc8346abbcf592d3b49129398b719", size = 65993, upload-time = "2026-05-31T03:07:20.555Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/4d/9fc8356fedb5999aa55a9aa8cbd77ed30167fe7da49b86767257f3d41ddd/opentfraw-1.1.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:a512363d8c648f799508b2ca42da56f94576809076f8fd1589db79f136817492", size = 363047, upload-time = "2026-05-31T03:07:13.616Z" },
+    { url = "https://files.pythonhosted.org/packages/04/3e/bb2a71cb563a3b08ebdabf85b817e0bc279f3e77c2536388ae59415e5f19/opentfraw-1.1.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:5017627c387720e8d325304213a328f713a6b6c167403fbf6d86fe1b0818bce6", size = 362666, upload-time = "2026-05-31T03:07:15.386Z" },
+    { url = "https://files.pythonhosted.org/packages/22/e1/02aeaad0d4e163d732862b897d04b707baf0902f0e4cf32f5891cb36a7cd/opentfraw-1.1.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8d51f1d19daaa632b26c93123c2504ca7be6a400da718758060b45c18d3a73af", size = 396232, upload-time = "2026-05-31T03:07:16.645Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/be/582a076b3643d041b9cdc081e53a70b8759431faf1eee4f501e34d59b4b4/opentfraw-1.1.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4dc20e9bedc6c607fd88e1ddd3f5f58bece92cd6148f1b2ef95d76515bafdccf", size = 404878, upload-time = "2026-05-31T03:07:17.978Z" },
+    { url = "https://files.pythonhosted.org/packages/48/4d/1a85e72aed97ee3d48c5fe1c8f599ce316afdfe855a4c47f32820a467fe4/opentfraw-1.1.0-cp38-abi3-win_amd64.whl", hash = "sha256:d0c9a8206610a799ab46c443a7d11ae584188fc0fd2aeacc1970f58804f6bf71", size = 264427, upload-time = "2026-05-31T03:07:19.298Z" },
 ]
 
 [[package]]
