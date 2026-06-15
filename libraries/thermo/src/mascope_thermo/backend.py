@@ -22,6 +22,7 @@ added as the remaining ``thermo.py`` functions move over.
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
@@ -187,6 +188,26 @@ class ReaderBackend(Protocol):
         backend must reimplement m/z-window summation in NumPy."""
         ...
 
+    def ms2_precursor_by_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> dict[int, float]:
+        """``{scan_number: precursor_mz}`` for MS² scans (only those whose
+        precursor is resolvable).
+
+        Gap 5.1b: the Thermo backend parses the precursor from the filter
+        string; OpenTFRaw returns it as ``None`` (fork/upstream candidate)."""
+        ...
+
+    def ms2_centroids_for_scans(
+        self, scan_indices: list[int]
+    ) -> tuple[list[dict], list[float]]:
+        """Per-scan centroids + TIC for explicit scan numbers:
+        ``([{masses, intensities, resolutions, signal_to_noise, timestamp}], tics)``."""
+        ...
+
 
 # Field set returned by GetInstrumentData (excluding non-serializable
 # ChannelLabels / Units). Kept here so every backend reports the same shape.
@@ -227,6 +248,29 @@ SCAN_STAT_FIELDS = (
     "ScanType",
     "CycleNumber",
 )
+
+
+def _label_peaks(
+    centroid_scan,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Extract ``(masses, intensities, resolutions, signal_to_noise)`` from a
+    Thermo CentroidScan's label peaks, or four empty arrays if there are none.
+    """
+    if centroid_scan is None or centroid_scan.Length == 0:
+        return (
+            np.array([], dtype=np.float64),
+            np.array([], dtype=np.float64),
+            np.array([], dtype=np.float64),
+            np.array([], dtype=np.float64),
+        )
+    peaks = centroid_scan.GetLabelPeaks()
+    n = len(peaks)
+    return (
+        np.fromiter((c.Mass for c in peaks), dtype=np.float64, count=n),
+        np.fromiter((c.Intensity for c in peaks), dtype=np.float64, count=n),
+        np.fromiter((c.Resolution for c in peaks), dtype=np.float64, count=n),
+        np.fromiter((c.SignalToNoise for c in peaks), dtype=np.float64, count=n),
+    )
 
 
 class ThermoBackend:
@@ -379,39 +423,16 @@ class ThermoBackend:
 
         out: list[dict] = []
         for scan, timestamp in zip(selector.scans, selector.scan_times):
-            centroid_scan = scan.CentroidScan
-            if centroid_scan is None or centroid_scan.Length == 0:
-                masses = np.array([], dtype=np.float64)
-                intensities = np.array([], dtype=np.float64)
-                resolutions = np.array([], dtype=np.float64)
-                signal_to_noise = np.array([], dtype=np.float64)
-            else:
-                peaks = centroid_scan.GetLabelPeaks()
-                n = len(peaks)
-                masses = np.fromiter(
-                    (c.Mass for c in peaks), dtype=np.float64, count=n
-                )
-                intensities = np.fromiter(
-                    (c.Intensity for c in peaks), dtype=np.float64, count=n
-                )
-                resolutions = np.fromiter(
-                    (c.Resolution for c in peaks), dtype=np.float64, count=n
-                )
-                signal_to_noise = np.fromiter(
-                    (c.SignalToNoise for c in peaks), dtype=np.float64, count=n
-                )
-                mz_mask = np.logical_and(mz_min <= masses, masses <= mz_max)
-                masses = masses[mz_mask]
-                intensities = intensities[mz_mask]
-                resolutions = resolutions[mz_mask]
-                signal_to_noise = signal_to_noise[mz_mask]
-
+            masses, intensities, resolutions, signal_to_noise = _label_peaks(
+                scan.CentroidScan
+            )
+            mz_mask = np.logical_and(mz_min <= masses, masses <= mz_max)
             out.append(
                 {
-                    "masses": masses,
-                    "intensities": intensities,
-                    "resolutions": resolutions,
-                    "signal_to_noise": signal_to_noise,
+                    "masses": masses[mz_mask],
+                    "intensities": intensities[mz_mask],
+                    "resolutions": resolutions[mz_mask],
+                    "signal_to_noise": signal_to_noise[mz_mask],
                     "timestamp": timestamp,
                 }
             )
@@ -561,6 +582,49 @@ class ThermoBackend:
             )[indices_0based]
 
         return intensities, selector.scan_times
+
+    def ms2_precursor_by_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> dict[int, float]:
+        selector = self._selector(polarity, t_min, t_max, ms_type="Ms2")
+        out: dict[int, float] = {}
+        for scan_idx, scan_filter in zip(
+            selector.scan_indices_1based, selector.scan_filters, strict=True
+        ):
+            match = re.search(r"ms2 ([\d.]+)@", scan_filter.ToString())
+            if match:
+                out[scan_idx] = float(match.group(1))
+        return out
+
+    def ms2_centroids_for_scans(
+        self, scan_indices: list[int]
+    ) -> tuple[list[dict], list[float]]:
+        from ThermoFisher.CommonCore.Data import Extensions
+
+        from mascope_thermo.thermo import SECONDS_PER_MINUTE
+
+        centroids: list[dict] = []
+        tic_values: list[float] = []
+        for scan_idx in scan_indices:
+            scan_obj = list(Extensions.GetScans(self._raw, scan_idx, scan_idx))[0]
+            stats = self._raw.GetScanStatsForScanNumber(scan_idx)
+            masses, intensities, resolutions, signal_to_noise = _label_peaks(
+                scan_obj.CentroidScan
+            )
+            centroids.append(
+                {
+                    "masses": masses,
+                    "intensities": intensities,
+                    "resolutions": resolutions,
+                    "signal_to_noise": signal_to_noise,
+                    "timestamp": stats.StartTime * SECONDS_PER_MINUTE,
+                }
+            )
+            tic_values.append(float(stats.TIC))
+        return centroids, tic_values
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:

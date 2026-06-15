@@ -2,7 +2,6 @@
 This module provides functions to read and process Thermo Fisher raw files.
 """
 
-import re
 from typing import Iterable, Literal
 
 import dask.array as da
@@ -671,31 +670,26 @@ def get_centroids_per_scan(
         )
 
 
-def _group_ms2_scans_by_parent(
-    scan_selector: ScanSelector,
+def _cluster_scans_by_parent(
+    scan_precursors: dict[int, float],
     parent_peak_tolerance: float = 0.001,
 ) -> dict[float, list[int]]:
-    """Group MS2 scans by their parent peak m/z.
+    """Cluster MS² scans by precursor m/z.
 
-    Parses each MS2 scan filter to extract the precursor m/z, clusters
-    near-duplicate values within tolerance, and returns a mapping of
-    canonical parent peak m/z to 1-based scan indices.
+    Takes a ``{scan_number: precursor_mz}`` mapping (from a backend), clusters
+    near-duplicate precursors within tolerance, and returns a mapping of
+    canonical parent peak m/z to scan numbers. Backend-agnostic: the precursor
+    extraction itself lives in the backend (``ms2_precursor_by_scan``).
 
-    :param scan_selector: A ScanSelector already filtered for MS2 scans.
-    :type scan_selector: ScanSelector
+    :param scan_precursors: Mapping of scan number to precursor m/z.
+    :type scan_precursors: dict[int, float]
     :param parent_peak_tolerance: Tolerance in Da for merging
                                   near-duplicate parent peaks.
     :type parent_peak_tolerance: float
-    :return: Mapping of canonical parent peak m/z to list of 1-based scan indices.
+    :return: Mapping of canonical parent peak m/z to list of scan numbers.
     :rtype: dict[float, list[int]]
     """
-    scan_parent_peaks: list[tuple[int, float]] = []
-    for scan_idx, scan_filter in zip(
-        scan_selector.scan_indices_1based, scan_selector.scan_filters, strict=True
-    ):
-        match = re.search(r"ms2 ([\d.]+)@", scan_filter.ToString())
-        if match:
-            scan_parent_peaks.append((scan_idx, float(match.group(1))))
+    scan_parent_peaks: list[tuple[int, float]] = list(scan_precursors.items())
 
     if not scan_parent_peaks:
         return {}
@@ -765,13 +759,12 @@ def get_ms2_centroids_by_parent(
              (masses, intensities, resolutions, signal_to_noise).
     :rtype: dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
+    with open_backend(datafile_path) as backend:
+        precursors = backend.ms2_precursor_by_scan(
+            polarity=polarity, t_min=t_min, t_max=t_max
         )
-
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            scan_selector, parent_peak_tolerance
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
         if not parent_peak_mapping:
             return {}
@@ -800,8 +793,8 @@ def get_ms2_centroids_by_parent(
                     np.array([], dtype=np.float64),
                 )
                 continue
-            centroid_mapping[pp] = _average_scans_centroids(
-                RawFile, scan_indices, ppm=ppm, average=average
+            centroid_mapping[pp] = backend.average_centroids(
+                scan_indices, ppm=ppm, average=average
             )
 
         return centroid_mapping
@@ -833,21 +826,15 @@ def get_ms2_summary_metadata(
              ms1_scan_count, ms2_scan_count, parent_peak_tolerance.
     :rtype: dict
     """
-    with RawFileManager(datafile_path) as RawFile:
-        # Get all scans to count MS1 vs MS2
-        all_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type=None
+    with open_backend(datafile_path) as backend:
+        all_count = len(
+            backend.scan_indices(polarity, t_min, t_max, ms_type=None)
         )
-        ms2_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
-        )
-
-        all_count = len(all_selector.scan_indices_1based)
-        # scan_indices_1based raises NoScansFoundError when nothing matches, so an
+        # scan_indices raises NoScansFoundError when nothing matches, so an
         # MS1-only file would otherwise blow up here instead of reaching the
         # graceful empty-MS² return below.
         try:
-            ms2_count = len(ms2_selector.scan_indices_1based)
+            ms2_count = len(backend.scan_indices(polarity, t_min, t_max, ms_type="Ms2"))
         except NoScansFoundError:
             ms2_count = 0
         ms1_count = all_count - ms2_count
@@ -863,24 +850,24 @@ def get_ms2_summary_metadata(
             }
 
         # Get MS2 scans grouped by parent peak
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            ms2_selector, parent_peak_tolerance
+        precursors = backend.ms2_precursor_by_scan(polarity, t_min, t_max)
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
         parent_peaks = list(parent_peak_mapping.keys())
 
-        first_scan_idx = ms2_selector.scan_indices_1based[0]
-        trailer_info = RawFile.GetTrailerExtraInformation(first_scan_idx)
-        trailer_labels = list(trailer_info.Labels)
-
+        # Isolation width + HCD energy come from the per-scan trailer table.
+        acq = backend.scan_acquisition_settings(
+            polarity, t_min, t_max, ms_type="Ms2"
+        )
+        trailer_labels = acq["header_labels"]
         isolation_width_idx = trailer_labels.index("MS2 Isolation Width:")
         hcd_label_idx = trailer_labels.index("HCD Energy V:")
 
         isolation_widths = set()
         scan_idx_to_hcd: dict[int, str] = {}
 
-        for scan_idx in ms2_selector.scan_indices_1based:
-            trailer = RawFile.GetTrailerExtraInformation(scan_idx)
-            trailer_values = list(trailer.Values)
+        for scan_idx, trailer_values in acq["settings"].items():
             isolation_widths.add(trailer_values[isolation_width_idx])
             scan_idx_to_hcd[scan_idx] = trailer_values[hcd_label_idx]
 
@@ -953,13 +940,10 @@ def get_ms2_centroids_per_scan_for_parent(
              signal_to_noise, timestamp.
     :rtype: tuple[list[dict], list[float]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        ms2_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
-        )
-
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            ms2_selector, parent_peak_tolerance
+    with open_backend(datafile_path) as backend:
+        precursors = backend.ms2_precursor_by_scan(polarity, t_min, t_max)
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
 
         # Find the matching parent peak cluster
@@ -972,50 +956,7 @@ def get_ms2_centroids_per_scan_for_parent(
         if not matching_scan_indices:
             return [], []
 
-        centroids: list[dict[str, np.ndarray | float]] = []
-        tic_values: list[float] = []
-
-        for scan_idx in matching_scan_indices:
-            scan = Extensions.GetScans(RawFile, scan_idx, scan_idx)
-            scan_obj = list(scan)[0]
-            stats = ms2_selector.raw_scan_stats[scan_idx - 1]
-            timestamp = stats.StartTime * SECONDS_PER_MINUTE
-            tic = float(stats.TIC)
-
-            centroid_scan = scan_obj.CentroidScan
-            if centroid_scan is None or centroid_scan.Length == 0:
-                masses = np.array([], dtype=np.float64)
-                intensities = np.array([], dtype=np.float64)
-                resolutions = np.array([], dtype=np.float64)
-                signal_to_noise = np.array([], dtype=np.float64)
-            else:
-                scan_centroids = centroid_scan.GetLabelPeaks()
-                n = len(scan_centroids)
-                masses = np.fromiter(
-                    (c.Mass for c in scan_centroids), dtype=np.float64, count=n
-                )
-                intensities = np.fromiter(
-                    (c.Intensity for c in scan_centroids), dtype=np.float64, count=n
-                )
-                resolutions = np.fromiter(
-                    (c.Resolution for c in scan_centroids), dtype=np.float64, count=n
-                )
-                signal_to_noise = np.fromiter(
-                    (c.SignalToNoise for c in scan_centroids), dtype=np.float64, count=n
-                )
-
-            centroids.append(
-                {
-                    "masses": masses,
-                    "intensities": intensities,
-                    "resolutions": resolutions,
-                    "signal_to_noise": signal_to_noise,
-                    "timestamp": timestamp,
-                }
-            )
-            tic_values.append(tic)
-
-        return centroids, tic_values
+        return backend.ms2_centroids_for_scans(matching_scan_indices)
 
 
 class RawFileMetadata:
