@@ -22,6 +22,7 @@ from ThermoFisher.CommonCore.Data.Business import (
 )
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 
+from mascope_thermo.backend import open_backend
 from mascope_thermo.runtime import runtime
 
 
@@ -276,24 +277,20 @@ def get_polarity_options(datafile_path: str) -> str:
             both are present.
     :rtype: str
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(RawFile, ms_type=None)
+    with open_backend(datafile_path) as backend:
+        polarities = backend.polarities()
 
-        polarities = set(
-            filter.Polarity.ToString() for filter in scan_selector.raw_scan_filters
-        )
+    has_positive = "+" in polarities
+    has_negative = "-" in polarities
 
-        has_positive = "Positive" in polarities
-        has_negative = "Negative" in polarities
-
-        if has_positive and has_negative:
-            return "+-"
-        elif has_positive:
-            return "+"
-        elif has_negative:
-            return "-"
-        else:
-            raise PolarityError("No valid polarities found in the raw file.")
+    if has_positive and has_negative:
+        return "+-"
+    elif has_positive:
+        return "+"
+    elif has_negative:
+        return "-"
+    else:
+        raise PolarityError("No valid polarities found in the raw file.")
 
 
 def get_signal(
@@ -453,37 +450,28 @@ def get_tic_per_scan(
     :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
     :rtype: tuple
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(RawFile, polarity=polarity)
-        scan_timestamp = scan_selector.scan_times  # already in seconds
+    with open_backend(datafile_path) as backend:
+        scan_timestamp, scan_tic = backend.tic_per_scan(polarity=polarity)
 
-        scan_tic = np.asarray(
-            [
-                RawFile.GetScanStatsForScanNumber(i).TIC
-                for i in scan_selector.scan_indices_1based
-            ],
-            dtype=np.float64,
-        )
+    if timestamps is not None:
+        requested_timestamps = np.asarray(list(timestamps), dtype=np.float64)
 
-        if timestamps is not None:
-            requested_timestamps = np.asarray(list(timestamps), dtype=np.float64)
+        if requested_timestamps.size == 0:
+            return requested_timestamps, requested_timestamps
 
-            if requested_timestamps.size == 0:
-                return requested_timestamps, requested_timestamps
+        # Find nearest scan index for each requested timestamp
+        right_idx = np.searchsorted(scan_timestamp, requested_timestamps)
+        right_idx = np.clip(right_idx, 0, len(scan_timestamp) - 1)
+        left_idx = np.clip(right_idx - 1, 0, len(scan_timestamp) - 1)
 
-            # Find nearest scan index for each requested timestamp
-            right_idx = np.searchsorted(scan_timestamp, requested_timestamps)
-            right_idx = np.clip(right_idx, 0, len(scan_timestamp) - 1)
-            left_idx = np.clip(right_idx - 1, 0, len(scan_timestamp) - 1)
+        left_distance = np.abs(requested_timestamps - scan_timestamp[left_idx])
+        right_distance = np.abs(scan_timestamp[right_idx] - requested_timestamps)
+        nearest_idx = np.where(left_distance <= right_distance, left_idx, right_idx)
 
-            left_distance = np.abs(requested_timestamps - scan_timestamp[left_idx])
-            right_distance = np.abs(scan_timestamp[right_idx] - requested_timestamps)
-            nearest_idx = np.where(left_distance <= right_distance, left_idx, right_idx)
+        scan_timestamp = scan_timestamp[nearest_idx]
+        scan_tic = scan_tic[nearest_idx]
 
-            scan_timestamp = scan_timestamp[nearest_idx]
-            scan_tic = scan_tic[nearest_idx]
-
-        return scan_timestamp, scan_tic
+    return scan_timestamp, scan_tic
 
 
 def get_scan_timestamps(
@@ -507,10 +495,8 @@ def get_scan_timestamps(
     :return: Array of filtered scan timestamps [s]
     :rtype: np.ndarray
     """
-    with RawFileManager(datafile_path) as RawFile:
-        return ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max
-        ).scan_times
+    with open_backend(datafile_path) as backend:
+        return backend.scan_times(polarity=polarity, t_min=t_min, t_max=t_max)
 
 
 def get_peak_timeseries(
@@ -1163,23 +1149,8 @@ class RawFileMetadata:
         """Information about the instrument used for the acquisition.
         ChannelLabels and Units are not included as they are not serializable.
         """
-        with RawFileManager(self.datafile_path) as RawFile:
-            instrument_data = RawFile.GetInstrumentData()
-
-            instrument_data_list = [
-                "Name",
-                "Model",
-                "SerialNumber",
-                "SoftwareVersion",
-                "HardwareVersion",
-                "Flags",
-                "AxisLabelX",
-                "AxisLabelY",
-                "IsValid",
-                "HasAccurateMassPrecursors",
-            ]
-
-            return {row: getattr(instrument_data, row) for row in instrument_data_list}
+        with open_backend(self.datafile_path) as backend:
+            return backend.instrument_details()
 
     @property
     def scan_acquisition_settings(self) -> dict:
