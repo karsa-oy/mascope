@@ -73,6 +73,30 @@ class ReaderBackend(Protocol):
         """Instrument metadata dict (Name, Model, SerialNumber, ...)."""
         ...
 
+    def num_scans(self) -> int:
+        """Total number of scans (spectra) in the file."""
+        ...
+
+    def scan_acquisition_settings(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        """Per-scan trailer table ``{"header_labels": [...], "settings": {...}}``."""
+        ...
+
+    def scan_statistics(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        """Per-scan statistics keyed by 1-based scan number."""
+        ...
+
 
 # Field set returned by GetInstrumentData (excluding non-serializable
 # ChannelLabels / Units). Kept here so every backend reports the same shape.
@@ -87,6 +111,31 @@ INSTRUMENT_FIELDS = (
     "AxisLabelY",
     "IsValid",
     "HasAccurateMassPrecursors",
+)
+
+# Per-scan statistics fields read from Thermo's ScanStats. (OpenTFRaw exposes a
+# subset; the metadata remap is assessment Phase 4.)
+SCAN_STAT_FIELDS = (
+    "HighMass",
+    "LowMass",
+    "LongWavelength",
+    "ShortWavelength",
+    "BasePeakIntensity",
+    "BasePeakMass",
+    "TIC",
+    "StartTime",
+    "PacketCount",
+    "NumberOfChannels",
+    "ScanNumber",
+    "ScanEventNumber",
+    "SegmentNumber",
+    "IsCentroidScan",
+    "Frequency",
+    "IsUniformTime",
+    "AbsorbanceUnitScale",
+    "WavelengthStep",
+    "ScanType",
+    "CycleNumber",
 )
 
 
@@ -174,6 +223,46 @@ class ThermoBackend:
     def instrument_details(self) -> dict:
         data = self._raw.GetInstrumentData()
         return {field: getattr(data, field) for field in INSTRUMENT_FIELDS}
+
+    def num_scans(self) -> int:
+        return self._raw.RunHeaderEx.SpectraCount
+
+    def scan_acquisition_settings(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        selector = self._selector(polarity, t_min, t_max, ms_type)
+        settings: dict[int, list] = {}
+        header_labels = None
+        for i in selector.scan_indices_1based:
+            header = self._raw.GetTrailerExtraInformation(i)
+            if header_labels is None:
+                header_labels = list(header.Labels)
+            settings[i] = list(header.Values)
+        return {"header_labels": header_labels, "settings": settings}
+
+    def scan_statistics(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        selector = self._selector(polarity, t_min, t_max, ms_type)
+        return {
+            scan_index: {
+                **{
+                    name: getattr(selector.raw_scan_stats[scan_index - 1], name)
+                    for name in SCAN_STAT_FIELDS
+                },
+                # Scan type isn't in ScanStats; read it from the filter.
+                "MsType": selector.raw_scan_filters[scan_index - 1].MSOrder.ToString(),
+            }
+            for scan_index in selector.scan_indices_1based
+        }
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:

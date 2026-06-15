@@ -1163,68 +1163,18 @@ class RawFileMetadata:
         """Acquisition settings for each scan (injection time, AGC target,
         isolation width, HCD energy, lock-mass info, etc.)
         """
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(
-                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+        with open_backend(self.datafile_path) as backend:
+            return backend.scan_acquisition_settings(
+                self.polarity, self.t_min, self.t_max, self.scan_type
             )
-            settings_dict = {}
-            header_labels = None
-            for i in scan_selector.scan_indices_1based:
-                header = RawFile.GetTrailerExtraInformation(i)
-                if header_labels is None:
-                    header_labels = list(header.Labels)
-                settings_dict[i] = list(header.Values)
-
-            return {
-                "header_labels": header_labels,
-                "settings": settings_dict,
-            }
 
     @property
     def scan_statistics(self) -> dict:
         """Get per scan statistics"""
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(
-                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+        with open_backend(self.datafile_path) as backend:
+            return backend.scan_statistics(
+                self.polarity, self.t_min, self.t_max, self.scan_type
             )
-            stat_names = [
-                "HighMass",
-                "LowMass",
-                "LongWavelength",
-                "ShortWavelength",
-                "BasePeakIntensity",
-                "BasePeakMass",
-                "TIC",
-                "StartTime",
-                "PacketCount",
-                "NumberOfChannels",
-                "ScanNumber",
-                "ScanEventNumber",
-                "SegmentNumber",
-                "IsCentroidScan",
-                "Frequency",
-                "IsUniformTime",
-                "AbsorbanceUnitScale",
-                "WavelengthStep",
-                "ScanType",
-                "CycleNumber",
-            ]
-            # The scan type is not included in the scan statistics,
-            # so we need to get it from the raw scan filters
-            return {
-                scan_index: {
-                    **{
-                        name: getattr(
-                            scan_selector.raw_scan_stats[scan_index - 1], name
-                        )
-                        for name in stat_names
-                    },
-                    "MsType": scan_selector.raw_scan_filters[
-                        scan_index - 1
-                    ].MSOrder.ToString(),
-                }
-                for scan_index in scan_selector.scan_indices_1based
-            }
 
 
 class RawFileMetadataLegacy(RawFileMetadata):
@@ -1233,8 +1183,8 @@ class RawFileMetadataLegacy(RawFileMetadata):
     @property
     def num_of_scans(self):
         """Number of scans in the raw file."""
-        with RawFileManager(self.datafile_path) as RawFile:
-            return RawFile.RunHeaderEx.SpectraCount
+        with open_backend(self.datafile_path) as backend:
+            return backend.num_scans()
 
     @property
     def instrument(self):
