@@ -892,10 +892,36 @@ class OpenTFRawBackend:
             )
         return result
 
-    def profile_per_scan(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Profile / SegmentedScan arrays are not exposed by OpenTFRaw (gap 5.2)."
+    def profile_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> tuple[list[np.ndarray], list[np.ndarray], np.ndarray]:
+        if not hasattr(self._raw, "profile"):
+            raise NotImplementedError(
+                "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
+                "not available in this opentfraw build."
+            )
+        mz_min, mz_max = self._validate_mz_range(mz_min, mz_max)
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+
+        scan_mzs: list[np.ndarray] = []
+        scan_specs: list[np.ndarray] = []
+        for s in selected:
+            mz, intensities = self._raw.profile(int(s["scan_number"]))
+            mz = np.asarray(mz, dtype=np.float64)
+            intensities = np.asarray(intensities, dtype=np.float64)
+            mask = np.logical_and(mz_min <= mz, mz <= mz_max)
+            scan_mzs.append(mz[mask])
+            scan_specs.append(intensities[mask])
+        times = np.array(
+            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
         )
+        return scan_mzs, scan_specs, times
 
     def average_profile(self, *args, **kwargs):
         raise NotImplementedError(
@@ -940,10 +966,27 @@ class OpenTFRawBackend:
         )
         return intensities, times
 
-    def ms2_precursor_by_scan(self, *args, **kwargs) -> dict[int, float]:
-        raise NotImplementedError(
-            "MS² precursor m/z is returned as None by OpenTFRaw (gap 5.1b)."
-        )
+    def ms2_precursor_by_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> dict[int, float]:
+        # Mirror the Thermo path: parse the precursor from the rendered filter
+        # string. OpenTFRaw's build_filter now renders it for Exploris too once
+        # the scan-event reaction is decoded (e.g. "... ms2 100.0757@hcd3.00").
+        out: dict[int, float] = {}
+        for s in self._selected(polarity, t_min, t_max, ms_type="Ms2"):
+            scan_number = int(s["scan_number"])
+            filter_string = self._raw.scan_filter(scan_number) or s.get(
+                "filter_string"
+            )
+            if not filter_string:
+                continue
+            match = re.search(r"ms2 ([\d.]+)@", filter_string)
+            if match:
+                out[scan_number] = float(match.group(1))
+        return out
 
     def ms2_centroids_for_scans(self, *args, **kwargs):
         raise NotImplementedError(

@@ -164,7 +164,7 @@ def test_centroids_per_scan_matches_thermo(monkeypatch, path):
     reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
 )
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
-def test_profile_matches_thermo(request, monkeypatch, path):
+def test_profile_matches_thermo(monkeypatch, path):
     """OpenTFRaw's profile spectrum must match Thermo's SegmentedScan.
 
     Guards the profile path so a structural-only check (e.g. get_signal's
@@ -173,19 +173,11 @@ def test_profile_matches_thermo(request, monkeypatch, path):
     tolerance. (On Q Exactive the m/z agrees to ~20 ppm - a lock-mass-level
     offset - hence 50 ppm, not sub-ppm.)
 
-    OpenTFRaw mis-calibrates Exploris profile m/z (the bins/intensities decode,
-    but the frequency->m/z coefficients don't), so Exploris is xfailed pending
-    the upstream fix; the non-zero *count* still matches there.
+    Exploris profile m/z is now correct too (the scan-event coefficient fix);
+    it previously xfailed here while the coefficients were mis-decoded.
     """
     path = str(path)
     raw = opentfraw.RawFile(path)
-    if "exploris" in (raw.instrument_model or "").lower():
-        request.applymarker(
-            pytest.mark.xfail(
-                reason="OpenTFRaw profile m/z mis-calibrated on Exploris (upstream)",
-                strict=False,
-            )
-        )
 
     monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "thermo")
     with open_backend(path) as backend:
@@ -210,3 +202,41 @@ def test_profile_matches_thermo(request, monkeypatch, path):
     assert ppm <= 50, (
         f"base-peak m/z {bp_otf:.4f} vs Thermo {bp_thermo:.4f} ({ppm:.0f} ppm)"
     )
+
+
+@pytest.mark.skipif(not RAW_FILES, reason="no .raw files in test_files/")
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_ms2_precursor_matches_thermo(monkeypatch, path):
+    """OpenTFRaw's MS2 precursor m/z must match Thermo's.
+
+    Both backends parse the precursor from the rendered scan-filter string;
+    OpenTFRaw renders it once the scan-event reaction is decoded (Exploris
+    needed the offset-4 fix). Skips files with no MS2 scans.
+    """
+    path = str(path)
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "thermo")
+    try:
+        with open_backend(path) as backend:
+            th = backend.ms2_precursor_by_scan()
+    except m_thermo.NoScansFoundError:
+        pytest.skip("no MS2 scans")
+    if not th:
+        pytest.skip("no resolvable MS2 precursors")
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "opentfraw")
+    with open_backend(path) as backend:
+        ot = backend.ms2_precursor_by_scan()
+
+    # The precursor comes from the rendered filter string; an opentfraw build
+    # without the Exploris scan-event fix renders no precursor on Exploris and
+    # returns nothing. Skip then (capability gate), like the profile/labels
+    # tests -- but if it decodes any, they must match Thermo exactly.
+    if not ot:
+        pytest.skip("installed opentfraw does not render MS2 precursors here")
+
+    assert set(ot) == set(th), "MS2 scan set with a resolvable precursor differs"
+    for scan_number, mz_thermo in th.items():
+        assert ot[scan_number] == pytest.approx(mz_thermo, abs=1e-3), (
+            f"scan {scan_number}: OpenTFRaw {ot[scan_number]} vs Thermo {mz_thermo}"
+        )
