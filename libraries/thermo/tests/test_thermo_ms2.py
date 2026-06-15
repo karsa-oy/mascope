@@ -1,0 +1,178 @@
+"""Characterization tests for the MS² extraction functions on the Thermo backend.
+
+These pin the *contract* (shape + internal consistency) of
+``get_ms2_summary_metadata``, ``get_ms2_centroids_by_parent`` and
+``get_ms2_centroids_per_scan_for_parent`` so the OpenTFRaw migration (assessment
+Phases 1–3) can't silently change it. Exact cross-backend agreement is enforced
+separately by the parity harness, where the Thermo backend is the runtime
+reference — so nothing here is hardcoded to a specific acquisition.
+
+These functions need MS² scans, and only some local files have them. The module
+discovers the smallest ``.raw`` file in ``test_files/`` that contains MS² scans
+and **skips** entirely if there is none (e.g. on a fresh clone, where only the
+MS1 KORBI files are committed).
+"""
+
+import numpy as np
+import pytest
+from conftest import TEST_FILES_DIR
+
+import mascope_thermo.thermo as m_thermo
+
+
+def _has_ms2(path: str) -> bool:
+    """True if the file contains at least one MS² scan."""
+    try:
+        with m_thermo.RawFileManager(path) as rf:
+            m_thermo.ScanSelector(rf, ms_type="Ms2").scan_indices_1based
+        return True
+    except m_thermo.NoScansFoundError:
+        return False
+    except Exception:
+        return False
+
+
+def _first_ms2_file() -> str | None:
+    """Smallest local .raw file with MS² scans, or None. Smallest-first keeps the
+    discovery probe cheap and avoids opening large files unnecessarily."""
+    for path in sorted(TEST_FILES_DIR.glob("*.raw"), key=lambda p: p.stat().st_size):
+        if _has_ms2(str(path)):
+            return str(path)
+    return None
+
+
+MS2_FILE = _first_ms2_file()
+
+pytestmark = pytest.mark.skipif(
+    MS2_FILE is None, reason="no .raw file with MS² scans in test_files/"
+)
+
+
+@pytest.fixture(scope="module")
+def summary() -> dict:
+    return m_thermo.get_ms2_summary_metadata(MS2_FILE)
+
+
+@pytest.fixture(scope="module")
+def by_parent() -> dict:
+    return m_thermo.get_ms2_centroids_by_parent(MS2_FILE)
+
+
+@pytest.fixture(scope="module")
+def num_scans() -> int:
+    return m_thermo.RawFileMetadataLegacy(MS2_FILE).num_of_scans
+
+
+class TestGetMs2SummaryMetadata:
+    """``get_ms2_summary_metadata`` reports parent peaks, HCD energies, isolation
+    width and the MS1/MS2 scan split — all mutually consistent.
+    """
+
+    def test_parent_peaks_sorted_unique_positive(self, summary):
+        parents = summary["parent_peaks"]
+        assert len(parents) >= 1
+        assert parents == sorted(parents)
+        assert len(set(parents)) == len(parents)
+        assert all(p > 0 for p in parents)
+
+    def test_hcd_energy_map_keyed_by_parents(self, summary):
+        assert sorted(summary["hcd_energy_map"]) == pytest.approx(
+            summary["parent_peaks"]
+        )
+        for energies in summary["hcd_energy_map"].values():
+            assert len(energies) >= 1
+            assert all(np.isfinite(e) for e in energies)
+
+    def test_isolation_width_positive(self, summary):
+        assert isinstance(summary["isolation_width"], float)
+        assert summary["isolation_width"] > 0
+
+    def test_scan_counts_consistent(self, summary, num_scans):
+        assert summary["ms2_scan_count"] > 0
+        assert summary["ms1_scan_count"] >= 0
+        assert summary["ms1_scan_count"] + summary["ms2_scan_count"] == num_scans
+
+    def test_parent_peak_tolerance_default(self, summary):
+        assert summary["parent_peak_tolerance"] == 0.001
+
+
+class TestGetMs2CentroidsByParent:
+    """``get_ms2_centroids_by_parent`` returns averaged centroids per parent peak,
+    each carrying per-peak resolution and S:N (the data the migration must
+    preserve — assessment §5.1).
+    """
+
+    def test_keys_match_summary_parents(self, by_parent, summary):
+        assert sorted(by_parent) == pytest.approx(summary["parent_peaks"])
+
+    def test_centroid_arrays_well_formed(self, by_parent):
+        for masses, intensities, resolutions, sn in by_parent.values():
+            n = masses.size
+            assert n > 0
+            assert intensities.size == resolutions.size == sn.size == n
+            assert np.all(np.isfinite(masses)) and np.all(masses > 0)
+            assert np.all(intensities >= 0) and intensities.sum() > 0
+            # Per-peak resolution / S:N must be present and finite.
+            assert np.all(np.isfinite(resolutions)) and np.all(resolutions > 0)
+            assert np.all(np.isfinite(sn))
+
+    def test_average_flag_scales_intensity(self, by_parent):
+        summed = m_thermo.get_ms2_centroids_by_parent(MS2_FILE, average=False)
+        for parent, (_, avg_int, _, _) in by_parent.items():
+            # Non-averaged intensities are scaled by the combined-scan count, so
+            # they must be at least as large as the averaged ones.
+            assert summed[parent][1].sum() >= avg_int.sum()
+
+    def test_mz_range_filters_parents(self, by_parent):
+        parents = sorted(by_parent)
+        if len(parents) < 2:
+            pytest.skip("need ≥2 parent peaks to exercise m/z filtering")
+        threshold = (parents[0] + parents[-1]) / 2
+        filtered = m_thermo.get_ms2_centroids_by_parent(MS2_FILE, mz_min=threshold)
+        assert filtered, "expected at least one parent above the threshold"
+        assert all(p >= threshold for p in filtered)
+        assert set(filtered).issubset(set(by_parent))
+
+
+class TestGetMs2CentroidsPerScanForParent:
+    """``get_ms2_centroids_per_scan_for_parent`` returns per-scan centroids + TICs
+    for one parent, time-ordered.
+    """
+
+    def test_returns_scans_for_a_real_parent(self, summary):
+        parent = summary["parent_peaks"][0]
+        per_scan, tics = m_thermo.get_ms2_centroids_per_scan_for_parent(
+            MS2_FILE, parent
+        )
+        assert len(per_scan) == len(tics) > 0
+        for d in per_scan:
+            assert set(d) == {
+                "masses",
+                "intensities",
+                "resolutions",
+                "signal_to_noise",
+                "timestamp",
+            }
+            n = d["masses"].size
+            assert d["intensities"].size == n
+            assert d["resolutions"].size == n
+            assert d["signal_to_noise"].size == n
+        timestamps = [d["timestamp"] for d in per_scan]
+        assert timestamps == sorted(timestamps)
+
+    def test_per_parent_scan_counts_sum_to_total(self, summary):
+        total = 0
+        for parent in summary["parent_peaks"]:
+            per_scan, _ = m_thermo.get_ms2_centroids_per_scan_for_parent(
+                MS2_FILE, parent
+            )
+            total += len(per_scan)
+        assert total == summary["ms2_scan_count"]
+
+    def test_unknown_parent_returns_empty(self, summary):
+        far_off = max(summary["parent_peaks"]) + 1000.0
+        per_scan, tics = m_thermo.get_ms2_centroids_per_scan_for_parent(
+            MS2_FILE, far_off
+        )
+        assert per_scan == []
+        assert tics == []
