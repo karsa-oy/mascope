@@ -674,16 +674,9 @@ def get_centroids(
              the criteria.
     :rtype: tuple of np.ndarray
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile,
-            polarity=polarity,
-            t_min=t_min,
-            t_max=t_max,
-        )
-        return _average_scans_centroids(
-            RawFile, scan_selector.scan_indices_1based, ppm=ppm, average=average
-        )
+    with open_backend(datafile_path) as backend:
+        indices = backend.scan_indices(polarity=polarity, t_min=t_min, t_max=t_max)
+        return backend.average_centroids(indices, ppm=ppm, average=average)
 
 
 def get_centroids_per_scan(
@@ -722,67 +715,15 @@ def get_centroids_per_scan(
              signal-to-noise ratios, and timestamps.
     :rtype: list[dict[str, np.ndarray]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
-        scan_selector = ScanSelector(
-            RawFile,
+    with open_backend(datafile_path) as backend:
+        return backend.centroids_per_scan(
             polarity=polarity,
             t_min=t_min,
             t_max=t_max,
             ms_type=scan_type,
+            mz_min=mz_min,
+            mz_max=mz_max,
         )
-
-        centroids = []
-        for scan, timestamp in zip(scan_selector.scans, scan_selector.scan_times):
-            centroid_scan = scan.CentroidScan
-
-            if centroid_scan is None or centroid_scan.Length == 0:
-                masses = np.array([], dtype=np.float64)
-                intensities = np.array([], dtype=np.float64)
-                resolutions = np.array([], dtype=np.float64)
-                signal_to_noise = np.array([], dtype=np.float64)
-            else:
-                scan_centroids = centroid_scan.GetLabelPeaks()
-                n_centroids = len(scan_centroids)
-
-                masses = np.fromiter(
-                    (c.Mass for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                intensities = np.fromiter(
-                    (c.Intensity for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                resolutions = np.fromiter(
-                    (c.Resolution for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                signal_to_noise = np.fromiter(
-                    (c.SignalToNoise for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-
-                mz_mask = np.logical_and(mz_min <= masses, masses <= mz_max)
-                masses = masses[mz_mask]
-                intensities = intensities[mz_mask]
-                resolutions = resolutions[mz_mask]
-                signal_to_noise = signal_to_noise[mz_mask]
-
-            centroids.append(
-                {
-                    "masses": masses,
-                    "intensities": intensities,
-                    "resolutions": resolutions,
-                    "signal_to_noise": signal_to_noise,
-                    "timestamp": timestamp,
-                }
-            )
-
-        return centroids
 
 
 def _group_ms2_scans_by_parent(
@@ -1232,42 +1173,8 @@ class RawFileMetadataLegacy(RawFileMetadata):
             }
         }
         """
-        result = {"time": [], "data": []}
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(RawFile, ms_type=None)
-            scans = scan_selector.scans
-            scan_times = scan_selector.scan_times
-            for timestamp, scan in zip(scan_times, scans):
-                centroid_scan = scan.CentroidScan
-                if centroid_scan is not None and centroid_scan.Length > 0:
-                    mzs = np.frombuffer(centroid_scan.Masses)
-                    intensities = np.frombuffer(centroid_scan.Intensities)
-                    resolutions = np.frombuffer(centroid_scan.Resolutions)
-                    noises = np.frombuffer(centroid_scan.Noises)
-
-                    valid_resolution_mask = np.isfinite(resolutions) & (resolutions > 0)
-                    valid_intensity_mask = np.isfinite(intensities) & (intensities > 0)
-                    valid_mask = valid_resolution_mask & valid_intensity_mask
-
-                    mzs = mzs[valid_mask].tolist()
-                    intensities = intensities[valid_mask].tolist()
-                    resolutions = resolutions[valid_mask].tolist()
-                    noises = noises[valid_mask].tolist()
-                else:
-                    mzs = []
-                    intensities = []
-                    resolutions = []
-                    noises = []
-                result["time"].append(timestamp)
-                result["data"].append(
-                    {
-                        "intensities": intensities,
-                        "mzs": mzs,
-                        "resolutions": resolutions,
-                        "noises": noises,
-                    }
-                )
-        return result
+        with open_backend(self.datafile_path) as backend:
+            return backend.centroids_meta()
 
     def to_dict(self):
         """Convert the metadata to a dictionary.

@@ -97,6 +97,47 @@ class ReaderBackend(Protocol):
         """Per-scan statistics keyed by 1-based scan number."""
         ...
 
+    def scan_indices(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> list[int]:
+        """1-based scan numbers matching the given filters."""
+        ...
+
+    def centroids_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = None,
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> list[dict]:
+        """Per-scan centroids: list of dicts with ``masses``, ``intensities``,
+        ``resolutions``, ``signal_to_noise``, ``timestamp``."""
+        ...
+
+    def average_centroids(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Multi-scan ppm-binned averaged centroids:
+        ``(masses, intensities, resolutions, signal_to_noise)``.
+
+        Gap 5.3: the Thermo backend uses ``Extensions.AverageScans``; the
+        OpenTFRaw backend must reimplement ppm binning in NumPy."""
+        ...
+
+    def centroids_meta(self) -> dict:
+        """All-scan centroid arrays for legacy metadata: ``{"time": [...],
+        "data": [{"mzs", "intensities", "resolutions", "noises"}]}``."""
+        ...
+
 
 # Field set returned by GetInstrumentData (excluding non-serializable
 # ChannelLabels / Units). Kept here so every backend reports the same shape.
@@ -263,6 +304,118 @@ class ThermoBackend:
             }
             for scan_index in selector.scan_indices_1based
         }
+
+    def scan_indices(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> list[int]:
+        return self._selector(polarity, t_min, t_max, ms_type).scan_indices_1based
+
+    def centroids_per_scan(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = None,
+        mz_min: float | None = None,
+        mz_max: float | None = None,
+    ) -> list[dict]:
+        from mascope_thermo.thermo import _validate_mz_range
+
+        mz_min, mz_max = _validate_mz_range(self._raw, mz_min, mz_max)
+        selector = self._selector(polarity, t_min, t_max, ms_type)
+
+        out: list[dict] = []
+        for scan, timestamp in zip(selector.scans, selector.scan_times):
+            centroid_scan = scan.CentroidScan
+            if centroid_scan is None or centroid_scan.Length == 0:
+                masses = np.array([], dtype=np.float64)
+                intensities = np.array([], dtype=np.float64)
+                resolutions = np.array([], dtype=np.float64)
+                signal_to_noise = np.array([], dtype=np.float64)
+            else:
+                peaks = centroid_scan.GetLabelPeaks()
+                n = len(peaks)
+                masses = np.fromiter(
+                    (c.Mass for c in peaks), dtype=np.float64, count=n
+                )
+                intensities = np.fromiter(
+                    (c.Intensity for c in peaks), dtype=np.float64, count=n
+                )
+                resolutions = np.fromiter(
+                    (c.Resolution for c in peaks), dtype=np.float64, count=n
+                )
+                signal_to_noise = np.fromiter(
+                    (c.SignalToNoise for c in peaks), dtype=np.float64, count=n
+                )
+                mz_mask = np.logical_and(mz_min <= masses, masses <= mz_max)
+                masses = masses[mz_mask]
+                intensities = intensities[mz_mask]
+                resolutions = resolutions[mz_mask]
+                signal_to_noise = signal_to_noise[mz_mask]
+
+            out.append(
+                {
+                    "masses": masses,
+                    "intensities": intensities,
+                    "resolutions": resolutions,
+                    "signal_to_noise": signal_to_noise,
+                    "timestamp": timestamp,
+                }
+            )
+        return out
+
+    def average_centroids(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        from mascope_thermo.thermo import _average_scans_centroids
+
+        return _average_scans_centroids(
+            self._raw, scan_indices, ppm=ppm, average=average
+        )
+
+    def centroids_meta(self) -> dict:
+        result = {"time": [], "data": []}
+        selector = self._selector(ms_type=None)
+        for timestamp, scan in zip(selector.scan_times, selector.scans):
+            centroid_scan = scan.CentroidScan
+            if centroid_scan is not None and centroid_scan.Length > 0:
+                mzs = np.frombuffer(centroid_scan.Masses)
+                intensities = np.frombuffer(centroid_scan.Intensities)
+                resolutions = np.frombuffer(centroid_scan.Resolutions)
+                noises = np.frombuffer(centroid_scan.Noises)
+
+                valid = (
+                    np.isfinite(resolutions)
+                    & (resolutions > 0)
+                    & np.isfinite(intensities)
+                    & (intensities > 0)
+                )
+                mzs = mzs[valid].tolist()
+                intensities = intensities[valid].tolist()
+                resolutions = resolutions[valid].tolist()
+                noises = noises[valid].tolist()
+            else:
+                mzs = []
+                intensities = []
+                resolutions = []
+                noises = []
+            result["time"].append(timestamp)
+            result["data"].append(
+                {
+                    "intensities": intensities,
+                    "mzs": mzs,
+                    "resolutions": resolutions,
+                    "noises": noises,
+                }
+            )
+        return result
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:
