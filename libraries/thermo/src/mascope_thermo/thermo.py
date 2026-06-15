@@ -957,7 +957,13 @@ def get_ms2_summary_metadata(
         )
 
         all_count = len(all_selector.scan_indices_1based)
-        ms2_count = len(ms2_selector.scan_indices_1based)
+        # scan_indices_1based raises NoScansFoundError when nothing matches, so an
+        # MS1-only file would otherwise blow up here instead of reaching the
+        # graceful empty-MS² return below.
+        try:
+            ms2_count = len(ms2_selector.scan_indices_1based)
+        except NoScansFoundError:
+            ms2_count = 0
         ms1_count = all_count - ms2_count
 
         if ms2_count == 0:

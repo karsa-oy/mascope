@@ -15,7 +15,7 @@ MS1 KORBI files are committed).
 
 import numpy as np
 import pytest
-from conftest import TEST_FILES_DIR
+from conftest import POS_ORBI_FILE_PATH, TEST_FILES_DIR
 
 import mascope_thermo.thermo as m_thermo
 
@@ -43,9 +43,27 @@ def _first_ms2_file() -> str | None:
 
 MS2_FILE = _first_ms2_file()
 
-pytestmark = pytest.mark.skipif(
+# Applied to the classes that need an actual MS² acquisition. The MS1-only
+# regression test below runs unconditionally against the committed KORBI file.
+requires_ms2 = pytest.mark.skipif(
     MS2_FILE is None, reason="no .raw file with MS² scans in test_files/"
 )
+
+
+def test_ms2_summary_on_ms1_only_file_returns_empty():
+    """An MS1-only file must return an empty-MS² summary, not raise.
+
+    Regression test: ``get_ms2_summary_metadata`` previously called
+    ``len(ms2_selector.scan_indices_1based)``, which raises ``NoScansFoundError``
+    when there are no MS² scans — making its own empty-MS² return branch dead
+    code. KORBI is committed and MS1-only.
+    """
+    meta = m_thermo.get_ms2_summary_metadata(POS_ORBI_FILE_PATH)
+    assert meta["ms2_scan_count"] == 0
+    assert meta["parent_peaks"] == []
+    assert meta["hcd_energy_map"] == {}
+    assert meta["isolation_width"] is None
+    assert meta["ms1_scan_count"] >= 0
 
 
 @pytest.fixture(scope="module")
@@ -63,6 +81,7 @@ def num_scans() -> int:
     return m_thermo.RawFileMetadataLegacy(MS2_FILE).num_of_scans
 
 
+@requires_ms2
 class TestGetMs2SummaryMetadata:
     """``get_ms2_summary_metadata`` reports parent peaks, HCD energies, isolation
     width and the MS1/MS2 scan split — all mutually consistent.
@@ -96,6 +115,7 @@ class TestGetMs2SummaryMetadata:
         assert summary["parent_peak_tolerance"] == 0.001
 
 
+@requires_ms2
 class TestGetMs2CentroidsByParent:
     """``get_ms2_centroids_by_parent`` returns averaged centroids per parent peak,
     each carrying per-peak resolution and S:N (the data the migration must
@@ -134,6 +154,7 @@ class TestGetMs2CentroidsByParent:
         assert set(filtered).issubset(set(by_parent))
 
 
+@requires_ms2
 class TestGetMs2CentroidsPerScanForParent:
     """``get_ms2_centroids_per_scan_for_parent`` returns per-scan centroids + TICs
     for one parent, time-ordered.
