@@ -827,7 +827,12 @@ class OpenTFRawBackend:
     ) -> tuple[np.ndarray, np.ndarray]:
         # NumPy reimplementation of the Thermo MassRange chromatogram (gap 5.4):
         # for each target m/z, sum the centroid intensities falling in its ppm
-        # window, per selected scan.
+        # window [mz(1-ppm), mz(1+ppm)], per selected scan.
+        #
+        # Vectorized per scan via a sorted prefix sum: peaks in [low, high] are
+        # the half-open index range [searchsorted(left), searchsorted(right)),
+        # so the window sum is cumsum[right] - cumsum[left] for all targets at
+        # once. Scales to "all peaks as targets" on large files.
         mzs = np.asarray(mzs, dtype=float)
         selected = self._selected(polarity, t_min, t_max, ms_type)
         lows = mzs - mzs * ppm / 1e6
@@ -837,9 +842,12 @@ class OpenTFRawBackend:
         for j, scan in enumerate(selected):
             scan_mz = np.asarray(scan["mz"], dtype=np.float64)
             scan_int = np.asarray(scan["intensity"], dtype=np.float64)
-            for i in range(len(mzs)):
-                in_window = (scan_mz >= lows[i]) & (scan_mz <= highs[i])
-                intensities[i, j] = scan_int[in_window].sum()
+            order = np.argsort(scan_mz)
+            scan_mz = scan_mz[order]
+            prefix = np.concatenate(([0.0], np.cumsum(scan_int[order])))
+            left = np.searchsorted(scan_mz, lows, side="left")
+            right = np.searchsorted(scan_mz, highs, side="right")
+            intensities[:, j] = prefix[right] - prefix[left]
 
         times = np.array(
             [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
