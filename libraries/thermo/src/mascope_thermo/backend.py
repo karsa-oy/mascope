@@ -171,6 +171,22 @@ class ReaderBackend(Protocol):
         Combines gaps 5.2 (profile) and 5.3 (ppm averaging)."""
         ...
 
+    def xic(
+        self,
+        mzs,
+        ppm: float = 5,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Extracted-ion chromatograms for each target m/z within ``ppm``:
+        ``(intensities[n_mz, n_scans], scan_times)``.
+
+        Gap 5.4: the Thermo backend uses ``GetChromatogramData``; the OpenTFRaw
+        backend must reimplement m/z-window summation in NumPy."""
+        ...
+
 
 # Field set returned by GetInstrumentData (excluding non-serializable
 # ChannelLabels / Units). Kept here so every backend reports the same shape.
@@ -502,6 +518,49 @@ class ThermoBackend:
         if not average:
             intensities = intensities * num_combined
         return mz, intensities, num_combined
+
+    def xic(
+        self,
+        mzs,
+        ppm: float = 5,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        from ThermoFisher.CommonCore.Data.Business import (
+            ChromatogramSignal,
+            ChromatogramTraceSettings,
+            Range,
+            TraceType,
+        )
+
+        mzs = np.asarray(mzs, dtype=float)
+        selector = self._selector(polarity, t_min, t_max, ms_type)
+        indices_0based = selector.scan_indices_0based
+
+        intensities = np.zeros((len(mzs), len(indices_0based)), dtype=np.float64)
+        mz_lows = mzs - (mzs * ppm / 1e6)
+        mz_highs = mzs + (mzs * ppm / 1e6)
+
+        settings = []
+        for mz_low, mz_high in zip(mz_lows, mz_highs):
+            mz_range = Range()
+            mz_range.Low = mz_low
+            mz_range.High = mz_high
+            setting = ChromatogramTraceSettings(TraceType.MassRange)
+            setting.MassRanges = [mz_range]
+            settings.append(setting)
+
+        # -1, -1 -> all scans; slice down to the filtered scans afterwards.
+        chromatogram = self._raw.GetChromatogramData(settings, -1, -1)
+        traces = ChromatogramSignal.FromChromatogramData(chromatogram)
+        for i, trace in enumerate(traces):
+            intensities[i] = np.fromiter(
+                trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
+            )[indices_0based]
+
+        return intensities, selector.scan_times
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:

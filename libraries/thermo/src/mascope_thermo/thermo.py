@@ -13,12 +13,8 @@ from System import NullReferenceException
 from System.Collections.Generic import List
 from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
 from ThermoFisher.CommonCore.Data.Business import (
-    ChromatogramSignal,
-    ChromatogramTraceSettings,
     Device,
     MassOptions,
-    Range,
-    TraceType,
 )
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 
@@ -506,48 +502,19 @@ def get_peak_timeseries(
     """
     mzs = np.asarray(mzs, dtype=float)
 
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max
-        )
-        indices_0based = scan_selector.scan_indices_0based
-
-        # Preallocate the array for intensities
-        intensities_for_mz_values = np.zeros(
-            (len(mzs), len(indices_0based)), dtype=np.float64
+    with open_backend(datafile_path) as backend:
+        intensities_for_mz_values, scan_times = backend.xic(
+            mzs, ppm=ppm, polarity=polarity, t_min=t_min, t_max=t_max
         )
 
-        # Precompute the mass ranges for each m/z value
-        mz_lows = mzs - (mzs * ppm / 1e6)
-        mz_highs = mzs + (mzs * ppm / 1e6)
+    peak_timeseries_dask = da.from_array(intensities_for_mz_values, chunks="auto")
 
-        settings = []
-        for i, (mz_low, mz_high) in enumerate(zip(mz_lows, mz_highs)):
-            mz_range = Range()
-            mz_range.Low = mz_low
-            mz_range.High = mz_high
-
-            setting = ChromatogramTraceSettings(TraceType.MassRange)
-            setting.MassRanges = [mz_range]
-            settings.append(setting)
-
-        # Get timeseries for the m/z values, -1 for all scans
-        chromatogram = RawFile.GetChromatogramData(settings, -1, -1)
-        traces = ChromatogramSignal.FromChromatogramData(chromatogram)
-
-        for i, trace in enumerate(traces):
-            intensities_for_mz_values[i] = np.fromiter(
-                trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
-            )[indices_0based]
-
-        peak_timeseries_dask = da.from_array(intensities_for_mz_values, chunks="auto")
-
-        return xr.DataArray(
-            peak_timeseries_dask,
-            dims=("mz", "time"),
-            coords={"mz": mzs, "time": np.array(scan_selector.scan_times)},
-            name="signal",
-        )
+    return xr.DataArray(
+        peak_timeseries_dask,
+        dims=("mz", "time"),
+        coords={"mz": mzs, "time": np.array(scan_times)},
+        name="signal",
+    )
 
 
 def _average_scans_centroids(
