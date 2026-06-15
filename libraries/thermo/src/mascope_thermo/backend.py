@@ -816,10 +816,35 @@ class OpenTFRawBackend:
             "Profile + ppm averaging not yet available (gaps 5.2 / 5.3)."
         )
 
-    def xic(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Arbitrary-m/z XIC not yet reimplemented (gap 5.4, step 5)."
+    def xic(
+        self,
+        mzs,
+        ppm: float = 5,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        # NumPy reimplementation of the Thermo MassRange chromatogram (gap 5.4):
+        # for each target m/z, sum the centroid intensities falling in its ppm
+        # window, per selected scan.
+        mzs = np.asarray(mzs, dtype=float)
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+        lows = mzs - mzs * ppm / 1e6
+        highs = mzs + mzs * ppm / 1e6
+
+        intensities = np.zeros((len(mzs), len(selected)), dtype=np.float64)
+        for j, scan in enumerate(selected):
+            scan_mz = np.asarray(scan["mz"], dtype=np.float64)
+            scan_int = np.asarray(scan["intensity"], dtype=np.float64)
+            for i in range(len(mzs)):
+                in_window = (scan_mz >= lows[i]) & (scan_mz <= highs[i])
+                intensities[i, j] = scan_int[in_window].sum()
+
+        times = np.array(
+            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
         )
+        return intensities, times
 
     def ms2_precursor_by_scan(self, *args, **kwargs) -> dict[int, float]:
         raise NotImplementedError(
