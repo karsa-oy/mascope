@@ -9,9 +9,17 @@ specific acquisition.
 
 import numpy as np
 import pandas as pd
+import pytest
 from conftest import POS_ORBI_FILE_PATH
 
 import mascope_thermo.thermo as m_thermo
+
+
+# Run every test under each reader backend; opentfraw xfails until it exists.
+# setup_method here only *constructs* metadata objects (no backend call), so the
+# backend-reading property accesses happen in the test bodies, after the env var
+# is set by the `backend` fixture.
+pytestmark = pytest.mark.usefixtures("backend")
 
 
 INSTRUMENT_KEYS = {

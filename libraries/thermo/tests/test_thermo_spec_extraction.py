@@ -1,8 +1,14 @@
 import numpy as np
 import pytest
-from conftest import NEG_ORBI_FILE_PATH, POS_ORBI_FILE_PATH
+from conftest import NEG_ORBI_FILE_PATH, POS_ORBI_FILE_PATH, read_or_xfail
 
 import mascope_thermo.thermo as m_thermo
+
+
+# Run every test in this module under each reader backend (thermo + opentfraw).
+# The opentfraw runs xfail until OpenTFRawBackend exists (see the `backend`
+# fixture in conftest.py).
+pytestmark = pytest.mark.usefixtures("backend")
 
 
 class TestGetPolarityOptions:
@@ -31,8 +37,13 @@ class TestGetSignal:
     - A ValueError should be raised if an invalid polarity is provided.
     """
 
-    def setup_method(self):
-        self.sig = m_thermo.get_signal(POS_ORBI_FILE_PATH, polarity="+")
+    @pytest.fixture(autouse=True)
+    def _setup(self, backend):
+        # Depends on `backend` so the env var is set before get_signal is called
+        # (a plain setup_method would run before the backend fixture). Wrapped so
+        # the not-yet-implemented opentfraw backend xfails rather than erroring in
+        # setup.
+        self.sig = read_or_xfail(m_thermo.get_signal, POS_ORBI_FILE_PATH, polarity="+")
 
     def test_correct_signal_extraction(self):
         assert self.sig.mz.size > 0, "Expected m/z array to have more than 0 elements"

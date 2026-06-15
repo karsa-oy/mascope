@@ -15,7 +15,7 @@ MS1 KORBI files are committed).
 
 import numpy as np
 import pytest
-from conftest import POS_ORBI_FILE_PATH, TEST_FILES_DIR
+from conftest import POS_ORBI_FILE_PATH, TEST_FILES_DIR, read_or_xfail
 
 import mascope_thermo.thermo as m_thermo
 
@@ -43,6 +43,9 @@ def _first_ms2_file() -> str | None:
 
 MS2_FILE = _first_ms2_file()
 
+# Run every test under each reader backend; opentfraw xfails until it exists.
+pytestmark = pytest.mark.usefixtures("backend")
+
 # Applied to the classes that need an actual MS² acquisition. The MS1-only
 # regression test below runs unconditionally against the committed KORBI file.
 requires_ms2 = pytest.mark.skipif(
@@ -66,19 +69,23 @@ def test_ms2_summary_on_ms1_only_file_returns_empty():
     assert meta["ms1_scan_count"] >= 0
 
 
-@pytest.fixture(scope="module")
-def summary() -> dict:
-    return m_thermo.get_ms2_summary_metadata(MS2_FILE)
+# These depend on `backend` so they (a) recompute per backend and (b) run after
+# the env var is set. Function-scoped for the same reason — they can't be cached
+# across backends. read_or_xfail keeps the not-yet-implemented opentfraw backend
+# an xfail rather than a fixture-setup error.
+@pytest.fixture
+def summary(backend) -> dict:
+    return read_or_xfail(m_thermo.get_ms2_summary_metadata, MS2_FILE)
 
 
-@pytest.fixture(scope="module")
-def by_parent() -> dict:
-    return m_thermo.get_ms2_centroids_by_parent(MS2_FILE)
+@pytest.fixture
+def by_parent(backend) -> dict:
+    return read_or_xfail(m_thermo.get_ms2_centroids_by_parent, MS2_FILE)
 
 
-@pytest.fixture(scope="module")
-def num_scans() -> int:
-    return m_thermo.RawFileMetadataLegacy(MS2_FILE).num_of_scans
+@pytest.fixture
+def num_scans(backend) -> int:
+    return read_or_xfail(lambda: m_thermo.RawFileMetadataLegacy(MS2_FILE).num_of_scans)
 
 
 @requires_ms2
