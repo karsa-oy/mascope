@@ -1180,17 +1180,46 @@ class OpenTFRawBackend:
                 out[scan_number] = float(match.group(1))
         return out
 
-    def ms2_acquisition_info(self, *args, **kwargs):
-        # OpenTFRaw exposes the nominal HCD value (the filter "@hcdN"), not the
-        # calibrated per-scan "HCD Energy V:" trailer field Thermo reports, so
-        # the MS2 summary metadata (which needs the calibrated energy) is
-        # blocked. Isolation width alone is available but the consumer needs
-        # both. See the metadata / HCD-energy ticket.
-        raise NotImplementedError(
-            "Calibrated MS2 HCD energy ('HCD Energy V:') is not exposed by "
-            "OpenTFRaw (only the nominal @hcd value); MS2 summary metadata is "
-            "blocked (gap 5.1b / metadata)."
-        )
+    def ms2_acquisition_info(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> tuple[float | None, dict[int, str]]:
+        # The calibrated "HCD Energy V:" and "MS2 Isolation Width:" live in the
+        # per-scan trailer (generic record), which OpenTFRaw decodes but only
+        # the scan_parameters() accessor surfaces. Guard so a released wheel
+        # without it still raises NotImplementedError (contract xfails).
+        if not hasattr(self._raw, "scan_parameters"):
+            raise NotImplementedError(
+                "MS2 isolation width / calibrated HCD energy require "
+                "opentfraw.RawFile.scan_parameters (the trailer accessor); not "
+                "available in this opentfraw build (gap 5.1b / metadata)."
+            )
+
+        def _as_float(value) -> float:
+            if isinstance(value, (int, float)):
+                return float(value)
+            return float(str(value).replace(",", "."))
+
+        isolation_widths: set[float] = set()
+        scan_idx_to_hcd: dict[int, str] = {}
+        for s in self._selected(polarity, t_min, t_max, ms_type="Ms2"):
+            scan_number = int(s["scan_number"])
+            params = self._raw.scan_parameters(scan_number) or {}
+            width = params.get("MS2 Isolation Width:")
+            if width is not None and str(width) != "":
+                # round away the f32->f64 noise so identical widths dedupe.
+                isolation_widths.add(round(_as_float(width), 6))
+            hcd = params.get("HCD Energy V:")
+            scan_idx_to_hcd[scan_number] = "" if hcd is None else str(hcd)
+
+        isolation_widths.discard(None)
+        if len(isolation_widths) == 1:
+            isolation_width = float(isolation_widths.pop())
+        else:
+            raise ValueError("Multiple isolation widths found for MS2 scans.")
+        return isolation_width, scan_idx_to_hcd
 
     def ms2_centroids_for_scans(self, *args, **kwargs):
         raise NotImplementedError(

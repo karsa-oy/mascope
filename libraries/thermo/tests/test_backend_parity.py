@@ -45,6 +45,10 @@ _OTF_HAS_PROFILE = hasattr(opentfraw.RawFile, "profile")
 # decoder branch, not the published wheel.
 _OTF_HAS_LABELS = hasattr(opentfraw.RawFile, "centroid_labels")
 
+# MS2 calibrated HCD energy / isolation width need RawFile.scan_parameters()
+# (the trailer accessor), present only in a build with that accessor.
+_OTF_HAS_SCAN_PARAMS = hasattr(opentfraw.RawFile, "scan_parameters")
+
 
 def _run_under(monkeypatch, backend, fn, *args, **kwargs):
     monkeypatch.setenv("MASCOPE_THERMO_BACKEND", backend)
@@ -204,14 +208,19 @@ def test_profile_matches_thermo(monkeypatch, path):
     )
 
 
-@pytest.mark.skipif(not RAW_FILES, reason="no .raw files in test_files/")
+@pytest.mark.skipif(
+    not _OTF_HAS_SCAN_PARAMS,
+    reason="installed opentfraw lacks the Exploris scan-event fix (fork build)",
+)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_ms2_precursor_matches_thermo(monkeypatch, path):
     """OpenTFRaw's MS2 precursor m/z must match Thermo's.
 
-    Both backends parse the precursor from the rendered scan-filter string;
-    OpenTFRaw renders it once the scan-event reaction is decoded (Exploris
-    needed the offset-4 fix). Skips files with no MS2 scans.
+    Both backends parse the precursor from the rendered scan-filter string.
+    OpenTFRaw renders it correctly only with the Exploris scan-event fix; the
+    released wheel renders Exploris precursors partially/incorrectly, so this is
+    gated on a fork-build marker (scan_parameters ships in the same build).
+    Skips files with no MS2 scans.
     """
     path = str(path)
 
@@ -267,6 +276,45 @@ def test_scan_statistics_match_thermo(monkeypatch, path):
         assert o["BasePeakMass"] == pytest.approx(t["BasePeakMass"], rel=1e-5, abs=1e-3)
         assert o["BasePeakIntensity"] == pytest.approx(
             t["BasePeakIntensity"], rel=1e-3, abs=1.0
+        )
+
+
+def _hcd_tuple(value):
+    return tuple(
+        round(float(part.replace(",", ".")), 2)
+        for part in str(value).split(",")
+        if part.strip()
+    )
+
+
+@pytest.mark.skipif(
+    not _OTF_HAS_SCAN_PARAMS,
+    reason="installed opentfraw lacks RawFile.scan_parameters() (trailer accessor)",
+)
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_ms2_acquisition_info_matches_thermo(monkeypatch, path):
+    """OpenTFRaw's MS2 isolation width + calibrated HCD energy (read from the
+    decoded trailer) must match Thermo's "MS2 Isolation Width:" / "HCD Energy
+    V:". Skips files without MS2 scans.
+    """
+    path = str(path)
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "thermo")
+    try:
+        with open_backend(path) as backend:
+            th_width, th_hcd = backend.ms2_acquisition_info()
+    except m_thermo.NoScansFoundError:
+        pytest.skip("no MS2 scans")
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "opentfraw")
+    with open_backend(path) as backend:
+        ot_width, ot_hcd = backend.ms2_acquisition_info()
+
+    assert ot_width == pytest.approx(th_width, abs=1e-3), "isolation width differs"
+    assert set(ot_hcd) == set(th_hcd), "MS2 scan set differs"
+    for scan_number, hcd in th_hcd.items():
+        assert _hcd_tuple(ot_hcd[scan_number]) == _hcd_tuple(hcd), (
+            f"scan {scan_number}: HCD energy {ot_hcd[scan_number]!r} vs {hcd!r}"
         )
 
 
