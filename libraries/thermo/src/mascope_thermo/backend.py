@@ -293,8 +293,7 @@ _AVG_PROFILE_CALIB_SCANS = 8  # scans sampled for the reference centroids
 _AVG_PROFILE_CALIB_SEP_PPM = 60  # min spacing between anchor peaks
 _AVG_PROFILE_CALIB_TIGHT_PPM = 5  # max residual to keep a match after pass 1
 _AVG_PROFILE_CALIB_MIN_ANCHORS = 6  # below this, leave the grid uncorrected
-_AVG_PROFILE_CALIB_QUAD_ANCHORS = 12  # use a quadratic fit at/above this many
-_AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a low-order fit needs few)
+_AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a linear fit needs few)
 _AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
 
 
@@ -1348,10 +1347,13 @@ class OpenTFRawBackend:
         if anchor_prof.size < _AVG_PROFILE_CALIB_MIN_ANCHORS:
             return grid
 
-        # Fit centroid_mz = poly(profile_mz) and remap the grid. Quadratic only
-        # with enough wide-spread anchors; otherwise linear (safer extrapolation).
-        degree = 2 if anchor_prof.size >= _AVG_PROFILE_CALIB_QUAD_ANCHORS else 1
-        coeffs = np.polyfit(anchor_prof, anchor_ref, degree)
+        # Fit centroid_mz = a + b*profile_mz (LINEAR) and remap the grid. The Da
+        # offset is ~linear in m/z; a quadratic over-fits the (dense, mid-m/z)
+        # anchors and mis-extrapolates the low-m/z curvature -- it left a ~5 ppm
+        # systematic below m/z 120 while a line keeps low and high m/z balanced
+        # (within ~1.5 ppm). Equivalent to the physical A + B/f^2 calibration form
+        # since profile m/z is ~ B/f^2.
+        coeffs = np.polyfit(anchor_prof, anchor_ref, 1)
         return np.polyval(coeffs, grid)
 
     def xic(
