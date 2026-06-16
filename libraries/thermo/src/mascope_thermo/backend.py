@@ -1108,16 +1108,22 @@ class OpenTFRawBackend:
         return scan_mzs, scan_specs, times
 
     def average_profile(self, *args, **kwargs):
-        # Deferred (gap 5.3): a naive ppm-bin of pooled profile points conserves
-        # total intensity and coarse shape but over-merges adjacent native
-        # profile points at low m/z (native spacing ~1 ppm), degrading the
-        # per-peak FWHM that the instrument-function fit reads from this signal.
-        # A faithful version needs resolution-preserving cross-scan co-addition
-        # (the ppm is a cross-scan match tolerance, not an output bin width).
-        # See the handoff doc / ticket for the design.
+        # Deferred (gap 5.3). T1a validation (June 2026) established the design
+        # but also two blockers a correct implementation must solve:
+        #   - FWHM: Thermo's AverageScans *interpolates* each scan onto a common
+        #     axis (broadening by the between-scan m/z jitter). A binning sum
+        #     keeps peaks ~40% too narrow; interpolate-and-sum matches FWHM to
+        #     within a few percent.
+        #   - BUT interpolating onto the dense union-of-all-points grid inflates
+        #     the total intensity ~20x (point-sum over-counts) and is too slow
+        #     (a 2807-scan file: ~100 s, ~6M output points).
+        # A correct version must interpolate (for FWHM) while emitting a
+        # native-density grid (to conserve total intensity) and accumulate
+        # performantly across many scans. See the T1a design note.
         raise NotImplementedError(
-            "Faithful profile co-addition not yet reimplemented (gap 5.3); a "
-            "naive ppm-bin degrades low-m/z peak shape for the resolution fit."
+            "Faithful profile co-addition not yet reimplemented (gap 5.3): "
+            "needs interpolation (FWHM) + native-density output (intensity) + "
+            "a performant multi-scan accumulation. See the T1a design note."
         )
 
     def xic(
