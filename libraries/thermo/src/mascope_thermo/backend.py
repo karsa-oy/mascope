@@ -280,6 +280,11 @@ _OTF_TRAILER_FIELDS = (
     ("collision_energy", "Collision Energy"),
 )
 
+# Output grid resolution (constant ppm) for average_profile. Fine enough to
+# sample per-peak FWHM (~4-8 ppm on Orbitrap) at many points while collapsing
+# the between-scan jitter duplicates into one cell per native position.
+_AVG_PROFILE_GRID_PPM = 0.2
+
 
 def _label_peaks(
     centroid_scan,
@@ -1107,24 +1112,64 @@ class OpenTFRawBackend:
         )
         return scan_mzs, scan_specs, times
 
-    def average_profile(self, *args, **kwargs):
-        # Deferred (gap 5.3). T1a validation (June 2026) established the design
-        # but also two blockers a correct implementation must solve:
-        #   - FWHM: Thermo's AverageScans *interpolates* each scan onto a common
-        #     axis (broadening by the between-scan m/z jitter). A binning sum
-        #     keeps peaks ~40% too narrow; interpolate-and-sum matches FWHM to
-        #     within a few percent.
-        #   - BUT interpolating onto the dense union-of-all-points grid inflates
-        #     the total intensity ~20x (point-sum over-counts) and is too slow
-        #     (a 2807-scan file: ~100 s, ~6M output points).
-        # A correct version must interpolate (for FWHM) while emitting a
-        # native-density grid (to conserve total intensity) and accumulate
-        # performantly across many scans. See the T1a design note.
-        raise NotImplementedError(
-            "Faithful profile co-addition not yet reimplemented (gap 5.3): "
-            "needs interpolation (FWHM) + native-density output (intensity) + "
-            "a performant multi-scan accumulation. See the T1a design note."
-        )
+    def average_profile(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, int]:
+        # NumPy reimplementation of Thermo's AverageScans over profile data
+        # (gap 5.3). Thermo interpolates each scan onto a common axis and
+        # averages (broadening by between-scan m/z jitter), so we must
+        # interpolate, not bin (binning keeps peaks ~40% too narrow). Steps:
+        #   1. Output grid = the union of the selected scans' profile m/z,
+        #      quantized to a fine constant-ppm grid. Quantizing collapses the
+        #      millions of jitter-duplicated points into one cell per native
+        #      position -> bounded, fast, and spans heterogeneous ranges.
+        #   2. Linear-interpolate each scan onto the grid (0 outside its range)
+        #      and sum -> reproduces Thermo's per-peak FWHM.
+        #   3. Rescale to the true total (sum of per-scan point sums) so the
+        #      finer-than-native grid does not inflate intensity.
+        if not hasattr(self._raw, "profile"):
+            raise NotImplementedError(
+                "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
+                "not available in this opentfraw build."
+            )
+        if ppm <= 0:
+            raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
+
+        mz_parts, int_parts = [], []
+        for scan_number in scan_indices:
+            mz, intensity = self._raw.profile(int(scan_number))
+            mz = np.asarray(mz, dtype=np.float64)
+            intensity = np.asarray(intensity, dtype=np.float64)
+            if mz.size:
+                mz_parts.append(mz)
+                int_parts.append(intensity)
+
+        num_combined = len(scan_indices)
+        if not mz_parts:
+            return np.array([]), np.array([]), num_combined
+
+        mz_all = np.concatenate(mz_parts)
+        lo = float(mz_all.min())
+        log_step = np.log1p(_AVG_PROFILE_GRID_PPM / 1e6)
+        occupied = np.unique(np.floor(np.log(mz_all / lo) / log_step).astype(np.int64))
+        grid = lo * np.exp((occupied + 0.5) * log_step)
+
+        summed = np.zeros(grid.shape, dtype=np.float64)
+        total_raw = 0.0
+        for mz, intensity in zip(mz_parts, int_parts):
+            order = np.argsort(mz, kind="stable")
+            summed += np.interp(grid, mz[order], intensity[order], left=0.0, right=0.0)
+            total_raw += float(intensity.sum())
+
+        grid_total = summed.sum()
+        if grid_total > 0:
+            summed *= total_raw / grid_total
+        if average and num_combined:
+            summed = summed / num_combined
+        return grid, summed, num_combined
 
     def xic(
         self,

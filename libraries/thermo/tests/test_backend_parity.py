@@ -379,3 +379,90 @@ def test_centroids_average_matches_thermo(monkeypatch, path):
     assert matched / om.size >= 0.8, (
         f"only {matched}/{om.size} averaged centroids matched Thermo within 1 ppm"
     )
+
+
+def _profile_fwhm_ppm(mz, inten, center, window_ppm=40):
+    """FWHM (in ppm) of the peak nearest `center` in a profile spectrum, or
+    None if it can't be measured cleanly. Half-max crossings are linearly
+    interpolated between adjacent points."""
+    sel = np.abs(mz - center) / center * 1e6 < window_ppm
+    x, y = mz[sel], inten[sel]
+    if x.size < 5:
+        return None
+    order = np.argsort(x)
+    x, y = x[order], y[order]
+    i = int(np.argmax(y))
+    ymax = y[i]
+    if ymax <= 0:
+        return None
+    half = ymax / 2.0
+
+    def cross(a, b):  # interpolate x where y == half between indices a, b
+        if y[b] == y[a]:
+            return x[a]
+        return x[a] + (half - y[a]) * (x[b] - x[a]) / (y[b] - y[a])
+
+    li = i
+    while li > 0 and y[li] > half:
+        li -= 1
+    if y[li] > half:
+        return None
+    ri = i
+    while ri < y.size - 1 and y[ri] > half:
+        ri += 1
+    if y[ri] > half:
+        return None
+    return (cross(ri, ri - 1) - cross(li, li + 1)) / center * 1e6
+
+
+@pytest.mark.skipif(
+    not _OTF_HAS_PROFILE,
+    reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
+)
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_sum_signal_matches_thermo(monkeypatch, path):
+    """OpenTFRaw's averaged profile (compute_sum_signal -> average_profile) must
+    reproduce Thermo's, in the two properties the instrument-function fit reads:
+    total intensity (conserved) and per-peak FWHM. Thermo interpolates each scan
+    onto a common axis (broadening by between-scan m/z jitter); a binning sum
+    would leave peaks too narrow, so this guards the interpolation behaviour.
+    Bounded to a small scan window for speed.
+    """
+    path = str(path)
+    t_min, t_max = _bounded_window(monkeypatch, path)
+
+    th_sig, th_n = _run_under(
+        monkeypatch, "thermo", m_thermo.compute_sum_signal, path, t_min=t_min, t_max=t_max
+    )
+    ot_sig, ot_n = _run_under(
+        monkeypatch, "opentfraw", m_thermo.compute_sum_signal, path, t_min=t_min, t_max=t_max
+    )
+    assert ot_n == th_n, "number of combined scans differs"
+
+    tmz, tv = np.asarray(th_sig.mz), np.asarray(th_sig.values)
+    omz, ov = np.asarray(ot_sig.mz), np.asarray(ot_sig.values)
+
+    # Total intensity is conserved (average_profile rescales to the true total).
+    np.testing.assert_allclose(ov.sum(), tv.sum(), rtol=0.02)
+
+    # Per-peak FWHM parity on the strongest, well-separated peaks.
+    order = np.argsort(tv)[::-1]
+    centers = []
+    for k in order[:600]:
+        c = tmz[k]
+        if all(abs(c - cc) / c * 1e6 > 50 for cc in centers):
+            centers.append(c)
+        if len(centers) >= 12:
+            break
+
+    ratios = [
+        b / a
+        for c in centers
+        if (a := _profile_fwhm_ppm(tmz, tv, c)) and (b := _profile_fwhm_ppm(omz, ov, c))
+        and a > 0
+    ]
+    if len(ratios) < 3:
+        pytest.skip("too few measurable peaks for FWHM comparison")
+    assert 0.85 <= float(np.median(ratios)) <= 1.15, (
+        f"median FWHM ratio OTF/Thermo = {np.median(ratios):.3f}"
+    )
