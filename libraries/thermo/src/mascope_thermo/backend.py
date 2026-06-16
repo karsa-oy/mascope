@@ -297,6 +297,9 @@ _AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a linear fit needs few)
 _AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
 _AVG_CENTROID_HEIGHT_PPM = 3.0  # window to source centroid height from profile apex
 _AVG_CENTROID_HEIGHT_BAND = (0.85, 1.15)  # apply the apex only as a modest refinement
+_AVG_CENTROID_MERGE_FWHM = 0.5  # merge centroids whose gap is below this * local FWHM
+_ZEROFILL_GAP_FACTOR = 4.0  # profile m/z gap > this * median = a cluster boundary
+_ZEROFILL_EDGE_PPM = 2.0  # place baseline zeros this far outside each cluster edge
 
 
 def _label_peaks(
@@ -1065,6 +1068,14 @@ class OpenTFRawBackend:
         masses, summed, (resolutions, signal_to_noise) = _ppm_bin(
             mz_all, int_all, [res_all, sn_all], ppm
         )
+        # Merge jitter-splits: the between-scan m/z jitter (~2 ppm) can exceed the
+        # ppm bin, splitting one peak's per-scan centroids into adjacent bins.
+        # Collapse neighbours whose gap is well below the local FWHM (so a real
+        # peak's split merges, while genuinely-resolved peaks stay separate) --
+        # mirroring Thermo's profile re-centroid, which never splits one peak.
+        masses, summed, resolutions, signal_to_noise = self._merge_split_centroids(
+            masses, summed, resolutions, signal_to_noise
+        )
         intensities = summed / num_combined if (average and num_combined) else summed
 
         # Source the height from the frequency-averaged profile apex (matches
@@ -1082,6 +1093,39 @@ class OpenTFRawBackend:
                     masses, intensities, grid_mz, profile
                 )
         return masses, intensities, resolutions, signal_to_noise
+
+    @staticmethod
+    def _merge_split_centroids(
+        masses: np.ndarray,
+        intensities: np.ndarray,
+        resolutions: np.ndarray,
+        sn: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Merge adjacent centroids that are a jitter-split of one peak.
+
+        Cluster where the m/z gap to the neighbour is below
+        ``_AVG_CENTROID_MERGE_FWHM`` * the local FWHM (= m/z / resolution): a
+        peak's split (gap << FWHM) collapses, while genuinely-resolved peaks
+        (gap >= FWHM) stay separate. Per cluster: intensity-weighted m/z, summed
+        intensity, intensity-weighted resolution / S:N.
+        """
+        if masses.size <= 1:
+            return masses, intensities, resolutions, sn
+        fwhm_ppm = np.where(resolutions > 0, 1e6 / resolutions, np.inf)
+        gap_ppm = np.diff(masses) / masses[:-1] * 1e6
+        thresh = _AVG_CENTROID_MERGE_FWHM * np.minimum(fwhm_ppm[:-1], fwhm_ppm[1:])
+        starts = np.concatenate(([0], np.flatnonzero(gap_ppm >= thresh) + 1))
+        isum = np.add.reduceat(intensities, starts)
+        counts = np.diff(np.append(starts, masses.size))
+        safe = np.where(isum > 0, isum, 1.0)
+        nonzero = isum > 0
+
+        def agg(values: np.ndarray) -> np.ndarray:
+            wmean = np.add.reduceat(values * intensities, starts) / safe
+            pmean = np.add.reduceat(values, starts) / counts
+            return np.where(nonzero, wmean, pmean)
+
+        return agg(masses), isum, agg(resolutions), agg(sn)
 
     @staticmethod
     def _heights_from_profile_apex(
@@ -1252,7 +1296,36 @@ class OpenTFRawBackend:
             summed = summed / num_combined
 
         grid = self._align_profile_grid_to_centroids(scan_indices, grid, summed)
+        grid, summed = self._zerofill_baseline(grid, summed)
         return grid, summed, num_combined
+
+    @staticmethod
+    def _zerofill_baseline(
+        grid: np.ndarray, summed: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Insert baseline zeros around peak clusters. OpenTFRaw's profile()
+        omits the zeros Thermo's SegmentedScan carries around each peak, so the
+        averaged profile (occupied cells only) never returns to 0 between
+        clusters. Add a zero just outside each cluster edge -- at every m/z gap
+        large versus the within-cluster spacing -- so the profile drops to
+        baseline between peaks, matching Thermo and the pipeline's other paths
+        (which fillna(0))."""
+        if grid.size < 2:
+            return grid, summed
+        gap_ppm = np.diff(grid) / grid[:-1] * 1e6
+        med = float(np.median(gap_ppm))
+        if not np.isfinite(med) or med <= 0:
+            return grid, summed
+        boundary = np.flatnonzero(gap_ppm > _ZEROFILL_GAP_FACTOR * med)
+        if boundary.size == 0:
+            return grid, summed
+        off = _ZEROFILL_EDGE_PPM / 1e6
+        left_z = grid[boundary] * (1 + off)
+        right_z = grid[boundary + 1] * (1 - off)
+        new_mz = np.concatenate([grid, left_z, right_z])
+        new_v = np.concatenate([summed, np.zeros(left_z.size + right_z.size)])
+        order = np.argsort(new_mz, kind="stable")
+        return new_mz[order], new_v[order]
 
     def _profile_conversion_params(
         self, scan_number: int
