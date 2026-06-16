@@ -205,6 +205,21 @@ class ReaderBackend(Protocol):
         string; OpenTFRaw returns it as ``None`` (fork/upstream candidate)."""
         ...
 
+    def ms2_acquisition_info(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> tuple[float | None, dict[int, str]]:
+        """``(isolation_width, {scan_number: hcd_energy_string})`` for MS² scans.
+
+        ``isolation_width`` is the single MS² isolation width across the scans;
+        the HCD energy strings may be comma-separated (step dissociation). Thermo
+        reads both from the trailer (``"MS2 Isolation Width:"`` /
+        ``"HCD Energy V:"``); a backend lacking the calibrated HCD energy raises
+        ``NotImplementedError``."""
+        ...
+
     def ms2_centroids_for_scans(
         self, scan_indices: list[int]
     ) -> tuple[list[dict], list[float]]:
@@ -251,6 +266,18 @@ SCAN_STAT_FIELDS = (
     "WavelengthStep",
     "ScanType",
     "CycleNumber",
+)
+
+# Per-scan acquisition fields OpenTFRaw decodes (from its typed scan dict),
+# surfaced as a trailer-like table. The label strings are descriptive and
+# intentionally differ from Thermo's trailer labels, which OpenTFRaw does not
+# expose; the (key, label) pairs map an OpenTFRaw scan-dict key to a column.
+_OTF_TRAILER_FIELDS = (
+    ("ion_injection_time_ms", "Ion Injection Time (ms)"),
+    ("charge", "Charge State"),
+    ("precursor_mz", "Precursor m/z"),
+    ("isolation_width", "Isolation Width (m/z)"),
+    ("collision_energy", "Collision Energy"),
 )
 
 
@@ -655,6 +682,31 @@ class ThermoBackend:
                 out[scan_idx] = float(match.group(1))
         return out
 
+    def ms2_acquisition_info(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+    ) -> tuple[float | None, dict[int, str]]:
+        acq = self.scan_acquisition_settings(polarity, t_min, t_max, ms_type="Ms2")
+        trailer_labels = acq["header_labels"]
+        isolation_width_idx = trailer_labels.index("MS2 Isolation Width:")
+        hcd_label_idx = trailer_labels.index("HCD Energy V:")
+
+        isolation_widths = set()
+        scan_idx_to_hcd: dict[int, str] = {}
+        for scan_idx, trailer_values in acq["settings"].items():
+            isolation_widths.add(trailer_values[isolation_width_idx])
+            scan_idx_to_hcd[scan_idx] = trailer_values[hcd_label_idx]
+
+        isolation_widths.discard(None)
+        isolation_widths.discard("")
+        if len(isolation_widths) == 1:
+            isolation_width = float(isolation_widths.pop().replace(",", "."))
+        else:
+            raise ValueError("Multiple isolation widths found for MS2 scans.")
+        return isolation_width, scan_idx_to_hcd
+
     def ms2_centroids_for_scans(
         self, scan_indices: list[int]
     ) -> tuple[list[dict], list[float]]:
@@ -825,23 +877,67 @@ class OpenTFRawBackend:
             float(max(s["high_mz"] for s in scans)),
         )
 
-    # -- not yet available (raise NotImplementedError → contract tests xfail) --
+    # -- Phase-4 metadata remap --
 
     def instrument_details(self) -> dict:
-        raise NotImplementedError(
-            "OpenTFRaw exposes only instrument_model, not the full instrument "
-            "details table (Phase 4 metadata remap)."
-        )
+        # OpenTFRaw detects only the instrument model (it does not parse the
+        # structured InstID block), so Model / Name are populated and the rest
+        # (serial number, software/hardware version, axis labels, flags) are
+        # absent. Model is the field downstream relies on. The same keys as the
+        # Thermo backend are returned so the shape is stable; missing values are
+        # None. (Populating the rest needs OpenTFRaw InstID parsing -- ticket.)
+        model = self._raw.instrument_model
+        details = {field: None for field in INSTRUMENT_FIELDS}
+        details["Model"] = model or ""
+        details["Name"] = model or ""
+        details["IsValid"] = model is not None
+        return details
 
-    def scan_acquisition_settings(self, *args, **kwargs) -> dict:
-        raise NotImplementedError(
-            "Per-scan trailer table is not exposed by OpenTFRaw (Phase 4)."
-        )
+    def scan_acquisition_settings(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        # OpenTFRaw exposes typed per-scan params rather than Thermo's
+        # trailer-label table, so surface the subset OpenTFRaw decodes under
+        # descriptive labels. Shape matches ThermoBackend (header_labels +
+        # settings rows aligned 1:1); the label *names* differ from Thermo's.
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+        header_labels = [label for _, label in _OTF_TRAILER_FIELDS]
+        settings = {
+            int(s["scan_number"]): [s.get(key) for key, _ in _OTF_TRAILER_FIELDS]
+            for s in selected
+        }
+        return {"header_labels": header_labels, "settings": settings}
 
-    def scan_statistics(self, *args, **kwargs) -> dict:
-        raise NotImplementedError(
-            "Thermo scan-statistics fields are not exposed by OpenTFRaw (Phase 4)."
-        )
+    def scan_statistics(
+        self,
+        polarity: Polarity | None = None,
+        t_min: float | None = None,
+        t_max: float | None = None,
+        ms_type: MsType | None = "Ms",
+    ) -> dict:
+        # Map the per-scan stats OpenTFRaw decodes onto Thermo's ScanStats field
+        # names. Fields OpenTFRaw does not provide (LongWavelength, Frequency,
+        # PacketCount, ...) are omitted rather than faked. StartTime is in
+        # minutes, matching Thermo's ScanStats.StartTime. MsType mirrors Thermo's
+        # MSOrder.ToString() ("Ms" / "Ms2").
+        selected = self._selected(polarity, t_min, t_max, ms_type)
+        return {
+            int(s["scan_number"]): {
+                "TIC": float(s["total_ion_current"]),
+                "StartTime": float(s["retention_time"]),
+                "BasePeakMass": float(s["base_peak_mz"]),
+                "BasePeakIntensity": float(s["base_peak_intensity"]),
+                "LowMass": float(s["low_mz"]),
+                "HighMass": float(s["high_mz"]),
+                "ScanNumber": int(s["scan_number"]),
+                "MsType": "Ms" if int(s["ms_level"]) == 1 else f"Ms{int(s['ms_level'])}",
+            }
+            for s in selected
+        }
 
     def _require_centroid_labels(self) -> None:
         """Gap 5.1 is only closed if the installed OpenTFRaw exposes the
@@ -1083,6 +1179,18 @@ class OpenTFRawBackend:
             if match:
                 out[scan_number] = float(match.group(1))
         return out
+
+    def ms2_acquisition_info(self, *args, **kwargs):
+        # OpenTFRaw exposes the nominal HCD value (the filter "@hcdN"), not the
+        # calibrated per-scan "HCD Energy V:" trailer field Thermo reports, so
+        # the MS2 summary metadata (which needs the calibrated energy) is
+        # blocked. Isolation width alone is available but the consumer needs
+        # both. See the metadata / HCD-energy ticket.
+        raise NotImplementedError(
+            "Calibrated MS2 HCD energy ('HCD Energy V:') is not exposed by "
+            "OpenTFRaw (only the nominal @hcd value); MS2 summary metadata is "
+            "blocked (gap 5.1b / metadata)."
+        )
 
     def ms2_centroids_for_scans(self, *args, **kwargs):
         raise NotImplementedError(

@@ -242,6 +242,34 @@ def test_ms2_precursor_matches_thermo(monkeypatch, path):
         )
 
 
+@pytest.mark.skipif(not RAW_FILES, reason="no .raw files in test_files/")
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_scan_statistics_match_thermo(monkeypatch, path):
+    """OpenTFRaw's mapped scan statistics must match Thermo for the fields it
+    provides (Phase-4 metadata remap). Uses only the base opentfraw API (the
+    typed scan dict), so it runs against the released wheel too -- no gate.
+    """
+    path = str(path)
+
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "thermo")
+    with open_backend(path) as backend:
+        th = backend.scan_statistics()
+    monkeypatch.setenv("MASCOPE_THERMO_BACKEND", "opentfraw")
+    with open_backend(path) as backend:
+        ot = backend.scan_statistics()
+
+    assert set(ot) == set(th), "scan set differs"
+    for scan_number, t in th.items():
+        o = ot[scan_number]
+        assert o["MsType"] == t["MsType"]
+        assert o["StartTime"] == pytest.approx(t["StartTime"], rel=1e-6, abs=1e-6)
+        assert o["TIC"] == pytest.approx(t["TIC"], rel=1e-4, abs=1e-3)
+        assert o["BasePeakMass"] == pytest.approx(t["BasePeakMass"], rel=1e-5, abs=1e-3)
+        assert o["BasePeakIntensity"] == pytest.approx(
+            t["BasePeakIntensity"], rel=1e-3, abs=1.0
+        )
+
+
 # Cap on scans averaged by the ppm-averaging parity tests, to bound runtime on
 # files with thousands of scans (the averaging still spans many scans).
 MAX_AVG_SCANS = 25

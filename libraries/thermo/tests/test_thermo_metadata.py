@@ -42,11 +42,14 @@ class TestRawFileMetadata:
     def setup_method(self):
         self.md = m_thermo.RawFileMetadata(POS_ORBI_FILE_PATH)
 
-    def test_instrument_details(self):
+    def test_instrument_details(self, backend):
         details = self.md.instrument_details
         assert set(details) == INSTRUMENT_KEYS
         assert isinstance(details["Model"], str) and details["Model"]
-        assert details["SerialNumber"]  # non-empty
+        if backend == "thermo":
+            # OpenTFRaw detects only the model; it does not parse the InstID
+            # block, so serial / software / hardware are absent (None).
+            assert details["SerialNumber"]  # non-empty
 
     def test_scan_acquisition_settings_aligned(self):
         acq = self.md.scan_acquisition_settings

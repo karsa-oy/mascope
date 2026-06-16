@@ -856,27 +856,12 @@ def get_ms2_summary_metadata(
         )
         parent_peaks = list(parent_peak_mapping.keys())
 
-        # Isolation width + HCD energy come from the per-scan trailer table.
-        acq = backend.scan_acquisition_settings(
-            polarity, t_min, t_max, ms_type="Ms2"
+        # Isolation width + (calibrated) HCD energy per MS² scan. Thermo reads
+        # these from the trailer ("MS2 Isolation Width:" / "HCD Energy V:");
+        # backends that lack the calibrated HCD energy raise NotImplementedError.
+        isolation_width, scan_idx_to_hcd = backend.ms2_acquisition_info(
+            polarity, t_min, t_max
         )
-        trailer_labels = acq["header_labels"]
-        isolation_width_idx = trailer_labels.index("MS2 Isolation Width:")
-        hcd_label_idx = trailer_labels.index("HCD Energy V:")
-
-        isolation_widths = set()
-        scan_idx_to_hcd: dict[int, str] = {}
-
-        for scan_idx, trailer_values in acq["settings"].items():
-            isolation_widths.add(trailer_values[isolation_width_idx])
-            scan_idx_to_hcd[scan_idx] = trailer_values[hcd_label_idx]
-
-        isolation_widths.discard(None)
-        isolation_widths.discard("")
-        if len(isolation_widths) == 1:
-            isolation_width = float(isolation_widths.pop().replace(",", "."))
-        else:
-            raise ValueError("Multiple isolation widths found for MS2 scans.")
 
         # Average HCD energies per parent peak, handling step dissociation
         # where energy values may contain multiple comma-separated values
