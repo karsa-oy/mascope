@@ -25,6 +25,7 @@ from mascope_match.params import (
     TOF_FITTING_THRESHOLD,
 )
 from mascope_signal.runtime import runtime
+from mascope_thermo.thermo import NoScansFoundError
 from mascope_tools.alignment.utils import flag_satellite_peaks
 
 
@@ -170,19 +171,23 @@ class OrbiPeakDetector(BasePeakDetector):
 
         progress_callback(10)
         runtime.logger.debug("Reading centroids from the Thermo file...")
-        # Get CALIBRATED centroids
-        try:
-            peaks_pos = await self._extract_peaks_for_polarity("+")
-        except Exception as e:
-            runtime.logger.debug(f"No positive polarity data found: {e}")
-            peaks_pos = None
-        try:
-            peaks_neg = await self._extract_peaks_for_polarity("-")
-        except Exception as e:
-            runtime.logger.debug(f"No negative polarity data found: {e}")
-            peaks_neg = None
+        # Get CALIBRATED centroids for each polarity present in the file.
+        # Only a genuinely-absent polarity (NoScansFoundError) is skipped; any
+        # other failure is a real error and must propagate with its true cause
+        # rather than being masked as an empty-concatenate downstream.
+        datasets = []
+        for polarity in ("+", "-"):
+            try:
+                datasets.append(await self._extract_peaks_for_polarity(polarity))
+            except NoScansFoundError:
+                runtime.logger.debug(
+                    f"No {polarity} polarity scans in the file; skipping."
+                )
 
-        datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
+        if not datasets:
+            raise PeakDetectionError(
+                f"No usable scans found for either polarity in '{self._filename}'."
+            )
         peaks = xarray.concat(datasets, dim="mz").sortby("mz")
 
         progress_callback(80)
