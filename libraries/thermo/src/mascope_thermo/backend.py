@@ -295,6 +295,8 @@ _AVG_PROFILE_CALIB_TIGHT_PPM = 5  # max residual to keep a match after pass 1
 _AVG_PROFILE_CALIB_MIN_ANCHORS = 6  # below this, leave the grid uncorrected
 _AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a linear fit needs few)
 _AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
+_AVG_CENTROID_HEIGHT_PPM = 3.0  # window to source centroid height from profile apex
+_AVG_CENTROID_HEIGHT_BAND = (0.85, 1.15)  # apply the apex only as a modest refinement
 
 
 def _label_peaks(
@@ -1031,11 +1033,12 @@ class OpenTFRawBackend:
         average: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         # NumPy reimplementation of Thermo's AverageScans over centroids (gap
-        # 5.3): pool the per-scan FT label peaks and ppm-bin them. Thermo
-        # averages in profile space and re-centroids, so this is an
-        # approximation -- m/z agrees to sub-ppm, intensity to a few percent,
-        # resolution/S:N more coarsely (they are not used by the instrument
-        # resolution fit, which reads the profile sum). See gap 5.3 notes.
+        # 5.3): pool the per-scan FT label peaks and ppm-bin them for m/z (sub-ppm
+        # exact), resolution and S:N (approximate). The HEIGHT, however, is then
+        # sourced from the frequency-averaged profile apex (below): Thermo
+        # re-centroids the averaged profile, whose apex incurs an interpolation
+        # loss that a per-scan centroid-apex sum does not, so the ppm-bin sum runs
+        # ~5-6% high; the profile apex matches Thermo to ~1-2%.
         self._require_centroid_labels()
         if ppm <= 0:
             raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
@@ -1063,7 +1066,75 @@ class OpenTFRawBackend:
             mz_all, int_all, [res_all, sn_all], ppm
         )
         intensities = summed / num_combined if (average and num_combined) else summed
+
+        # Source the height from the frequency-averaged profile apex (matches
+        # Thermo's re-centroid-of-the-averaged-profile), falling back to the
+        # ppm-bin value where the profile has no peak or no profile build.
+        if masses.size and hasattr(self._raw, "profile"):
+            try:
+                grid_mz, profile, _ = self.average_profile(
+                    scan_indices, ppm=ppm, average=average
+                )
+            except NotImplementedError:
+                grid_mz = np.array([])
+            if grid_mz.size:
+                intensities = self._heights_from_profile_apex(
+                    masses, intensities, grid_mz, profile
+                )
         return masses, intensities, resolutions, signal_to_noise
+
+    @staticmethod
+    def _heights_from_profile_apex(
+        masses: np.ndarray,
+        fallback: np.ndarray,
+        grid_mz: np.ndarray,
+        profile: np.ndarray,
+    ) -> np.ndarray:
+        """Re-centroid the averaged profile for height: detect profile local
+        maxima, take each one's parabolic-vertex apex (which recovers the
+        continuous apex the discrete max under-shoots), and assign it to its
+        nearest centroid within a tight window. Each profile peak maps to one
+        centroid (via maximum.at), so dense centroids cannot share a neighbour's
+        apex; centroids with no matched profile peak keep the ppm-bin `fallback`.
+        """
+        out = fallback.astype(np.float64).copy()
+        if profile.size < 3 or masses.size == 0:
+            return out
+        # profile local maxima
+        mid = profile[1:-1]
+        pk = np.where((mid > profile[:-2]) & (mid >= profile[2:]) & (mid > 0))[0] + 1
+        if pk.size == 0:
+            return out
+        # parabolic-vertex apex height per peak (the continuous apex the discrete
+        # max under-shoots), clamped so a flat/noisy top (denom -> 0) cannot blow
+        # the vertex up far above the sampled max.
+        y0, y1, y2 = profile[pk - 1], profile[pk], profile[pk + 1]
+        denom = y0 - 2.0 * y1 + y2
+        corr = np.where(denom < 0, -0.125 * (y2 - y0) ** 2 / denom, 0.0)
+        apex = y1 + np.minimum(corr, 0.25 * y1)
+        # nearest centroid to each profile peak, kept only within the window
+        pmz = grid_mz[pk]
+        j = np.clip(np.searchsorted(masses, pmz), 1, masses.size - 1)
+        left_closer = np.abs(pmz - masses[j - 1]) <= np.abs(pmz - masses[j])
+        nidx = np.where(left_closer, j - 1, j)
+        within = np.abs(masses[nidx] - pmz) / pmz * 1e6 <= _AVG_CENTROID_HEIGHT_PPM
+        # one height per centroid (tallest matched peak wins)
+        cand = np.full(masses.size, -np.inf)
+        np.maximum.at(cand, nidx[within], apex[within])
+        # Apply the profile apex only where it is a MODEST refinement of the
+        # ppm-bin (the interpolation-loss regime, ~0.93x). A large disagreement
+        # means an intermittent/weak peak (whose averaged-profile apex is far
+        # below the per-scan-apex sum) or a noise maximum -- there the ppm-bin is
+        # the safer estimate. This corrects the systematic ~5-6% high on real
+        # peaks without destabilising the weak-peak aggregate.
+        valid = (cand > -np.inf) & (fallback > 0)
+        ratio = np.zeros(masses.size)
+        ratio[valid] = cand[valid] / fallback[valid]
+        apply = valid & (ratio >= _AVG_CENTROID_HEIGHT_BAND[0]) & (
+            ratio <= _AVG_CENTROID_HEIGHT_BAND[1]
+        )
+        out[apply] = cand[apply]
+        return out
 
     def centroids_meta(self) -> dict:
         self._require_centroid_labels()
