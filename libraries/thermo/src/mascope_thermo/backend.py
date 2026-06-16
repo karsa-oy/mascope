@@ -295,6 +295,7 @@ _AVG_PROFILE_CALIB_TIGHT_PPM = 5  # max residual to keep a match after pass 1
 _AVG_PROFILE_CALIB_MIN_ANCHORS = 6  # below this, leave the grid uncorrected
 _AVG_PROFILE_CALIB_QUAD_ANCHORS = 12  # use a quadratic fit at/above this many
 _AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a low-order fit needs few)
+_AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
 
 
 def _label_peaks(
@@ -1130,24 +1131,28 @@ class OpenTFRawBackend:
         average: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, int]:
         # NumPy reimplementation of Thermo's AverageScans over profile data
-        # (gap 5.3). Thermo interpolates each scan onto a common axis and
-        # averages (broadening by between-scan m/z jitter), so we must
-        # interpolate, not bin (binning keeps peaks ~40% too narrow). Steps:
-        #   1. Output grid = the union of the selected scans' profile m/z,
-        #      quantized to a fine constant-ppm grid. Quantizing collapses the
-        #      millions of jitter-duplicated points into one cell per native
-        #      position -> bounded, fast, and spans heterogeneous ranges.
-        #   2. Linear-interpolate each scan onto the grid (0 outside its range)
-        #      and sum -> reproduces Thermo's per-peak FWHM.
-        #   3. Normalize to conserve the integrated signal (area under the
-        #      profile), which is grid-independent. The point-sum is NOT a valid
-        #      invariant here: our grid is finer than native, so matching the
-        #      per-scan point-sum total would deflate the apex (~2x too low).
-        #   4. Calibrate the grid m/z to the file's centroid labels. OpenTFRaw's
-        #      frequency->m/z uses the base coefficients only and omits Thermo's
-        #      per-scan calibration compensations (~10-20 ppm, m/z dependent);
-        #      the centroid labels carry the fully-calibrated m/z, so we align
-        #      the profile axis to them (gap T2c).
+        # (gap 5.3). AverageScans averages in the FREQUENCY domain: an ion's
+        # physical frequency is identical across scans, and the between-scan
+        # "jitter" lives only in the per-scan freq->m/z calibration. Averaging in
+        # frequency therefore aligns the peaks (no broadening: FWHM == single
+        # scan) and yields the mean profile on a native-density grid -- whereas a
+        # constant-ppm m/z grid + interpolate-and-sum inflates the apex (~+8%, no
+        # interpolation loss) and leaves peaks asymmetric (~2 ppm). Steps:
+        #   1. Convert each scan's profile m/z back to frequency using that
+        #      scan's Conversion Parameter B/C (m/z = B/f^2 + C/f^4).
+        #   2. Output grid = the union of the scans' frequencies, quantized to a
+        #      native-density (FFT-bin) grid -- occupied cells only, so it is
+        #      bounded and matches the density Thermo emits (~30k points).
+        #   3. Linear-interpolate each scan onto the freq grid and sum. The peaks
+        #      are aligned, so this reproduces Thermo's apex (= mean *
+        #      ScansCombined) and FWHM; no integral rescale is needed.
+        #   4. Convert the freq grid back to m/z (reference calibration), then
+        #      calibrate the axis to the centroid labels (gap T2c): the freq->m/z
+        #      conversion still omits Thermo's per-scan calibration compensations
+        #      (~10-20 ppm), which the exact centroid m/z carry.
+        # Falls back to a constant-ppm m/z grid when the Conversion Parameters
+        # are unavailable (non-FTMS, or an opentfraw build without
+        # scan_parameters).
         if not hasattr(self._raw, "profile"):
             raise NotImplementedError(
                 "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
@@ -1156,20 +1161,102 @@ class OpenTFRawBackend:
         if ppm <= 0:
             raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
 
-        mz_parts, int_parts = [], []
+        num_combined = len(scan_indices)
+        scans: list[tuple[np.ndarray, np.ndarray, float | None, float | None]] = []
         for scan_number in scan_indices:
             mz, intensity = self._raw.profile(int(scan_number))
             mz = np.asarray(mz, dtype=np.float64)
             intensity = np.asarray(intensity, dtype=np.float64)
             if mz.size:
-                mz_parts.append(mz)
-                int_parts.append(intensity)
-
-        num_combined = len(scan_indices)
-        if not mz_parts:
+                b, c = self._profile_conversion_params(int(scan_number))
+                scans.append((mz, intensity, b, c))
+        if not scans:
             return np.array([]), np.array([]), num_combined
 
-        mz_all = np.concatenate(mz_parts)
+        if all(b is not None for (_, _, b, _) in scans):
+            grid, summed = self._average_profile_in_frequency(scans)
+        else:
+            grid, summed = self._average_profile_in_mz(scans)
+
+        if average and num_combined:
+            summed = summed / num_combined
+
+        grid = self._align_profile_grid_to_centroids(scan_indices, grid, summed)
+        return grid, summed, num_combined
+
+    def _profile_conversion_params(
+        self, scan_number: int
+    ) -> tuple[float | None, float | None]:
+        """Per-scan freq->m/z Conversion Parameter B/C from the trailer, or
+        (None, None) if unavailable (non-FTMS / no scan_parameters accessor)."""
+        if not hasattr(self._raw, "scan_parameters"):
+            return None, None
+        params = self._raw.scan_parameters(scan_number)
+        if not params:
+            return None, None
+        b = params.get("Conversion Parameter B:")
+        c = params.get("Conversion Parameter C:")
+        if isinstance(b, (int, float)) and isinstance(c, (int, float)) and b:
+            return float(b), float(c)
+        return None, None
+
+    @staticmethod
+    def _mz_to_freq(mz: np.ndarray, b: float, c: float) -> np.ndarray:
+        """Invert the Orbitrap m/z = B/f^2 + C/f^4 conversion (Newton's method).
+
+        Frequency is calibration-independent, so this recovers the physical
+        frequency axis on which a peak aligns across scans.
+        """
+        f = np.sqrt(b / mz)
+        for _ in range(_AVG_PROFILE_FREQ_NEWTON):
+            f2 = f * f
+            g = b / f2 + c / (f2 * f2) - mz
+            dg = -2.0 * b / (f2 * f) - 4.0 * c / (f2 * f2 * f)
+            f = f - g / dg
+        return f
+
+    def _average_profile_in_frequency(
+        self, scans: list[tuple[np.ndarray, np.ndarray, float, float]]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Average profiles in the frequency domain (see average_profile)."""
+        freqs = [self._mz_to_freq(mz, b, c) for (mz, _, b, c) in scans]
+        ref = max(range(len(freqs)), key=lambda i: freqs[i].size)  # densest scan
+        d = np.diff(np.sort(freqs[ref]))
+        d = d[d > 0]
+        # native FFT bin spacing = the within-cluster spacing (robust to the
+        # large inter-cluster gaps via the lower half of the diffs).
+        df = float(np.median(d[d <= np.median(d)])) if d.size else 0.0
+        if df <= 0:
+            return self._average_profile_in_mz(scans)
+
+        f_all = np.concatenate(freqs)
+        f0 = float(f_all.min())
+        occupied = np.unique(np.floor((f_all - f0) / df).astype(np.int64))
+        fgrid = f0 + (occupied + 0.5) * df
+
+        summed = np.zeros(fgrid.shape, dtype=np.float64)
+        for f, (_, intensity, _, _) in zip(freqs, scans):
+            order = np.argsort(f, kind="stable")
+            f_sorted, int_sorted = f[order], intensity[order]
+            lo = int(np.searchsorted(fgrid, f_sorted[0], side="left"))
+            hi = int(np.searchsorted(fgrid, f_sorted[-1], side="right"))
+            if hi > lo:
+                summed[lo:hi] += np.interp(fgrid[lo:hi], f_sorted, int_sorted)
+
+        # Convert the freq grid back to m/z with the reference scan's calibration.
+        b_ref, c_ref = scans[ref][2], scans[ref][3]
+        f2 = fgrid * fgrid
+        mz_grid = b_ref / f2 + c_ref / (f2 * f2)
+        order = np.argsort(mz_grid)
+        return mz_grid[order], summed[order]
+
+    def _average_profile_in_mz(
+        self,
+        scans: list[tuple[np.ndarray, np.ndarray, float | None, float | None]],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Fallback: constant-ppm m/z grid + integral-conserving interpolation
+        sum, used when the freq->m/z Conversion Parameters are unavailable."""
+        mz_all = np.concatenate([mz for (mz, _, _, _) in scans])
         lo = float(mz_all.min())
         log_step = np.log1p(_AVG_PROFILE_GRID_PPM / 1e6)
         occupied = np.unique(np.floor(np.log(mz_all / lo) / log_step).astype(np.int64))
@@ -1177,30 +1264,18 @@ class OpenTFRawBackend:
 
         summed = np.zeros(grid.shape, dtype=np.float64)
         target_integral = 0.0
-        for mz, intensity in zip(mz_parts, int_parts):
+        for mz, intensity, _, _ in scans:
             order = np.argsort(mz, kind="stable")
             mz_sorted, int_sorted = mz[order], intensity[order]
             target_integral += float(np.trapz(int_sorted, mz_sorted))
-            # Interpolate only over the grid span this scan actually covers;
-            # outside [mz.min, mz.max] the contribution is zero anyway. This
-            # skips the (often large) empty grid regions for narrow / SIM /
-            # time-windowed selections (identical result, less work).
-            lo = int(np.searchsorted(grid, mz_sorted[0], side="left"))
-            hi = int(np.searchsorted(grid, mz_sorted[-1], side="right"))
-            if hi > lo:
-                summed[lo:hi] += np.interp(grid[lo:hi], mz_sorted, int_sorted)
-
-        # Conserve the integrated signal (grid-independent), not the point-sum.
-        # Interpolation already preserves each scan's integral, so this scale is
-        # ~1; computing it explicitly removes interpolation edge effects.
+            a = int(np.searchsorted(grid, mz_sorted[0], side="left"))
+            b = int(np.searchsorted(grid, mz_sorted[-1], side="right"))
+            if b > a:
+                summed[a:b] += np.interp(grid[a:b], mz_sorted, int_sorted)
         grid_integral = float(np.trapz(summed, grid))
         if grid_integral > 0:
             summed *= target_integral / grid_integral
-        if average and num_combined:
-            summed = summed / num_combined
-
-        grid = self._align_profile_grid_to_centroids(scan_indices, grid, summed)
-        return grid, summed, num_combined
+        return grid, summed
 
     def _align_profile_grid_to_centroids(
         self,
