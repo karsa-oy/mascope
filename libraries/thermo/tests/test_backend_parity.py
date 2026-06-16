@@ -240,3 +240,66 @@ def test_ms2_precursor_matches_thermo(monkeypatch, path):
         assert ot[scan_number] == pytest.approx(mz_thermo, abs=1e-3), (
             f"scan {scan_number}: OpenTFRaw {ot[scan_number]} vs Thermo {mz_thermo}"
         )
+
+
+# Cap on scans averaged by the ppm-averaging parity tests, to bound runtime on
+# files with thousands of scans (the averaging still spans many scans).
+MAX_AVG_SCANS = 25
+
+
+def _bounded_window(monkeypatch, path):
+    """(t_min, t_max) [s] covering at most MAX_AVG_SCANS scans."""
+    times = np.sort(_run_under(monkeypatch, "thermo", m_thermo.get_scan_timestamps, path))
+    if times.size == 0:
+        return None, None
+    return float(times[0]), float(times[min(times.size, MAX_AVG_SCANS) - 1])
+
+
+@pytest.mark.skipif(
+    not _OTF_HAS_LABELS,
+    reason="installed opentfraw lacks RawFile.centroid_labels() (decoder build)",
+)
+@pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
+def test_centroids_average_matches_thermo(monkeypatch, path):
+    """Approximate parity for averaged centroids (gap 5.3).
+
+    Thermo's AverageScans re-centroids the averaged profile, so this NumPy
+    ppm-binning of per-scan centroids cannot match it exactly: m/z agrees to
+    sub-ppm and the summed intensity to a few percent, while resolution / S:N
+    are coarser and not asserted (they do not feed the instrument fit; see the
+    follow-up ticket). Guards against gross regressions. Bounded to a small
+    scan window for speed.
+    """
+    path = str(path)
+    t_min, t_max = _bounded_window(monkeypatch, path)
+
+    tm, ti, _, _ = _run_under(
+        monkeypatch, "thermo", m_thermo.get_centroids, path, t_min=t_min, t_max=t_max
+    )
+    om, oi, orr, osn = _run_under(
+        monkeypatch, "opentfraw", m_thermo.get_centroids, path, t_min=t_min, t_max=t_max
+    )
+    if tm.size == 0:
+        pytest.skip("no centroids")
+
+    assert om.size == orr.size == osn.size == oi.size
+    # Peak counts in the same ballpark (re-centroiding splits/merges differently).
+    assert 0.6 * tm.size <= om.size <= 1.6 * tm.size, (
+        f"centroid count {om.size} vs Thermo {tm.size}"
+    )
+    # Summed intensity within a few percent.
+    np.testing.assert_allclose(oi.sum(), ti.sum(), rtol=0.1)
+
+    # Most OpenTFRaw peaks match a Thermo peak within 1 ppm (robust to which
+    # single peak happens to be tallest, unlike a base-peak check).
+    tm_sorted = np.sort(tm)
+    pos = np.searchsorted(tm_sorted, om)
+    matched = 0
+    for k, mzv in enumerate(om):
+        for c in (pos[k] - 1, pos[k]):
+            if 0 <= c < tm_sorted.size and abs(tm_sorted[c] - mzv) / mzv * 1e6 <= 1.0:
+                matched += 1
+                break
+    assert matched / om.size >= 0.8, (
+        f"only {matched}/{om.size} averaged centroids matched Thermo within 1 ppm"
+    )

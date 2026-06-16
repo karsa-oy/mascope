@@ -277,6 +277,58 @@ def _label_peaks(
     )
 
 
+def _ppm_bin(
+    mz: np.ndarray,
+    intensity: np.ndarray,
+    extras: list[np.ndarray],
+    ppm: float,
+) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+    """Greedily cluster ``(mz, intensity)`` points within ``ppm`` and aggregate.
+
+    Points (pooled across scans) are sorted by m/z; a new bin starts wherever
+    the gap to the previous point exceeds ``ppm`` (relative to the lower m/z).
+    Per bin: intensity-weighted mean m/z, summed intensity, and an
+    intensity-weighted mean of each array in ``extras`` (e.g. resolution, S:N).
+    Vectorized with ``np.add.reduceat`` so it scales to the hundreds of
+    thousands of profile points a multi-scan window produces.
+
+    Returns ``(binned_mz, summed_intensity, [binned_extra, ...])``.
+    """
+    empty = np.array([], dtype=np.float64)
+    if mz.size == 0:
+        return empty, empty, [empty for _ in extras]
+
+    order = np.argsort(mz, kind="stable")
+    mz = mz[order]
+    intensity = intensity[order]
+    extras = [e[order] for e in extras]
+
+    if mz.size == 1:
+        starts = np.array([0])
+    else:
+        gap_ppm = np.diff(mz) / mz[:-1] * 1e6
+        starts = np.concatenate(([0], np.flatnonzero(gap_ppm > ppm) + 1))
+
+    counts = np.diff(np.append(starts, mz.size))
+    isum = np.add.reduceat(intensity, starts)
+    # Guard against zero-intensity bins (fall back to a plain mean for m/z and
+    # the extras there).
+    safe = np.where(isum > 0, isum, 1.0)
+    nonzero = isum > 0
+
+    wmz = np.add.reduceat(mz * intensity, starts) / safe
+    plain_mz = np.add.reduceat(mz, starts) / counts
+    binned_mz = np.where(nonzero, wmz, plain_mz)
+
+    binned_extras = []
+    for e in extras:
+        we = np.add.reduceat(e * intensity, starts) / safe
+        plain_e = np.add.reduceat(e, starts) / counts
+        binned_extras.append(np.where(nonzero, we, plain_e))
+
+    return binned_mz, isum, binned_extras
+
+
 class ThermoBackend:
     """:class:`ReaderBackend` backed by Thermo RawFileReader via pythonnet.
 
@@ -860,10 +912,46 @@ class OpenTFRawBackend:
             )
         return out
 
-    def average_centroids(self, *args, **kwargs):
-        raise NotImplementedError(
-            "ppm-binned centroid averaging not yet reimplemented (gap 5.3, step 5)."
+    def average_centroids(
+        self,
+        scan_indices: list[int],
+        ppm: int = 1,
+        average: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        # NumPy reimplementation of Thermo's AverageScans over centroids (gap
+        # 5.3): pool the per-scan FT label peaks and ppm-bin them. Thermo
+        # averages in profile space and re-centroids, so this is an
+        # approximation -- m/z agrees to sub-ppm, intensity to a few percent,
+        # resolution/S:N more coarsely (they are not used by the instrument
+        # resolution fit, which reads the profile sum). See gap 5.3 notes.
+        self._require_centroid_labels()
+        if ppm <= 0:
+            raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
+
+        mz_parts, int_parts, res_parts, sn_parts = [], [], [], []
+        for scan_number in scan_indices:
+            labels = self._raw.centroid_labels(int(scan_number))
+            mz = np.asarray(labels["mz"], dtype=np.float64)
+            intensity = np.asarray(labels["intensity"], dtype=np.float64)
+            resolution = np.asarray(labels["resolution"], dtype=np.float64)
+            signal_to_noise = np.asarray(labels["signal_to_noise"], dtype=np.float64)
+            keep = np.isfinite(resolution) & np.isfinite(signal_to_noise)
+            mz_parts.append(mz[keep])
+            int_parts.append(intensity[keep])
+            res_parts.append(resolution[keep])
+            sn_parts.append(signal_to_noise[keep])
+
+        num_combined = len(scan_indices)
+        mz_all = np.concatenate(mz_parts) if mz_parts else np.array([])
+        int_all = np.concatenate(int_parts) if int_parts else np.array([])
+        res_all = np.concatenate(res_parts) if res_parts else np.array([])
+        sn_all = np.concatenate(sn_parts) if sn_parts else np.array([])
+
+        masses, summed, (resolutions, signal_to_noise) = _ppm_bin(
+            mz_all, int_all, [res_all, sn_all], ppm
         )
+        intensities = summed / num_combined if (average and num_combined) else summed
+        return masses, intensities, resolutions, signal_to_noise
 
     def centroids_meta(self) -> dict:
         self._require_centroid_labels()
@@ -924,8 +1012,16 @@ class OpenTFRawBackend:
         return scan_mzs, scan_specs, times
 
     def average_profile(self, *args, **kwargs):
+        # Deferred (gap 5.3): a naive ppm-bin of pooled profile points conserves
+        # total intensity and coarse shape but over-merges adjacent native
+        # profile points at low m/z (native spacing ~1 ppm), degrading the
+        # per-peak FWHM that the instrument-function fit reads from this signal.
+        # A faithful version needs resolution-preserving cross-scan co-addition
+        # (the ppm is a cross-scan match tolerance, not an output bin width).
+        # See the handoff doc / ticket for the design.
         raise NotImplementedError(
-            "Profile + ppm averaging not yet available (gaps 5.2 / 5.3)."
+            "Faithful profile co-addition not yet reimplemented (gap 5.3); a "
+            "naive ppm-bin degrades low-m/z peak shape for the resolution fit."
         )
 
     def xic(
