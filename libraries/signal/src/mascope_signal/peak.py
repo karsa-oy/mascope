@@ -206,17 +206,14 @@ class OrbiPeakDetector(BasePeakDetector):
             signal_to_noise,
         ) = await m_compute.get_orbi_centroids(self._filename, polarity=polarity)
 
-        sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
-        mz_mins = peak_mzs - 3 * sigmas
-        mz_maxs = peak_mzs + 3 * sigmas
-        mz_arr = self._sum_signal.mz.values
-        left_indices = np.searchsorted(mz_arr, mz_mins, side="left")
-        right_indices = np.searchsorted(mz_arr, mz_maxs, side="right")
-
+        # The m/z peak area is the integral of the analytic peak model, so it is
+        # computed on a self-built grid inside calculate_peak_area and does not
+        # need a profile-window slice here (the OpenTFRaw profile is sparse and
+        # would otherwise leave many centroids in empty windows).
         peak_areas = np.array(
             [
                 m_fitting.calculate_peak_area(
-                    mz_arr[left_indices[i] : right_indices[i]],
+                    None,
                     self._peak_shape,
                     (peak_mzs[i], peak_heights[i], resolutions[i]),
                     sample_interval=None,
