@@ -285,6 +285,17 @@ _OTF_TRAILER_FIELDS = (
 # the between-scan jitter duplicates into one cell per native position.
 _AVG_PROFILE_GRID_PPM = 0.2
 
+# average_profile m/z calibration (align the profile axis to the centroid
+# labels; see _align_profile_grid_to_centroids). Sample a few scans for the
+# reference centroids, anchor on well-separated strong peaks, reject matches
+# whose offset is far from the median, and fit a low-order correction.
+_AVG_PROFILE_CALIB_SCANS = 8  # scans sampled for the reference centroids
+_AVG_PROFILE_CALIB_SEP_PPM = 60  # min spacing between anchor peaks
+_AVG_PROFILE_CALIB_TIGHT_PPM = 5  # max residual to keep a match after pass 1
+_AVG_PROFILE_CALIB_MIN_ANCHORS = 6  # below this, leave the grid uncorrected
+_AVG_PROFILE_CALIB_QUAD_ANCHORS = 12  # use a quadratic fit at/above this many
+_AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a low-order fit needs few)
+
 
 def _label_peaks(
     centroid_scan,
@@ -1132,6 +1143,11 @@ class OpenTFRawBackend:
         #      profile), which is grid-independent. The point-sum is NOT a valid
         #      invariant here: our grid is finer than native, so matching the
         #      per-scan point-sum total would deflate the apex (~2x too low).
+        #   4. Calibrate the grid m/z to the file's centroid labels. OpenTFRaw's
+        #      frequency->m/z uses the base coefficients only and omits Thermo's
+        #      per-scan calibration compensations (~10-20 ppm, m/z dependent);
+        #      the centroid labels carry the fully-calibrated m/z, so we align
+        #      the profile axis to them (gap T2c).
         if not hasattr(self._raw, "profile"):
             raise NotImplementedError(
                 "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
@@ -1182,7 +1198,86 @@ class OpenTFRawBackend:
             summed *= target_integral / grid_integral
         if average and num_combined:
             summed = summed / num_combined
+
+        grid = self._align_profile_grid_to_centroids(scan_indices, grid, summed)
         return grid, summed, num_combined
+
+    def _align_profile_grid_to_centroids(
+        self,
+        scan_indices: list[int],
+        grid: np.ndarray,
+        summed: np.ndarray,
+    ) -> np.ndarray:
+        """Correct the profile m/z axis to match the file's centroid labels.
+
+        OpenTFRaw converts the frequency-domain profile to m/z with the base
+        polynomial coefficients only; Thermo additionally applies per-scan
+        calibration compensations, leaving OpenTFRaw's profile m/z offset by
+        ~10-20 ppm (m/z dependent) while the centroid labels carry the fully
+        calibrated m/z. We use the centroids as a reference: match the strongest
+        well-separated profile peaks to their nearest centroid, reject outliers,
+        and fit a low-order m/z correction. Returns the corrected grid, or the
+        original grid unchanged when there is too little signal to fit reliably
+        or centroid labels are unavailable (released wheel).
+        """
+        if grid.size == 0 or not hasattr(self._raw, "centroid_labels"):
+            return grid
+
+        # Reference m/z from centroid labels of a sample of the selected scans
+        # (strong peaks appear in every scan, so a sample keeps this cheap on
+        # large files).
+        step = max(1, len(scan_indices) // _AVG_PROFILE_CALIB_SCANS)
+        ref_parts = []
+        for scan_number in scan_indices[::step][:_AVG_PROFILE_CALIB_SCANS]:
+            mz = np.asarray(
+                self._raw.centroid_labels(int(scan_number))["mz"], dtype=np.float64
+            )
+            if mz.size:
+                ref_parts.append(mz)
+        if not ref_parts:
+            return grid
+        ref_mz = np.unique(np.concatenate(ref_parts))
+
+        # Anchors: the strongest, well-separated profile peaks.
+        anchor_prof = []
+        for k in np.argsort(summed)[::-1]:
+            if summed[k] <= 0:
+                break
+            c = grid[k]
+            if all(
+                abs(c - p) / c * 1e6 >= _AVG_PROFILE_CALIB_SEP_PPM for p in anchor_prof
+            ):
+                anchor_prof.append(c)
+            if len(anchor_prof) >= _AVG_PROFILE_CALIB_MAX_ANCHORS:
+                break
+        anchor_prof = np.asarray(anchor_prof)
+        if anchor_prof.size < _AVG_PROFILE_CALIB_MIN_ANCHORS:
+            return grid
+
+        def nearest(vals: np.ndarray) -> np.ndarray:
+            idx = np.clip(np.searchsorted(ref_mz, vals), 1, ref_mz.size - 1)
+            left, right = ref_mz[idx - 1], ref_mz[idx]
+            return np.where(np.abs(vals - left) <= np.abs(vals - right), left, right)
+
+        # Pass 1: nearest centroid gives the gross (median) offset. Pass 2:
+        # re-match each anchor to the centroid nearest its offset-corrected
+        # position and keep only tight matches -- this locks onto the right peak
+        # and drops mismatches that a single nearest-search would let through.
+        n1 = nearest(anchor_prof)
+        med = np.median((n1 - anchor_prof) / anchor_prof * 1e6)
+        expected = anchor_prof * (1.0 + med / 1e6)
+        anchor_ref = nearest(expected)
+        resid_ppm = np.abs(anchor_ref - expected) / expected * 1e6
+        keep = resid_ppm <= _AVG_PROFILE_CALIB_TIGHT_PPM
+        anchor_prof, anchor_ref = anchor_prof[keep], anchor_ref[keep]
+        if anchor_prof.size < _AVG_PROFILE_CALIB_MIN_ANCHORS:
+            return grid
+
+        # Fit centroid_mz = poly(profile_mz) and remap the grid. Quadratic only
+        # with enough wide-spread anchors; otherwise linear (safer extrapolation).
+        degree = 2 if anchor_prof.size >= _AVG_PROFILE_CALIB_QUAD_ANCHORS else 1
+        coeffs = np.polyfit(anchor_prof, anchor_ref, degree)
+        return np.polyval(coeffs, grid)
 
     def xic(
         self,

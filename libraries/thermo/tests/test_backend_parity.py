@@ -426,6 +426,15 @@ def _profile_apex(mz, inten, center, window_ppm=40):
     return ymax if ymax > 0 else None
 
 
+def _profile_apex_mz(mz, inten, center, window_ppm=40):
+    """m/z of the apex of the peak nearest `center`, or None if not measurable."""
+    sel = np.abs(mz - center) / center * 1e6 < window_ppm
+    if sel.sum() < 3:
+        return None
+    sub_mz, sub_i = mz[sel], inten[sel]
+    return float(sub_mz[int(np.argmax(sub_i))])
+
+
 @pytest.mark.skipif(
     not _OTF_HAS_PROFILE,
     reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
@@ -469,7 +478,7 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
         if len(centers) >= 12:
             break
 
-    apex_ratios, fwhm_ratios = [], []
+    apex_ratios, fwhm_ratios, mz_off_ppm = [], [], []
     for c in centers:
         ta, oa = _profile_apex(tmz, tv, c), _profile_apex(omz, ov, c)
         if ta and oa:
@@ -477,6 +486,9 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
         tf, of = _profile_fwhm_ppm(tmz, tv, c), _profile_fwhm_ppm(omz, ov, c)
         if tf and of and tf > 0:
             fwhm_ratios.append(of / tf)
+        om = _profile_apex_mz(omz, ov, c)
+        if om:
+            mz_off_ppm.append((om - c) / c * 1e6)
 
     if len(apex_ratios) < 3 or len(fwhm_ratios) < 3:
         pytest.skip("too few measurable peaks for profile comparison")
@@ -486,3 +498,11 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
     assert 0.85 <= float(np.median(fwhm_ratios)) <= 1.15, (
         f"median FWHM ratio OTF/Thermo = {np.median(fwhm_ratios):.3f}"
     )
+    # Profile m/z is aligned to the centroid labels (average_profile step 4), so
+    # the OpenTFRaw profile axis should match Thermo's, not sit ~13 ppm low.
+    # Only assert where the alignment can run (>= its minimum anchor count).
+    if len(mz_off_ppm) >= 6:
+        assert abs(float(np.median(mz_off_ppm))) <= 5.0, (
+            f"median profile m/z offset OTF vs Thermo = {np.median(mz_off_ppm):.2f} "
+            "ppm (profile axis should be aligned to the centroid labels)"
+        )
