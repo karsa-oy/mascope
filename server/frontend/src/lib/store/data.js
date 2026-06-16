@@ -72,7 +72,8 @@ export const useData = (
     { records, selection, detailed },
     { sync, reloadRecord },
     events,
-    logger
+    logger,
+    deps
   )
 
   // Initialization, all root stores initialize themselves
@@ -96,6 +97,13 @@ export const useData = (
               data: { key, from: prev?.[key], to: next?.[key] }
             })
           })
+
+        // Clear persisted selection when the parent genuinely switches
+        // (not on initial load where prev is null).
+        const prevHadValue = prev && Object.values(prev).some((v) => v != null)
+        if (prevHadValue) {
+          selection?.resetPersist?.()
+        }
 
         sync({ context: 'dependencies' })
       }

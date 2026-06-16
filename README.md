@@ -694,25 +694,9 @@ Agents are small Python programs installed with Pyinstaller on Windows instrumen
 
 ```sh
 agents/           # Agent applications
-  export/             # CSV Export Agent (to export match results into file)
   file/               # File Agent (for ThermoFisher Orbitrap instruments)
   tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
 ```
-
-### CSV Export Agent
-
-The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architectures. It monitors new samples arriving in a specified dataset, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
-
-#### Build
-
-To run the agent build script, execute:
-
-```
-cd agents/export
-./build.ps1
-```
-
-Then run the executable found in `agents/export/dist`. See the agent README for details.
 
 ### File Agent
 
@@ -884,11 +868,11 @@ Events follow the naming convention `{record_type}_{operation}` (e.g., `batch_cr
 
 ### Backend Auth
 
-Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods—**Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
+Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods: **Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
 
 #### Cookie-based JWT authentication
 
-Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lucks the token admin control.
+Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lacks the token admin control.
 
 - **Transport**: Cookies are configured with `HttpOnly` and `Secure` flags (in production), preventing client-side JavaScript access and providing secure transmission over HTTPS.
 - **Token details**:
@@ -916,30 +900,136 @@ To enable authenticated access for external applications, such as Jupyter server
 
 #### Authorization
 
-**Role-Based Access Control (RBAC)**
+Mascope uses two complementary authorization layers:
 
-Roles are dynamically created during database migrations based on the configuration in `auth/config.py`. Each role is assigned a numeric `role_id`, indicating its privilege level.
+1. **Global RBAC**: role-based access control tied to the user's system role. Used for application-wide operations such as user management and data uploading.
+2. **Workspace ACL**: workspace-level access control tied to the user's membership in the workspace that owns the resource. Used for workspace-scoped operations such as sample management.
 
-The current roles include:
+The split of API resources between the two layers is presented in detail below in the route authorization reference table.
+
+**Roles**
+
+Roles are shared across both authorization layers. They are ordered by privilege:
 
 - **`guest`**: Read-only access (includes Jupyter-accessible endpoints via bearer access tokens).
 - **`editor`**: Create, update, and delete permissions.
-- **`admin`**: Full administrative rights, including user management.
-- **`owner`**: Full permissions, including the ability to manage admins.
+- **`admin`**: Full administrative rights, including user management up to admin level.
+- **`owner`**: Full permissions, including the ability to manage admins and owners.
 
-**Role-Based endpoint dependencies**
+Superusers bypass all workspace membership checks.
 
-To secure routes, role-based dependencies are used. Examples:
+**Global RBAC**
+
+Global RBAC dependencies check the user's system-wide role. They are defined in `api/new/auth/dependencies.py`:
 
 ```python
-
-@fastapi_router.get("/api/resource")
+@router.get("/api/resource")
 async def resource_route(user: User = Depends(admin_user)):
     ...
-
 ```
 
 Available dependencies: `guest_user`, `editor_user`, `admin_user`, and `owner_user`.
+
+**Workspace ACL**
+
+Workspace ACL checks that the authenticated user is a member of the workspace that owns the requested resource, with at least the required role. Dependencies and check functions live in `api/new/workspaces/dependencies.py`.
+
+Resources are resolved to a workspace through the ownership chain:
+
+```
+SampleItem → SampleBatch → Dataset → Workspace
+```
+
+There are two patterns depending on how the resource ID reaches the route:
+
+**Pattern 1: Path-parameter routes** (resource ID is a URL path segment):
+
+Use a dependency factory. FastAPI caches `Depends()` calls, so `current_active_user` is resolved once even though both `user` and the factory depend on it.
+
+```python
+from mascope_backend.api.new.workspaces.dependencies import require_sample_role
+
+@router.get("/{sample_item_id}/data")
+@api_route(token_access=True)
+async def get_sample_data(
+    sample_item_id: str,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
+):
+    ...
+```
+
+Available factories: `require_workspace_role`, `require_dataset_role`, `require_dataset_query_role`, `require_batch_role`, `require_sample_role`.
+
+**Pattern 2: Body/query-parameter routes** (resource ID comes from request body or query):
+
+Call an explicit check function inside the route handler:
+
+```python
+from mascope_backend.api.new.workspaces.dependencies import check_batch_access_bulk
+
+@router.post("/rematch/batches")
+@api_route(status_code=202)
+async def rematch_batches_route(
+    body: RematchBatchesBody,
+    user: User = Depends(current_active_user),
+):
+    await check_batch_access_bulk(body.sample_batch_ids, user, "editor")
+    ...
+```
+
+Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`, `check_sample_file_access_bulk`, `check_workspace_access`, `check_instrument_workspace_access`, `check_sample_file_instrument_access`, `check_sample_file_instrument_access_bulk`, `check_target_collection_access`, `accessible_acquisition_instruments`, `accessible_workspace_ids_for_user`.
+
+> [!IMPORTANT]
+> The `@api_route()` decorator **requires** a parameter named `user` in the route signature (it raises `ValueError` otherwise). When using workspace ACL, always keep `user: User = Depends(current_active_user)` as a separate parameter alongside the membership dependency.
+
+**Route authorization reference**
+
+Each API resource uses one of the two authorization layers. The table below documents the intended scope for every resource area.
+
+| Resource                                                               | Auth          | Min Role       | Rationale                                             |
+| ---------------------------------------------------------------------- | ------------- | -------------- | ----------------------------------------------------- |
+| **Workspace-scoped (data under Workspace → Dataset → Batch → Sample)** |               |                |                                                       |
+| Workspaces                                                             | Workspace ACL | guest / editor | Direct workspace operations                           |
+| Workspace membership                                                   | Workspace ACL | admin          | Add, remove, update workspace members                 |
+| Datasets                                                               | Workspace ACL | guest / editor | Workspace children                                    |
+| Dataset acquisitions                                                   | Workspace ACL | guest / editor | System "Acquisitions" workspace                       |
+| Sample batches                                                         | Workspace ACL | guest / editor | Under datasets                                        |
+| Sample batch export                                                    | Workspace ACL | guest          | Export scoped to batch                                |
+| Sample items                                                           | Workspace ACL | guest / editor | Under batches                                         |
+| Samples (data loading)                                                 | Workspace ACL | guest          | Peaks, spectra, centroids, timeseries                 |
+| Match management                                                       | Workspace ACL | editor / admin | Rematch, compute, remove                              |
+| Match sub-resources                                                    | Workspace ACL | guest / editor | Collections, compounds, ions, isotopes, samples       |
+| Match aggregates                                                       | Workspace ACL | guest / editor | Batch and sample aggregations                         |
+| Match ratings                                                          | Workspace ACL | guest          | User match ratings                                    |
+| Match records                                                          | Workspace ACL | guest          | Read-only match record queries                        |
+| MS2 analysis                                                           | Workspace ACL | guest          | MS2 summary, centroids, timeseries                    |
+| Cheminfo (match)                                                       | Workspace ACL | guest          | `/mz/match/sample/{id}` — sample-scoped               |
+| Visualization                                                          | Workspace ACL | guest          | Ion focus visualization                               |
+| Target collections                                                     | Workspace ACL | guest / editor | Collection → workspace; global (null) readable by all |
+| Target associations                                                    | Workspace ACL | guest          | Scoped via collection or batch workspace              |
+| Sample files (read)                                                    | Workspace ACL | guest          | Filtered by accessible workspaces via sample items    |
+| Sample files (mutations)                                               | Workspace ACL | editor         | Requires Acquisitions workspace membership            |
+| File download                                                          | Workspace ACL | guest          | Via sample items in accessible workspaces             |
+| **Global (shared system resources)**                                   |               |                |                                                       |
+| Instruments                                                            | Global RBAC   | guest          | Shared hardware definitions                           |
+| Instrument configs                                                     | Global RBAC   | guest / editor | Shared instrument configuration                       |
+| Ionization modes                                                       | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Ionization mechanisms                                                  | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Attribute templates                                                    | Global RBAC   | guest / editor | Shared metadata schemas                               |
+| Target compounds                                                       | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target ions                                                            | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target isotopes                                                        | Global RBAC   | guest          | Shared reference data (cross-workspace)               |
+| Calibration (read)                                                     | Global RBAC   | guest          | View calibration state                                |
+| Calibration (mutations)                                                | Global RBAC   | admin          | Global operation, affects all associated samples      |
+| Cheminfo (query)                                                       | Global RBAC   | guest          | Stateless formula lookup                              |
+| Params                                                                 | Global RBAC   | guest          | Application parameters                                |
+| Temp files                                                             | Global RBAC   | guest          | Temporary file serving                                |
+| **Admin (system management)**                                          |               |                |                                                       |
+| Users (admin/owner)                                                    | Global RBAC   | admin / owner  | User management                                       |
+| Users (self)                                                           | Authenticated | —              | Own profile                                           |
+| Roles                                                                  | Global RBAC   | admin / owner  | Role definitions                                      |
+| Auth / tokens                                                          | Authenticated | —              | JWT and access tokens                                 |
 
 ### API Response Format
 

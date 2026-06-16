@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi_users import schemas
-from pydantic import EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.new.auth.config import auth_settings
@@ -59,6 +59,20 @@ class UserRead(schemas.BaseUser[int]):
         if role_name not in role_access_levels:
             raise ValueError(f"Invalid role name: '{role_name}'.")
         return role_name
+
+
+class UserPublic(BaseModel):
+    """Reduced user schema for public listing. Omits sensitive fields like email."""
+
+    id: int = Field(..., description="Unique identifier of the user (Primary Key).")
+    username: str = Field(
+        ...,
+        description="Name of the user, used for display purposes (not for login).",
+    )
+
+    model_config = {
+        "from_attributes": True,
+    }
 
 
 class UserCreate(schemas.BaseUserCreate):

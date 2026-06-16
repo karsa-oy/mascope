@@ -1,9 +1,13 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.file.schema import FileDownloadBody
 from mascope_backend.api.new.file.service import download_files
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_sample_file_instrument_access,
+)
+from mascope_backend.db import User
 from mascope_backend.db.id import gen_id
 
 
@@ -15,15 +19,20 @@ file_router = APIRouter(prefix="/api/file", tags=["Parameters"])
 async def download_file_route(
     body: FileDownloadBody,
     background_tasks: BackgroundTasks,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
 ):
-    """Download one or more sample files if available
+    """Download one or more sample files if available.
 
-    :param body: the request body
+    Checks that the user has guest-level access to the instrument workspace
+    for each requested file.
+
+    :param body: The request body containing sample file IDs to download.
     :type body: FileDownloadBody
-    :param user: The authenticated user, defaults to Depends(guest_user).
-    :return: Dictionary containing a message and the parameters.
+    :param user: The authenticated user.
+    :return: Dictionary containing a message and the process ID.
     """
+    for fid in body.sample_file_ids:
+        await check_sample_file_instrument_access(fid, user, "guest")
 
     process_id = gen_id(8)
 

@@ -21,10 +21,12 @@ from sqlalchemy import (
     Boolean,
     Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
     Text,
+    UniqueConstraint,
     event,
     func,
     or_,
@@ -77,12 +79,117 @@ Base = declarative_base(
 )
 
 
+# ---------------------------------------------------------------------------
+# Workspace & membership
+# ---------------------------------------------------------------------------
+
+
+class Workspace(Base):
+    """Workspace is the primary access-control and data-sharing boundary.
+
+    Contains datasets. User access is managed via WorkspaceMember.
+    """
+
+    __tablename__ = "workspace"
+
+    workspace_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    workspace_name: Mapped[str] = mapped_column(String(256))
+    workspace_description: Mapped[Optional[str]] = mapped_column(Text)
+    workspace_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'active'")
+    )
+    is_system: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
+
+    workspace_utc_created: Mapped[Optional[dt]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    workspace_utc_modified: Mapped[Optional[dt]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_workspace_name_ci",
+            func.lower(workspace_name),
+            unique=True,
+        ),
+    )
+
+    # Relationships
+    datasets = relationship(
+        "Dataset",
+        back_populates="workspace",
+        cascade="all, delete, delete-orphan",
+    )
+    members = relationship(
+        "WorkspaceMember",
+        back_populates="workspace",
+        cascade="all, delete, delete-orphan",
+    )
+    target_collections = relationship(
+        "TargetCollection",
+        back_populates="workspace",
+    )
+
+
+class WorkspaceMember(Base):
+    """Junction table granting a user access to a workspace with a specific role.
+
+    workspace_role values: 'guest', 'editor', 'admin', 'owner'.
+    """
+
+    __tablename__ = "workspace_member"
+
+    workspace_member_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("user.id", ondelete="CASCADE"),
+        index=True,
+    )
+    workspace_role: Mapped[str] = mapped_column(
+        String(20), server_default=text("'guest'")
+    )
+    granted_at: Mapped[dt] = mapped_column(
+        TIMESTAMP(timezone=True),
+        default=lambda: dt.now(timezone.utc),
+        nullable=False,
+    )
+    granted_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("user.id", ondelete="SET NULL"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member_pair"),
+    )
+
+    # Relationships
+    workspace = relationship("Workspace", back_populates="members")
+    user = relationship(
+        "User", foreign_keys=[user_id], back_populates="workspace_memberships"
+    )
+    granted_by_user = relationship("User", foreign_keys=[granted_by])
+
+
+# ---------------------------------------------------------------------------
+# Auth / Users / Roles
+# ---------------------------------------------------------------------------
+
+
 class User(SQLAlchemyBaseUserTable[int], Base):
     """User authentication and authorization model."""
 
     __tablename__ = "user"
 
-    # User table fields required for FastAPI Users. Kept unchanged for easier compatibility.
+    # User table fields required for FastAPI Users.
+    # Kept unchanged for easier compatibility.
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(
         String(length=320), unique=True, index=True, nullable=False
@@ -107,6 +214,12 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     role = relationship("Role", back_populates="user")
     access_token = relationship(
         "AccessToken", back_populates="user", cascade="all, delete, delete-orphan"
+    )
+    workspace_memberships = relationship(
+        "WorkspaceMember",
+        back_populates="user",
+        foreign_keys="WorkspaceMember.user_id",
+        cascade="all, delete, delete-orphan",
     )
 
     @classmethod
@@ -171,7 +284,8 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
     @classmethod
     async def clean_invalid_tokens(cls, session) -> int:
         """
-        Clean up tokens with NULL/invalid service names that are not allowed in AccessTokenConfig.
+        Clean up tokens with NULL/invalid service names that are not allowed in
+        AccessTokenConfig.
 
         :param session: SQLAlchemy async session
         :type session: AsyncSession
@@ -200,11 +314,16 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
 
 
 class Dataset(Base):
-    """Dataset container for organizing sample batches."""
+    """Dataset container for organizing sample batches. Belongs to a Workspace."""
 
     __tablename__ = "dataset"
 
     dataset_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("workspace.workspace_id", ondelete="CASCADE"),
+        index=True,
+    )
     dataset_name: Mapped[str] = mapped_column(String(256))
     dataset_description: Mapped[Optional[str]] = mapped_column(Text)
     dataset_type: Mapped[str] = mapped_column(
@@ -221,6 +340,7 @@ class Dataset(Base):
     dataset_utc_modified: Mapped[Optional[dt]] = mapped_column(TIMESTAMP(timezone=True))
 
     # Relationships
+    workspace = relationship("Workspace", back_populates="datasets")
     sample_batch = relationship(
         "SampleBatch", back_populates="dataset", cascade="all, delete, delete-orphan"
     )
@@ -288,7 +408,7 @@ def update_dataset_on_sample_batch_change(mapper, connection, target):
         )
         connection.execute(stmt)
         runtime.logger.debug(
-            f"Updated Dataset '{target.dataset_id}' timestamp due to SampleBatch change."
+            f"Updated Dataset '{target.dataset_id}' timestamp due to SampleBatch change"
         )
 
 
@@ -436,7 +556,8 @@ def update_sample_batch_on_sample_item_change(mapper, connection, target):
         )
         connection.execute(stmt)
         runtime.logger.debug(
-            f"Updated SampleBatch '{target.sample_batch_id}' timestamp due to SampleItem change."
+            f"Updated SampleBatch '{target.sample_batch_id}' "
+            "timestamp due to SampleItem change."
         )
 
 
@@ -454,8 +575,15 @@ class TargetCollection(Base):
             f"'{target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE}'"
         ),
     )
+    workspace_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey("workspace.workspace_id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
 
     # Relationships
+    workspace = relationship("Workspace", back_populates="target_collections")
     sample_batch = relationship(
         "TargetCollectionInSampleBatch",
         back_populates="target_collection",
@@ -923,6 +1051,8 @@ class InstrumentFunction(Base):
 
 __all__ = [
     "Base",
+    "Workspace",
+    "WorkspaceMember",
     "User",
     "Role",
     "AccessToken",

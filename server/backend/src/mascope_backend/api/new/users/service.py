@@ -22,10 +22,16 @@ from mascope_backend.api.new.users.me.schemas import (
     UserUpdateMe,
     UserUpdateMeCredentials,
 )
-from mascope_backend.api.new.users.schemas import UserCreate, UserRead, UserUpdate
+from mascope_backend.api.new.users.schemas import (
+    UserCreate,
+    UserPublic,
+    UserRead,
+    UserUpdate,
+)
 from mascope_backend.api.new.users.user_manager.service import UserManager
 from mascope_backend.api.new.users.util import check_username_exists
-from mascope_backend.db import Role, User, async_session
+from mascope_backend.db import Role, User, Workspace, WorkspaceMember, async_session
+from mascope_backend.db.id import gen_id
 
 
 @api_controller()
@@ -36,6 +42,7 @@ async def get_users(
     limit: int | None = None,
     sort: str = "registered_at",
     order: str = "desc",
+    caller: User | None = None,
 ) -> dict:
     """
     Retrieves a paginated, sorted, and optionally filtered list of users.
@@ -52,6 +59,9 @@ async def get_users(
     :type sort: str
     :param order: Sort order, either 'asc' or 'desc', defaults to "desc".
     :type order: str
+    :param caller: The user making the request, used for access control. Admin and
+                   higher roles see full user details, defaults to None (public view).
+    :type caller: User | None
     :raises NotFoundException: If no users are found in the database.
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
@@ -98,11 +108,22 @@ async def get_users(
         result = await session.execute(query)
 
         # Step 5: Construct the response data
+        # Admins/owners see full user details; others get public-only fields
+        admin_level = auth_settings.ROLE_ACCESS_LEVELS["admin"]
+        schema = (
+            UserRead
+            if caller
+            and (
+                caller.is_superuser
+                or (caller.role_id is not None and caller.role_id >= admin_level)
+            )
+            else UserPublic
+        )
         users = []
         for user, role_name in result.all():
             user_data = user.to_dict()
             user_data["role_name"] = role_name
-            users.append(UserRead.model_validate(user_data))
+            users.append(schema.model_validate(user_data))
 
     return {
         "message": f"Retrieved {len(users)} user records.",
@@ -187,6 +208,30 @@ async def register_user(
 
     # --- Create the user ---
     created_user = await user_manager.create(user_create=user_create, safe=safe)
+
+    # --- Auto-add to system workspaces with matching global role ---
+    role_name = next(
+        (
+            name
+            for name, level in auth_settings.ROLE_ACCESS_LEVELS.items()
+            if level == user_create.role_id
+        ),
+        "guest",
+    )
+    async with async_session() as session:
+        result = await session.execute(
+            select(Workspace).where(Workspace.is_system.is_(True))
+        )
+        for ws in result.scalars().all():
+            member = WorkspaceMember(
+                workspace_member_id=gen_id(),
+                workspace_id=ws.workspace_id,
+                user_id=created_user.id,
+                workspace_role=role_name,
+                granted_by=None,
+            )
+            session.add(member)
+        await session.commit()
 
     # --- Validate and return the registered user's details ---
     user = (await get_user(user_id=created_user.id))["data"]

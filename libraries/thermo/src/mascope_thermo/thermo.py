@@ -168,6 +168,25 @@ class ScanSelector:
             ]
         )
 
+    def _bad_first_scan(self) -> bool:
+        """Checks if the TIC in the first scan is 5 times higher than
+        the median TIC of the other scans
+
+        This is a workaround for a common issue in Thermo raw files where the first scan
+        is an outlier with an abnormally high TIC.
+
+        #TODO: can be removed if Thermo releases a fix for this issue
+        """
+        has_only_one_scan = len(self.raw_scan_stats) == 1
+        if has_only_one_scan:
+            return False
+
+        tic_values = np.array([stats.TIC for stats in self.raw_scan_stats])
+        first_scan_tic = tic_values[0]
+        median_other_tic = np.median(tic_values[1:])
+
+        return first_scan_tic >= 5 * median_other_tic
+
     @property
     def scan_indices_1based(self) -> list[int]:
         """Returns the list of scan indices that match the specified polarity,
@@ -184,6 +203,13 @@ class ScanSelector:
 
         if self._ms_type:
             mask &= self._ms_type_mask()
+
+        if self._bad_first_scan():
+            runtime.logger.warning(
+                "The first scan appears to be an outlier with abnormally high TIC. "
+                "Excluding the first scan from selection."
+            )
+            mask[0] = False
 
         filtered_indices = np.array(self.all_scan_indices)[mask]
 

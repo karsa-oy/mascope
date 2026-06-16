@@ -53,7 +53,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         ? `Batches (${filteredCount}/${app.data.batch.list?.length})`
         : `Batches (${app.data.batch.list?.length})`
     "
-    icon="pi pi-tags"
+    icon="pi pi-folder-open"
     :contextMenu="contextMenu"
     :pt="
       app.ui.help.right(`

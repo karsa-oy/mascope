@@ -23,12 +23,10 @@ export const useUser = defineStore('app.data.user', () => {
   const data = useData(
     name,
     () =>
-      sudo(() =>
-        api.http.get(`/users`, {
-          use: 'read',
-          type: 'load_users'
-        })
-      ) ?? [],
+      api.http.get(`/users`, {
+        use: 'read',
+        type: 'load_users'
+      }),
     {
       key
     }

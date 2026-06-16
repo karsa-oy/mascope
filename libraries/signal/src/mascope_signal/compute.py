@@ -762,7 +762,7 @@ async def get_ms2_fragment_timeseries(
     polarity: Literal["+", "-"] | None = None,
     noise_threshold: float = 10.0,
     parent_peak_tolerance: float = 0.001,
-    normalize_by: Literal["tic", "none"] = "none",
+    normalize_by: Literal["tic"] | None = None,
 ) -> dict:
     """Compute fragment timeseries for a single MS2 parent peak.
 
@@ -785,8 +785,8 @@ async def get_ms2_fragment_timeseries(
     :param parent_peak_tolerance: Tolerance in Da for matching parent peaks.
     :type parent_peak_tolerance: float
     :param normalize_by: Normalization mode. ``"tic"`` normalizes by scan TIC,
-        ``"none"`` returns raw intensities.
-    :type normalize_by: Literal["tic", "none"]
+        ``None`` returns raw intensities.
+    :type normalize_by: Literal["tic"] | None, optional
     :return: Dictionary with mz_values, time, and values arrays.
     :rtype: dict
     """

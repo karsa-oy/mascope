@@ -31,6 +31,7 @@ import { BaseClipboardContext } from '@/lib/base'
 import { isValidChemicalFormula, isSameCompound, findExistingCompound } from '@/lib/chem'
 import { clone } from '@/lib/utils'
 import { collectionTypes, getAllowedDatasetTypes, getAllowedBatchTypes } from '@/lib/constants'
+import { ROLES } from '@/lib/roles'
 
 const confirm = useConfirm()
 
@@ -49,11 +50,15 @@ const visible = ref(false)
 const initializing = ref(false)
 
 // Collection info
+const GLOBAL_SENTINEL = '__global__'
+
+// Collection info
 const info = reactive({
   id: null,
   name: '',
   desc: '',
-  type: 'TARGETS'
+  type: 'TARGETS',
+  workspace_id: undefined // undefined = use focused workspace; GLOBAL_SENTINEL = global
 })
 
 // Compounds state
@@ -331,7 +336,8 @@ function execute() {
   const common = {
     target_collection_name: info.name,
     target_collection_description: info.desc,
-    target_collection_type: info.type
+    target_collection_type: info.type,
+    workspace_id: info.workspace_id === GLOBAL_SENTINEL ? null : info.workspace_id
   }
   const target_collection_id = original.value?.target_collection_id
   const target_compound_ids = [
@@ -370,13 +376,17 @@ function execute() {
         totalCompounds === 0
           ? 'No compounds yet - assign peaks or update this collection later.'
           : `Total ${totalCompounds} compounds (${created} new, ${existing} existing from other collections).`
+      const scopeSummary =
+        info.workspace_id === GLOBAL_SENTINEL
+          ? 'Scope: Global (shared across all workspaces).'
+          : `Scope: ${workspaceScopeOptions.value.find((o) => o.value === info.workspace_id)?.label ?? 'Unknown workspace'}.`
       confirm.require({
         group: 'target-collection-create',
         icon: 'pi pi-info-circle',
         header: `Creating ${info.name} (${info.type})`,
         message: {
           intro: 'Please review collection parameters before creating:',
-          items: [batchSummary, compoundSummary]
+          items: [scopeSummary, batchSummary, compoundSummary]
         },
         accept: () => {
           app.data.target.collection.create({
@@ -475,13 +485,15 @@ const executeLabel = computed(() => (action.value == 'delete' ? 'Delete' : 'Save
 const invalidated = computed(() => {
   switch (action.value) {
     case 'create':
-      return !info.name || !info.type
+      return !info.name || !info.type || !info.workspace_id
 
     case 'update': {
       const infoChanged =
         info.name !== original.value.target_collection_name ||
         info.desc !== original.value.target_collection_description ||
-        info.type !== original.value.target_collection_type
+        info.type !== original.value.target_collection_type ||
+        (info.workspace_id === GLOBAL_SENTINEL ? null : info.workspace_id) !==
+          (original.value.workspace_id ?? null)
       const compoundsChanged = !equals(compounds.initial, compounds.selected, 'target_compound_id')
       const compoundsCreated = compounds.created.length > 0 // Check if new compounds were added
       return !(infoChanged || compoundsChanged || compoundsCreated)
@@ -496,6 +508,24 @@ const invalidated = computed(() => {
 const invalidFormula = computed(
   () => add.formula.length > 0 && !isValidChemicalFormula(add.formula)
 )
+
+// Workspace scope options for the scope selector
+const workspaceScopeOptions = computed(() => {
+  const options = app.data.workspace.list
+    .filter((w) => !w.is_system)
+    .map((w) => ({
+      label: w.workspace_name,
+      value: w.workspace_id
+    }))
+  // Only admins+ can create/edit global collections
+  if (app.auth.user.role_id >= ROLES.admin) {
+    options.unshift({ label: 'Global (all workspaces)', value: GLOBAL_SENTINEL })
+  }
+  return options
+})
+
+// Whether the scope selector should be disabled (only editable on create, not update_batches)
+const scopeDisabled = computed(() => action.value === 'update_batches')
 
 // Check for existing compound in db for manual input
 const existingInputCompound = computed(() =>
@@ -637,6 +667,7 @@ async function init(mode) {
     info.name = original.value?.target_collection_name
     info.desc = original.value?.target_collection_description
     info.type = original.value?.target_collection_type
+    info.workspace_id = original.value?.workspace_id ?? GLOBAL_SENTINEL
     compounds.selected = original.value?.target_compounds ?? []
   }
 
@@ -646,6 +677,7 @@ async function init(mode) {
       info.name = ''
       info.desc = ''
       info.type = null
+      info.workspace_id = app.data.workspace.focusedId ?? GLOBAL_SENTINEL
       selected.dataset = app.data.dataset.focused
       break
     }
@@ -896,6 +928,35 @@ watch(
           :allowEmpty="false"
           :disabled="action == 'update_batches'"
         />
+      </div>
+      <div class="row" style="margin-top: 0.5rem; align-items: center">
+        <Select
+          v-model="info.workspace_id"
+          :options="workspaceScopeOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Select workspace scope"
+          :disabled="scopeDisabled"
+          v-tooltip.top="{
+            value:
+              'Choose which workspace this collection belongs to, or make it global for all workspaces',
+            showDelay: 500
+          }"
+          style="min-width: 14rem"
+        >
+          <template #value="{ value }">
+            <div class="row" style="align-items: center; gap: 0.5rem">
+              <span
+                :class="value === GLOBAL_SENTINEL ? 'pi ph ph-globe' : 'pi ph ph-briefcase'"
+                style="font-size: 1rem; opacity: 0.7"
+              />
+              <span>{{
+                workspaceScopeOptions.find((o) => o.value === value)?.label ??
+                'Select workspace scope'
+              }}</span>
+            </div>
+          </template>
+        </Select>
       </div>
       <Tabs v-model:value="selected.tab" lazy>
         <TabList>
@@ -1163,7 +1224,20 @@ watch(
                         style="min-width: 200px"
                         filter
                         resetFilterOnHide
-                      />
+                      >
+                        <template #option="{ option }">
+                          <div style="display: flex; align-items: center; gap: 0.4rem">
+                            <span
+                              v-if="option.target_collection_id !== 'all-compounds'"
+                              :class="
+                                !option.workspace_id ? 'pi ph ph-globe' : 'pi ph ph-briefcase'
+                              "
+                              style="font-size: 0.85rem; opacity: 0.6"
+                            />
+                            <span>{{ option.target_collection_name }}</span>
+                          </div>
+                        </template>
+                      </Select>
                     </FloatLabel>
                     <FloatLabel style="flex-grow: 1">
                       <IconField class="full">

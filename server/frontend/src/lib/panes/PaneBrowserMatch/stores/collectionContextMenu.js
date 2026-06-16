@@ -1,6 +1,7 @@
 import { ref, reactive, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useApp } from '@/stores'
+import { ROLES } from '@/lib/roles'
 
 export const useCollectionContextMenu = defineStore('collectionContextMenu', () => {
   const app = useApp()
@@ -23,10 +24,14 @@ export const useCollectionContextMenu = defineStore('collectionContextMenu', () 
         }
       ]
 
+    const isGlobal = !selection.value.workspace_id
+    const canMutate = !isGlobal || app.auth.user.role_id >= ROLES.admin
+
     return [
       {
         label: `Edit '${selection.value.target_collection_name}'`,
         icon: 'pi pi-pen-to-square',
+        disabled: !canMutate,
         command: () => {
           dialog.op = 'update'
         }
@@ -41,6 +46,7 @@ export const useCollectionContextMenu = defineStore('collectionContextMenu', () 
       {
         label: `Delete '${selection.value.target_collection_name}'`,
         icon: 'pi pi-trash',
+        disabled: !canMutate,
         command: () => {
           dialog.op = 'delete'
         }

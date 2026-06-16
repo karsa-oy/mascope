@@ -11,7 +11,8 @@ from mascope_backend.api.controllers.sample.batches.sample_batches_controller im
     get_sample_batch,
 )
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import editor_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import require_batch_role
 from mascope_backend.db.id import gen_id
 
 
@@ -23,7 +24,8 @@ sample_batches_export_router = APIRouter(tags=["Sample Batches Export"])
 async def sample_batch_export_spreadsheet_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Export batch data and matches to Excel spreadsheet.
 

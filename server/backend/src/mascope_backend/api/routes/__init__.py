@@ -19,10 +19,15 @@ from mascope_backend.api.new.users.first_owner.routes import (
 from mascope_backend.api.new.users.me.routes import me_router
 from mascope_backend.api.new.users.owner.routes import owner_router
 from mascope_backend.api.new.users.routes import users_router
+from mascope_backend.api.new.workspaces.routes import workspaces_router
 from mascope_backend.api.routes.attribute_templates.attribute_templates_routes import (
     attribute_templates_router,
 )
 from mascope_backend.api.routes.calibration.calibration_routes import calibration_router
+from mascope_backend.api.routes.dataset.acquisition.routes import (
+    acquisition_datasets_router,
+)
+from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 from mascope_backend.api.routes.ionization_mechanisms.ionization_mechanisms_routes import (
     ionization_mechanisms_router,
 )
@@ -45,9 +50,6 @@ from mascope_backend.api.routes.match.isotopes.match_isotopes_routes import (
 from mascope_backend.api.routes.match.match_routes import match_router
 from mascope_backend.api.routes.match.samples.match_samples_routes import (
     match_samples_router,
-)
-from mascope_backend.api.routes.match.targets.batch.match_targets_batch_routes import (
-    match_targets_batch_router,
 )
 from mascope_backend.api.routes.match_rating.match_rating_routes import (
     match_rating_router,
@@ -82,7 +84,6 @@ from mascope_backend.api.routes.target.isotopes.target_isotopes_routes import (
 from mascope_backend.api.routes.visualization.visualization_routes import (
     visualization_router,
 )
-from mascope_backend.api.routes.dataset.dataset_routes import dataset_router
 
 
 routers = [
@@ -93,8 +94,10 @@ routers = [
     admin_router,
     owner_router,
     roles_router,
+    workspaces_router,
     params_router,
     dataset_router,
+    acquisition_datasets_router,
     sample_batches_router,
     samples_router,
     sample_files_router,
@@ -113,7 +116,6 @@ routers = [
     instrument_configs_router,
     calibration_router,
     match_records_router,
-    match_targets_batch_router,
     match_router,
     match_aggregate_batch_router,
     match_aggregate_sample_router,

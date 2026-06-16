@@ -13,7 +13,9 @@ from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.models.visualization.visualization_pydantic_model import (
     GetVisualizationIonFocusQueryParams,
 )
-from mascope_backend.api.new.auth.dependencies import guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import check_sample_access
+from mascope_backend.db import User
 from mascope_backend.db.id import gen_id
 
 
@@ -26,16 +28,17 @@ async def visualization_ion_focus_route(
     request: Request,
     background_tasks: BackgroundTasks,
     query_params: GetVisualizationIonFocusQueryParams = Depends(),
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
 ):
     """Initiate a visualization task for focusing on a specific ion in a sample.
 
     :param background_tasks: Background task manager for running visualization tasks.
     :param query_params: Query parameters for the ion focus visualization.
-    :param user: The authenticated user, defaults to Depends(guest_user).
+    :param user: The current authenticated user. Requires workspace guest role.
+    :type user: User
     :return: A dictionary with a message indicating task initiation and a process ID.
     """
-    # Verify the existence
+    await check_sample_access(query_params.sample_item_id, user, "guest")
     sample_data = await get_sample_item(query_params.sample_item_id)
     sample = sample_data.get("data")
     sample_item_name = sample["sample_item_name"]

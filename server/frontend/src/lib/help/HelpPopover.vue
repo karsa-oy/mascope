@@ -18,6 +18,7 @@ const placement = ref()
 
 const { floatingStyles, x, y, middlewareData } = useFloating(targetEl, popoverEl, {
   placement,
+  strategy: 'fixed',
   middleware: [offset(10), arrow({ element: arrowEl })]
 })
 
@@ -115,7 +116,7 @@ watchDebounced(
 
 <style scoped>
 .help-popover {
-  position: absolute;
+  position: fixed;
   padding: 1rem;
   z-index: 9999;
   border-radius: 0.5rem;

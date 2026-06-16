@@ -1,8 +1,14 @@
 import os
+import re
 
 import datetime_glob
 
 from mascope_file.runtime import runtime
+
+
+# Instrument names are derived from filenames (first segment before '_').
+# Only allow letters, digits, and hyphens — no underscores (used as separator).
+_INSTRUMENT_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
 
 
 FILENAME_DATETIME_PATTERNS = [
@@ -97,6 +103,25 @@ def filename_to_datafile_path(base_filename):
             )
 
 
+def validate_instrument_name(instrument: str) -> None:
+    """Reject instrument names that don't match the expected pattern.
+
+    Validates that the name contains only letters, digits, and hyphens
+    (no underscores - those are used as the filename separator), and that
+    the instrument resolves to a known type via :func:`resolve_instrument_type`.
+
+    :param instrument: Instrument name to validate
+    :type instrument: str
+    :raises ValueError: If the name is invalid or the instrument type is unknown
+    """
+    if not _INSTRUMENT_RE.match(instrument):
+        raise ValueError(
+            f"Invalid instrument name '{instrument}'. "
+            "Must be 1-64 characters using only letters, digits, and hyphens."
+        )
+    resolve_instrument_type(instrument)
+
+
 def get_instrument_name(filename: str) -> str:
     """Get instrument name from sample file
 
@@ -112,14 +137,15 @@ def get_instrument_name(filename: str) -> str:
     return instrument_name
 
 
-def resolve_instrument_type(instrument_name: str, throw: bool = True) -> str:
+def resolve_instrument_type(instrument_name: str, throw: bool = True) -> str | None:
     """Get instrument type (one of {"orbi", "tof"}) from an instrument name
 
     :param instrument_name: instrument name
     :type instrument: str
     :raises ValueError: Failed to detect instrument type
-    :return: Instrument type, one of {"orbi", "tof"}
-    :rtype: str
+    :return: Instrument type, one of {"orbi", "tof"} or None if
+             not resolved and throw=False
+    :rtype: str | None
     """
     name = instrument_name.lower()
     if "orbi" in name:
@@ -136,14 +162,14 @@ def resolve_instrument_type(instrument_name: str, throw: bool = True) -> str:
     return instrument_type
 
 
-def get_instrument_type(filename: str) -> str:
+def get_instrument_type(filename: str) -> str | None:
     """Get instrument type (one of {"orbi", "tof"}) from sample file
 
     :param filename: Sample file name
     :type filename: str
     :raises ValueError: Failed to detect instrument type
-    :return: Instrument type, one of {"orbi", "tof"}
-    :rtype: str
+    :return: Instrument type, one of {"orbi", "tof"} or None if not resolved
+    :rtype: str | None
     """
     instrument_name = get_instrument_name(filename)
     return resolve_instrument_type(instrument_name)
@@ -172,3 +198,4 @@ def get_sample_file_type(filename: str) -> str:
             return "tof_h5" if is_h5 else "tof_zarr"
         case "orbi":
             return "orbi_raw" if is_raw else "orbi_zarr"
+    raise ValueError(f"Failed to determine sample file type for {filename}")

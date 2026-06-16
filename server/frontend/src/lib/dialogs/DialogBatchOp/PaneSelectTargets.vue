@@ -83,25 +83,31 @@ watch(
   { immediate: true }
 )
 const targetCollections = computed(() =>
-  app.data.target.collection.list.filter((coll) => {
-    // Filter by allowed types for this batch
-    if (!allowedTypes.value.includes(coll.target_collection_type)) return false
+  app.data.target.collection.list
+    .filter((coll) => {
+      // Filter by allowed types for this batch
+      if (!allowedTypes.value.includes(coll.target_collection_type)) return false
 
-    // Filter by selected category
-    if (
-      category.value !== 'All' &&
-      beautifyConstant(coll.target_collection_type) !== category.value
-    ) {
-      return false
-    }
+      // Filter by selected category
+      if (
+        category.value !== 'All' &&
+        beautifyConstant(coll.target_collection_type) !== category.value
+      ) {
+        return false
+      }
 
-    // Filter by search
-    const query = search.value?.toLowerCase() ?? ''
-    return (
-      coll.target_collection_name.toLowerCase().includes(query) ||
-      coll.target_collection_description?.toLowerCase().includes(query)
-    )
-  })
+      // Filter by search
+      const query = search.value?.toLowerCase() ?? ''
+      return (
+        coll.target_collection_name.toLowerCase().includes(query) ||
+        coll.target_collection_description?.toLowerCase().includes(query)
+      )
+    })
+    .map((coll) => ({
+      ...coll,
+      _outOfScope: coll.workspace_id !== null && coll.workspace_id !== app.data.workspace.focusedId
+    }))
+    .sort((a, b) => (a._outOfScope === b._outOfScope ? 0 : a._outOfScope ? 1 : -1))
 )
 </script>
 
@@ -126,10 +132,30 @@ const targetCollections = computed(() =>
       </FloatLabel>
     </div>
     <ScrollPanel style="width: 100%; height: 300px">
-      <DataTable v-model:selection="selected" :value="targetCollections">
+      <DataTable
+        v-model:selection="selected"
+        :value="targetCollections"
+        dataKey="target_collection_id"
+        :rowClass="(data) => (data._outOfScope ? 'out-of-scope-row' : '')"
+        :isDataSelectable="(event) => !event.data._outOfScope"
+      >
         <Column v-if="mode == 'targets'" selectionMode="multiple" headerStyle="width: 3rem" />
         <Column v-else selectionMode="single" headerStyle="width: 3rem" />
-        <Column header="Name" field="target_collection_name" />
+        <Column header="Name" field="target_collection_name">
+          <template #body="{ data }">
+            <span
+              v-if="!data.workspace_id"
+              v-tooltip.top="{ value: 'Global collection', showDelay: 500 }"
+              class="pi ph ph-globe scope-icon scope-global"
+            />
+            <span
+              v-else-if="data._outOfScope"
+              v-tooltip.top="{ value: 'From another workspace', showDelay: 500 }"
+              class="pi ph ph-lock scope-icon scope-locked"
+            />
+            <span>{{ data.target_collection_name }}</span>
+          </template>
+        </Column>
         <Column header="Description" field="target_collection_description" />
       </DataTable>
     </ScrollPanel>
@@ -144,5 +170,24 @@ const targetCollections = computed(() =>
 
 :deep(.p-floatlabel) {
   margin: 0;
+}
+
+.scope-icon {
+  margin-right: 0.4rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+
+.scope-global {
+  color: var(--p-primary-color);
+}
+
+.scope-locked {
+  color: var(--p-text-muted-color);
+}
+
+:deep(.out-of-scope-row) {
+  opacity: 0.45;
+  pointer-events: none;
 }
 </style>

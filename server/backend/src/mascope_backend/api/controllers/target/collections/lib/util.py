@@ -1,19 +1,44 @@
 """
-Target collection utility functions for target collection operations and change detection.
+Target collection utility functions for collection operations and change detection.
 
 This module contains helper functions for target collection management operations,
 including change detection, validation utilities, and data transformation
 functions used across target collection-related controllers.
 """
 
+from typing import TypedDict
+
+from sqlalchemy import select
+
+from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
+from mascope_backend.api.models.target.collections.target_collection_pydantic_model import (
+    TargetCollectionUpdate,
+)
+from mascope_backend.db import (
+    Dataset,
+    SampleBatch,
+    TargetCollection,
+    async_session,
+)
 from mascope_backend.runtime import runtime
 
 
+class TargetCollectionChanges(TypedDict):
+    compounds: bool
+    compounds_to_add: set[str]
+    compounds_to_remove: set[str]
+    batches: bool
+    batches_to_add: set[str]
+    batches_to_remove: set[str]
+    basic_fields: bool
+    collection_type: bool
+
+
 def detect_target_collection_changes(
-    target_collection_db,
-    target_collection_update,
-    updated_compound_ids: set | None = None,
-) -> dict[str, bool]:
+    target_collection_db: TargetCollection,
+    target_collection_update: TargetCollectionUpdate,
+    updated_compound_ids: set[str] | None = None,
+) -> TargetCollectionChanges:
     """
     Detects changes between existing target collection and update data.
 
@@ -25,10 +50,11 @@ def detect_target_collection_changes(
     :type target_collection_db: TargetCollection
     :param target_collection_update: Pydantic model containing proposed updates
     :type target_collection_update: TargetCollectionUpdate
-    :param updated_compound_ids: Final compound IDs that should be associated with the collection
-    :type updated_compound_ids: set | None
-    :return: Dictionary mapping change types to boolean flags
-    :rtype: dict[str, bool]
+    :param updated_compound_ids: Final compound IDs that should be associated with the
+                                 collection
+    :type updated_compound_ids: set[str] | None
+    :return: Dictionary mapping change types to boolean flags and sets of IDs
+    :rtype: dict[str, bool | set[str]]
     """
     sample_batches_db = {sb.sample_batch_id for sb in target_collection_db.sample_batch}
     target_compounds_db = {
@@ -69,8 +95,15 @@ def detect_target_collection_changes(
         and target_collection_update.target_collection_description
         != target_collection_db.target_collection_description
     )
+    workspace_id_changed = (
+        "workspace_id" in target_collection_update.model_fields_set
+        and target_collection_update.workspace_id != target_collection_db.workspace_id
+    )
     basic_fields_changed = (
-        collection_type_changed or name_changed or description_changed
+        collection_type_changed
+        or name_changed
+        or description_changed
+        or workspace_id_changed
     )
 
     runtime.logger.debug(
@@ -94,3 +127,53 @@ def detect_target_collection_changes(
         "basic_fields": basic_fields_changed,
         "collection_type": collection_type_changed,
     }
+
+
+async def validate_scope_change(
+    target_collection_db: TargetCollection,
+    new_workspace_id: str | None,
+) -> None:
+    """Validate that a collection's scope can be changed to a new workspace.
+
+    When narrowing scope (global→workspace or workspaceA→workspaceB), checks
+    that no existing batch associations fall outside the target workspace.
+    Expanding to global (any→null) is always allowed.
+
+    :param target_collection_db: Current target collection entity from database
+    :param new_workspace_id: The target workspace_id (None for global)
+    :raises ApiException: If associated batches exist outside the target workspace
+    """
+    # No actual change
+    if new_workspace_id == target_collection_db.workspace_id:
+        return
+
+    # Expanding to global is always safe — visible to everyone
+    if new_workspace_id is None:
+        return
+
+    # No batch associations — scope change is safe
+    if not target_collection_db.sample_batch:
+        return
+
+    # Check if any associated batches belong to a different workspace
+    batch_ids = [assoc.sample_batch_id for assoc in target_collection_db.sample_batch]
+    async with async_session() as session:
+        result = await session.execute(
+            select(Dataset.workspace_id)
+            .join(SampleBatch, SampleBatch.dataset_id == Dataset.dataset_id)
+            .where(SampleBatch.sample_batch_id.in_(batch_ids))
+            .where(Dataset.workspace_id != new_workspace_id)
+            .limit(1)
+        )
+        out_of_scope = result.scalar_one_or_none()
+
+    if out_of_scope is not None:
+        msg = (
+            "Cannot change collection scope: the collection is associated "
+            "with batches in other workspaces."
+        )
+        raise ApiException(
+            user_message=msg,
+            tech_message=msg,
+            status_code=409,
+        )

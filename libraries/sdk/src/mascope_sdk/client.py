@@ -16,27 +16,6 @@ from tqdm import tqdm
 from .exceptions import ConfigurationError
 
 
-def _compat_dataset_kwarg(dataset, kwargs, method_name):
-    """Accept ``workspace=`` as a deprecated alias for ``dataset=``."""
-    if "workspace" in kwargs:
-        import warnings
-
-        warnings.warn(
-            f"'{method_name}(workspace=...)' is deprecated, "
-            f"use '{method_name}(dataset=...)' instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        if dataset is not None:
-            raise TypeError(
-                f"{method_name}() got both 'dataset' and 'workspace' arguments"
-            )
-        return kwargs.pop("workspace")
-    elif dataset is None:
-        raise ValueError(f"{method_name}() missing required 'dataset' argument")
-    return dataset
-
-
 # Track whether we've already configured the SDK's loguru handler
 _log_handler_id: int | None = None
 
@@ -93,6 +72,12 @@ class MascopeClient:
     :vartype url: str
     :ivar access_token: The API access token.
     :vartype access_token: str
+    :ivar workspace_id: The resolved workspace ID.
+    :vartype workspace_id: str
+    :ivar workspace_name: The resolved workspace name.
+    :vartype workspace_name: str
+    :ivar workspaces: Resource for workspace operations.
+    :vartype workspaces: WorkspacesResource
     :ivar datasets: Resource for dataset operations.
     :vartype datasets: DatasetsResource
     :ivar batches: Resource for sample batch operations.
@@ -108,17 +93,20 @@ class MascopeClient:
 
         from mascope_sdk import MascopeClient
 
-        # Auto-configure from .env or environment variables
+        # Auto-configure from .env, auto-selects workspace if only one
         mascope = MascopeClient()
 
-        # List all datasets
+        # Explicit workspace selection
+        mascope = MascopeClient(workspace="My Workspace")
+
+        # List all datasets of the selected workspace
         datasets = mascope.datasets.list()
 
         # Get samples from a batch
-        samples = mascope.samples.list(sample_batch_id="batch-123")
+        samples = mascope.samples.list(batch="My Batch")
 
         # Get spectrum data
-        spectrum = mascope.samples.get_spectrum(sample_id="sample-456")
+        spectrum = mascope.samples.get_spectrum(sample_id="sample-123")
     """
 
     def __init__(
@@ -126,6 +114,7 @@ class MascopeClient:
         url: str | None = None,
         access_token: str | None = None,
         *,
+        workspace: str | None = None,
         env_file: Path | str | None = None,
         verify_ssl: bool | None = None,
         service_name: str = "mascope_sdk",
@@ -138,6 +127,12 @@ class MascopeClient:
         :param access_token: The API access token.
                             Falls back to ``MASCOPE_ACCESS_TOKEN`` environment variable.
         :type access_token: str, optional
+        :param workspace: Workspace name, substring, or ID to select. If not
+                          provided and the user belongs to exactly one workspace,
+                          it is auto-selected. If the user belongs to multiple
+                          workspaces, a ``ConfigurationError`` is raised listing
+                          the available options.
+        :type workspace: str, optional
         :param env_file: Optional path to a ``.env`` file. If not provided, searches
                         for ``.env`` in the current directory and parent directories.
         :type env_file: Path | str | None, optional
@@ -145,17 +140,22 @@ class MascopeClient:
         :type verify_ssl: bool, optional
         :param service_name: Service name for request headers.
         :type service_name: str, optional
-        :raises ConfigurationError: If URL or access token cannot be determined.
+        :raises ConfigurationError: If URL or access token cannot be determined,
+                                    or if workspace cannot be resolved.
 
         Example::
 
-            # Using .env file (automatic)
+            # Using .env file (automatic), auto-selects workspace
             mascope = MascopeClient()
+
+            # Explicit workspace selection
+            mascope = MascopeClient(workspace="My Workspace")
 
             # Explicit configuration
             mascope = MascopeClient(
                 url="https://example.mascope.app",
-                access_token="your-token"
+                access_token="your-token",
+                workspace="My Workspace",
             )
 
             # Custom .env file location
@@ -212,6 +212,7 @@ class MascopeClient:
         self._cache: dict[str, pd.DataFrame] = {}
 
         # Initialize resource objects (lazy imports to avoid circular dependencies)
+        self._workspaces: Any = None
         self._datasets: Any = None
         self._batches: Any = None
         self._samples: Any = None
@@ -219,8 +220,8 @@ class MascopeClient:
         self._cheminfo: Any = None
         self._ionization: Any = None
 
-        # Pre-instantiate datasets resource for early error detection
-        self.datasets.list()
+        # Resolve workspace (fetch list, then resolve or auto-select)
+        self._workspace_id, self._workspace_name = self._resolve_workspace(workspace)
 
     @property
     def url(self) -> str:
@@ -231,6 +232,25 @@ class MascopeClient:
     def access_token(self) -> str:
         """The API access token."""
         return self._access_token  # type: ignore
+
+    @property
+    def workspace_id(self) -> str:
+        """The resolved workspace ID."""
+        return self._workspace_id
+
+    @property
+    def workspace_name(self) -> str:
+        """The resolved workspace name."""
+        return self._workspace_name
+
+    @property
+    def workspaces(self) -> "WorkspacesResource":
+        """Resource for workspace operations."""
+        if self._workspaces is None:
+            from .resources.workspaces import WorkspacesResource
+
+            self._workspaces = WorkspacesResource(self)
+        return self._workspaces
 
     @property
     def datasets(self) -> "DatasetsResource":
@@ -286,10 +306,46 @@ class MascopeClient:
             self._ionization = IonizationResource(self)
         return self._ionization
 
+    def _resolve_workspace(self, workspace: str | None) -> tuple[str, str]:
+        """Resolve workspace argument to a workspace ID and name.
+
+        If *workspace* is provided, resolves it by exact ID or name match.
+        If not provided, auto-selects when exactly one workspace is available.
+
+        :param workspace: Workspace name, substring, regex, or ID.
+        :raises ConfigurationError: If resolution fails.
+        :return: Tuple of (workspace_id, workspace_name).
+        """
+        from ._resolve import resolve_id
+
+        ws_df = self.workspaces.list()
+
+        if ws_df is None or ws_df.empty:
+            raise ConfigurationError("No workspaces found for the current user.")
+
+        if workspace is not None:
+            try:
+                ws_id = resolve_id(
+                    workspace, ws_df, "workspace_id", "workspace_name", "workspace"
+                )
+            except ValueError as exc:
+                raise ConfigurationError(str(exc)) from exc
+        elif len(ws_df) == 1:
+            ws_id = ws_df.iloc[0]["workspace_id"]
+        else:
+            available = ws_df["workspace_name"].tolist()
+            raise ConfigurationError(
+                f"Multiple workspaces available: {available}. "
+                f"Please specify one with MascopeClient(workspace=...)."
+            )
+
+        ws_name = ws_df.loc[ws_df["workspace_id"] == ws_id, "workspace_name"].iloc[0]
+        logger.info("Selected workspace '{}' ({})", ws_name, ws_id)
+        return ws_id, ws_name
+
     def load_peaks(
         self,
-        dataset: str
-        | None = None,  # TODO: Make dataset a required positional argument when removing workspace compatibility
+        dataset: str,
         batches: str | None = None,
         *,
         samples: str | None = None,
@@ -380,7 +436,6 @@ class MascopeClient:
         """
         from ._loaders import load_peaks as _load_peaks
 
-        dataset = _compat_dataset_kwarg(dataset, kwargs, "load_peaks")
         return _load_peaks(
             self,
             dataset,
@@ -396,8 +451,7 @@ class MascopeClient:
 
     def load_peak_timeseries(
         self,
-        dataset: str
-        | None = None,  # TODO: Make dataset a required positional argument when removing workspace compatibility
+        dataset: str,
         batches: str | None = None,
         *,
         samples: str | None = None,
@@ -480,7 +534,6 @@ class MascopeClient:
         """
         from ._loaders import load_peak_timeseries as _load_peak_timeseries
 
-        dataset = _compat_dataset_kwarg(dataset, kwargs, "load_peak_timeseries")
         return _load_peak_timeseries(
             self,
             dataset,
@@ -574,7 +627,7 @@ class MascopeClient:
         self._cache.clear()
 
     def __repr__(self) -> str:
-        return f"MascopeClient(url='{self._url}')"
+        return f"MascopeClient(url='{self._url}', workspace='{self._workspace_name}')"
 
 
 # Type hints for lazy-loaded resources
@@ -588,3 +641,4 @@ if TYPE_CHECKING:
     from .resources.ionization import IonizationResource
     from .resources.matching import MatchingResource
     from .resources.samples import SamplesResource
+    from .resources.workspaces import WorkspacesResource

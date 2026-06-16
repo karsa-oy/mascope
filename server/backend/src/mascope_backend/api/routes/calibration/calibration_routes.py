@@ -26,7 +26,7 @@ from mascope_backend.api.models.calibration.calibration_pydantic_model import (
     GetMzCalibrationQueryParams,
     MzCalibrationParams,
 )
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import admin_user, guest_user
 from mascope_backend.db.id import gen_id
 
 
@@ -61,7 +61,7 @@ async def calibration_mz_fit_route(
     sample_item_id: str = Query(
         ..., description="The sample item ID to query for sample mz_calibration"
     ),
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """Initiate m/z fitting for a sample.
 
@@ -71,7 +71,7 @@ async def calibration_mz_fit_route(
     :type background_tasks: BackgroundTasks
     :param sample_item_id: The sample item ID.
     :type sample_item_id: str
-    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :param user: The current authenticated admin, defaults to Depends(admin_user).
     :type user: User, optional
     :return: Message confirming start of m/z fit calibration.
     :rtype: dict
@@ -106,7 +106,7 @@ async def calibration_mz_apply_route(
     body: CalibrationMzApplyBody,
     background_tasks: BackgroundTasks,
     filename: str = Query(..., description="The filename to aply m/z fit"),
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """Apply m/z calibration to a sample file.
 
@@ -116,7 +116,7 @@ async def calibration_mz_apply_route(
     :type background_tasks: BackgroundTasks
     :param filename: The filename to apply m/z calibration.
     :type filename: str
-    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :param user: The current authenticated admin, defaults to Depends(admin_user).
     :type user: User, optional
     :return: Message confirming application of m/z calibration.
     :rtype: dict
@@ -151,7 +151,7 @@ async def calibration_mz_calibrate_sample_route(
     sample_item_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """m/z calibrate specific sample.
 
@@ -161,7 +161,7 @@ async def calibration_mz_calibrate_sample_route(
     :type mz_calibration_params: MzCalibrationParams
     :param background_tasks: Background tasks for async processing.
     :type background_tasks: BackgroundTasks
-    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :param user: The current authenticated admin, defaults to Depends(admin_user).
     :type user: User, optional
     :return: Message confirming start of sample calibration.
     :rtype: dict
@@ -196,7 +196,7 @@ async def calibration_mz_calibrate_batch_route(
     sample_batch_id: str,
     mz_calibration_params: MzCalibrationParams,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """
     m/z calibrate all samples in a batch.
@@ -209,7 +209,7 @@ async def calibration_mz_calibrate_batch_route(
     :type mz_calibration_params: MzCalibrationParams
     :param background_tasks: Background tasks for async processing.
     :type background_tasks: BackgroundTasks
-    :param user: The current authenticated editor, defaults to Depends(editor_user).
+    :param user: The current authenticated admin, defaults to Depends(admin_user).
     :type user: User, optional
     :return: Message confirming start of batch calibration.
     :rtype: dict
