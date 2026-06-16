@@ -1128,8 +1128,10 @@ class OpenTFRawBackend:
         #      position -> bounded, fast, and spans heterogeneous ranges.
         #   2. Linear-interpolate each scan onto the grid (0 outside its range)
         #      and sum -> reproduces Thermo's per-peak FWHM.
-        #   3. Rescale to the true total (sum of per-scan point sums) so the
-        #      finer-than-native grid does not inflate intensity.
+        #   3. Normalize to conserve the integrated signal (area under the
+        #      profile), which is grid-independent. The point-sum is NOT a valid
+        #      invariant here: our grid is finer than native, so matching the
+        #      per-scan point-sum total would deflate the apex (~2x too low).
         if not hasattr(self._raw, "profile"):
             raise NotImplementedError(
                 "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
@@ -1158,11 +1160,11 @@ class OpenTFRawBackend:
         grid = lo * np.exp((occupied + 0.5) * log_step)
 
         summed = np.zeros(grid.shape, dtype=np.float64)
-        total_raw = 0.0
+        target_integral = 0.0
         for mz, intensity in zip(mz_parts, int_parts):
             order = np.argsort(mz, kind="stable")
             mz_sorted, int_sorted = mz[order], intensity[order]
-            total_raw += float(int_sorted.sum())
+            target_integral += float(np.trapz(int_sorted, mz_sorted))
             # Interpolate only over the grid span this scan actually covers;
             # outside [mz.min, mz.max] the contribution is zero anyway. This
             # skips the (often large) empty grid regions for narrow / SIM /
@@ -1172,9 +1174,12 @@ class OpenTFRawBackend:
             if hi > lo:
                 summed[lo:hi] += np.interp(grid[lo:hi], mz_sorted, int_sorted)
 
-        grid_total = summed.sum()
-        if grid_total > 0:
-            summed *= total_raw / grid_total
+        # Conserve the integrated signal (grid-independent), not the point-sum.
+        # Interpolation already preserves each scan's integral, so this scale is
+        # ~1; computing it explicitly removes interpolation edge effects.
+        grid_integral = float(np.trapz(summed, grid))
+        if grid_integral > 0:
+            summed *= target_integral / grid_integral
         if average and num_combined:
             summed = summed / num_combined
         return grid, summed, num_combined

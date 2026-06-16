@@ -415,6 +415,17 @@ def _profile_fwhm_ppm(mz, inten, center, window_ppm=40):
     return (cross(ri, ri - 1) - cross(li, li + 1)) / center * 1e6
 
 
+def _profile_apex(mz, inten, center, window_ppm=40):
+    """Apex intensity of the peak nearest `center` (the OpenTFRaw profile m/z can
+    be offset by up to ~20 ppm, so search a window), or None if not measurable."""
+    sel = np.abs(mz - center) / center * 1e6 < window_ppm
+    y = inten[sel]
+    if y.size < 3:
+        return None
+    ymax = float(y.max())
+    return ymax if ymax > 0 else None
+
+
 @pytest.mark.skipif(
     not _OTF_HAS_PROFILE,
     reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
@@ -422,10 +433,12 @@ def _profile_fwhm_ppm(mz, inten, center, window_ppm=40):
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_sum_signal_matches_thermo(monkeypatch, path):
     """OpenTFRaw's averaged profile (compute_sum_signal -> average_profile) must
-    reproduce Thermo's, in the two properties the instrument-function fit reads:
-    total intensity (conserved) and per-peak FWHM. Thermo interpolates each scan
-    onto a common axis (broadening by between-scan m/z jitter); a binning sum
+    reproduce Thermo's, in the two properties that matter downstream: absolute
+    peak intensity (base-peak height) and per-peak FWHM. Thermo interpolates each
+    scan onto a common axis (broadening by between-scan m/z jitter); a binning sum
     would leave peaks too narrow, so this guards the interpolation behaviour.
+    average_profile conserves the integrated signal (not the grid-dependent
+    point-sum), so absolute intensities -- and thus the apex -- match Thermo.
     Bounded to a small scan window for speed.
     """
     path = str(path)
@@ -442,10 +455,11 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
     tmz, tv = np.asarray(th_sig.mz), np.asarray(th_sig.values)
     omz, ov = np.asarray(ot_sig.mz), np.asarray(ot_sig.values)
 
-    # Total intensity is conserved (average_profile rescales to the true total).
-    np.testing.assert_allclose(ov.sum(), tv.sum(), rtol=0.02)
-
-    # Per-peak FWHM parity on the strongest, well-separated peaks.
+    # Parity on the strongest, well-separated peaks for both absolute apex
+    # intensity and per-peak FWHM. average_profile conserves the integrated
+    # signal, so a peak's apex matches Thermo up to the (separately checked)
+    # small FWHM difference. Median over several peaks is robust to a single
+    # noise-level apex on near-blank files.
     order = np.argsort(tv)[::-1]
     centers = []
     for k in order[:600]:
@@ -455,14 +469,20 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
         if len(centers) >= 12:
             break
 
-    ratios = [
-        b / a
-        for c in centers
-        if (a := _profile_fwhm_ppm(tmz, tv, c)) and (b := _profile_fwhm_ppm(omz, ov, c))
-        and a > 0
-    ]
-    if len(ratios) < 3:
-        pytest.skip("too few measurable peaks for FWHM comparison")
-    assert 0.85 <= float(np.median(ratios)) <= 1.15, (
-        f"median FWHM ratio OTF/Thermo = {np.median(ratios):.3f}"
+    apex_ratios, fwhm_ratios = [], []
+    for c in centers:
+        ta, oa = _profile_apex(tmz, tv, c), _profile_apex(omz, ov, c)
+        if ta and oa:
+            apex_ratios.append(oa / ta)
+        tf, of = _profile_fwhm_ppm(tmz, tv, c), _profile_fwhm_ppm(omz, ov, c)
+        if tf and of and tf > 0:
+            fwhm_ratios.append(of / tf)
+
+    if len(apex_ratios) < 3 or len(fwhm_ratios) < 3:
+        pytest.skip("too few measurable peaks for profile comparison")
+    assert 0.8 <= float(np.median(apex_ratios)) <= 1.25, (
+        f"median apex ratio OTF/Thermo = {np.median(apex_ratios):.3f}"
+    )
+    assert 0.85 <= float(np.median(fwhm_ratios)) <= 1.15, (
+        f"median FWHM ratio OTF/Thermo = {np.median(fwhm_ratios):.3f}"
     )
