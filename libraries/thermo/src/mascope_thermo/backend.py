@@ -1161,8 +1161,16 @@ class OpenTFRawBackend:
         total_raw = 0.0
         for mz, intensity in zip(mz_parts, int_parts):
             order = np.argsort(mz, kind="stable")
-            summed += np.interp(grid, mz[order], intensity[order], left=0.0, right=0.0)
-            total_raw += float(intensity.sum())
+            mz_sorted, int_sorted = mz[order], intensity[order]
+            total_raw += float(int_sorted.sum())
+            # Interpolate only over the grid span this scan actually covers;
+            # outside [mz.min, mz.max] the contribution is zero anyway. This
+            # skips the (often large) empty grid regions for narrow / SIM /
+            # time-windowed selections (identical result, less work).
+            lo = int(np.searchsorted(grid, mz_sorted[0], side="left"))
+            hi = int(np.searchsorted(grid, mz_sorted[-1], side="right"))
+            if hi > lo:
+                summed[lo:hi] += np.interp(grid[lo:hi], mz_sorted, int_sorted)
 
         grid_total = summed.sum()
         if grid_total > 0:
