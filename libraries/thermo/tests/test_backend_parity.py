@@ -7,8 +7,9 @@ function under both backends and assert agreement. This is the evidence that a
 reimplementation actually reproduces Thermo's numbers, not just its structure.
 
 File-agnostic, like the parity harness: every ``*.raw`` in ``test_files/`` is
-compared (only the KORBI files are committed; drop in more locally for wider
-coverage). Both backends (pythonnet + opentfraw) are runtime dependencies of
+compared (only the small committed sample files ship; drop in more locally, or
+point ``MASCOPE_THERMO_TEST_FILES_DIR`` at a wider corpus). Both backends
+(pythonnet + opentfraw) are runtime dependencies of
 ``mascope_thermo``, so they're assumed importable.
 
 Targets are sampled *evenly across the m/z range* rather than "all peaks": a
@@ -130,7 +131,10 @@ def test_centroids_per_scan_matches_thermo(monkeypatch, path):
 
     Pins the values behind ``get_centroids_per_scan`` under both backends:
     per FT scan, the peak count must match and masses / resolution / S:N must
-    agree. Resolution is decoded verbatim (exact); S:N is
+    agree. These come from the *same* binary stream Thermo decodes, so they are
+    bit-exact in practice (measured: 0 ppm m/z, 0 rel-err resolution, ~2e-7 S:N
+    across the corpus). The tolerances are therefore tight -- loose tolerances
+    here would silently tolerate a real decode regression. S:N is
     ``(intensity - baseline) / (noise - baseline)`` (matches Thermo to f32).
     Works on Exploris too, unlike the profile m/z.
     """
@@ -150,12 +154,14 @@ def test_centroids_per_scan_matches_thermo(monkeypatch, path):
         if t["masses"].size == 0:
             continue
         compared += 1
-        np.testing.assert_allclose(o["masses"], t["masses"], rtol=0, atol=1e-3)
+        # m/z is bit-exact; atol=1e-5 Da is ~0.0002 ppm at m/z 50, still ~100x
+        # tighter than a 1 ppm decode error (5e-5 Da there) would produce.
+        np.testing.assert_allclose(o["masses"], t["masses"], rtol=0, atol=1e-5)
         np.testing.assert_allclose(
-            o["resolutions"], t["resolutions"], rtol=1e-5, atol=1.0
+            o["resolutions"], t["resolutions"], rtol=1e-6, atol=1.0
         )
         np.testing.assert_allclose(
-            o["signal_to_noise"], t["signal_to_noise"], rtol=1e-4, atol=1e-3
+            o["signal_to_noise"], t["signal_to_noise"], rtol=1e-5, atol=1e-3
         )
         np.testing.assert_allclose(o["timestamp"], t["timestamp"], rtol=1e-6)
 
@@ -342,15 +348,17 @@ def test_centroids_average_matches_thermo(monkeypatch, path):
 
     Thermo's AverageScans re-centroids the averaged profile, so this NumPy
     ppm-binning of per-scan centroids cannot match it exactly: m/z agrees to
-    sub-ppm and the summed intensity to a few percent, while resolution / S:N
-    are coarser and not asserted (they do not feed the instrument fit; see the
-    follow-up ticket). Guards against gross regressions. Bounded to a small
-    scan window for speed.
+    sub-ppm and the summed intensity to a few percent, while resolution is
+    coarser and not asserted (it does not feed the instrument fit). S:N *is*
+    asserted at the weak-peak threshold (it feeds peak detection's weak-peak
+    filter): the count of peaks above the threshold must track Thermo, which the
+    n/sqrt(N) averaged-S:N scaling restores. Guards against gross regressions.
+    Bounded to a small scan window for speed.
     """
     path = str(path)
     t_min, t_max = _bounded_window(monkeypatch, path)
 
-    tm, ti, _, _ = _run_under(
+    tm, ti, _, tsn = _run_under(
         monkeypatch, "thermo", m_thermo.get_centroids, path, t_min=t_min, t_max=t_max
     )
     om, oi, orr, osn = _run_under(
@@ -360,26 +368,59 @@ def test_centroids_average_matches_thermo(monkeypatch, path):
         pytest.skip("no centroids")
 
     assert om.size == orr.size == osn.size == oi.size
-    # Peak counts in the same ballpark (re-centroiding splits/merges differently).
-    assert 0.6 * tm.size <= om.size <= 1.6 * tm.size, (
+    # Peak counts in the same ballpark (re-centroiding splits/merges differently;
+    # measured 0.99-1.04 across the corpus, so this is comfortably loose).
+    assert 0.85 * tm.size <= om.size <= 1.20 * tm.size, (
         f"centroid count {om.size} vs Thermo {tm.size}"
     )
     # Summed intensity within a few percent.
     np.testing.assert_allclose(oi.sum(), ti.sum(), rtol=0.1)
 
-    # Most OpenTFRaw peaks match a Thermo peak within 1 ppm (robust to which
-    # single peak happens to be tallest, unlike a base-peak check).
+    # Each OpenTFRaw peak's nearest Thermo peak (robust to which single peak
+    # happens to be tallest, unlike a base-peak check).
     tm_sorted = np.sort(tm)
     pos = np.searchsorted(tm_sorted, om)
-    matched = 0
+    dev_ppm = np.full(om.shape, np.inf)
     for k, mzv in enumerate(om):
         for c in (pos[k] - 1, pos[k]):
-            if 0 <= c < tm_sorted.size and abs(tm_sorted[c] - mzv) / mzv * 1e6 <= 1.0:
-                matched += 1
-                break
-    assert matched / om.size >= 0.8, (
-        f"only {matched}/{om.size} averaged centroids matched Thermo within 1 ppm"
+            if 0 <= c < tm_sorted.size:
+                dev_ppm[k] = min(dev_ppm[k], abs(tm_sorted[c] - mzv) / mzv * 1e6)
+    # (1) High match fraction within 1 ppm. The ~5-8 % that don't pair are
+    # sub-threshold noise peaks (discarded downstream) and ringing/satellite
+    # artifacts around very intense peaks (a sub-FWHM picket fence the two
+    # backends position slightly differently; flagged downstream by
+    # flag_satellite_peaks) -- not lost analytes; measured >=0.95 across the
+    # corpus, so 0.92 leaves margin. Pushing to ~100 % would need re-centroiding
+    # the averaged profile (see report 4.4/4.5), not a threshold.
+    matched = dev_ppm <= 1.0
+    assert matched.mean() >= 0.92, (
+        f"only {int(matched.sum())}/{om.size} averaged centroids matched Thermo "
+        "within 1 ppm"
     )
+    # (2) The matched peaks must agree to *sub-0.1 ppm* -- this is the HRMS mass
+    # accuracy guarantee, and the centroid m/z is what feeds peak detection.
+    # Measured median 0.02-0.05 ppm, p90 <= 0.15 ppm.
+    md = dev_ppm[matched]
+    assert float(np.median(md)) <= 0.1, (
+        f"median matched-peak m/z deviation {np.median(md):.3f} ppm (> 0.1)"
+    )
+    assert float(np.percentile(md, 90)) <= 0.4, (
+        f"p90 matched-peak m/z deviation {np.percentile(md, 90):.3f} ppm (> 0.4)"
+    )
+
+    # Averaged S:N must track Thermo well enough that peak detection's weak-peak
+    # filter (S:N >= 3) keeps/drops the same peaks. Thermo reads S:N off the
+    # noise-reduced averaged profile (~sqrt(N) lower noise); the backend scales
+    # the pooled per-scan S:N by n/sqrt(N) to match. Without it the count above
+    # the threshold runs ~sqrt(N) low and near-threshold peaks vanish. Assert the
+    # above-threshold count tracks Thermo where there are enough peaks to be
+    # statistically meaningful.
+    t_pass = int((tsn >= 3.0).sum())
+    o_pass = int((osn >= 3.0).sum())
+    if t_pass >= 20:
+        assert 0.7 * t_pass <= o_pass <= 1.4 * t_pass, (
+            f"{o_pass} averaged centroids above S:N 3 vs Thermo {t_pass}"
+        )
 
 
 def _profile_fwhm_ppm(mz, inten, center, window_ppm=40):
@@ -501,15 +542,19 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
 
     if len(apex_ratios) < 3 or len(fwhm_ratios) < 3:
         pytest.skip("too few measurable peaks for profile comparison")
-    assert 0.8 <= float(np.median(apex_ratios)) <= 1.25, (
+    # Measured median apex 0.99-1.02, FWHM 0.99-1.01 across the corpus.
+    assert 0.92 <= float(np.median(apex_ratios)) <= 1.10, (
         f"median apex ratio OTF/Thermo = {np.median(apex_ratios):.3f}"
     )
-    assert 0.85 <= float(np.median(fwhm_ratios)) <= 1.15, (
+    assert 0.93 <= float(np.median(fwhm_ratios)) <= 1.10, (
         f"median FWHM ratio OTF/Thermo = {np.median(fwhm_ratios):.3f}"
     )
     # Profile m/z is aligned to the centroid labels (average_profile step 4), so
-    # the OpenTFRaw profile axis should match Thermo's, not sit ~13 ppm low.
-    # Only assert where the alignment can run (>= its minimum anchor count).
+    # the OpenTFRaw profile axis should match Thermo's, not sit at the raw
+    # lock-mass-level offset. The floor is a few ppm, set by files whose strongest
+    # peaks fall in a dense low-m/z cluster where the per-peak residual is worst;
+    # most files are well under this. The median is the right metric. Assert where
+    # alignment can run.
     if len(mz_off_ppm) >= 6:
         assert abs(float(np.median(mz_off_ppm))) <= 5.0, (
             f"median profile m/z offset OTF vs Thermo = {np.median(mz_off_ppm):.2f} "
