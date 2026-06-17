@@ -295,6 +295,7 @@ _AVG_PROFILE_CALIB_TIGHT_PPM = 5  # max residual to keep a match after pass 1
 _AVG_PROFILE_CALIB_MIN_ANCHORS = 6  # below this, leave the grid uncorrected
 _AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a linear fit needs few)
 _AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
+_AVG_PROFILE_GAP_DF = 2.0  # zero a scan's interp beyond this * FFT bin from its samples
 _AVG_CENTROID_HEIGHT_PPM = 3.0  # window to source centroid height from profile apex
 _AVG_CENTROID_HEIGHT_BAND = (0.85, 1.15)  # apply the apex only as a modest refinement
 _AVG_CENTROID_MERGE_FWHM = 0.5  # merge centroids whose gap is below this * local FWHM
@@ -1383,8 +1384,20 @@ class OpenTFRawBackend:
             f_sorted, int_sorted = f[order], intensity[order]
             lo = int(np.searchsorted(fgrid, f_sorted[0], side="left"))
             hi = int(np.searchsorted(fgrid, f_sorted[-1], side="right"))
-            if hi > lo:
-                summed[lo:hi] += np.interp(fgrid[lo:hi], f_sorted, int_sorted)
+            if hi <= lo:
+                continue
+            seg = fgrid[lo:hi]
+            vals = np.interp(seg, f_sorted, int_sorted)
+            # Zero this scan's contribution in its inter-cluster gaps. OpenTFRaw's
+            # profile() omits points between peak clusters, so np.interp would ramp
+            # straight across a gap; summed over scans those spurious ramps inflate
+            # and flat-top sparse/intermittent peaks (a peak present in one scan
+            # picks up 11 ramps from the others). Keep only grid points within a
+            # couple of FFT bins of an actual sample of this scan.
+            j = np.clip(np.searchsorted(f_sorted, seg), 1, f_sorted.size - 1)
+            near = np.minimum(np.abs(seg - f_sorted[j - 1]), np.abs(seg - f_sorted[j]))
+            vals[near > _AVG_PROFILE_GAP_DF * df] = 0.0
+            summed[lo:hi] += vals
 
         # Convert the freq grid back to m/z with the reference scan's calibration.
         b_ref, c_ref = scans[ref][2], scans[ref][3]
