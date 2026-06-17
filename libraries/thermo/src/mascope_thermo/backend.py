@@ -790,6 +790,19 @@ class OpenTFRawBackend:
             self._scans = list(self._raw.iter_scans())
         return self._scans
 
+    @staticmethod
+    def _bad_first_scan(scans: list[dict]) -> bool:
+        """Mirror the ThermoBackend first-scan-outlier workaround (thermo.py
+        ``_bad_first_scan``): a Mascope-side guard for a common Thermo raw-file
+        quirk where the first scan has an abnormally high TIC. True when the
+        first scan's TIC is >= 5x the median TIC of the rest. Replicated here so
+        both backends select the same scan set (computed over all scans, as the
+        Thermo path does)."""
+        if len(scans) <= 1:
+            return False
+        tic = np.array([s["total_ion_current"] for s in scans], dtype=np.float64)
+        return bool(tic[0] >= 5 * np.median(tic[1:]))
+
     def _selected(
         self,
         polarity: Polarity | None = None,
@@ -836,6 +849,19 @@ class OpenTFRawBackend:
                     "MS scan type must be 'Ms' or 'Ms2'."
                 )
             mask &= np.array([int(s["ms_level"]) == level for s in scans])
+
+        # Mirror the ThermoBackend first-scan-outlier exclusion (thermo.py
+        # scan_indices_1based) so both backends select the same scan set. The
+        # check and mask[0] are over the full file scan list, as on the Thermo
+        # path.
+        if self._bad_first_scan(scans):
+            from mascope_thermo.runtime import runtime
+
+            runtime.logger.warning(
+                "The first scan appears to be an outlier with abnormally high "
+                "TIC. Excluding the first scan from selection."
+            )
+            mask[0] = False
 
         selected = [s for s, keep in zip(scans, mask) if keep]
         if not selected:
