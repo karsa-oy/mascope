@@ -135,6 +135,13 @@ If you specifically want RawFileReader (for example to cross-check results, or f
 
 This also needs the .NET Runtime (installed by the setup scripts). Without the DLLs the Thermo backend raises a clear error and Mascope stays on OpenTFRaw.
 
+For the Docker backend image, the .NET Runtime is **not installed by default** (the default image is Thermo-free). Build with the `INSTALL_DOTNET` build arg to include it:
+
+```bash
+docker build --build-arg INSTALL_DOTNET=true -f server/backend/Dockerfile -t mascope-backend .
+# or via compose: add `args: [INSTALL_DOTNET=true]` under the backend service's build section
+```
+
 #### The `mascope-opentfraw` fork
 
 OpenTFRaw support relies on a few capabilities — profile spectra, per-peak resolution/S:N, Exploris scan-event decoding, and the per-scan trailer — that are submitted upstream as pull requests but not yet in an upstream release. Until they land, Mascope depends on **`mascope-opentfraw`**, a Karsa fork that ships the same `opentfraw` module with those additions (imports are unchanged). Switch the dependency in `libraries/thermo/pyproject.toml` back to upstream `opentfraw` once the PRs are released.

@@ -27,13 +27,18 @@ RUN wget -qO /etc/apt/keyrings/pgdg.asc https://www.postgresql.org/media/keys/AC
 # use jemalloc to avoid DLL segfaults (free(): invalid pointer)
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 
-# Install .NET runtime (required for ThermoFisher library)
-RUN wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && rm packages-microsoft-prod.deb \
-    && apt update \
-    && apt install -y dotnet-runtime-9.0 \
-    && rm -rf /var/lib/apt/lists/*
+# .NET runtime is only needed for the optional Thermo RawFileReader backend
+# (MASCOPE_THERMO_BACKEND=thermo). The default OpenTFRaw backend needs nothing
+# extra, so .NET is skipped unless the image is built with INSTALL_DOTNET=true.
+ARG INSTALL_DOTNET=false
+RUN if [ "$INSTALL_DOTNET" = "true" ]; then \
+        wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+        && dpkg -i packages-microsoft-prod.deb \
+        && rm packages-microsoft-prod.deb \
+        && apt update \
+        && apt install -y dotnet-runtime-9.0 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 WORKDIR /app
 
