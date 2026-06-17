@@ -2,10 +2,10 @@
 
 These pin the *contract* (shape + internal consistency) of
 ``get_ms2_summary_metadata``, ``get_ms2_centroids_by_parent`` and
-``get_ms2_centroids_per_scan_for_parent`` so the OpenTFRaw migration (assessment
-Phases 1–3) can't silently change it. Exact cross-backend agreement is enforced
-separately by the parity harness, where the Thermo backend is the runtime
-reference — so nothing here is hardcoded to a specific acquisition.
+``get_ms2_centroids_per_scan_for_parent`` so the OpenTFRaw migration can't
+silently change it. Exact cross-backend agreement is enforced separately by
+``test_backend_parity.py``, where the Thermo backend is the runtime reference —
+so nothing here is hardcoded to a specific acquisition.
 
 These functions need MS² scans, and only some local files have them. The module
 discovers the smallest ``.raw`` file in ``test_files/`` that contains MS² scans
