@@ -1,8 +1,8 @@
 """Characterization tests for the metadata classes on the Thermo backend.
 
 These pin the *contract* (shape + internal consistency) of ``RawFileMetadata``
-and ``RawFileMetadataLegacy`` so the OpenTFRaw migration (assessment Phase 4)
-can't silently change it. They run against the committed KORBI file so they work
+and ``RawFileMetadataLegacy`` so the reader backend can't silently change it.
+They run against the committed KORBI file so they work
 on a fresh clone, and assert structural invariants rather than values tied to a
 specific acquisition.
 """
@@ -15,7 +15,7 @@ from conftest import POS_ORBI_FILE_PATH
 import mascope_thermo.thermo as m_thermo
 
 
-# Run every test under each reader backend; opentfraw xfails until it exists.
+# Run every test under each reader backend.
 # setup_method here only *constructs* metadata objects (no backend call), so the
 # backend-reading property accesses happen in the test bodies, after the env var
 # is set by the `backend` fixture.

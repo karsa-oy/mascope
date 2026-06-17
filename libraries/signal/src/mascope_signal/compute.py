@@ -562,12 +562,12 @@ async def get_orbi_centroids(
     Extract centroided peaks from an Orbitrap (Thermo .raw) file for specified m/z values and time range.
 
     This function determines the sample type and, if the sample file contains the Orbitrap raw file,
-    extracts centroided peaks whose m/z values are within ±0.5 of any value in `u_list` and within the specified
+    extracts centroided peaks whose m/z values are within +/-0.5 of any value in `u_list` and within the specified
     time range and polarity. Returns the filtered centroid m/z values, their intensities, and resolutions.
 
     :param base_filename: Sample file name (base, not full path).
     :type base_filename: str
-    :param u_list: Iterable of m/z values to select centroid peaks near (within ±0.5), defaults to None.
+    :param u_list: Iterable of m/z values to select centroid peaks near (within +/-0.5), defaults to None.
     :type u_list: Iterable[float]
     :param t_min: Minimum time [s] for scan selection, optional, defaults to None (start of run).
     :type t_min: float | None, optional

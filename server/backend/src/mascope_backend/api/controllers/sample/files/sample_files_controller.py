@@ -650,13 +650,13 @@ async def delete_sample_files(
 
     # Determine response based on results
     if skipped_files and deleted_files:
-        # Partial success - some deleted, some skipped → 207 Multi-Status
+        # Partial success - some deleted, some skipped -> 207 Multi-Status
         raise_api_warning(message, data, status_code=207)
     elif skipped_files and not deleted_files:
-        # Complete failure - nothing deleted, everything skipped → 422 Error
+        # Complete failure - nothing deleted, everything skipped -> 422 Error
         raise ApiException(user_message=message, tech_message=data, status_code=422)
     else:
-        # Complete success - all files deleted, nothing skipped → 200 OK
+        # Complete success - all files deleted, nothing skipped -> 200 OK
         return {"message": message, "data": data}
 
 

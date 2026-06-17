@@ -1,10 +1,10 @@
 """Cross-backend numerical parity for reimplemented computed ops.
 
 Where OpenTFRaw needs a NumPy reimplementation of a Thermo-computed operation
-(assessment gaps 5.3 / 5.4), the dual-backend contract suite only checks the
-*shape* of the result. These tests pin the *values*: run the same public
-function under both backends and assert agreement. This is the evidence that a
-reimplementation actually reproduces Thermo's numbers, not just its structure.
+(averaged centroids, the XIC), a shape-only check is not enough. These tests pin
+the *values*: run the same public function under both backends and assert
+agreement. This is the evidence that a reimplementation actually reproduces
+Thermo's numbers, not just its structure.
 
 File-agnostic, like the parity harness: every ``*.raw`` in ``test_files/`` is
 compared (only the small committed sample files ship; drop in more locally, or
@@ -15,7 +15,7 @@ point ``MASCOPE_THERMO_TEST_FILES_DIR`` at a wider corpus). Both backends
 Targets are sampled *evenly across the m/z range* rather than "all peaks": a
 full Orbitrap file can have hundreds of thousands of averaged centroids, and
 ``get_peak_timeseries`` issues one Thermo ``GetChromatogramData`` trace per
-target — so all-peaks is O(100k traces x scans) and takes tens of minutes. An
+target -- so all-peaks is O(100k traces x scans) and takes tens of minutes. An
 even spread (capped at ``MASCOPE_PARITY_MAX_XIC_TARGETS``, default 200) covers
 the whole m/z range and varied peak densities in a second or two per file.
 """
@@ -45,19 +45,6 @@ RAW_FILES = sorted(TEST_FILES_DIR.glob("*.raw"))
 # Cap on XIC targets per file (even spread across m/z). Override to widen
 # coverage (e.g. MASCOPE_PARITY_MAX_XIC_TARGETS=1000) at the cost of runtime.
 MAX_XIC_TARGETS = int(os.environ.get("MASCOPE_PARITY_MAX_XIC_TARGETS", "200"))
-
-# Profile parity needs an opentfraw build that exposes RawFile.profile(). The
-# published 1.1.0 wheel does not; a maturin build of the accessor branch does.
-_OTF_HAS_PROFILE = hasattr(opentfraw.RawFile, "profile")
-
-# Per-peak label parity (resolution / S:N) needs an opentfraw build exposing
-# RawFile.centroid_labels(). Same story as profile: a maturin build of the
-# decoder branch, not the published wheel.
-_OTF_HAS_LABELS = hasattr(opentfraw.RawFile, "centroid_labels")
-
-# MS2 calibrated HCD energy / isolation width need RawFile.scan_parameters()
-# (the trailer accessor), present only in a build with that accessor.
-_OTF_HAS_SCAN_PARAMS = hasattr(opentfraw.RawFile, "scan_parameters")
 
 
 def _run_under(monkeypatch, backend, fn, *args, **kwargs):
@@ -105,7 +92,7 @@ def test_xic_matches_thermo(monkeypatch, path):
 def test_clean_mappings_match_thermo(monkeypatch, path):
     """Regression-guard the OpenTFRaw capabilities that already work.
 
-    The contract suite only xpasses these under ``strict=False`` — a regression
+    The contract suite only xpasses these under ``strict=False`` -- a regression
     would silently turn XPASS into xfail and stay green. Comparing the values
     through the real public functions under both backends protects them.
     """
@@ -130,10 +117,6 @@ def test_clean_mappings_match_thermo(monkeypatch, path):
     np.testing.assert_allclose(ot_tic, th_tic, rtol=1e-4, atol=1e-3)
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_LABELS,
-    reason="installed opentfraw lacks RawFile.centroid_labels() (decoder build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_centroids_per_scan_matches_thermo(monkeypatch, path):
     """OpenTFRaw's decoded per-peak labels must match Thermo's CentroidStream.
@@ -178,10 +161,6 @@ def test_centroids_per_scan_matches_thermo(monkeypatch, path):
         pytest.skip("no FT centroid scans to compare")
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_PROFILE,
-    reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_profile_matches_thermo(monkeypatch, path):
     """OpenTFRaw's profile spectrum must match Thermo's SegmentedScan.
@@ -192,8 +171,7 @@ def test_profile_matches_thermo(monkeypatch, path):
     tolerance. (On Q Exactive the m/z agrees to ~20 ppm - a lock-mass-level
     offset - hence 50 ppm, not sub-ppm.)
 
-    Exploris profile m/z is now correct too (the scan-event coefficient fix);
-    it previously xfailed here while the coefficients were mis-decoded.
+    Exploris profile m/z is correct too, via the scan-event coefficient decoding.
     """
     path = str(path)
     raw = opentfraw.RawFile(path)
@@ -223,19 +201,13 @@ def test_profile_matches_thermo(monkeypatch, path):
     )
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_SCAN_PARAMS,
-    reason="installed opentfraw lacks the Exploris scan-event fix (fork build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_ms2_precursor_matches_thermo(monkeypatch, path):
     """OpenTFRaw's MS2 precursor m/z must match Thermo's.
 
-    Both backends parse the precursor from the rendered scan-filter string.
-    OpenTFRaw renders it correctly only with the Exploris scan-event fix; the
-    released wheel renders Exploris precursors partially/incorrectly, so this is
-    gated on a fork-build marker (scan_parameters ships in the same build).
-    Skips files with no MS2 scans.
+    Both backends parse the precursor from the rendered scan-filter string; on
+    Exploris this relies on the mascope-opentfraw scan-event decoding. Skips
+    files with no MS2 scans.
     """
     path = str(path)
 
@@ -252,12 +224,11 @@ def test_ms2_precursor_matches_thermo(monkeypatch, path):
     with open_backend(path) as backend:
         ot = backend.ms2_precursor_by_scan()
 
-    # The precursor comes from the rendered filter string; an opentfraw build
-    # without the Exploris scan-event fix renders no precursor on Exploris and
-    # returns nothing. Skip then (capability gate), like the profile/labels
-    # tests -- but if it decodes any, they must match Thermo exactly.
+    # The precursor is parsed from the rendered scan-filter string. If OpenTFRaw
+    # resolves none for this file, skip rather than fail; any it does resolve
+    # must match Thermo exactly.
     if not ot:
-        pytest.skip("installed opentfraw does not render MS2 precursors here")
+        pytest.skip("no MS2 precursor resolved by OpenTFRaw for this file")
 
     assert set(ot) == set(th), "MS2 scan set with a resolvable precursor differs"
     for scan_number, mz_thermo in th.items():
@@ -270,8 +241,8 @@ def test_ms2_precursor_matches_thermo(monkeypatch, path):
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_scan_statistics_match_thermo(monkeypatch, path):
     """OpenTFRaw's mapped scan statistics must match Thermo for the fields it
-    provides (Phase-4 metadata remap). Uses only the base opentfraw API (the
-    typed scan dict), so it runs against the released wheel too -- no gate.
+    provides (the scan-statistics metadata remap). Uses only the base opentfraw
+    typed scan dict.
     """
     path = str(path)
 
@@ -302,10 +273,6 @@ def _hcd_tuple(value):
     )
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_SCAN_PARAMS,
-    reason="installed opentfraw lacks RawFile.scan_parameters() (trailer accessor)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_ms2_acquisition_info_matches_thermo(monkeypatch, path):
     """OpenTFRaw's MS2 isolation width + calibrated HCD energy (read from the
@@ -347,13 +314,9 @@ def _bounded_window(monkeypatch, path):
     return float(times[0]), float(times[min(times.size, MAX_AVG_SCANS) - 1])
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_LABELS,
-    reason="installed opentfraw lacks RawFile.centroid_labels() (decoder build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_centroids_average_matches_thermo(monkeypatch, path):
-    """Approximate parity for averaged centroids (gap 5.3).
+    """Approximate parity for averaged centroids.
 
     Thermo's AverageScans re-centroids the averaged profile, so this NumPy
     ppm-binning of per-scan centroids cannot match it exactly: m/z agrees to
@@ -400,7 +363,7 @@ def test_centroids_average_matches_thermo(monkeypatch, path):
     # backends position slightly differently; flagged downstream by
     # flag_satellite_peaks) -- not lost analytes; measured >=0.95 across the
     # corpus, so 0.92 leaves margin. Pushing to ~100 % would need re-centroiding
-    # the averaged profile (see report 4.4/4.5), not a threshold.
+    # the averaged profile (matching Thermo's AverageScans), not a threshold.
     matched = dev_ppm <= 1.0
     assert matched.mean() >= 0.92, (
         f"only {int(matched.sum())}/{om.size} averaged centroids matched Thermo "
@@ -488,10 +451,6 @@ def _profile_apex_mz(mz, inten, center, window_ppm=40):
     return float(sub_mz[int(np.argmax(sub_i))])
 
 
-@pytest.mark.skipif(
-    not _OTF_HAS_PROFILE,
-    reason="installed opentfraw lacks RawFile.profile() (needs the accessor build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_sum_signal_matches_thermo(monkeypatch, path):
     """OpenTFRaw's real measured averaged profile (compute_sum_signal ->
@@ -558,10 +517,6 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
     # overlay is the reconstruction's job -- test_reconstructed_profile_matches_thermo.
 
 
-@pytest.mark.skipif(
-    not (_OTF_HAS_PROFILE and _OTF_HAS_LABELS),
-    reason="reconstruction needs RawFile.profile() + centroid_labels() (fork build)",
-)
 @pytest.mark.parametrize("path", RAW_FILES, ids=lambda p: p.name)
 def test_reconstructed_profile_matches_thermo(monkeypatch, path):
     """Thermo's averaged profile is itself a reconstruction -- one Gaussian per

@@ -157,7 +157,7 @@ class ScanSelector:
                 f"Invalid time range: t_min={t_min} s > t_max={t_max} s"
             )
 
-        # Adjust time range as `abs_eps(x) ~ |x∣ * eps` where eps is machine epsilon
+        # Adjust time range as `abs_eps(x) ~ |x| * eps` where eps is machine epsilon
         # to account for floating point precision issues
         epsilon = np.finfo(np.float64).eps * t_max
         t_min_adj = t_min - epsilon
@@ -708,7 +708,7 @@ def _cluster_scans_by_parent(
     scan_precursors: dict[int, float],
     parent_peak_tolerance: float = 0.001,
 ) -> dict[float, list[int]]:
-    """Cluster MS² scans by precursor m/z.
+    """Cluster MS2 scans by precursor m/z.
 
     Takes a ``{scan_number: precursor_mz}`` mapping (from a backend), clusters
     near-duplicate precursors within tolerance, and returns a mapping of
@@ -866,7 +866,7 @@ def get_ms2_summary_metadata(
         )
         # scan_indices raises NoScansFoundError when nothing matches, so an
         # MS1-only file would otherwise blow up here instead of reaching the
-        # graceful empty-MS² return below.
+        # graceful empty-MS2 return below.
         try:
             ms2_count = len(backend.scan_indices(polarity, t_min, t_max, ms_type="Ms2"))
         except NoScansFoundError:
@@ -890,7 +890,7 @@ def get_ms2_summary_metadata(
         )
         parent_peaks = list(parent_peak_mapping.keys())
 
-        # Isolation width + (calibrated) HCD energy per MS² scan. Thermo reads
+        # Isolation width + (calibrated) HCD energy per MS2 scan. Thermo reads
         # these from the trailer ("MS2 Isolation Width:" / "HCD Energy V:");
         # backends that lack the calibrated HCD energy raise NotImplementedError.
         isolation_width, scan_idx_to_hcd = backend.ms2_acquisition_info(

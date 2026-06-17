@@ -11,7 +11,7 @@ from mascope_thermo.lib import thermo_available
 _TESTS_DIR = Path(__file__).parent
 
 # Directory of sample .raw files. Only the two small committed sample files
-# ship; tests that need other acquisitions (e.g. an MS² file) discover them at
+# ship; tests that need other acquisitions (e.g. an MS2 file) discover them at
 # runtime and skip when absent, so the suite stays portable. Override with
 # MASCOPE_THERMO_TEST_FILES_DIR to run the file-agnostic parity suite against a
 # broader local corpus (e.g. a stratified sample of the filestore).
@@ -52,8 +52,8 @@ def read_or_xfail(fn, *args, **kwargs):
 
     The ``backend`` fixture's ``xfail(raises=NotImplementedError)`` only covers a
     test's *call* phase; an exception during fixture setup is otherwise reported
-    as an error. An imperative ``pytest.xfail()`` works in setup, and — since it
-    only fires when the call actually raises — the test still runs (and XPASSes)
+    as an error. An imperative ``pytest.xfail()`` works in setup, and -- since it
+    only fires when the call actually raises -- the test still runs (and XPASSes)
     once the backend is implemented.
     """
     try:

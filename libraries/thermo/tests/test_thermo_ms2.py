@@ -1,14 +1,14 @@
-"""Characterization tests for the MS² extraction functions on the Thermo backend.
+"""Characterization tests for the MS2 extraction functions on the Thermo backend.
 
 These pin the *contract* (shape + internal consistency) of
 ``get_ms2_summary_metadata``, ``get_ms2_centroids_by_parent`` and
 ``get_ms2_centroids_per_scan_for_parent`` so the OpenTFRaw migration can't
 silently change it. Exact cross-backend agreement is enforced separately by
-``test_backend_parity.py``, where the Thermo backend is the runtime reference —
+``test_backend_parity.py``, where the Thermo backend is the runtime reference --
 so nothing here is hardcoded to a specific acquisition.
 
-These functions need MS² scans, and only some local files have them. The module
-discovers the smallest ``.raw`` file in ``test_files/`` that contains MS² scans
+These functions need MS2 scans, and only some local files have them. The module
+discovers the smallest ``.raw`` file in ``test_files/`` that contains MS2 scans
 and **skips** entirely if there is none (e.g. on a fresh clone, where only the
 MS1 KORBI files are committed).
 """
@@ -22,7 +22,7 @@ from mascope_thermo.backend import open_backend
 
 
 def _has_ms2(path: str) -> bool:
-    """True if the file contains at least one MS² scan (probed via the current
+    """True if the file contains at least one MS2 scan (probed via the current
     backend, so discovery works without the Thermo DLLs)."""
     try:
         with open_backend(path) as be:
@@ -35,7 +35,7 @@ def _has_ms2(path: str) -> bool:
 
 
 def _first_ms2_file() -> str | None:
-    """Smallest local .raw file with MS² scans, or None. Smallest-first keeps the
+    """Smallest local .raw file with MS2 scans, or None. Smallest-first keeps the
     discovery probe cheap and avoids opening large files unnecessarily."""
     for path in sorted(TEST_FILES_DIR.glob("*.raw"), key=lambda p: p.stat().st_size):
         if _has_ms2(str(path)):
@@ -45,22 +45,22 @@ def _first_ms2_file() -> str | None:
 
 MS2_FILE = _first_ms2_file()
 
-# Run every test under each reader backend; opentfraw xfails until it exists.
+# Run every test under each reader backend.
 pytestmark = pytest.mark.usefixtures("backend")
 
-# Applied to the classes that need an actual MS² acquisition. The MS1-only
+# Applied to the classes that need an actual MS2 acquisition. The MS1-only
 # regression test below runs unconditionally against the committed KORBI file.
 requires_ms2 = pytest.mark.skipif(
-    MS2_FILE is None, reason="no .raw file with MS² scans in test_files/"
+    MS2_FILE is None, reason="no .raw file with MS2 scans in test_files/"
 )
 
 
 def test_ms2_summary_on_ms1_only_file_returns_empty():
-    """An MS1-only file must return an empty-MS² summary, not raise.
+    """An MS1-only file must return an empty-MS2 summary, not raise.
 
     Regression test: ``get_ms2_summary_metadata`` previously called
     ``len(ms2_selector.scan_indices_1based)``, which raises ``NoScansFoundError``
-    when there are no MS² scans — making its own empty-MS² return branch dead
+    when there are no MS2 scans -- making its own empty-MS2 return branch dead
     code. KORBI is committed and MS1-only.
     """
     meta = m_thermo.get_ms2_summary_metadata(POS_ORBI_FILE_PATH)
@@ -72,7 +72,7 @@ def test_ms2_summary_on_ms1_only_file_returns_empty():
 
 
 # These depend on `backend` so they (a) recompute per backend and (b) run after
-# the env var is set. Function-scoped for the same reason — they can't be cached
+# the env var is set. Function-scoped for the same reason -- they can't be cached
 # across backends. read_or_xfail keeps the not-yet-implemented opentfraw backend
 # an xfail rather than a fixture-setup error.
 @pytest.fixture
@@ -93,7 +93,7 @@ def num_scans(backend) -> int:
 @requires_ms2
 class TestGetMs2SummaryMetadata:
     """``get_ms2_summary_metadata`` reports parent peaks, HCD energies, isolation
-    width and the MS1/MS2 scan split — all mutually consistent.
+    width and the MS1/MS2 scan split -- all mutually consistent.
     """
 
     def test_parent_peaks_sorted_unique_positive(self, summary):
@@ -131,8 +131,8 @@ class TestGetMs2SummaryMetadata:
 @requires_ms2
 class TestGetMs2CentroidsByParent:
     """``get_ms2_centroids_by_parent`` returns averaged centroids per parent peak,
-    each carrying per-peak resolution and S:N (the data the migration must
-    preserve — assessment §5.1).
+    each carrying per-peak resolution and S:N (the per-peak label data the
+    reader backend must preserve).
     """
 
     def test_keys_match_summary_parents(self, by_parent, summary):
@@ -159,7 +159,7 @@ class TestGetMs2CentroidsByParent:
     def test_mz_range_filters_parents(self, by_parent):
         parents = sorted(by_parent)
         if len(parents) < 2:
-            pytest.skip("need ≥2 parent peaks to exercise m/z filtering")
+            pytest.skip("need >=2 parent peaks to exercise m/z filtering")
         threshold = (parents[0] + parents[-1]) / 2
         filtered = m_thermo.get_ms2_centroids_by_parent(MS2_FILE, mz_min=threshold)
         assert filtered, "expected at least one parent above the threshold"

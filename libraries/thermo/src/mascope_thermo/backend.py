@@ -13,6 +13,11 @@ Select with the ``MASCOPE_THERMO_BACKEND`` environment variable::
 :class:`ReaderBackend` is a capability protocol (profile arrays, centroids,
 multi-scan averaging, XIC, trailer, run header, ...) rather than an emulation of
 the .NET RawFile object, so each backend implements it natively.
+
+For an end-to-end explanation of the reading and averaging pipeline (why
+averaging happens in the frequency domain, the real-vs-reconstructed profile
+split, the averaged-centroid approximation), see ``libraries/thermo/docs/
+reader_pipeline.md``.
 """
 
 from __future__ import annotations
@@ -130,8 +135,8 @@ class ReaderBackend(Protocol):
         """Multi-scan ppm-binned averaged centroids:
         ``(masses, intensities, resolutions, signal_to_noise)``.
 
-        Gap 5.3: the Thermo backend uses ``Extensions.AverageScans``; the
-        OpenTFRaw backend must reimplement ppm binning in NumPy."""
+        The Thermo backend uses ``Extensions.AverageScans``; the OpenTFRaw
+        backend reimplements ppm binning in NumPy."""
         ...
 
     def centroids_meta(self) -> dict:
@@ -155,8 +160,8 @@ class ReaderBackend(Protocol):
         """Per-scan profile spectra: ``(scan_mzs, scan_intensities, scan_times)``,
         the m/z and intensity arrays already restricted to ``[mz_min, mz_max]``.
 
-        Gap 5.2: OpenTFRaw's Python bindings expose centroids only; an
-        OpenTFRaw backend needs the profile arrays surfaced (fork/upstream)."""
+        OpenTFRaw's base Python bindings expose centroids only; the profile
+        arrays come from the ``mascope-opentfraw`` profile accessor."""
         ...
 
     def average_profile(
@@ -176,7 +181,7 @@ class ReaderBackend(Protocol):
         ``reconstruct=False`` returns the real measured profile, which the
         instrument-function fit needs.
 
-        Combines gaps 5.2 (profile) and 5.3 (ppm averaging)."""
+        Builds on the profile accessor and the NumPy ppm averaging above."""
         ...
 
     def xic(
@@ -191,8 +196,8 @@ class ReaderBackend(Protocol):
         """Extracted-ion chromatograms for each target m/z within ``ppm``:
         ``(intensities[n_mz, n_scans], scan_times)``.
 
-        Gap 5.4: the Thermo backend uses ``GetChromatogramData``; the OpenTFRaw
-        backend must reimplement m/z-window summation in NumPy."""
+        The Thermo backend uses ``GetChromatogramData``; the OpenTFRaw backend
+        reimplements m/z-window summation in NumPy."""
         ...
 
     def ms2_precursor_by_scan(
@@ -201,11 +206,11 @@ class ReaderBackend(Protocol):
         t_min: float | None = None,
         t_max: float | None = None,
     ) -> dict[int, float]:
-        """``{scan_number: precursor_mz}`` for MS² scans (only those whose
+        """``{scan_number: precursor_mz}`` for MS2 scans (only those whose
         precursor is resolvable).
 
-        Gap 5.1b: the Thermo backend parses the precursor from the filter
-        string; OpenTFRaw returns it as ``None`` (fork/upstream candidate)."""
+        Both backends parse the precursor from the rendered scan-filter string;
+        on Exploris this relies on the ``mascope-opentfraw`` scan-event decoding."""
         ...
 
     def ms2_acquisition_info(
@@ -214,9 +219,9 @@ class ReaderBackend(Protocol):
         t_min: float | None = None,
         t_max: float | None = None,
     ) -> tuple[float | None, dict[int, str]]:
-        """``(isolation_width, {scan_number: hcd_energy_string})`` for MS² scans.
+        """``(isolation_width, {scan_number: hcd_energy_string})`` for MS2 scans.
 
-        ``isolation_width`` is the single MS² isolation width across the scans;
+        ``isolation_width`` is the single MS2 isolation width across the scans;
         the HCD energy strings may be comma-separated (step dissociation). Thermo
         reads both from the trailer (``"MS2 Isolation Width:"`` /
         ``"HCD Energy V:"``); a backend lacking the calibrated HCD energy raises
@@ -246,8 +251,8 @@ INSTRUMENT_FIELDS = (
     "HasAccurateMassPrecursors",
 )
 
-# Per-scan statistics fields read from Thermo's ScanStats. (OpenTFRaw exposes a
-# subset; the metadata remap is assessment Phase 4.)
+# Per-scan statistics fields read from Thermo's ScanStats. (OpenTFRaw currently
+# exposes a subset of these fields; see the metadata-remap follow-up issue.)
 SCAN_STAT_FIELDS = (
     "HighMass",
     "LowMass",
@@ -773,10 +778,10 @@ class ThermoBackend:
 class OpenTFRawBackend:
     """:class:`ReaderBackend` backed by the open-source OpenTFRaw reader.
 
-    Built incrementally (migration step 4+). Capabilities OpenTFRaw 1.1.0 exposes
-    cleanly are implemented; the rest raise ``NotImplementedError`` referencing
-    the relevant gap, so the dual-backend contract suite xfails them until they
-    land (decode/fork work or NumPy reimplementations).
+    Reads centroids, profiles and metadata directly from OpenTFRaw, and
+    reimplements in NumPy the operations Thermo's .NET library computes natively
+    (ppm-binned averaging, the XIC). The profile, per-peak label and scan-event
+    accessors it relies on are provided by the ``mascope-opentfraw`` build.
     """
 
     def __init__(self, datafile_path: str):
@@ -1001,16 +1006,14 @@ class OpenTFRawBackend:
         }
 
     def _require_centroid_labels(self) -> None:
-        """Gap 5.1 is only closed if the installed OpenTFRaw exposes the
-        per-peak label accessor. The released wheel does not, so fall back to
-        ``NotImplementedError`` (the contract suite xfails) rather than an
-        ``AttributeError``.
+        """Per-peak labels (resolution / S:N) come from the ``mascope-opentfraw``
+        ``centroid_labels`` accessor. Raise a clear error if a build without it
+        is ever installed, rather than an opaque ``AttributeError``.
         """
         if not hasattr(self._raw, "centroid_labels"):
             raise NotImplementedError(
-                "Per-peak resolution / S:N require "
-                "opentfraw.RawFile.centroid_labels (gap 5.1); not available in "
-                "this opentfraw build."
+                "Per-peak resolution / S:N require the centroid_labels accessor "
+                "from mascope-opentfraw; the installed opentfraw build lacks it."
             )
 
     def _validate_mz_range(
@@ -1075,8 +1078,8 @@ class OpenTFRawBackend:
         ppm: int = 1,
         average: bool = False,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        # NumPy reimplementation of Thermo's AverageScans over centroids (gap
-        # 5.3): pool the per-scan FT label peaks and ppm-bin them for m/z (sub-ppm
+        # NumPy reimplementation of Thermo's AverageScans over centroids: pool
+        # the per-scan FT label peaks and ppm-bin them for m/z (sub-ppm
         # exact), resolution and S:N (approximate). The HEIGHT, however, is then
         # sourced from the frequency-averaged profile apex (below): Thermo
         # re-centroids the averaged profile, whose apex incurs an interpolation
@@ -1281,8 +1284,8 @@ class OpenTFRawBackend:
     ) -> tuple[list[np.ndarray], list[np.ndarray], np.ndarray]:
         if not hasattr(self._raw, "profile"):
             raise NotImplementedError(
-                "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
-                "not available in this opentfraw build."
+                "Profile arrays require the profile accessor from "
+                "mascope-opentfraw; the installed opentfraw build lacks it."
             )
         mz_min, mz_max = self._validate_mz_range(mz_min, mz_max)
         selected = self._selected(polarity, t_min, t_max, ms_type)
@@ -1327,8 +1330,8 @@ class OpenTFRawBackend:
                 masses, intensities, resolutions
             )
             return grid, summed, num_combined
-        # NumPy reimplementation of Thermo's AverageScans over profile data
-        # (gap 5.3). AverageScans averages in the FREQUENCY domain: an ion's
+        # NumPy reimplementation of Thermo's AverageScans over profile data.
+        # AverageScans averages in the FREQUENCY domain: an ion's
         # physical frequency is identical across scans, and the between-scan
         # "jitter" lives only in the per-scan freq->m/z calibration. Averaging in
         # frequency therefore aligns the peaks (no broadening: FWHM == single
@@ -1344,16 +1347,16 @@ class OpenTFRawBackend:
         #      are aligned, so this reproduces Thermo's apex (= mean *
         #      ScansCombined) and FWHM; no integral rescale is needed.
         #   4. Convert the freq grid back to m/z (reference calibration), then
-        #      calibrate the axis to the centroid labels (gap T2c): the freq->m/z
-        #      conversion still omits Thermo's per-scan calibration compensations
-        #      (~10-20 ppm), which the exact centroid m/z carry.
+        #      calibrate the axis to the centroid labels: the freq->m/z conversion
+        #      still omits Thermo's per-scan calibration compensations (~10-20
+        #      ppm), which the exact centroid m/z carry.
         # Falls back to a constant-ppm m/z grid when the Conversion Parameters
         # are unavailable (non-FTMS, or an opentfraw build without
         # scan_parameters).
         if not hasattr(self._raw, "profile"):
             raise NotImplementedError(
-                "Profile arrays require opentfraw.RawFile.profile (gap 5.2); "
-                "not available in this opentfraw build."
+                "Profile arrays require the profile accessor from "
+                "mascope-opentfraw; the installed opentfraw build lacks it."
             )
         if ppm <= 0:
             raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
@@ -1558,7 +1561,7 @@ class OpenTFRawBackend:
         well-separated profile peaks to their nearest centroid, reject outliers,
         and fit a low-order m/z correction. Returns the corrected grid, or the
         original grid unchanged when there is too little signal to fit reliably
-        or centroid labels are unavailable (released wheel).
+        or the centroid labels are unavailable.
         """
         if grid.size == 0 or not hasattr(self._raw, "centroid_labels"):
             return grid
@@ -1631,8 +1634,8 @@ class OpenTFRawBackend:
         t_max: float | None = None,
         ms_type: MsType | None = "Ms",
     ) -> tuple[np.ndarray, np.ndarray]:
-        # NumPy reimplementation of the Thermo MassRange chromatogram (gap 5.4):
-        # for each target m/z, sum the centroid intensities falling in its ppm
+        # NumPy reimplementation of the Thermo MassRange chromatogram: for each
+        # target m/z, sum the centroid intensities falling in its ppm
         # window [mz(1-ppm), mz(1+ppm)], per selected scan.
         #
         # Vectorized per scan via a sorted prefix sum: peaks in [low, high] are
@@ -1689,14 +1692,14 @@ class OpenTFRawBackend:
         t_max: float | None = None,
     ) -> tuple[float | None, dict[int, str]]:
         # The calibrated "HCD Energy V:" and "MS2 Isolation Width:" live in the
-        # per-scan trailer (generic record), which OpenTFRaw decodes but only
-        # the scan_parameters() accessor surfaces. Guard so a released wheel
-        # without it still raises NotImplementedError (contract xfails).
+        # per-scan trailer (generic record), surfaced by the scan_parameters()
+        # accessor from mascope-opentfraw. Raise a clear error if a build without
+        # it is ever installed, rather than an opaque AttributeError.
         if not hasattr(self._raw, "scan_parameters"):
             raise NotImplementedError(
-                "MS2 isolation width / calibrated HCD energy require "
-                "opentfraw.RawFile.scan_parameters (the trailer accessor); not "
-                "available in this opentfraw build (gap 5.1b / metadata)."
+                "MS2 isolation width / calibrated HCD energy require the "
+                "scan_parameters accessor from mascope-opentfraw; the installed "
+                "opentfraw build lacks it."
             )
 
         def _as_float(value) -> float:
