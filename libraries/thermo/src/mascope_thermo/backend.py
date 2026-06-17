@@ -1727,10 +1727,33 @@ class OpenTFRawBackend:
             raise ValueError("Multiple isolation widths found for MS2 scans.")
         return isolation_width, scan_idx_to_hcd
 
-    def ms2_centroids_for_scans(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Per-peak resolution / S:N are not decoded by OpenTFRaw (gap 5.1)."
-        )
+    def ms2_centroids_for_scans(
+        self, scan_indices: list[int]
+    ) -> tuple[list[dict], list[float]]:
+        self._require_centroid_labels()
+        by_num = {int(s["scan_number"]): s for s in self._all_scans()}
+        centroids: list[dict] = []
+        tic_values: list[float] = []
+        for scan_idx in scan_indices:
+            s = by_num[int(scan_idx)]
+            labels = self._raw.centroid_labels(int(scan_idx))
+            masses = np.asarray(labels["mz"], dtype=np.float64)
+            intensities = np.asarray(labels["intensity"], dtype=np.float64)
+            resolutions = np.asarray(labels["resolution"], dtype=np.float64)
+            signal_to_noise = np.asarray(labels["signal_to_noise"], dtype=np.float64)
+            # Keep only FT label peaks (finite resolution / S:N), as elsewhere.
+            mask = np.isfinite(resolutions) & np.isfinite(signal_to_noise)
+            centroids.append(
+                {
+                    "masses": masses[mask],
+                    "intensities": intensities[mask],
+                    "resolutions": resolutions[mask],
+                    "signal_to_noise": signal_to_noise[mask],
+                    "timestamp": s["retention_time"] * _SECONDS_PER_MINUTE,
+                }
+            )
+            tic_values.append(float(s["total_ion_current"]))
+        return centroids, tic_values
 
 
 def open_backend(datafile_path: str) -> ReaderBackend:

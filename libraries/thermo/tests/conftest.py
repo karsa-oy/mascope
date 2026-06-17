@@ -23,27 +23,17 @@ NEG_ORBI_FILE_PATH = str(TEST_FILES_DIR / "KORBI2_AMB_NEG_20260108144525.raw")
 
 @pytest.fixture(params=["thermo", "opentfraw"])
 def backend(request, monkeypatch):
-    """Run a contract test once per reader backend (assessment Phase 5).
+    """Run a contract test once per reader backend.
 
-    Sets ``MASCOPE_THERMO_BACKEND`` for the test. The OpenTFRaw backend isn't
-    implemented yet (migration step 4), so its runs are expected to xfail with
-    ``NotImplementedError`` for now; as ``OpenTFRawBackend`` lands they flip to
-    ``XPASS`` function by function (``strict=False`` keeps the suite green and
-    surfaces the XPASS as the signal to promote them).
+    Sets ``MASCOPE_THERMO_BACKEND`` for the test. Both backends are now fully
+    implemented -- the OpenTFRaw capabilities ship in the pinned
+    ``mascope-opentfraw`` fork -- so both runs are expected to pass.
 
     Tests/fixtures that build per-test state by *calling* a backend function must
     depend on this fixture (directly or via an autouse setup fixture) so the env
-    var is set before the call — a plain ``setup_method`` runs too early.
+    var is set before the call -- a plain ``setup_method`` runs too early.
     """
     monkeypatch.setenv("MASCOPE_THERMO_BACKEND", request.param)
-    if request.param == "opentfraw":
-        request.applymarker(
-            pytest.mark.xfail(
-                reason="OpenTFRawBackend not implemented yet (migration step 4)",
-                raises=NotImplementedError,
-                strict=False,
-            )
-        )
     return request.param
 
 
