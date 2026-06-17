@@ -331,7 +331,7 @@ def _ppm_bin(
     intensity: np.ndarray,
     extras: list[np.ndarray],
     ppm: float,
-) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+) -> tuple[np.ndarray, np.ndarray, list[np.ndarray], np.ndarray]:
     """Greedily cluster ``(mz, intensity)`` points within ``ppm`` and aggregate.
 
     Points (pooled across scans) are sorted by m/z; a new bin starts wherever
@@ -341,11 +341,13 @@ def _ppm_bin(
     Vectorized with ``np.add.reduceat`` so it scales to the hundreds of
     thousands of profile points a multi-scan window produces.
 
-    Returns ``(binned_mz, summed_intensity, [binned_extra, ...])``.
+    Returns ``(binned_mz, summed_intensity, [binned_extra, ...], counts)`` where
+    ``counts`` is the number of pooled points in each bin (= scans contributing
+    a centroid, used to scale the averaged S:N).
     """
     empty = np.array([], dtype=np.float64)
     if mz.size == 0:
-        return empty, empty, [empty for _ in extras]
+        return empty, empty, [empty for _ in extras], empty
 
     order = np.argsort(mz, kind="stable")
     mz = mz[order]
@@ -375,7 +377,7 @@ def _ppm_bin(
         plain_e = np.add.reduceat(e, starts) / counts
         binned_extras.append(np.where(nonzero, we, plain_e))
 
-    return binned_mz, isum, binned_extras
+    return binned_mz, isum, binned_extras, counts.astype(np.float64)
 
 
 class ThermoBackend:
@@ -1066,7 +1068,7 @@ class OpenTFRawBackend:
         res_all = np.concatenate(res_parts) if res_parts else np.array([])
         sn_all = np.concatenate(sn_parts) if sn_parts else np.array([])
 
-        masses, summed, (resolutions, signal_to_noise) = _ppm_bin(
+        masses, summed, (resolutions, signal_to_noise), present = _ppm_bin(
             mz_all, int_all, [res_all, sn_all], ppm
         )
         # Merge jitter-splits: the between-scan m/z jitter (~2 ppm) can exceed the
@@ -1074,9 +1076,26 @@ class OpenTFRawBackend:
         # Collapse neighbours whose gap is well below the local FWHM (so a real
         # peak's split merges, while genuinely-resolved peaks stay separate) --
         # mirroring Thermo's profile re-centroid, which never splits one peak.
-        masses, summed, resolutions, signal_to_noise = self._merge_split_centroids(
-            masses, summed, resolutions, signal_to_noise
+        (
+            masses,
+            summed,
+            resolutions,
+            signal_to_noise,
+            present,
+        ) = self._merge_split_centroids(
+            masses, summed, resolutions, signal_to_noise, present
         )
+        # Scale the pooled per-scan S:N up to the averaged-spectrum S:N. Thermo
+        # reads S:N off the noise-reduced *averaged* profile: averaging N scans
+        # drops the noise ~sqrt(N), so a peak present in n of the N scans has
+        # averaged S:N ~= (mean per-scan S:N) * n / sqrt(N) (the averaged peak
+        # height carries n/N of the signal, the noise floor sqrt(N) less). The
+        # intensity-weighted per-scan mean alone omits this and runs ~sqrt(N) too
+        # low, which would drop near-threshold peaks the weak-peak filter keeps
+        # under Thermo. S:N is intensity-scale-invariant, so this is independent
+        # of the sum/mean (`average`) choice.
+        if num_combined > 0:
+            signal_to_noise = signal_to_noise * present / np.sqrt(num_combined)
         intensities = summed / num_combined if (average and num_combined) else summed
 
         # Source the height from the frequency-averaged profile apex (matches
@@ -1101,17 +1120,19 @@ class OpenTFRawBackend:
         intensities: np.ndarray,
         resolutions: np.ndarray,
         sn: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        present: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Merge adjacent centroids that are a jitter-split of one peak.
 
         Cluster where the m/z gap to the neighbour is below
         ``_AVG_CENTROID_MERGE_FWHM`` * the local FWHM (= m/z / resolution): a
         peak's split (gap << FWHM) collapses, while genuinely-resolved peaks
         (gap >= FWHM) stay separate. Per cluster: intensity-weighted m/z, summed
-        intensity, intensity-weighted resolution / S:N.
+        intensity, intensity-weighted resolution / S:N, and summed ``present``
+        (the split halves' scans add up to the merged peak's scan count).
         """
         if masses.size <= 1:
-            return masses, intensities, resolutions, sn
+            return masses, intensities, resolutions, sn, present
         fwhm_ppm = np.where(resolutions > 0, 1e6 / resolutions, np.inf)
         gap_ppm = np.diff(masses) / masses[:-1] * 1e6
         thresh = _AVG_CENTROID_MERGE_FWHM * np.minimum(fwhm_ppm[:-1], fwhm_ppm[1:])
@@ -1126,7 +1147,8 @@ class OpenTFRawBackend:
             pmean = np.add.reduceat(values, starts) / counts
             return np.where(nonzero, wmean, pmean)
 
-        return agg(masses), isum, agg(resolutions), agg(sn)
+        present_merged = np.add.reduceat(present, starts)
+        return agg(masses), isum, agg(resolutions), agg(sn), present_merged
 
     @staticmethod
     def _heights_from_profile_apex(
