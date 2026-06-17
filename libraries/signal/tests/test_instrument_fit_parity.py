@@ -64,7 +64,13 @@ def _fit_resolution_coeff(path, backend, t_min, t_max):
         return None  # "Not enough quality peaks"
     if len(p_mzs) < 3:
         return None
-    resolution_function, _ = _fit_resolution_function("orbitrap", p_mzs, p_fwhms)
+    resolution_function, stats = _fit_resolution_function("orbitrap", p_mzs, p_fwhms)
+    # R = a/sqrt(m) is fit over the *binned* mass points; with too few the fit is
+    # degenerate (a is then fixed by a single peak, covariance unestimable) and
+    # the coefficient is not a meaningful basis for parity. Skip those -- the test
+    # is for acquisitions rich enough to support a stable fit.
+    if int(stats.get("n_points", 0)) < 3:
+        return None
     return float(resolution_function.keywords["a"])
 
 
