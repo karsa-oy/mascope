@@ -82,6 +82,8 @@ The Mascope runtime includes setup scripts and a comprehensive `mascope` command
 
 Our setup scripts - found in the `tooling` folder - provide an `install` command to setup low-level prerequisites (_Python 3.12_, _Node 22_, _uv_, _Docker_ and _.NET Runtime_), package dependencies (via `uv`) and the `mascope` cli.
 
+> **.NET Runtime** is only needed for the optional Thermo RawFileReader backend (see [Reader backend](#reader-backend-opentfraw--thermo)). Mascope reads `.raw` files with the open-source OpenTFRaw backend by default and has no Thermo dependency.
+
 #### Windows
 
 The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
@@ -107,6 +109,35 @@ git clone git@github.com:karsa-oy/mascope.git && cd mascope && ./tooling/ubuntu.
 Since [`uv` automatically syncs the virtual environment](https://docs.astral.sh/uv/concepts/projects/sync/#automatic-lock-and-sync) and we run `npm install` every time we launch the dev server, there is usually no need to reinstall when switching branches.
 
 If this doesn't work for some reason, the `tooling` scripts accept are `reinstall` and `uninstall` commands. These fully remove the `.venv`, `node_modules` and Mascope environment variables,but do not remove installed tooling (in case its used in other work).
+
+### Reader backend (OpenTFRaw / Thermo)
+
+Mascope reads Thermo `.raw` files through a pluggable reader backend, selected by the `MASCOPE_THERMO_BACKEND` environment variable:
+
+- **`opentfraw` (default)** — the open-source [OpenTFRaw](https://github.com/karsa-oy/OpenTFRaw) reader (Rust), installed from PyPI as `mascope-opentfraw`. Mascope ships and runs on this with **no Thermo dependency** and no proprietary binaries.
+- **`thermo` (optional)** — Thermo's proprietary RawFileReader (.NET, via `pythonnet`). Fully supported, but **not shipped**: the RawFileReader DLLs are proprietary and are deliberately not included in this repository.
+
+The two backends are parity-validated against each other (centroids, XIC, profile, MS² precursor, averaged spectra); OpenTFRaw reproduces the numbers the pipeline depends on, so it is the dependency-free default.
+
+#### Using the Thermo RawFileReader backend
+
+If you specifically want RawFileReader (for example to cross-check results, or for a file OpenTFRaw cannot yet read):
+
+1. Obtain the Thermo RawFileReader DLLs (`ThermoFisher.CommonCore.*.dll`) from Thermo's RawFileReader distribution, under its license, and place them in a directory.
+2. Point Mascope at them and select the backend:
+
+   ```bash
+   export MASCOPE_THERMO_DLL_DIR=/path/to/rawfilereader/dlls   # dir with ThermoFisher.CommonCore.RawFileReader.dll
+   export MASCOPE_THERMO_BACKEND=thermo
+   ```
+
+   On Windows/PowerShell: `$env:MASCOPE_THERMO_DLL_DIR = "..."; $env:MASCOPE_THERMO_BACKEND = "thermo"`.
+
+This also needs the .NET Runtime (installed by the setup scripts). Without the DLLs the Thermo backend raises a clear error and Mascope stays on OpenTFRaw.
+
+#### The `mascope-opentfraw` fork
+
+OpenTFRaw support relies on a few capabilities — profile spectra, per-peak resolution/S:N, Exploris scan-event decoding, and the per-scan trailer — that are submitted upstream as pull requests but not yet in an upstream release. Until they land, Mascope depends on **`mascope-opentfraw`**, a Karsa fork that ships the same `opentfraw` module with those additions (imports are unchanged). Switch the dependency in `libraries/thermo/pyproject.toml` back to upstream `opentfraw` once the PRs are released.
 
 ### CLI
 
