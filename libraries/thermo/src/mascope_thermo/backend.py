@@ -681,9 +681,9 @@ class ThermoBackend:
 
         mzs = np.asarray(mzs, dtype=float)
         selector = self._selector(polarity, t_min, t_max, ms_type)
-        indices_0based = selector.scan_indices_0based
+        selected_scans = selector.scan_indices_1based
 
-        intensities = np.zeros((len(mzs), len(indices_0based)), dtype=np.float64)
+        intensities = np.zeros((len(mzs), len(selected_scans)), dtype=np.float64)
         mz_lows = mzs - (mzs * ppm / 1e6)
         mz_highs = mzs + (mzs * ppm / 1e6)
 
@@ -696,13 +696,46 @@ class ThermoBackend:
             setting.MassRanges = [mz_range]
             settings.append(setting)
 
-        # -1, -1 -> all scans; slice down to the filtered scans afterwards.
+        # -1, -1 -> the chromatogram's full scan range. Align each trace to the
+        # selected scans by scan number, not positionally: on some files Thermo's
+        # GetChromatogramData under-covers the scan list (it can return points for
+        # only a subset, even a single scan), which made positional slicing
+        # overrun. Scans a trace does not cover are filled below.
         chromatogram = self._raw.GetChromatogramData(settings, -1, -1)
         traces = ChromatogramSignal.FromChromatogramData(chromatogram)
-        for i, trace in enumerate(traces):
-            intensities[i] = np.fromiter(
+        rows: list[np.ndarray] = []
+        has_gaps = False
+        for trace in traces:
+            scans = np.fromiter(
+                trace.Scans, dtype=np.int64, count=len(trace.Scans)
+            ).tolist()
+            values = np.fromiter(
                 trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
-            )[indices_0based]
+            ).tolist()
+            by_scan = dict(zip(scans, values))
+            row = np.array(
+                [by_scan.get(sn, np.nan) for sn in selected_scans], dtype=np.float64
+            )
+            has_gaps = has_gaps or bool(np.isnan(row).any())
+            rows.append(row)
+
+        # Where GetChromatogramData under-covered scans, fill the gaps with the
+        # per-scan centroid-window sum -- the same quantity it returns where it
+        # does have data -- so the XIC spans every selected scan. Only read the
+        # centroids when there is actually a gap (the common path has none).
+        if has_gaps:
+            per_scan = self.centroids_per_scan(
+                polarity=polarity, t_min=t_min, t_max=t_max, ms_type=ms_type
+            )
+            scan_centroids = [(d["masses"], d["intensities"]) for d in per_scan]
+            for i, row in enumerate(rows):
+                for j in np.flatnonzero(np.isnan(row)):
+                    mz_arr, int_arr = scan_centroids[j]
+                    in_window = (mz_arr >= mz_lows[i]) & (mz_arr <= mz_highs[i])
+                    row[j] = float(int_arr[in_window].sum())
+
+        for i, row in enumerate(rows):
+            intensities[i] = np.nan_to_num(row, nan=0.0)
 
         return intensities, selector.scan_times
 
