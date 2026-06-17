@@ -4,6 +4,8 @@ The data processing workflow provides a standardized, instrument-agnostic archit
 The architecture branches to accommodate physics-based differences in detector characteristics before converging into a unified downstream storage, matching, and calibration.
 This modular layout decouples raw hardware signal acquisition from logical compound identification, enabling flexible integration of new instrument types and calibration strategies without disrupting the core data handling and matching logic.
 
+![Signal Processing Pipeline](images/signal_processin_pipeline.png)
+
 ## Processing Stages and Data Flow
 
 ### Signal Aggregation and Summation
