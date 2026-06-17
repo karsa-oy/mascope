@@ -8,15 +8,11 @@ caring which.
 Select with the ``MASCOPE_THERMO_BACKEND`` environment variable::
 
     "opentfraw"  -> OpenTFRawBackend (default; mascope-opentfraw wheel)
-    "thermo"     -> ThermoBackend (pythonnet + bundled .NET DLLs)
+    "thermo"     -> ThermoBackend (opt-in; pythonnet + external .NET DLLs)
 
-See ``libraries/thermo/OpenTFRaw_migration_execution_plan.md`` (§3) for the
-rationale (a capability protocol, not an emulation of the .NET RawFile object).
-
-This is introduced incrementally: :class:`ReaderBackend` lists only the
-capabilities of functions already migrated onto the seam. More methods (profile
-arrays, centroids, multi-scan averaging, XIC, trailer, run header, ...) are
-added as the remaining ``thermo.py`` functions move over.
+:class:`ReaderBackend` is a capability protocol (profile arrays, centroids,
+multi-scan averaging, XIC, trailer, run header, ...) rather than an emulation of
+the .NET RawFile object, so each backend implements it natively.
 """
 
 from __future__ import annotations
