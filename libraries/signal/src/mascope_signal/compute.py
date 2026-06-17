@@ -131,6 +131,13 @@ def get_sum_signal(
     :type polarity: str, optional
     :param average: Whether to return the average signal
     :type average: bool, optional
+    :param reconstruct: When True, return the profile reconstructed as one
+        Gaussian per centroid (overlays the centroids exactly; matches Thermo,
+        whose profile is itself a reconstruction) -- for display. Honoured only
+        for live ``orbi_raw``; other paths return the real measured signal. The
+        default False is what the instrument-function fit and other quantitative
+        consumers use. Caches separately from the real signal.
+    :type reconstruct: bool, optional
     :raises RuntimeError: If the sample file is not found or inaccessible
     :return: The sum signal as an xarray DataArray
     :rtype: xr.DataArray
