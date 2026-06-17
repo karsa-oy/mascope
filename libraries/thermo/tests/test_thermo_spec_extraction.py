@@ -3,11 +3,12 @@ import pytest
 from conftest import NEG_ORBI_FILE_PATH, POS_ORBI_FILE_PATH, read_or_xfail
 
 import mascope_thermo.thermo as m_thermo
+from mascope_thermo.backend import open_backend
 
 
 # Run every test in this module under each reader backend (thermo + opentfraw).
-# The opentfraw runs xfail until OpenTFRawBackend exists (see the `backend`
-# fixture in conftest.py).
+# The Thermo backend is skipped unless its DLLs are available (see the `backend`
+# fixture in conftest.py); OpenTFRaw always runs.
 pytestmark = pytest.mark.usefixtures("backend")
 
 
@@ -127,9 +128,8 @@ class TestGetPeakTimeseries:
     """
 
     def setup_method(self):
-        with m_thermo.RawFileManager(POS_ORBI_FILE_PATH) as RawFile:
-            low = RawFile.RunHeaderEx.LowMass
-            high = RawFile.RunHeaderEx.HighMass
+        with open_backend(POS_ORBI_FILE_PATH) as be:
+            low, high = be.mass_range()
             self.test_mzs = np.array(
                 [
                     low + (high - low) * 0.25,
@@ -379,9 +379,8 @@ class TestGetCentroidsPerScan:
         )
 
     def test_mz_range_filtering(self):
-        with m_thermo.RawFileManager(POS_ORBI_FILE_PATH) as RawFile:
-            low = RawFile.RunHeaderEx.LowMass
-            high = RawFile.RunHeaderEx.HighMass
+        with open_backend(POS_ORBI_FILE_PATH) as be:
+            low, high = be.mass_range()
 
         mz_min = low + (high - low) * 0.25
         mz_max = low + (high - low) * 0.50

@@ -18,13 +18,15 @@ import pytest
 from conftest import POS_ORBI_FILE_PATH, TEST_FILES_DIR, read_or_xfail
 
 import mascope_thermo.thermo as m_thermo
+from mascope_thermo.backend import open_backend
 
 
 def _has_ms2(path: str) -> bool:
-    """True if the file contains at least one MS² scan."""
+    """True if the file contains at least one MS² scan (probed via the current
+    backend, so discovery works without the Thermo DLLs)."""
     try:
-        with m_thermo.RawFileManager(path) as rf:
-            m_thermo.ScanSelector(rf, ms_type="Ms2").scan_indices_1based
+        with open_backend(path) as be:
+            be.scan_indices(ms_type="Ms2")
         return True
     except m_thermo.NoScansFoundError:
         return False

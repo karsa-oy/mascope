@@ -29,7 +29,16 @@ from conftest import TEST_FILES_DIR
 
 import mascope_thermo.thermo as m_thermo
 from mascope_thermo.backend import open_backend
+from mascope_thermo.lib import thermo_available
 
+
+# Every test here compares OpenTFRaw against the Thermo backend, which needs the
+# proprietary RawFileReader DLLs (not shipped). Skip the module when they aren't
+# available; set MASCOPE_THERMO_DLL_DIR to run it.
+pytestmark = pytest.mark.skipif(
+    not thermo_available(),
+    reason="Thermo backend unavailable (set MASCOPE_THERMO_DLL_DIR)",
+)
 
 RAW_FILES = sorted(TEST_FILES_DIR.glob("*.raw"))
 

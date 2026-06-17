@@ -1,6 +1,14 @@
 """
 This module provides functions to read and process Thermo Fisher raw files.
+
+The .NET (pythonnet) assemblies are loaded lazily -- inside the functions that
+use them, after ``_ensure_dotnet()`` -- so importing this module does not require
+the Thermo RawFileReader DLLs. Mascope ships without those proprietary DLLs and
+defaults to the OpenTFRaw backend; the Thermo backend is opt-in via
+``MASCOPE_THERMO_DLL_DIR`` (see ``mascope_thermo.lib`` and the README).
 """
+
+from __future__ import annotations
 
 from typing import Iterable, Literal
 
@@ -8,17 +16,22 @@ import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray as xr
-from System import NullReferenceException
-from System.Collections.Generic import List
-from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
-from ThermoFisher.CommonCore.Data.Business import (
-    Device,
-    MassOptions,
-)
-from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 
 from mascope_thermo.backend import open_backend
+from mascope_thermo.lib import load_dotnet
 from mascope_thermo.runtime import runtime
+
+
+def _ensure_dotnet() -> None:
+    """Load the Thermo RawFileReader .NET assemblies (idempotent).
+
+    Raises a clear error when the DLLs are not configured -- see
+    ``mascope_thermo.lib.load_dotnet``."""
+    load_dotnet(
+        "ThermoFisher.CommonCore.Data",
+        "ThermoFisher.CommonCore.RawFileReader",
+        "System",
+    )
 
 
 SECONDS_PER_MINUTE = 60
@@ -60,6 +73,11 @@ class RawFileManager:
         self.RawFile = None
 
     def __enter__(self):
+        _ensure_dotnet()
+        from System import NullReferenceException
+        from ThermoFisher.CommonCore.Data.Business import Device
+        from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
+
         try:
             self.RawFile = RawFileReaderAdapter.FileFactory(self.path)
             self.RawFile.SelectInstrument(Device.MS, 1)
@@ -228,6 +246,8 @@ class ScanSelector:
     def scan_indices_dotnet(self) -> List[int]:
         """Returns the list of scan indices as a .NET List[int] for use with
         Thermo library functions."""
+        from System.Collections.Generic import List
+
         net_list = List[int]()
         for index in self.scan_indices_1based:
             net_list.Add(index)
@@ -246,6 +266,8 @@ class ScanSelector:
     @property
     def scans(self) -> tuple:
         """Returns the scan objects for the filtered scan indices."""
+        from ThermoFisher.CommonCore.Data import Extensions
+
         return tuple(Extensions.GetScans(self._RawFile, self.scan_indices_dotnet))
 
     @property
@@ -550,6 +572,11 @@ def _average_scans_centroids(
     """
     if ppm <= 0:
         raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
+
+    _ensure_dotnet()
+    from System.Collections.Generic import List
+    from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
+    from ThermoFisher.CommonCore.Data.Business import MassOptions
 
     dotnet_indices = List[int]()
     for index in scan_indices_1based:

@@ -21,9 +21,17 @@ import pytest
 opentfraw = pytest.importorskip("opentfraw")
 
 import mascope_thermo.thermo as m_thermo  # noqa: E402
+from mascope_thermo.lib import thermo_available  # noqa: E402
 from mascope_signal.instrument_func.fit import (  # noqa: E402
     _fit_resolution_function,
     _process_peak_shapes,
+)
+
+# Compares the resolution fit on OpenTFRaw vs the Thermo backend, so it needs the
+# Thermo RawFileReader DLLs (not shipped). Skip when unavailable.
+pytestmark = pytest.mark.skipif(
+    not thermo_available(),
+    reason="Thermo backend unavailable (set MASCOPE_THERMO_DLL_DIR)",
 )
 
 # mascope_thermo's test corpus (shared); resolves relative to this file.
