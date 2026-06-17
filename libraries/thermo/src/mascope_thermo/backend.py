@@ -304,7 +304,8 @@ _AVG_PROFILE_CALIB_MAX_ANCHORS = 60  # cap anchors (a linear fit needs few)
 _AVG_PROFILE_FREQ_NEWTON = 4  # Newton iterations for the m/z -> frequency inverse
 _AVG_PROFILE_GAP_DF = 2.0  # zero a scan's interp beyond this * FFT bin from its samples
 _RECON_SIGMA = 5.0  # reconstructed-profile half-window / sample span, in sigma
-_RECON_PTS = 21  # samples per peak across +-_RECON_SIGMA sigma (display smoothness)
+_RECON_PTS = 15  # samples per peak across +-_RECON_SIGMA sigma (~Thermo's density;
+# keep odd so the centroid is sampled exactly -> the profile apex lands on it)
 _AVG_CENTROID_HEIGHT_PPM = 3.0  # window to source centroid height from profile apex
 _AVG_CENTROID_HEIGHT_BAND = (0.85, 1.15)  # apply the apex only as a modest refinement
 _AVG_CENTROID_MERGE_FWHM = 0.5  # merge centroids whose gap is below this * local FWHM
