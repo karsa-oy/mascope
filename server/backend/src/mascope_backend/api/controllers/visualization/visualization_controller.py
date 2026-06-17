@@ -200,6 +200,10 @@ async def _load_peaks_and_averaged_signal(
         iso.sample_peak_mz for iso in isotopes if iso.sample_peak_mz is not None
     ]
     mz_min, mz_max = min(match_mzs) - dmz, max(match_mzs) + dmz
+    # Display the reconstructed profile (one Gaussian per centroid) so it overlays
+    # the centroids exactly, matching the Thermo backend (whose profile is itself
+    # such a reconstruction). get_sum_signal honours reconstruct only for live
+    # orbi_raw; TOF/zarr return the real profile.
     averaged_signal = (
         m_compute.get_sum_signal(
             sample.filename,
@@ -207,6 +211,7 @@ async def _load_peaks_and_averaged_signal(
             sample.t1,
             polarity=sample.polarity,
             average=True,
+            reconstruct=True,
         )
         .sel(mz=slice(mz_min, mz_max))
         .compute()

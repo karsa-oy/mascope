@@ -117,6 +117,7 @@ def get_sum_signal(
     t_max: float | None = None,
     polarity: Literal["+", "-"] | None = None,
     average: bool = False,
+    reconstruct: bool = False,
 ) -> xr.DataArray:
     """Get sum signal from the sample file for the given time range and polarity.
 
@@ -136,7 +137,10 @@ def get_sum_signal(
     """
 
     sample_type = m_name.get_sample_file_type(base_filename)
-    cached_name = _get_sum_signal_hash_name(t_min, t_max, polarity)
+    # reconstruct only applies to live orbi_raw computation (one Gaussian per
+    # centroid); other paths return the real signal regardless.
+    reconstruct = reconstruct and sample_type == "orbi_raw"
+    cached_name = _get_sum_signal_hash_name(t_min, t_max, polarity, reconstruct)
     averaging_factor = None
     if average:
         averaging_factor = _get_averaging_factor(
@@ -173,6 +177,7 @@ def get_sum_signal(
                 t_min=t_min,
                 t_max=t_max,
                 polarity=polarity,
+                reconstruct=reconstruct,
             )
         case "tof_h5":
             datafile_path = os.path.join(sample_path, "data.h5")
@@ -216,7 +221,12 @@ def get_sum_signal(
                 name="sum_signal",
             )
 
-    if cached_name != "sum_signal":
+    # The full, unfiltered sum signal skips the one-point m/z calibration factor;
+    # filtered signals get it (this matches what the app displays). Keyed on the
+    # filter, not the cache-name string, so the reconstructed variant follows the
+    # same rule as the real signal of the same window.
+    is_full_sum_signal = t_min is None and t_max is None and polarity is None
+    if not is_full_sum_signal:
         # Check if calibration factor is available in the sample file properties
         props = m_io.read_props(base_filename)
         calibration = props["mz_calibration"]
@@ -255,8 +265,13 @@ def get_sum_signal(
     return sum_signal
 
 
-def _get_sum_signal_hash_name(t_min, t_max, polarity):
-    """Generate a unique hash name for sum signal based on parameters"""
+def _get_sum_signal_hash_name(t_min, t_max, polarity, reconstruct=False):
+    """Generate a unique hash name for sum signal based on parameters.
+
+    The reconstructed profile (one Gaussian per centroid, for display) caches
+    separately from the real measured profile via a ``_recon`` suffix; real
+    names are unchanged for backward compatibility.
+    """
     is_full_sum_signal = t_min is None and t_max is None and polarity is None
     if is_full_sum_signal:
         cached_name = "sum_signal"
@@ -265,6 +280,8 @@ def _get_sum_signal_hash_name(t_min, t_max, polarity):
         hash_addition = hashlib.sha1(key_str.encode()).hexdigest()[:12]
         cached_name = f"sum_signal_{hash_addition}"
 
+    if reconstruct:
+        cached_name += "_recon"
     return cached_name
 
 

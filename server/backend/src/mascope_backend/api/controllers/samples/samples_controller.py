@@ -601,9 +601,16 @@ async def get_sample_spectrum(
     # - Compute averaged spectrum in the time range with polarity filtering
     intensity_unit = "counts/s"
 
-    # Use specific time range with polarity filtering
+    # Use specific time range with polarity filtering. reconstruct=True asks for
+    # the display profile (one Gaussian per centroid, overlays the centroids,
+    # matches Thermo); get_sum_signal honours it only for live orbi_raw.
     spectrum = m_compute.get_sum_signal(
-        sample.filename, t_min_eff, t_max_eff, polarity=sample.polarity, average=True
+        sample.filename,
+        t_min_eff,
+        t_max_eff,
+        polarity=sample.polarity,
+        average=True,
+        reconstruct=True,
     )
 
     # Check if spectrum computation returned None (no data found)

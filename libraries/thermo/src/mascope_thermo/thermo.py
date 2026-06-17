@@ -360,6 +360,7 @@ def compute_sum_signal(
     t_max: float | None = None,
     ppm: int = 1,
     polarity: Literal["+", "-"] | None = None,
+    reconstruct: bool = False,
 ) -> tuple[xr.DataArray, int]:
     """Computes sum signal, binning counts within ``ppm`` value.
     Polarity and time filters may be optionally provided.
@@ -377,6 +378,12 @@ def compute_sum_signal(
     :param polarity: + or -, Polarity of the scans to be retrieved, optional,
                     defaults to None
     :type polarity: str, optional
+    :param reconstruct: When True, return a profile reconstructed as one Gaussian
+                    per centroid (overlays the centroids exactly; matches Thermo's
+                    profile, which is also a reconstruction) -- intended for
+                    display. The default False returns the real measured profile,
+                    which the instrument-function fit needs.
+    :type reconstruct: bool, optional
     :raises ValueError: If the specified time range is invalid, or if no data is found
                         in the specified filters, or the specified polarity is not found
                         in the raw file.
@@ -387,11 +394,11 @@ def compute_sum_signal(
         indices = backend.scan_indices(polarity=polarity, t_min=t_min, t_max=t_max)
         runtime.logger.debug(
             f"Selected {len(indices)} scans for sum signal computation. "
-            f"Polarity: {polarity}, binning ppm: {ppm}."
+            f"Polarity: {polarity}, binning ppm: {ppm}, reconstruct: {reconstruct}."
         )
         # average=False restores the sum signal (averaged * scans combined).
         mz, sum_signal, num_of_combined_scans = backend.average_profile(
-            indices, ppm=ppm, average=False
+            indices, ppm=ppm, average=False, reconstruct=reconstruct
         )
 
     sum_signal_dask = da.from_array(sum_signal, chunks="auto")

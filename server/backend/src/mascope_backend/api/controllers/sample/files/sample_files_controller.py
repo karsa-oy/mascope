@@ -1233,8 +1233,13 @@ async def get_sample_file_spectrum(
     filename = sample_file_data.get("data").get("filename")
     intensity_unit = "counts/s"
 
-    # Step 2: Compute averaged spectrum in the time range
-    spectrum = m_compute.get_sum_signal(filename, t_min, t_max, average=True)
+    # Step 2: Compute averaged spectrum in the time range. reconstruct=True asks
+    # for the display profile (one Gaussian per centroid, overlays the centroids,
+    # matches Thermo); get_sum_signal honours it only for live orbi_raw and
+    # returns the real signal otherwise.
+    spectrum = m_compute.get_sum_signal(
+        filename, t_min, t_max, average=True, reconstruct=True
+    )
 
     # Step 3: Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:
