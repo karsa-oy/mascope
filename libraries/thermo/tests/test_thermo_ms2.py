@@ -116,7 +116,11 @@ class TestGetMs2SummaryMetadata:
     def test_scan_counts_consistent(self, summary, num_scans):
         assert summary["ms2_scan_count"] > 0
         assert summary["ms1_scan_count"] >= 0
-        assert summary["ms1_scan_count"] + summary["ms2_scan_count"] == num_scans
+        # ms1 + ms2 is the number of *selected* scans: the file total, minus the
+        # first scan when the bad-first-scan workaround drops it as a high-TIC
+        # outlier (see thermo.py _bad_first_scan; applied by both backends).
+        selected = summary["ms1_scan_count"] + summary["ms2_scan_count"]
+        assert num_scans - 1 <= selected <= num_scans
 
     def test_parent_peak_tolerance_default(self, summary):
         assert summary["parent_peak_tolerance"] == 0.001

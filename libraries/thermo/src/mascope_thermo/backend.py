@@ -1,14 +1,14 @@
 """Reader-backend seam for ``mascope_thermo``.
 
 Selects the file-reading implementation behind a single switch so the public
-functions in :mod:`mascope_thermo.thermo` can run on either Thermo's
-RawFileReader (the current default) or — once implemented — the open-source
-OpenTFRaw reader, without the callers caring which.
+functions in :mod:`mascope_thermo.thermo` can run on either the open-source
+OpenTFRaw reader (the default) or Thermo's RawFileReader, without the callers
+caring which.
 
 Select with the ``MASCOPE_THERMO_BACKEND`` environment variable::
 
-    "thermo"     -> ThermoBackend (default; pythonnet + bundled .NET DLLs)
-    "opentfraw"  -> OpenTFRawBackend (built in a later migration step)
+    "opentfraw"  -> OpenTFRawBackend (default; mascope-opentfraw wheel)
+    "thermo"     -> ThermoBackend (pythonnet + bundled .NET DLLs)
 
 See ``libraries/thermo/OpenTFRaw_migration_execution_plan.md`` (§3) for the
 rationale (a capability protocol, not an emulation of the .NET RawFile object).
@@ -1736,10 +1736,10 @@ class OpenTFRawBackend:
 def open_backend(datafile_path: str) -> ReaderBackend:
     """Open ``datafile_path`` with the backend selected by ``MASCOPE_THERMO_BACKEND``.
 
-    Returns a context manager. Defaults to the Thermo backend, preserving today's
-    behaviour when the variable is unset.
+    Returns a context manager. Defaults to the OpenTFRaw backend; set
+    ``MASCOPE_THERMO_BACKEND=thermo`` to use the legacy Thermo RawFileReader.
     """
-    name = os.environ.get(ENV_BACKEND, "thermo").lower()
+    name = os.environ.get(ENV_BACKEND, "opentfraw").lower()
     if name == "thermo":
         return ThermoBackend(datafile_path)
     if name == "opentfraw":

@@ -9,11 +9,11 @@ import pytest
 from mascope_thermo import backend as m_backend
 
 
-def test_default_backend_is_thermo(monkeypatch):
+def test_default_backend_is_opentfraw(monkeypatch):
     monkeypatch.delenv(m_backend.ENV_BACKEND, raising=False)
     be = m_backend.open_backend("dummy.raw")
-    assert isinstance(be, m_backend.ThermoBackend)
-    # ThermoBackend structurally satisfies the ReaderBackend protocol.
+    assert isinstance(be, m_backend.OpenTFRawBackend)
+    # OpenTFRawBackend structurally satisfies the ReaderBackend protocol.
     assert isinstance(be, m_backend.ReaderBackend)
 
 
@@ -32,15 +32,6 @@ def test_opentfraw_backend_selected(monkeypatch):
     be = m_backend.open_backend("dummy.raw")
     assert isinstance(be, m_backend.OpenTFRawBackend)
     assert isinstance(be, m_backend.ReaderBackend)
-
-
-def test_opentfraw_unimplemented_capability_raises(monkeypatch):
-    # Capabilities OpenTFRaw can't satisfy yet must raise NotImplementedError
-    # (so the contract suite xfails them), not AttributeError.
-    monkeypatch.setenv(m_backend.ENV_BACKEND, "opentfraw")
-    be = m_backend.open_backend("dummy.raw")
-    with pytest.raises(NotImplementedError):
-        be.profile_per_scan()
 
 
 def test_unknown_backend_raises(monkeypatch):
