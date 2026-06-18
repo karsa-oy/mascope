@@ -1726,18 +1726,18 @@ source = { editable = "libraries/molmass" }
 
 [[package]]
 name = "mascope-opentfraw"
-version = "1.2.0"
+version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/c3/4723fd7d11d40492b5bda5d2de5870b88fba996537e181a6ccfeebe143ac/mascope_opentfraw-1.2.0.tar.gz", hash = "sha256:43e26d32916e7c989b275ebfe23b8a3cceb32396617cd0a3cb2810af440e412c", size = 71987, upload-time = "2026-06-17T14:13:06.93Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/2b/d9dbf91ac5f29ac726d79d9b00ed1e99d950900b52fd00427eeb5938a1fb/mascope_opentfraw-1.3.0.tar.gz", hash = "sha256:5ba53dbaee3207bb4ac7b178679f26b03046d30bbcb6d702a43f5da05361314b", size = 72438, upload-time = "2026-06-18T11:39:51.483Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6c/23/2ecd691e7520e3c349abeb80157da11300c511408c073d32e2d91a912f4d/mascope_opentfraw-1.2.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:cef51c50141ed3570c576061df60e14f8525a584b91140d67bd49b562cd4a8a2", size = 372084, upload-time = "2026-06-17T14:12:59.121Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/7f/25df82ddf7bbdccbf85078df53638d020c7bd9637417a7e948c48e19a794/mascope_opentfraw-1.2.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:aa58af613993dadf541729c578e443fe11384e84c73461a6b220cc4617b4e0d5", size = 368508, upload-time = "2026-06-17T14:13:00.768Z" },
-    { url = "https://files.pythonhosted.org/packages/79/db/821fbb53e5a07f166a5a27af834e91169c32101bb2039ab9809848d8bf2f/mascope_opentfraw-1.2.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5f13245fee0db8492d812089ce35ff6942c5bb1700afad5d90f456e5cade6905", size = 410009, upload-time = "2026-06-17T14:13:02.32Z" },
-    { url = "https://files.pythonhosted.org/packages/44/67/8570e0ebc3bf6b33c411594b364d904287892089b0db58d429767f83747a/mascope_opentfraw-1.2.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b874abaefbd9e635099c40f5c8f794ff0724280d0db84065617dc0fb99fd4974", size = 420896, upload-time = "2026-06-17T14:13:04.121Z" },
-    { url = "https://files.pythonhosted.org/packages/b6/3c/551c2e8282a26a2f6144f92a46731bf84338415d3fe06cffc33b395fa187/mascope_opentfraw-1.2.0-cp38-abi3-win_amd64.whl", hash = "sha256:4c3232c2d242df4331da090f3401329926a5426f31e58841498d7fd3e8ee5ffa", size = 272164, upload-time = "2026-06-17T14:13:05.497Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/37/6cebe6d30877556bc19c1b7468e4b14094149113c5031fafd08a13f067b2/mascope_opentfraw-1.3.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:8b1757497d8d890e87a1a6dc38fa7b142f7b2f11a0c5419216ed0b2be07afdcf", size = 372430, upload-time = "2026-06-18T11:39:44.596Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/8e/ce60922ede6eabb9e86ccf971f54538cf046623f5818cf7ae3c26af793ce/mascope_opentfraw-1.3.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:628e958543d9f64fb4e8ee1519dba739f8ec9ac8fd4786a5cdcbc8e673870fe2", size = 368879, upload-time = "2026-06-18T11:39:45.88Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/87/5bb183469371e878aa0744ef519f025659bace9547e4acd3beecf89aba8f/mascope_opentfraw-1.3.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d69ac0b75dc955b2a0dfc4831fb2842ade1effa9b2f1b0d9b5a006fff4c11d6a", size = 410305, upload-time = "2026-06-18T11:39:47.224Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/59/72fe21df5ad09a457a927c1d3c00f42748bb3debb8a8374a4be0b9ca1680/mascope_opentfraw-1.3.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d8aa02bd8e9bd5ce4101cd81be77e2231cf90e6756cb853bb992110874961f25", size = 421305, upload-time = "2026-06-18T11:39:48.728Z" },
+    { url = "https://files.pythonhosted.org/packages/11/bb/c2e92adc71589ac68da90dee50d3caa0fa541ec5b654cb2c3ecdebcf50e7/mascope_opentfraw-1.3.0-cp38-abi3-win_amd64.whl", hash = "sha256:82be8823e0128aaca7744d26f74d7121da34f9381d69ab718f6e1e82f109cce2", size = 272670, upload-time = "2026-06-18T11:39:50.103Z" },
 ]
 
 [[package]]
@@ -1833,7 +1833,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "mascope-file", editable = "libraries/file" },
-    { name = "mascope-opentfraw", specifier = "~=1.2" },
+    { name = "mascope-opentfraw", specifier = "~=1.3" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
     { name = "numpy", specifier = "~=1.26" },
     { name = "pythonnet", specifier = "~=3.0" },
