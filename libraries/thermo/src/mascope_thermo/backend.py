@@ -83,6 +83,11 @@ class ReaderBackend(Protocol):
         """Total number of scans (spectra) in the file."""
         ...
 
+    def created(self) -> "datetime | None":
+        """File creation (acquisition) timestamp, or ``None`` if the backend
+        cannot provide it."""
+        ...
+
     def scan_acquisition_settings(
         self,
         polarity: Polarity | None = None,
@@ -478,6 +483,12 @@ class ThermoBackend:
 
     def num_scans(self) -> int:
         return self._raw.RunHeaderEx.SpectraCount
+
+    def created(self):
+        from datetime import datetime
+
+        d = self._raw.CreationDate
+        return datetime(d.Year, d.Month, d.Day, d.Hour, d.Minute, d.Second)
 
     def scan_acquisition_settings(
         self,
@@ -956,6 +967,20 @@ class OpenTFRawBackend:
 
     def num_scans(self) -> int:
         return int(self._raw.num_scans)
+
+    def created(self):
+        from datetime import datetime, timezone
+
+        # ``RawFile.created`` (mascope-opentfraw) is the Xcalibur audit timestamp:
+        # the instrument's local wall-clock encoded as a Windows FILETIME, with no
+        # timezone in the file. Interpret it as UTC to recover that exact
+        # wall-clock independent of this machine's timezone, then drop tzinfo to
+        # match the legacy (naive) CreationDate. Returns None on builds without
+        # the accessor, or files without an audit timestamp.
+        ts = getattr(self._raw, "created", None)
+        if ts is None:
+            return None
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).replace(tzinfo=None)
 
     def scan_indices(
         self,

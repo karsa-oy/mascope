@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime, timezone
 
 from mascope_backend.api.new.instrument_configs.schemas import (
@@ -10,7 +12,10 @@ from mascope_backend.file_converter.base_processor import (
     SampleFileProps,
     with_file_context,
 )
-from mascope_thermo.thermo import RawFileManager, get_polarity_options
+from mascope_thermo.backend import open_backend
+from mascope_thermo.thermo import get_polarity_options
+
+_log = logging.getLogger(__name__)
 
 
 class RawProcessor(BaseFileProcessor):
@@ -40,14 +45,13 @@ class RawProcessor(BaseFileProcessor):
         return ".raw"
 
     @property
-    @with_file_context
     def filename(self) -> str:
         """Base filename of the raw file currently being processed
 
         :return: Base filename
         :rtype: str
         """
-        filename = self._strip_filepath(self.file_handle.FileName).replace(" ", "_")
+        filename = self._strip_filepath(self.file_to_process).replace(" ", "_")
         timestamp = datetime.fromisoformat(self.timestamp).strftime(
             "%Y.%m.%d-%Hh%Mm%Ss"
         )
@@ -70,8 +74,8 @@ class RawProcessor(BaseFileProcessor):
         :return: Measurement interval [s]
         :rtype: float
         """
-        scans = self.file_handle.RunHeaderEx.LastSpectrum
-        return self.length / scans  # [s]
+        scans = self.file_handle.num_scans()
+        return self.length / scans if scans else 0.0  # [s]
 
     @property
     @with_file_context
@@ -81,21 +85,22 @@ class RawProcessor(BaseFileProcessor):
         :return: Sample length [s]
         :rtype: float
         """
-        return self.file_handle.RunHeaderEx.EndTime * 60.0  # [s]
+        times = self.file_handle.scan_times(ms_type=None)  # all scans, seconds
+        return float(times.max()) if times.size else 0.0  # [s]
 
     @property
-    @with_file_context
     def method_file(self) -> str:
-        """Instrument method file name from the raw file
+        """Instrument method file name.
+
+        Not exposed by the OpenTFRaw reader, so reported as empty (the Thermo
+        backend also returned "" when absent).
 
         :return: Instrument method file name
         :rtype: str
         """
-        method_file = self.file_handle.SampleInformation.InstrumentMethodFile
-        return method_file if method_file else ""
+        return ""
 
     @property
-    @with_file_context
     def mz_calibration(self) -> None:
         """M/z calibration coefficient is not applicable for Orbi files
 
@@ -112,20 +117,17 @@ class RawProcessor(BaseFileProcessor):
         :return: M/z range
         :rtype: list
         """
-        return [
-            self.file_handle.RunHeaderEx.LowMass,
-            self.file_handle.RunHeaderEx.HighMass,
-        ]
+        low, high = self.file_handle.mass_range()
+        return [low, high]
 
     @property
-    @with_file_context
     def polarity(self) -> str:
         """Polarity options in the sample file
 
         :return: Polarity options
         :rtype: str
         """
-        return get_polarity_options(self.file_handle.FileName)
+        return get_polarity_options(self.file_to_process)
 
     @property
     def sample_interval(self) -> None:
@@ -148,22 +150,24 @@ class RawProcessor(BaseFileProcessor):
     @property
     @with_file_context
     def timestamp(self) -> str:
-        """Timestamp in isoformat, local timezone
+        """Acquisition timestamp in isoformat, local timezone.
+
+        Uses the reader's file creation date when available; the OpenTFRaw reader
+        does not currently surface it, so we fall back to the file's modification
+        time. (See ReaderBackend.created.)
 
         :return: Timestamp
         :rtype: str
         """
-        dotnet_datetime = self.file_handle.CreationDate
-
-        python_datetime = datetime(
-            year=dotnet_datetime.Year,
-            month=dotnet_datetime.Month,
-            day=dotnet_datetime.Day,
-            hour=dotnet_datetime.Hour,
-            minute=dotnet_datetime.Minute,
-            second=dotnet_datetime.Second,
-        )
-        return python_datetime.isoformat()
+        created = self.file_handle.created()
+        if created is None:
+            created = datetime.fromtimestamp(os.path.getmtime(self.file_to_process))
+            _log.warning(
+                "Reader did not provide an acquisition date; using file mtime "
+                "for %s",
+                self.file_to_process,
+            )
+        return created.isoformat()
 
     @property
     def utc_offset(self) -> int:
@@ -181,13 +185,16 @@ class RawProcessor(BaseFileProcessor):
 
     @staticmethod
     def _file_context_manager(file_path: str):
-        """Context manager for raw files
+        """Context manager for raw files.
+
+        Uses the reader-backend seam (OpenTFRaw by default, Thermo when its DLLs
+        are configured) so file processing needs no proprietary dependency.
 
         :param file_path: Path to the raw file
-        :return: Raw file handle
-        :rtype: RawFileManager
+        :return: Reader backend bound to the file
+        :rtype: ReaderBackend
         """
-        return RawFileManager(file_path)
+        return open_backend(file_path)
 
     def _process_instrument_config(
         self, sample_file_props: SampleFileProps

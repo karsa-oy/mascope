@@ -8,10 +8,11 @@ dependencies = [
     "mascope_runtime",
     "mascope_file",
     "numpy~=1.26",
-    # Karsa fork of opentfraw (adds profile / centroid_labels / scan_parameters
-    # accessors + Exploris scan-event decoding). Ships the `opentfraw` module, so
-    # imports are unchanged. Switch back to upstream `opentfraw` once these land.
-    "mascope-opentfraw~=1.2",
+    # Karsa fork of opentfraw (adds profile / centroid_labels / scan_parameters /
+    # created accessors + Exploris scan-event decoding). Ships the `opentfraw`
+    # module, so imports are unchanged. 1.3 adds `created` (acquisition timestamp)
+    # used at ingestion. Switch back to upstream `opentfraw` once these land.
+    "mascope-opentfraw~=1.3",
     "pythonnet~=3.0",
     "xarray>=2025.06.1",
 ]
