@@ -13,7 +13,7 @@ from importlib.metadata import version
 # Version of the SDK (read from pyproject.toml via installed package metadata)
 __version__ = version("mascope_sdk")
 
-# Agent-internal helpers (used by file-agent, tof-agent)
+# Agent-internal helpers (used by file-agent)
 from ._agents import SERVICE_NAME, api_post_file  # noqa: F401
 
 # Public API

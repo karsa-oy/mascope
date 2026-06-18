@@ -473,7 +473,7 @@ Since Mascope is a monorepo, and we require multimachine deployments, we need to
 
 To list the modules registered in our runtime library, run `mascope modules`. Modules can be optionally installable, as for those which correspond to poetry or npm packages. They can also optionally be runnable, like the file converter service or the frontend dev server.
 
-Modules can also be run in _groups_: for example, `mascope dev run tof` will launch the `backend`, `frontend`, `tof` and `file-converter` modules. For a full list of groups, run `mascope groups`.
+Modules can also be run in _groups_: for example, `mascope dev run orbi` will launch the `backend`, `frontend`, `file-agent` and `file-converter` modules. For a full list of groups, run `mascope groups`.
 
 Modules' [configuration](#runtime-config) is scoped to that module and exposed to the module runtime.
 
@@ -732,8 +732,7 @@ Agents are small Python programs installed with Pyinstaller on Windows instrumen
 
 ```sh
 agents/           # Agent applications
-  file/               # File Agent (for ThermoFisher Orbitrap instruments)
-  tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
+  file/               # File Agent (for automatic file uploads)
 ```
 
 ### File Agent
@@ -742,26 +741,20 @@ The File Agent is responsible for uploading files from instrument machines uncha
 
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 
-### TOF Agent
-
-The TOF Agent is responsible for transforming and transferring files from Tofwerk instrument machines to the server.
-
-To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
-
-### Building Instrument Agents (File/TOF) for production
+### Building File Agent for production
 
 To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
 
 To run the agent build script, execute:
 
 ```
-cd agents/tof
+cd agents/file
 ./build.ps1
 ```
 
-Then run the executable found in `agents/tof/dist`.
+Then run the executable found in `agents/file/dist`.
 
-When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\.runtime\env\prod`.
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileAgent` and the runtime environment will therefore be `%AppData%\Mascope\FileAgent\.runtime\env\prod`.
 
 You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with:
 
@@ -769,7 +762,7 @@ You will need to run the agent once so that it initializes the directory structu
 2. Access token with write access:
    - Log into Mascope web application (editor role or higher required)
    - Click the user profile icon to open the sidebar
-   - In the "API Access Tokens" section, select "TOF Agent" from the dropdown
+   - In the "API Access Tokens" section, select "File Agent" from the dropdown
    - Generate and copy the access token (note: token is shown only once)
 
 You will also need to manually edit the `state.json` file in the `.runtime/` directory to correctly resolve the config path:
@@ -781,7 +774,7 @@ You will also need to manually edit the `state.json` file in the `.runtime/` dir
 Then restart the agent, and the correct config is loaded and the agent is ready to go.
 
 > [!IMPORTANT]
-> In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
+> In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of FileAgent, in order to initialize correct configs.
 
 > [!IMPORTANT]
 > Windows prevents applications from writing into `Program Files` directory. Therefore, when testing the agent with TofDaq Recorder, its data directory must be outside `Program Files`.
@@ -2399,7 +2392,6 @@ flowchart LR
     thermo([mascope_thermo])
     runtime([mascope_runtime])
     file_agent([mascope_file_agent])
-    tof_agent([mascope_tof_agent])
     cli([mascope_cli])
 
     classDef library fill:#ba642e,stroke-width: 0;
@@ -2409,7 +2401,7 @@ flowchart LR
     class backend service;
 
     classDef agent fill:#8e3688,stroke-width: 0;
-    class tof_agent,file_agent agent;
+    class file_agent agent;
 
     classDef cli fill:#2e845c,stroke-width: 0;
     class cli cli;
@@ -2431,9 +2423,6 @@ flowchart LR
     signal --> tofwerk
     signal --> thermo
 
-    %% agents
-    tof_agent --> tofwerk
-
     %% runtime
     backend -.-> runtime
     thermo -.-> runtime
@@ -2441,7 +2430,6 @@ flowchart LR
     molmass -.-> runtime
     file -.-> runtime
     signal -.-> runtime
-    tof_agent -.-> runtime
     file_agent -.-> runtime
     cli -.-> runtime
 

@@ -1,4 +1,4 @@
-"""Internal HTTP helpers for Mascope agents (file-agent, tof-agent).
+"""Internal HTTP helpers for Mascope agents (file-agent).
 
 These are low-level request wrappers used by agent services that upload
 files to the Mascope backend. They are NOT part of the public SDK API.

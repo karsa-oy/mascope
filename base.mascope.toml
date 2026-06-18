@@ -101,21 +101,8 @@ run = "cd ./server/frontend && npm install && npm run dev"
 
 # AGENTS
 
-[tof-agent]
-tags = ['agents', 'tof', 'all']
-log_path = './logs'
-color = "pink"
-# settings
-host = 'localhost'
-access_token = ''
-# filename_prefix = ''
-# filename_suffix = ''
-
-# scripts
-run = "uv run mascope agent tof"
-
 [file-agent]
-tags = ['agents', 'orbi', 'all']
+tags = ['agents', 'orbi', 'tof', 'all']
 log_path = './logs'
 color = "purple"
 # settings
@@ -165,9 +152,6 @@ color = "white"
 tags = ['lib']
 log_path = './logs'
 color = "white"
-# settings
-tofwerk_dll = 'Auto'
-# 'Auto', 'Windows', 'Linux' or 'Darwin' (= MacOs)
 
 # public
 

@@ -500,7 +500,7 @@ mascope_sdk/
 ├── _resolve.py          # Name-to-ID resolution helpers
 ├── _loaders.py          # High-level loaders (load_peaks, load_peak_timeseries, load_peaks_by_stage)
 ├── _concurrent.py       # ThreadPoolExecutor wrapper with progress bars and cancellation
-├── _agents.py           # Internal HTTP helpers for Mascope agents (file-agent, tof-agent)
+├── _agents.py           # Internal HTTP helpers for Mascope agents (file-agent)
 ├── resources/
 │   ├── _base.py         # BaseResource: shared HTTP helpers and datetime coercion
 │   ├── batches.py       # BatchesResource

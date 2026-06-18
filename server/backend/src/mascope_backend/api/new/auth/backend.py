@@ -71,7 +71,7 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         runtime.logger.debug("Using web application authentication.")
         return [auth_backend_jwt]
 
-    # Access token-based authentication(mascope_sdk Jupyter lib, file_converter service, tof-agent)
+    # Access token-based authentication(mascope_sdk Jupyter lib, file_converter service)
     if auth_header and not cookie_auth:
         try:
             token = auth_header.split(" ")[1]

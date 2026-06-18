@@ -70,7 +70,7 @@ async def authenticate_socket_connection(
 
         # --- Validate provided authentication token ---
         if service_name:
-            # Service authentication (e.g., tof-agent)
+            # Service authentication (e.g., file-agent)
             user = await validate_service_access_token(token, service_name)
         else:
             # Frontend user authentication

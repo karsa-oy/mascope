@@ -241,10 +241,10 @@ class ModuleConfig(BaseModel):
     run: str | None = None  # command to run the module, if any
 
     # * module groups allow you to easily run multiple modules.
-    # For example, a common scenario is testing TOF acquisition
+    # For example, a common scenario is testing Orbitrap acquisition
     # workflows. For example, with the default `base.mascope.toml`
-    # configuration, running `mascope dev run tof` will spin up
-    # the backend, frontend, file-converter and tof-agent modules.
+    # configuration, running `mascope dev run orbi` will spin up
+    # the backend, frontend, file-converter and file-agent modules.
 
 
 class RedisConfig(BaseModel):
