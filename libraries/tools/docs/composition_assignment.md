@@ -4,7 +4,7 @@ The architecture detailed here couples a bounded, recursive tree-traversal routi
 By dynamically computing allowable atomic boundaries, pruning unfeasible elemental combinations early, and verifying surviving candidates against simulated isotope distributions, the workflow systematically isolates high-confidence chemical compositions while discarding mathematically valid but physically impossible configurations.
 
 ## Core Combinatorial Optimization Algorithm
-The primary composition discovery engine uses a depth-first, recursive tree-search strategy to systematically explore the multi-dimensional space of potential element counts.
+[The primary composition discovery engine](../src/mascope_tools/composition/finder.py) uses a depth-first, recursive tree-search strategy to systematically explore the multi-dimensional space of potential element counts.
 Rather than executing an exhaustive brute-force search over all permutations, the algorithm relies on dynamic mass-domain pruning to eliminate non-viable computational branches before they are fully evaluated.
 
 ### Precomputation and Search Space Initialization
@@ -30,7 +30,7 @@ Candidates whose calculated unsaturation falls outside the accepted minimum and 
 Valid formulae are passed to the downstream filtering layers.
 
 ## Heuristic and Isotopic Filtering Layers
-While the initial generation step limits candidates to broad mass and unsaturation envelopes, the pipeline subjects the remaining formula pool to strict structural and spectral validation filters.
+While the initial generation step limits candidates to broad mass and unsaturation envelopes, the pipeline subjects the remaining formula pool to strict [structural and spectral validation filters](../src/mascope_tools/composition/heuristic_filter.py).
 Although the broader framework references [Seven Golden Rules](https://doi.org/10.1186/1471-2105-8-105) of chemical space validation, this processing pipeline enforces automated decisions through vectorized element-ratio verification and multi-parametric isotopic pattern matching.
 
 ### Element Ratio Filter
