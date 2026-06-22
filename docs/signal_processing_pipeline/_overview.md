@@ -1,8 +1,8 @@
 # Overview of the Signal Processing Pipeline
 
 The data processing workflow provides a standardized, instrument-agnostic architectural framework for converting raw mass spectrometry outputs into isotopic assignments.
-The architecture branches to accommodate physics-based differences in detector characteristics before converging into a unified downstream storage, matching, and calibration.
-This modular layout decouples raw hardware signal acquisition from logical compound identification, enabling flexible integration of new instrument types and calibration strategies without disrupting the core data handling and matching logic.
+The architecture branches to accommodate physics-based differences in detector characteristics.
+The modular layout decouples raw hardware signal acquisition from logical compound identification, enabling flexible integration of new instrument types without disrupting the core data handling and matching logic.
 
 ![Signal Processing Pipeline](images/signal_processin_pipeline.png)
 
@@ -10,14 +10,14 @@ This modular layout decouples raw hardware signal acquisition from logical compo
 
 ### Signal Aggregation and Summation
 The processing begins by loading the continuous profile spectra from vendor files (such as Orbitrap RAW or Tofwerk H5 formats).
-To maximize the signal-to-noise ratio for baseline peak extraction, raw signal vectors are accumulated and combined across all temporal scans to construct a single, high-quality aggregate spectrum.
+To maximize the signal-to-noise ratio for peak detection, the scans are aggregated by summing the spectra across all temporal scans to construct a single sum signal.
 
 ### Empirical Instrument Function Estimation
-To account for operational fluctuations and drift, empirical peak shapes and resolution profiles are extracted directly from the experimental spectrum rather than relying on idealized mathematical assumptions.
+To account for instrument characteristics, empirical peak shapes and resolution profiles are extracted directly from the experimental spectrum rather than relying on idealized mathematical assumptions.
 Detailed methodologies for these calculations are provided in [instrument function documentation](instrument_functions.md).
 
 ### Peak Detection
-Following instrument characterization, the pipeline executes specialized peak detection routines to extract discrete ion signals from the continuous matrix.
+Following instrument characterization, the pipeline executes specialized peak detection routines to extract discrete ion signals (peaks) from the sum signal.
 The mathematical implementation of these routines is documented in [peak detection documentation](peak_detection.md).
 
 ### Quality Control and Artifact Filtering
@@ -25,10 +25,9 @@ To safeguard downstream calibration steps against false or distorted signals, th
 The exact filters are described in [quality control documentation](peak_detection.md#quality-control-filtering).
 
 ### Mass Calibration
-The mass calibration corrects systematic mass errors by aligning detected experimental peaks to expected theoretical targets.
+The mass calibration corrects systematic mass errors by using known peaks as anchor points to adjust the mass axis.
 The calibration process is detailed in [calibration documentation](calibration.md).
 
 ### Isotopic Matching
-Stored experimental peaks are aligned against expected theoretical reference patterns to verify chemical composition
+Detected peaks are matched to candidate elemental compositions by comparing measured m/z values and observed isotopic distributions with theoretical patterns.
 The foundational matching rules and assignment criteria are expanded in [matching documentation](matching.md).
-

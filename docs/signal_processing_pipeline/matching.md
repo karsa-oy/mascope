@@ -1,11 +1,11 @@
 # Target Isotope Matching
-The [isotope matching](../../libraries/match/src/mascope_match/compute/isotopes.py) workflow establishes high-confidence links between predicted theoretical targets and detected experimental peaks in sample mass spectra.
+The [isotope matching](../../libraries/match/src/mascope_match/compute/isotopes.py) workflow establishes high-confidence links between a predefined list of target compositions and detected experimental peaks in sample mass spectra.
 
 The procedure should be distinguished from unconstrained [composition assignment scoring](../../libraries/tools/src/mascope_tools/composition/finder.py) (which screens peaks against wide combinatorial formula spaces).
-Instead, this matching engine operates exclusively on an expected list of target compounds, their designated ionization mechanisms, and their predictable isotopic envelopes.
+Instead, this matching engine operates exclusively on a fixed set of target compounds, their designated ionization mechanisms, and their predictable isotopic envelopes.
 
 ## Data Pre-Filtering and Peak Extraction
-Before the matching algorithm aligns targets to experimental peaks, the input datasets undergo instrument-specific filtering to ensure that the theoretical models match the physical limitations of the hardware detector.
+Before the algorithm matches targets to experimental peaks, the input datasets undergo instrument-specific filtering to ensure that the theoretical models match the physical limitations of the hardware detector.
 
 ### Resolution-Driven Isotope Selection
 Target isotope masses and intensities are computed and grouped dynamically depending on the instrument configuration to account for peak merging at different resolving powers.

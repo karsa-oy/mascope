@@ -1,12 +1,12 @@
 # Mass Calibration
 
-Mass-to-charge ratio ($m/z$) [calibration](../../server/backend/src/mascope_backend/api/controllers/calibration/lib/calibration_mz_fit.py) is a critical procedure required to ensure high mass accuracy by aligning observed detector signals with theoretical isotopic standards.
+Mass-to-charge ratio ($m/z$) [calibration](../../server/backend/src/mascope_backend/api/controllers/calibration/lib/calibration_mz_fit.py) is a critical procedure required to ensure high mass accuracy by aligning known peaks (such as reagent ions) m/zs with their theoretical m/zs.
 
 ## Candidate Selection and Matching
 
 Prior to executing instrument-specific regressions, a unified data-cleaning and matching pipeline isolates high-confidence reference points.
 
-Detected peaks are extracted from the sample file and filtered based on their signal-to-noise ratio and polarity. 
+Detected peaks are extracted from the sample file and filtered based on their signal-to-noise ratio. 
 
 Reference compounds are pulled from a calibration target collection, generating a list of exact theoretical isotopic masses based on the designated ionization mechanisms and instrument.
 Peaks are only retained if their observed mass coordinates lie within a parts-per-million refinement window relative to any target isotopic mass.
