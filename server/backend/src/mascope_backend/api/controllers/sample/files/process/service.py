@@ -15,6 +15,9 @@ from mascope_backend.api.controllers.calibration.calibration_controller import (
 from mascope_backend.api.controllers.calibration.lib.calibration_mz_fit import (
     calibration_params_factory,
 )
+from mascope_backend.api.controllers.dataset.acquisition.service import (
+    get_acquisition_dataset,
+)
 from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
@@ -31,9 +34,6 @@ from mascope_backend.api.controllers.sample.lib.fetch_affected_sample_data impor
 )
 from mascope_backend.api.controllers.sample.lib.sample_file_fetch import (
     fetch_sample_file,
-)
-from mascope_backend.api.controllers.dataset.acquisition.service import (
-    get_acquisition_dataset,
 )
 from mascope_backend.api.lib.api_features import api_controller_background_task
 from mascope_backend.api.lib.exceptions.api_exceptions import (
@@ -78,7 +78,7 @@ CALIBRATION_ITERATIONS = 7
 )
 async def auto_process_sample_file(
     sample_file_id: str,
-    independent_transaction: bool = None,
+    independent_transaction: bool = False,
     user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
@@ -91,15 +91,19 @@ async def auto_process_sample_file(
 
     Steps:
     - Validate sample file existence
-    - Get ACQUISITION dataset for the instrument
+    - Derive year from sample file datetime (prefers datetime_utc over datetime)
+    - Get or create per-instrument workspace and year-based ACQUISITION dataset
+      (the uploading user becomes workspace owner if the workspace is newly created)
     - Create ACQUISITION batches and sample items for each sample file ionization mode
     - Perform calibration and match computation for created ACQUISITION samples
+      (calibration is skipped for blank files or when no calibration collection is set)
     - Schedule rematch tasks for other affected samples
     - Return processing results with affected IDs or UI reloads
 
     :param sample_file_id: ID of the uploaded sample file
     :type sample_file_id: str
-    :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
+    :param independent_transaction: Indicates whether this operation should be treated
+                                    as a standalone transaction.
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
     :type user_id: int | None, optional
@@ -116,11 +120,16 @@ async def auto_process_sample_file(
     sample_file = await fetch_sample_file(sample_file_id=sample_file_id)
 
     # --- Get ACQUISITION dataset for the instrument --- #
+    file_dt = sample_file.datetime_utc or sample_file.datetime
     acquisition_dataset = (
-        await get_acquisition_dataset(sample_file.instrument)
+        await get_acquisition_dataset(
+            instrument=sample_file.instrument,
+            year=file_dt.year if file_dt else None,
+            user_id=user_id,
+        )
     ).get("data")
 
-    # --- Create ACQUISITION batches and sample items for each sample file ionization mode --- #
+    # --- Create ACQUISITION batches and sample items for each ionization mode --- #
     (
         acquisition_samples,
         acquisition_sample_batches,
@@ -140,7 +149,7 @@ async def auto_process_sample_file(
     # Blank files are stored without an instrument config and should skip calibration.
     is_blank_sample_file = sample_file.instrument_function_id is None
 
-    # --- Perform calibration and match computation for created ACQUISITION samples --- #
+    # --- Perform calibration and matching for created ACQUISITION samples --- #
     for sample in acquisition_samples:
         sample_item_id = sample["sample_item_id"]
 
@@ -163,8 +172,9 @@ async def auto_process_sample_file(
             )
         elif is_blank_sample_file:
             runtime.logger.info(
-                f"Skipping m/z calibration for blank sample '{sample['sample_item_name']}': "
-                "calibration is not applicable."
+                "Skipping m/z calibration for blank file "
+                f"'{sample['sample_item_name']}'. "
+                "Calibration is not applicable."
             )
         else:
             ionization_mode_name = (
@@ -172,7 +182,8 @@ async def auto_process_sample_file(
             )
             runtime.logger.warning(
                 f"Skipping m/z calibration for sample '{sample['sample_item_name']}': "
-                f"Calibration collection is not set for the ionization mode '{ionization_mode_name}'."
+                "Calibration collection is not set for the ionization mode "
+                f"'{ionization_mode_name}'."
             )
 
         await match_compute_sample(
@@ -196,14 +207,15 @@ async def auto_process_sample_file(
         asyncio.create_task(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
-                independent_transaction=True,  # Set to true to handle reloads independently
+                independent_transaction=True,  # Handle reloads independently
                 user_id=user_id,
                 process_id=gen_id(8),
             )
         )
 
         runtime.logger.info(
-            f"Started independent rematch task for {len(other_affected_sample_item_ids)} affected samples"
+            "Started independent rematch task for "
+            f"{len(other_affected_sample_item_ids)} affected samples"
         )
 
     # --- Return processed results with affected IDs for UI reloads --- #
@@ -217,7 +229,10 @@ async def auto_process_sample_file(
     ).affected_samples
 
     return {
-        "message": f"Auto-processing complete for {sample_file.filename}, processed {len(acquisition_samples)} samples.",
+        "message": (
+            f"Auto-processing complete for {sample_file.filename}, processed "
+            f"{len(acquisition_samples) if acquisition_samples else 0} samples."
+        ),
         "data": acquisition_samples,
         "_notification_data": {
             "affected_sample_batch_ids": affected_sample_batch_ids,
@@ -250,7 +265,8 @@ async def re_process_sample_files(
 
     :param sample_file_ids: List of IDs of the sample files to re-process
     :type sample_file_ids: list[str]
-    :param independent_transaction: Indicates whether this operation should be treated as a standalone transaction.
+    :param independent_transaction: Indicates whether this operation should be treated
+                                    as a standalone transaction.
     :type independent_transaction: bool, optional
     :param user_id: Current user triggered operation (for user notifications)
     :type user_id: int | None, optional
@@ -324,7 +340,7 @@ async def re_process_sample_files(
                     "sample_file_id": sample_file.sample_file_id,
                     "filename": sample_file.filename,
                     "message": (
-                        "Cannot re-process file as it is associated with a user-created "
+                        "Cannot re-process file as it is associated with user-created "
                         f"sample in the batch {batch.sample_batch_name}."
                     ),
                 }
@@ -474,7 +490,8 @@ async def re_process_sample_files(
         )
     else:
         message = (
-            f"Re-processed {processed_count} files successfully, {failed_count} files failed.\n"
+            f"Re-processed {processed_count} files successfully, "
+            f"{failed_count} files failed.\n"
             + "\n".join(
                 [
                     f"{failed['filename']}: {failed['message']}"
@@ -529,17 +546,20 @@ async def create_acquisition_batches_and_items(
 
             if len(batch_data) > 1:
                 runtime.logger.error(
-                    f"Multiple ACQUISITION batches found for {batch_name} with ionization mode {ion_mode_name}, using first one."
+                    f"Multiple ACQUISITION batches found for {batch_name} with "
+                    f"ionization mode {ion_mode_name}, using first one."
                 )
 
             if batch_data:
                 acquisition_sample_batch = batch_data[0]
                 runtime.logger.debug(
-                    f"Using existing ACQUISITION batch: {acquisition_sample_batch['sample_batch_name']}"
+                    "Using existing ACQUISITION batch: "
+                    f"{acquisition_sample_batch['sample_batch_name']}"
                 )
             else:
                 # Create new ACQUISITION batch
-                # Get DIAGNOSTICS and CALIBRATION target collections for ACQUISITION batches
+                # Get DIAGNOSTICS and CALIBRATION target collections for
+                # ACQUISITION batches
                 target_collection_ids = []
                 if ionization_mode.diagnostic_collection_id:
                     target_collection_ids.append(
@@ -552,7 +572,9 @@ async def create_acquisition_batches_and_items(
 
                 if not target_collection_ids:
                     runtime.logger.warning(
-                        f"No {', '.join(sample_batch_config.ACQUISITION_COLLECTION_TYPES)} target collections found for ACQUISITION batch"
+                        "No "
+                        f"{', '.join(sample_batch_config.ACQUISITION_COLLECTION_TYPES)}"
+                        " target collections found for ACQUISITION batch"
                     )
 
                 # Create new ACQUISITION batch with defined build params
@@ -561,7 +583,10 @@ async def create_acquisition_batches_and_items(
                         sample_batch=SampleBatchCreate(
                             dataset_id=dataset_id,
                             sample_batch_name=batch_name,
-                            sample_batch_description=f"Auto-generated daily acquisition batch for {sample_file.instrument}",
+                            sample_batch_description=(
+                                "Auto-generated daily acquisition batch "
+                                f"for {sample_file.instrument}"
+                            ),
                             sample_batch_type="ACQUISITION",
                             polarity=ionization_mode.ionization_mode_polarity,
                             target_collection_ids=target_collection_ids,
@@ -571,7 +596,8 @@ async def create_acquisition_batches_and_items(
                 ).get("data")
 
                 runtime.logger.debug(
-                    f"Created new ACQUISITION batch: {acquisition_sample_batch['sample_batch_name']}"
+                    "Created new ACQUISITION batch: "
+                    f"{acquisition_sample_batch['sample_batch_name']}"
                 )
 
         acquisition_sample_batches.append(acquisition_sample_batch)
@@ -628,7 +654,8 @@ async def calibrate_with_retry(
         except ApiException as e:
             if i == CALIBRATION_ITERATIONS:
                 runtime.logger.error(
-                    f"Failed to calibrate m/z with m/z tolerance {mz_calibration_params.mz_error_tolerance} "
+                    "Failed to calibrate m/z with m/z tolerance "
+                    f"{mz_calibration_params.mz_error_tolerance} "
                     f"for sample item {sample['sample_item_name']}: {e}"
                 )
             else:
@@ -643,7 +670,8 @@ async def calibrate_with_retry(
                         mz_calibration_params.mz_error_tolerance + 1
                     )
                 runtime.logger.warning(
-                    f"Not enough calibration peaks with m/z error tolerance {old_tolerance}, "
-                    f"retrying m/z calibration for sample {sample['sample_item_name']} with "
+                    "Not enough calibration peaks with m/z error tolerance "
+                    f"{old_tolerance}, retrying m/z calibration for sample "
+                    f"{sample['sample_item_name']} with "
                     f"mz_error_tolerance={mz_calibration_params.mz_error_tolerance}."
                 )

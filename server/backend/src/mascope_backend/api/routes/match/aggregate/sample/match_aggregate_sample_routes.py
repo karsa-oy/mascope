@@ -22,7 +22,9 @@ from mascope_backend.api.models.match.aggregate.match_aggregate_pydantic_model i
     AggregateSampleMatchCompoundsBody,
     AggregateSampleMatchIonBody,
 )
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import require_sample_role
+from mascope_backend.db import User
 
 
 match_aggregate_sample_router = APIRouter(
@@ -36,7 +38,8 @@ match_aggregate_sample_router = APIRouter(
 async def aggregate_sample_match_isotope_filtered_data_route(
     sample_item_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
     """Fetch filtered match isotope data for a specific sample.
 
@@ -44,8 +47,10 @@ async def aggregate_sample_match_isotope_filtered_data_route(
     :type sample_item_id: str
     :param body: Filter parameters for match isotope data.
     :type body: AggregateMatchIsotopeFilteredDataBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Filtered isotope match data with count and message.
     :rtype: dict
     """
@@ -64,7 +69,8 @@ async def aggregate_sample_match_isotope_filtered_data_route(
         return {
             "results": len(data_dict),
             "message": (
-                f"Filtered match isotope data fetched successfully for sample '{sample_item_name}'"
+                f"Filtered match isotope data fetched successfully for sample "
+                f"'{sample_item_name}'"
             ),
             "data": data_dict,
         }
@@ -80,7 +86,8 @@ async def aggregate_sample_match_isotope_filtered_data_route(
 async def aggregate_sample_match_ion_route(
     sample_item_id: str,
     body: AggregateSampleMatchIonBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
     """Aggregate match ion data for a specific sample.
 
@@ -88,8 +95,10 @@ async def aggregate_sample_match_ion_route(
     :type sample_item_id: str
     :param body: Aggregation parameters for match ion data.
     :type body: AggregateSampleMatchIonBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Aggregated match ion data.
     :rtype: dict
     """
@@ -106,17 +115,20 @@ async def aggregate_sample_match_ion_route(
 async def aggregate_sample_match_compound_route(
     sample_item_id: str,
     body: AggregateSampleMatchCompoundBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
-    """Aggregate match data for compounds within a sample based on a target compound formula,
-    applying specified match parameters to filter the matches.
+    """Aggregate match data for compounds within a sample based on a target compound
+    formula, applying specified match parameters to filter the matches.
 
     :param sample_item_id: The unique identifier of the sample.
     :type sample_item_id: str
     :param body: Aggregation parameters for match compound data.
     :type body: AggregateSampleMatchCompoundBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Aggregated match compound data.
     :rtype: dict
     """
@@ -133,17 +145,20 @@ async def aggregate_sample_match_compound_route(
 async def aggregate_sample_match_compounds_route(
     sample_item_id: str,
     body: AggregateSampleMatchCompoundsBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
-    """Aggregate match data for compounds within a sample based on a target compound formula,
-    applying specified match parameters to filter the matches.
+    """Aggregate match data for compounds within a sample based on a target compound
+    formula, applying specified match parameters to filter the matches.
 
     :param sample_item_id: The unique identifier of the sample.
     :type sample_item_id: str
     :param body: Aggregation parameters for match compound data.
     :type body: AggregateSampleMatchCompoundBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Aggregated match compound data.
     :rtype: dict
     """
@@ -160,7 +175,8 @@ async def aggregate_sample_match_compounds_route(
 async def aggregate_sample_matches_route(
     sample_item_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
     """Aggregate match data for a specific sample.
 
@@ -168,8 +184,10 @@ async def aggregate_sample_matches_route(
     :type sample_item_id: str
     :param body: Aggregation parameters for match data.
     :type body: AggregateMatchIsotopeFilteredDataBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Aggregated match data with count and message.
     :rtype: dict
     """
@@ -200,7 +218,8 @@ async def aggregate_sample_matches_route(
 async def aggregate_and_create_sample_matches_route(
     sample_item_id: str,
     body: AggregateAndCreateMatchesBody,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("editor")),
 ):
     """Aggregate and save new matches for a sample.
 
@@ -208,8 +227,10 @@ async def aggregate_and_create_sample_matches_route(
     :type sample_item_id: str
     :param body: Parameters for creating matches.
     :type body: AggregateAndCreateMatchesBody
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user. Requires workspace editor role.
     :type user: User
+    :param membership: Workspace membership with editor role on the sample.
+    :type membership: WorkspaceMember
     :return: Success message and any associated logs.
     :rtype: dict
     """
@@ -229,14 +250,17 @@ async def aggregate_and_create_sample_matches_route(
 @api_route()
 async def get_sample_aggregate_matches_route(
     sample_item_id: str,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
 ):
     """Retrieve all sample and aggregated match data for a sample.
 
     :param sample_item_id: The unique identifier of the sample.
     :type sample_item_id: str
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the sample.
+    :type membership: WorkspaceMember
     :return: Sample and aggregated match data.
     :rtype: dict
     """

@@ -82,6 +82,8 @@ The Mascope runtime includes setup scripts and a comprehensive `mascope` command
 
 Our setup scripts - found in the `tooling` folder - provide an `install` command to setup low-level prerequisites (_Python 3.12_, _Node 22_, _uv_, _Docker_ and _.NET Runtime_), package dependencies (via `uv`) and the `mascope` cli.
 
+> **.NET Runtime** is only needed for the optional Thermo RawFileReader backend (see [Reader backend](#reader-backend-opentfraw--thermo)). Mascope reads `.raw` files with the open-source OpenTFRaw backend by default and has no Thermo dependency.
+
 #### Windows
 
 The only prerequisite is [Powershell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows), which should be available on Windows 11 by default.
@@ -107,6 +109,38 @@ git clone git@github.com:karsa-oy/mascope.git && cd mascope && ./tooling/ubuntu.
 Since [`uv` automatically syncs the virtual environment](https://docs.astral.sh/uv/concepts/projects/sync/#automatic-lock-and-sync) and we run `npm install` every time we launch the dev server, there is usually no need to reinstall when switching branches.
 
 If this doesn't work for some reason, the `tooling` scripts accept are `reinstall` and `uninstall` commands. These fully remove the `.venv`, `node_modules` and Mascope environment variables,but do not remove installed tooling (in case its used in other work).
+
+### Reader backend (OpenTFRaw / Thermo)
+
+Mascope reads Thermo `.raw` files through a pluggable reader backend, selected by the `MASCOPE_THERMO_BACKEND` environment variable:
+
+- **`opentfraw` (default)** — the open-source [OpenTFRaw](https://github.com/karsa-oy/OpenTFRaw) reader (Rust), installed from PyPI as `opentfraw`. Mascope ships and runs on this with **no Thermo dependency** and no proprietary binaries.
+- **`thermo` (optional)** — Thermo's proprietary RawFileReader (.NET, via `pythonnet`). Fully supported, but **not shipped**: the RawFileReader DLLs are proprietary and are deliberately not included in this repository.
+
+The two backends are parity-validated against each other (centroids, XIC, profile, MS² precursor, averaged spectra); OpenTFRaw reproduces the numbers the pipeline depends on, so it is the dependency-free default.
+
+#### Using the Thermo RawFileReader backend
+
+If you specifically want RawFileReader (for example to cross-check results, or for a file OpenTFRaw cannot yet read):
+
+1. Obtain the Thermo RawFileReader DLLs (`ThermoFisher.CommonCore.*.dll`) from Thermo's RawFileReader distribution, under its license, and place them in a directory.
+2. Point Mascope at them and select the backend:
+
+   ```bash
+   export MASCOPE_THERMO_DLL_DIR=/path/to/rawfilereader/dlls   # dir with ThermoFisher.CommonCore.RawFileReader.dll
+   export MASCOPE_THERMO_BACKEND=thermo
+   ```
+
+   On Windows/PowerShell: `$env:MASCOPE_THERMO_DLL_DIR = "..."; $env:MASCOPE_THERMO_BACKEND = "thermo"`.
+
+This also needs the .NET Runtime (installed by the setup scripts). Without the DLLs the Thermo backend raises a clear error and Mascope stays on OpenTFRaw.
+
+For the Docker backend image, the .NET Runtime is **not installed by default** (the default image is Thermo-free). Build with the `INSTALL_DOTNET` build arg to include it:
+
+```bash
+docker build --build-arg INSTALL_DOTNET=true -f server/backend/Dockerfile -t mascope-backend .
+# or via compose: add `args: [INSTALL_DOTNET=true]` under the backend service's build section
+```
 
 ### CLI
 
@@ -435,7 +469,7 @@ Since Mascope is a monorepo, and we require multimachine deployments, we need to
 
 To list the modules registered in our runtime library, run `mascope modules`. Modules can be optionally installable, as for those which correspond to poetry or npm packages. They can also optionally be runnable, like the file converter service or the frontend dev server.
 
-Modules can also be run in _groups_: for example, `mascope dev run tof` will launch the `backend`, `frontend`, `tof` and `file-converter` modules. For a full list of groups, run `mascope groups`.
+Modules can also be run in _groups_: for example, `mascope dev run orbi` will launch the `backend`, `frontend`, `file-agent` and `file-converter` modules. For a full list of groups, run `mascope groups`.
 
 Modules' [configuration](#runtime-config) is scoped to that module and exposed to the module runtime.
 
@@ -694,25 +728,8 @@ Agents are small Python programs installed with Pyinstaller on Windows instrumen
 
 ```sh
 agents/           # Agent applications
-  export/             # CSV Export Agent (to export match results into file)
-  file/               # File Agent (for ThermoFisher Orbitrap instruments)
-  tof_agent/          # TOF Agent (for Tofwerk TOF instruments)
+  file/               # File Agent (for automatic file uploads)
 ```
-
-### CSV Export Agent
-
-The CSV Export Agent is an agent application designed to allow integrating Mascope data into external data architectures. It monitors new samples arriving in a specified dataset, and computes matches for a configurable list of target compounds. The results are exported into a structured text file, to be ingested into the external system.
-
-#### Build
-
-To run the agent build script, execute:
-
-```
-cd agents/export
-./build.ps1
-```
-
-Then run the executable found in `agents/export/dist`. See the agent README for details.
 
 ### File Agent
 
@@ -720,26 +737,20 @@ The File Agent is responsible for uploading files from instrument machines uncha
 
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 
-### TOF Agent
-
-The TOF Agent is responsible for transforming and transferring files from Tofwerk instrument machines to the server.
-
-To run all services needed to emulate the Tofwerk acquisition workflow in development, run `mascope dev run tof`.
-
-### Building Instrument Agents (File/TOF) for production
+### Building File Agent for production
 
 To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
 
 To run the agent build script, execute:
 
 ```
-cd agents/tof
+cd agents/file
 ./build.ps1
 ```
 
-Then run the executable found in `agents/tof/dist`.
+Then run the executable found in `agents/file/dist`.
 
-When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\TofAgent` and the runtime environment will therefore be `%AppData%\Mascope\TofAgent\.runtime\env\prod`.
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileAgent` and the runtime environment will therefore be `%AppData%\Mascope\FileAgent\.runtime\env\prod`.
 
 You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with:
 
@@ -747,7 +758,7 @@ You will need to run the agent once so that it initializes the directory structu
 2. Access token with write access:
    - Log into Mascope web application (editor role or higher required)
    - Click the user profile icon to open the sidebar
-   - In the "API Access Tokens" section, select "TOF Agent" from the dropdown
+   - In the "API Access Tokens" section, select "File Agent" from the dropdown
    - Generate and copy the access token (note: token is shown only once)
 
 You will also need to manually edit the `state.json` file in the `.runtime/` directory to correctly resolve the config path:
@@ -759,7 +770,7 @@ You will also need to manually edit the `state.json` file in the `.runtime/` dir
 Then restart the agent, and the correct config is loaded and the agent is ready to go.
 
 > [!IMPORTANT]
-> In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of TofAgent, in order to initialize correct configs.
+> In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of FileAgent, in order to initialize correct configs.
 
 > [!IMPORTANT]
 > Windows prevents applications from writing into `Program Files` directory. Therefore, when testing the agent with TofDaq Recorder, its data directory must be outside `Program Files`.
@@ -884,11 +895,11 @@ Events follow the naming convention `{record_type}_{operation}` (e.g., `batch_cr
 
 ### Backend Auth
 
-Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods—**Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
+Mascope employs **Role-Based Access Control (RBAC)** and two authentication methods: **Cookie-based JWT authentication** for web users and **Access Token-based authentication** for external applications like Jupyter.
 
 #### Cookie-based JWT authentication
 
-Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lucks the token admin control.
+Mascope's web application uses **JWT authentication** via cookies for secure session management. This approach provides seamless, session-like authentication for web users, but lacks the token admin control.
 
 - **Transport**: Cookies are configured with `HttpOnly` and `Secure` flags (in production), preventing client-side JavaScript access and providing secure transmission over HTTPS.
 - **Token details**:
@@ -916,30 +927,136 @@ To enable authenticated access for external applications, such as Jupyter server
 
 #### Authorization
 
-**Role-Based Access Control (RBAC)**
+Mascope uses two complementary authorization layers:
 
-Roles are dynamically created during database migrations based on the configuration in `auth/config.py`. Each role is assigned a numeric `role_id`, indicating its privilege level.
+1. **Global RBAC**: role-based access control tied to the user's system role. Used for application-wide operations such as user management and data uploading.
+2. **Workspace ACL**: workspace-level access control tied to the user's membership in the workspace that owns the resource. Used for workspace-scoped operations such as sample management.
 
-The current roles include:
+The split of API resources between the two layers is presented in detail below in the route authorization reference table.
+
+**Roles**
+
+Roles are shared across both authorization layers. They are ordered by privilege:
 
 - **`guest`**: Read-only access (includes Jupyter-accessible endpoints via bearer access tokens).
 - **`editor`**: Create, update, and delete permissions.
-- **`admin`**: Full administrative rights, including user management.
-- **`owner`**: Full permissions, including the ability to manage admins.
+- **`admin`**: Full administrative rights, including user management up to admin level.
+- **`owner`**: Full permissions, including the ability to manage admins and owners.
 
-**Role-Based endpoint dependencies**
+Superusers bypass all workspace membership checks.
 
-To secure routes, role-based dependencies are used. Examples:
+**Global RBAC**
+
+Global RBAC dependencies check the user's system-wide role. They are defined in `api/new/auth/dependencies.py`:
 
 ```python
-
-@fastapi_router.get("/api/resource")
+@router.get("/api/resource")
 async def resource_route(user: User = Depends(admin_user)):
     ...
-
 ```
 
 Available dependencies: `guest_user`, `editor_user`, `admin_user`, and `owner_user`.
+
+**Workspace ACL**
+
+Workspace ACL checks that the authenticated user is a member of the workspace that owns the requested resource, with at least the required role. Dependencies and check functions live in `api/new/workspaces/dependencies.py`.
+
+Resources are resolved to a workspace through the ownership chain:
+
+```
+SampleItem → SampleBatch → Dataset → Workspace
+```
+
+There are two patterns depending on how the resource ID reaches the route:
+
+**Pattern 1: Path-parameter routes** (resource ID is a URL path segment):
+
+Use a dependency factory. FastAPI caches `Depends()` calls, so `current_active_user` is resolved once even though both `user` and the factory depend on it.
+
+```python
+from mascope_backend.api.new.workspaces.dependencies import require_sample_role
+
+@router.get("/{sample_item_id}/data")
+@api_route(token_access=True)
+async def get_sample_data(
+    sample_item_id: str,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("guest")),
+):
+    ...
+```
+
+Available factories: `require_workspace_role`, `require_dataset_role`, `require_dataset_query_role`, `require_batch_role`, `require_sample_role`.
+
+**Pattern 2: Body/query-parameter routes** (resource ID comes from request body or query):
+
+Call an explicit check function inside the route handler:
+
+```python
+from mascope_backend.api.new.workspaces.dependencies import check_batch_access_bulk
+
+@router.post("/rematch/batches")
+@api_route(status_code=202)
+async def rematch_batches_route(
+    body: RematchBatchesBody,
+    user: User = Depends(current_active_user),
+):
+    await check_batch_access_bulk(body.sample_batch_ids, user, "editor")
+    ...
+```
+
+Available check functions: `check_dataset_access`, `check_batch_access`, `check_batch_access_bulk`, `check_sample_access`, `check_sample_access_bulk`, `check_sample_file_access_bulk`, `check_workspace_access`, `check_instrument_workspace_access`, `check_sample_file_instrument_access`, `check_sample_file_instrument_access_bulk`, `check_target_collection_access`, `accessible_acquisition_instruments`, `accessible_workspace_ids_for_user`.
+
+> [!IMPORTANT]
+> The `@api_route()` decorator **requires** a parameter named `user` in the route signature (it raises `ValueError` otherwise). When using workspace ACL, always keep `user: User = Depends(current_active_user)` as a separate parameter alongside the membership dependency.
+
+**Route authorization reference**
+
+Each API resource uses one of the two authorization layers. The table below documents the intended scope for every resource area.
+
+| Resource                                                               | Auth          | Min Role       | Rationale                                             |
+| ---------------------------------------------------------------------- | ------------- | -------------- | ----------------------------------------------------- |
+| **Workspace-scoped (data under Workspace → Dataset → Batch → Sample)** |               |                |                                                       |
+| Workspaces                                                             | Workspace ACL | guest / editor | Direct workspace operations                           |
+| Workspace membership                                                   | Workspace ACL | admin          | Add, remove, update workspace members                 |
+| Datasets                                                               | Workspace ACL | guest / editor | Workspace children                                    |
+| Dataset acquisitions                                                   | Workspace ACL | guest / editor | System "Acquisitions" workspace                       |
+| Sample batches                                                         | Workspace ACL | guest / editor | Under datasets                                        |
+| Sample batch export                                                    | Workspace ACL | guest          | Export scoped to batch                                |
+| Sample items                                                           | Workspace ACL | guest / editor | Under batches                                         |
+| Samples (data loading)                                                 | Workspace ACL | guest          | Peaks, spectra, centroids, timeseries                 |
+| Match management                                                       | Workspace ACL | editor / admin | Rematch, compute, remove                              |
+| Match sub-resources                                                    | Workspace ACL | guest / editor | Collections, compounds, ions, isotopes, samples       |
+| Match aggregates                                                       | Workspace ACL | guest / editor | Batch and sample aggregations                         |
+| Match ratings                                                          | Workspace ACL | guest          | User match ratings                                    |
+| Match records                                                          | Workspace ACL | guest          | Read-only match record queries                        |
+| MS2 analysis                                                           | Workspace ACL | guest          | MS2 summary, centroids, timeseries                    |
+| Cheminfo (match)                                                       | Workspace ACL | guest          | `/mz/match/sample/{id}` — sample-scoped               |
+| Visualization                                                          | Workspace ACL | guest          | Ion focus visualization                               |
+| Target collections                                                     | Workspace ACL | guest / editor | Collection → workspace; global (null) readable by all |
+| Target associations                                                    | Workspace ACL | guest          | Scoped via collection or batch workspace              |
+| Sample files (read)                                                    | Workspace ACL | guest          | Filtered by accessible workspaces via sample items    |
+| Sample files (mutations)                                               | Workspace ACL | editor         | Requires Acquisitions workspace membership            |
+| File download                                                          | Workspace ACL | guest          | Via sample items in accessible workspaces             |
+| **Global (shared system resources)**                                   |               |                |                                                       |
+| Instruments                                                            | Global RBAC   | guest          | Shared hardware definitions                           |
+| Instrument configs                                                     | Global RBAC   | guest / editor | Shared instrument configuration                       |
+| Ionization modes                                                       | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Ionization mechanisms                                                  | Global RBAC   | guest / editor | Shared chemistry reference data                       |
+| Attribute templates                                                    | Global RBAC   | guest / editor | Shared metadata schemas                               |
+| Target compounds                                                       | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target ions                                                            | Global RBAC   | guest / editor | Shared reference data (cross-workspace)               |
+| Target isotopes                                                        | Global RBAC   | guest          | Shared reference data (cross-workspace)               |
+| Calibration (read)                                                     | Global RBAC   | guest          | View calibration state                                |
+| Calibration (mutations)                                                | Global RBAC   | admin          | Global operation, affects all associated samples      |
+| Cheminfo (query)                                                       | Global RBAC   | guest          | Stateless formula lookup                              |
+| Params                                                                 | Global RBAC   | guest          | Application parameters                                |
+| Temp files                                                             | Global RBAC   | guest          | Temporary file serving                                |
+| **Admin (system management)**                                          |               |                |                                                       |
+| Users (admin/owner)                                                    | Global RBAC   | admin / owner  | User management                                       |
+| Users (self)                                                           | Authenticated | —              | Own profile                                           |
+| Roles                                                                  | Global RBAC   | admin / owner  | Role definitions                                      |
+| Auth / tokens                                                          | Authenticated | —              | JWT and access tokens                                 |
 
 ### API Response Format
 
@@ -2271,7 +2388,6 @@ flowchart LR
     thermo([mascope_thermo])
     runtime([mascope_runtime])
     file_agent([mascope_file_agent])
-    tof_agent([mascope_tof_agent])
     cli([mascope_cli])
 
     classDef library fill:#ba642e,stroke-width: 0;
@@ -2281,7 +2397,7 @@ flowchart LR
     class backend service;
 
     classDef agent fill:#8e3688,stroke-width: 0;
-    class tof_agent,file_agent agent;
+    class file_agent agent;
 
     classDef cli fill:#2e845c,stroke-width: 0;
     class cli cli;
@@ -2303,9 +2419,6 @@ flowchart LR
     signal --> tofwerk
     signal --> thermo
 
-    %% agents
-    tof_agent --> tofwerk
-
     %% runtime
     backend -.-> runtime
     thermo -.-> runtime
@@ -2313,7 +2426,6 @@ flowchart LR
     molmass -.-> runtime
     file -.-> runtime
     signal -.-> runtime
-    tof_agent -.-> runtime
     file_agent -.-> runtime
     cli -.-> runtime
 

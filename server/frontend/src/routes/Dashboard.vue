@@ -28,10 +28,10 @@ const app = useApp()
 
 const tabs = computed(() => [
   {
-    label: 'Acquisitions',
+    label: 'Raw files',
     icon: 'pi pi-hourglass',
     help: `
-      <h1>Acquisitions</h1>
+      <h1>Raw files</h1>
       <p>
         View data files uploaded to the Mascope server, and import files from your computer.
       </p>
@@ -152,8 +152,8 @@ const tabs = computed(() => [
               </Tab>
             </TabList>
             <TabPanels>
-              <TabPanel value="acquisitions">
-                <PaneTabAcquisitions :active="app.ui.tab.active == 'acquisitions'" />
+              <TabPanel value="raw files">
+                <PaneTabAcquisitions :active="app.ui.tab.active == 'raw files'" />
               </TabPanel>
               <TabPanel value="batch">
                 <PaneTabBatch />

@@ -213,8 +213,8 @@ class GetSampleItemsQueryParams(GetSampleItemsQueryValidator, QueryParamsModel):
     Inherits polarity validation from CommonValidators and URL decoding from QueryParamsModel.
     """
 
-    sample_batch_id: str | None = Field(
-        None,
+    sample_batch_id: str = Field(
+        ...,
         description="The sample batch ID for which you want to fetch the sample items",
     )
     sample_file_id: str | None = Field(
@@ -253,7 +253,7 @@ class SampleItemUpdateBody(BaseModel):
 
 class SampleItemsDeleteBody(BaseModel):
     sample_item_ids: list[str] = Field(
-        ..., description="The sample item IDs of samples to be deleted"
+        ..., min_length=1, description="The sample item IDs of samples to be deleted"
     )
 
 
@@ -261,11 +261,15 @@ class SampleItemsCopyBody(BaseModel):
     sample_batch_id: str = Field(
         ..., description="ID of the sample batch where to copy sample items"
     )
-    sample_item_ids: list[str] = Field(..., description="Sample item IDs to copy")
+    sample_item_ids: list[str] = Field(
+        ..., min_length=1, description="Sample item IDs to copy"
+    )
 
 
 class SampleItemsMoveBody(BaseModel):
     sample_batch_id: str = Field(
         ..., description="ID of the sample batch where to move sample items"
     )
-    sample_item_ids: list[str] = Field(..., description="Sample item IDs to move")
+    sample_item_ids: list[str] = Field(
+        ..., min_length=1, description="Sample item IDs to move"
+    )

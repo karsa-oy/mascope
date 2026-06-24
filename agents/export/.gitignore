@@ -1,5 +1,0 @@
-build
-src/mascope_csv_export_agent/results
-export_agent.log*
-state.json
-*.spec

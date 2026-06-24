@@ -79,8 +79,8 @@ export const useAcquisition = defineStore('app.data.acquisition', () => {
     () => instrument.focused,
     (next, prev) => {
       unfocus()
-      if (prev) api.socket.emit('unsubscribe', prev.instrument)
-      if (next) api.socket.emit('subscribe', next.instrument)
+      if (prev) api.socket.removeSubscription(prev.instrument)
+      if (next) api.socket.addSubscription(next.instrument)
     }
   )
 

@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.params import Query
 
@@ -18,7 +20,13 @@ from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_samp
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
 from mascope_backend.api.models.match.match_pydantic_model import RematchBatchesBody
-from mascope_backend.api.new.auth.dependencies import admin_user, editor_user
+from mascope_backend.api.new.auth.dependencies import admin_user, current_active_user
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_batch_access_bulk,
+    require_batch_role,
+    require_sample_role,
+)
+from mascope_backend.db import User
 from mascope_backend.db.id import gen_id
 
 
@@ -30,18 +38,30 @@ match_router = APIRouter(prefix="/api/match", tags=["Match Management"])
 async def rematch_batches_route(
     body: RematchBatchesBody,
     background_tasks: BackgroundTasks,
-    full_remove: bool = Query(
-        False,
-        description="If True, removes all existing matches before recomputing."
-        "If False, removes only orphaned matches.",
-    ),
-    force: bool = Query(
-        False,
-        description="If True, bypasses status checks and forces rematch regardless of current status.",
-    ),
-    user=Depends(editor_user),
+    full_remove: Annotated[
+        bool,
+        Query(
+            description="If True, removes all existing matches before recomputing. "
+            "If False, removes only orphaned matches.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        Query(
+            description="If True, bypasses status checks and forces rematch",
+        ),
+    ] = False,
+    user: User = Depends(current_active_user),
 ):
-    """Rematch multiple sample batches"""
+    """Rematch multiple sample batches.
+
+    :param body: Request body containing sample batch IDs to rematch.
+    :type body: RematchBatchesBody
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    """
+    await check_batch_access_bulk(body.sample_batch_ids, user, "editor")
+
     # Get data for notifications
     process_id = gen_id(8)
 
@@ -57,7 +77,10 @@ async def rematch_batches_route(
 
     total_batches = len(body.sample_batch_ids)
     return {
-        "message": f"Rematching {total_batches} sample batch{'es' if total_batches != 1 else ''}, please wait.",
+        "message": (
+            f"Rematching {total_batches} "
+            f"sample batch{'es' if total_batches != 1 else ''}..."
+        ),
         "process_id": process_id,
     }
 
@@ -67,23 +90,35 @@ async def rematch_batches_route(
 async def rematch_batch_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    full_remove: bool = Query(
-        False,
-        description="If True, removes all existing matches before recomputing."
-        "If False, removes only orphaned matches.",
-    ),
-    force: bool = Query(
-        False,
-        description="If True, bypasses status checks and forces rematch regardless of current status.",
-    ),
-    user=Depends(editor_user),
+    full_remove: Annotated[
+        bool,
+        Query(
+            description="If True, removes all existing matches before recomputing. "
+            "If False, removes only orphaned matches.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        Query(
+            description="If True, bypasses status checks and forces rematch",
+        ),
+    ] = False,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """
-    Rematch a specific sample batch by removing orphaned/all matches and recomputing them
+    Rematch a specific sample batch by removing orphaned/all matches and recompute
     for all samples in the batch
 
     - Processing batches cannot be rematched
     - Ready batches require force=true to rematch
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the batch.
+    :type membership: WorkspaceMember
     """
     # Verify the existance of sample batch
     sample_batch = await fetch_sample_batch(sample_batch_id)
@@ -98,7 +133,9 @@ async def rematch_batch_route(
             )
             raise ApiException(msg, notification_data, 409)
         case "ready" if not force:
-            msg += "already matched - please use 'rematch' option if you want to recompute matches"
+            msg += (
+                "already matched - please use 'rematch' option if you want to recompute"
+            )
             raise ApiException(msg, notification_data, 409)
         case _:
             # "rematch" status or force=True with "ready" - proceed
@@ -117,7 +154,7 @@ async def rematch_batch_route(
         process_id=process_id,
     )
     return {
-        "message": f"Rematching sample batch '{sample_batch.sample_batch_name}', please wait.",
+        "message": f"Rematching sample batch '{sample_batch.sample_batch_name}'...",
         "process_id": process_id,
     }
 
@@ -127,9 +164,18 @@ async def rematch_batch_route(
 async def match_compute_batch_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
-    """Compute matches for a specific sample batch."""
+    """Compute matches for a specific sample batch.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the batch.
+    :type membership: WorkspaceMember
+    """
     # Verify the existance of sample batch
     sample_batch = await fetch_sample_batch(sample_batch_id)
 
@@ -144,7 +190,9 @@ async def match_compute_batch_route(
         process_id=process_id,
     )
     return {
-        "message": f"Computing matches for sample batch '{sample_batch.sample_batch_name}', please wait.",
+        "message": (
+            f"Computing matches for sample batch '{sample_batch.sample_batch_name}'..."
+        ),
         "process_id": process_id,
     }
 
@@ -154,18 +202,28 @@ async def match_compute_batch_route(
 async def match_remove_batch_route(
     sample_batch_id: str,
     background_tasks: BackgroundTasks,
-    full_remove: bool = Query(
-        False,
-        description="If True, removes all existing matches before recomputing."
-        "If False, removes only orphaned matches.",
-    ),
-    user=Depends(editor_user),
+    full_remove: Annotated[
+        bool,
+        Query(
+            description="If True, removes all existing matches before recomputing. "
+            "If False, removes only orphaned matches.",
+        ),
+    ] = False,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """
     Remove orphaned/all matches for a specific sample batch.
 
     By default, removes only orphaned matches.
     Use full_remove=true to remove all matches.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :type sample_batch_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the batch.
+    :type membership: WorkspaceMember
     """
     # Verify the existance of sample batch
     sample_batch = await fetch_sample_batch(sample_batch_id)
@@ -182,7 +240,9 @@ async def match_remove_batch_route(
         process_id=process_id,
     )
     return {
-        "message": f"Removing matches for sample batch '{sample_batch.sample_batch_name}', please wait.",
+        "message": (
+            f"Removing matches for sample batch '{sample_batch.sample_batch_name}'..."
+        ),
         "process_id": process_id,
     }
 
@@ -192,18 +252,28 @@ async def match_remove_batch_route(
 async def rematch_sample_route(
     sample_item_id: str,
     background_tasks: BackgroundTasks,
-    full_remove: bool = Query(
-        False,
-        description="If True, removes all existing matches before recomputing."
-        "If False, removes only orphaned matches.",
-    ),
-    user=Depends(editor_user),
+    full_remove: Annotated[
+        bool,
+        Query(
+            description="If True, removes all existing matches before recomputing. "
+            "If False, removes only orphaned matches.",
+        ),
+    ] = False,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("editor")),
 ):
     """
     Rematch a specific sample by removing orphaned/all matches and recomputing.
 
     By default, performs partial rematching by removing only orphaned matches.
     Use full_remove=true for complete reset and rematch.
+
+    :param sample_item_id: The unique identifier of the sample.
+    :type sample_item_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the sample.
+    :type membership: WorkspaceMember
     """
     # Verify the existence of sample item
     sample = await fetch_sample(sample_item_id)
@@ -231,12 +301,15 @@ async def rematch_sample_route(
 async def match_remove_sample_route(
     sample_item_id: str,
     background_tasks: BackgroundTasks,
-    full_remove: bool = Query(
-        False,
-        description="If True, removes all existing matches before recomputing."
-        "If False, removes only orphaned matches.",
-    ),
-    user=Depends(editor_user),
+    full_remove: Annotated[
+        bool,
+        Query(
+            description="If True, removes all existing matches before recomputing. "
+            "If False, removes only orphaned matches.",
+        ),
+    ] = False,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("editor")),
 ):
     """
     Remove orphaned/all matches for a specific sample.
@@ -244,6 +317,12 @@ async def match_remove_sample_route(
     By default, removes only orphaned matches.
     Use full_remove=true to remove all matches.
 
+    :param sample_item_id: The unique identifier of the sample.
+    :type sample_item_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the sample.
+    :type membership: WorkspaceMember
     """
     # Verify the existance of sample item
     sample = await fetch_sample(sample_item_id)
@@ -260,7 +339,7 @@ async def match_remove_sample_route(
         process_id=process_id,
     )
     return {
-        "message": f"Removing matches for sample '{sample.sample_item_name}', please wait.",
+        "message": f"Removing matches for sample '{sample.sample_item_name}'...",
         "process_id": process_id,
     }
 
@@ -270,9 +349,18 @@ async def match_remove_sample_route(
 async def match_compute_sample_route(
     sample_item_id: str,
     background_tasks: BackgroundTasks,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("editor")),
 ):
-    """Compute matches for a specific sample."""
+    """Compute matches for a specific sample.
+
+    :param sample_item_id: The unique identifier of the sample.
+    :type sample_item_id: str
+    :param user: The current authenticated user. Requires workspace editor role.
+    :type user: User
+    :param membership: Workspace membership with editor role on the sample.
+    :type membership: WorkspaceMember
+    """
     # Verify the existance of sample item
     sample = await fetch_sample(sample_item_id)
 
@@ -286,7 +374,7 @@ async def match_compute_sample_route(
         process_id=process_id,
     )
     return {
-        "message": f"Computing matches for sample '{sample.sample_item_name}', please wait.",
+        "message": f"Computing matches for sample '{sample.sample_item_name}'...",
         "process_id": process_id,
     }
 

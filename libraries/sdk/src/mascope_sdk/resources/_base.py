@@ -68,6 +68,7 @@ class BaseResource:
             access_token=self._client.access_token,
             params=params,
             stream=stream,
+            timeout=self._client._timeout,
             verify_ssl=self._client._verify_ssl,
             service_name=self._client._service_name,
         )
@@ -101,6 +102,7 @@ class BaseResource:
             path=path,
             access_token=self._client.access_token,
             data=data,
+            timeout=self._client._timeout,
             verify_ssl=self._client._verify_ssl,
             service_name=self._client._service_name,
         )

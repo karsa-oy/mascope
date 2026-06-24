@@ -14,6 +14,7 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
   })
   const data = computed(() => parsed.value?.data)
   const op = computed(() => parsed.value?.op)
+  const dataset = computed(() => (isDataset(data.value) ? data.value : null))
   const batch = computed(() => {
     if (isBatch(data.value)) {
       return data.value
@@ -62,6 +63,7 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
 
   return {
     op,
+    dataset,
     batch,
     samples,
     copy,
@@ -70,6 +72,15 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
     clear
   }
 })
+
+function isDataset(record) {
+  return (
+    record?.dataset_id &&
+    record?.dataset_name &&
+    !record?.sample_batch_id &&
+    !record?.sample_item_id
+  )
+}
 
 function isBatch(record) {
   return record?.sample_batch_id && !record?.sample_item_id

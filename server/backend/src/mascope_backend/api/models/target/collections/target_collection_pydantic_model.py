@@ -76,6 +76,10 @@ class TargetCollectionBase(TargetCollectionBaseValidator, BaseModel):
         default=target_collection_config.DEFAULT_TARGET_COLLECTION_TYPE,
         description="Type of the target collection",
     )
+    workspace_id: str | None = Field(
+        None,
+        description="ID of the workspace this collection belongs to. Null for global collections.",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -140,6 +144,10 @@ class GetTargetCollectionsQueryParams(QueryParamsModel):
     target_collection_type: list[str] | None = Field(
         default=None,
         description="Filter by target collection types (TARGETS, DIAGNOSTICS, CALIBRANTS). Can specify multiple types.",
+    )
+    workspace_id: str | None = Field(
+        None,
+        description="Filter by workspace ID. Null-workspace (global) collections are always included.",
     )
     sort: str | None = Field(
         None,

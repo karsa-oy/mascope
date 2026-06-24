@@ -25,6 +25,7 @@ from mascope_match.params import (
     TOF_FITTING_THRESHOLD,
 )
 from mascope_signal.runtime import runtime
+from mascope_thermo.thermo import NoScansFoundError
 from mascope_tools.alignment.utils import flag_satellite_peaks
 
 
@@ -170,19 +171,23 @@ class OrbiPeakDetector(BasePeakDetector):
 
         progress_callback(10)
         runtime.logger.debug("Reading centroids from the Thermo file...")
-        # Get CALIBRATED centroids
-        try:
-            peaks_pos = await self._extract_peaks_for_polarity("+")
-        except Exception as e:
-            runtime.logger.debug(f"No positive polarity data found: {e}")
-            peaks_pos = None
-        try:
-            peaks_neg = await self._extract_peaks_for_polarity("-")
-        except Exception as e:
-            runtime.logger.debug(f"No negative polarity data found: {e}")
-            peaks_neg = None
+        # Get CALIBRATED centroids for each polarity present in the file.
+        # Only a genuinely-absent polarity (NoScansFoundError) is skipped; any
+        # other failure is a real error and must propagate with its true cause
+        # rather than being masked as an empty-concatenate downstream.
+        datasets = []
+        for polarity in ("+", "-"):
+            try:
+                datasets.append(await self._extract_peaks_for_polarity(polarity))
+            except NoScansFoundError:
+                runtime.logger.debug(
+                    f"No {polarity} polarity scans in the file; skipping."
+                )
 
-        datasets = [ds for ds in [peaks_pos, peaks_neg] if ds is not None]
+        if not datasets:
+            raise PeakDetectionError(
+                f"No usable scans found for either polarity in '{self._filename}'."
+            )
         peaks = xarray.concat(datasets, dim="mz").sortby("mz")
 
         progress_callback(80)
@@ -201,17 +206,14 @@ class OrbiPeakDetector(BasePeakDetector):
             signal_to_noise,
         ) = await m_compute.get_orbi_centroids(self._filename, polarity=polarity)
 
-        sigmas = peak_mzs / resolutions / m_fitting.SIGMA_MULTIPLIER
-        mz_mins = peak_mzs - 3 * sigmas
-        mz_maxs = peak_mzs + 3 * sigmas
-        mz_arr = self._sum_signal.mz.values
-        left_indices = np.searchsorted(mz_arr, mz_mins, side="left")
-        right_indices = np.searchsorted(mz_arr, mz_maxs, side="right")
-
+        # The m/z peak area is the integral of the analytic peak model, so it is
+        # computed on a self-built grid inside calculate_peak_area and does not
+        # need a profile-window slice here (the OpenTFRaw profile is sparse and
+        # would otherwise leave many centroids in empty windows).
         peak_areas = np.array(
             [
                 m_fitting.calculate_peak_area(
-                    mz_arr[left_indices[i] : right_indices[i]],
+                    None,
                     self._peak_shape,
                     (peak_mzs[i], peak_heights[i], resolutions[i]),
                     sample_interval=None,

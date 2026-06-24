@@ -1,35 +1,29 @@
-We leverage [Thermo libraries](https://github.com/thermofisherlsms/RawFileReader/tree/main) to read *.raw files.
+# mascope_thermo
 
-The libraries are .NET-based. The problem with .NET imports is that references are not propagated across python files. That means if we do:
+Reads Thermo `.raw` files for Mascope. The public functions in `thermo.py`
+(centroids, profiles, XICs, averaged spectra, MS² extraction, run-header
+metadata) are backend-agnostic: they run on top of a reader seam and don't care
+which reader is underneath.
 
-```Python
-# thermo.py
-...
-clr.AddReference("ThermoFisher.CommonCore.RawFileReader")
-from ThermoFisher.CommonCore.RawFileReader import RawFileAdapter
-```
+## Reader backends
 
-and then try to import `thermo.py` in some other py-file:
+The implementation is selected by the `MASCOPE_THERMO_BACKEND` environment
+variable (see `backend.py`):
 
-```Python
-# file_func.py
-from mascope_thermo.orbitrap import thermo
-```
-We will get an error:
+- **`opentfraw`** (default) — the open-source reader, via the
+  [`opentfraw`](https://pypi.org/project/opentfraw/) wheel. No
+  proprietary dependency; nothing to install beyond the package.
+- **`thermo`** — Thermo's RawFileReader (.NET via pythonnet). Opt-in: it needs
+  the proprietary `ThermoFisher.CommonCore.*` DLLs, which are **not** shipped in
+  this repository. Point `MASCOPE_THERMO_DLL_DIR` at a directory containing them
+  and set `MASCOPE_THERMO_BACKEND=thermo`.
 
-> ModuleNotFoundError: No module named 'ThermoFisher'
+The .NET runtime is loaded lazily and only when the Thermo backend is actually
+used, so importing this package never requires .NET or the DLLs. See the
+repository-root `README.md` ("Reader backend") for the user-facing setup.
 
-To avoid this, .NET references must be added to the target file that uses functions from `mascope_thermo.orbitrap`:
+## Layout
 
-```Python
-# file_func.py
-from pythonnet import load
-
-load("coreclr")
-import clr
-import mascope_thermo
-
-sys.path.append(os.path.join(mascope_thermo.__path__[0], "./orbitrap/lib/dlls"))
-
-clr.AddReference("ThermoFisher.CommonCore.RawFileReader")
-```
+- `thermo.py` — the public, backend-agnostic reader functions.
+- `backend.py` — the `ReaderBackend` seam and the two implementations.
+- `lib/` — lazy .NET loader and DLL discovery for the Thermo backend.

@@ -13,46 +13,20 @@ from importlib.metadata import version
 # Version of the SDK (read from pyproject.toml via installed package metadata)
 __version__ = version("mascope_sdk")
 
-# Legacy API exports (deprecated, kept for backwards compatibility)
-from ._legacy import (  # Internal helpers (used by agents); Deprecated public functions
-    SERVICE_NAME,  # noqa: F401
-    api_get,  # noqa: F401
-    api_post,  # noqa: F401
-    api_post_file,  # noqa: F401
-    get_cheminfo_by_mz,
-    get_ionization_mechanisms,
-    get_sample,
-    get_sample_batch_data,
-    get_sample_batches,
-    get_sample_centroids_per_scan,
-    get_sample_compound_matches,
-    get_sample_compounds_matches,
-    get_sample_file_instrument_config,
-    get_sample_file_metadata,
-    get_sample_file_peak_timeseries,
-    get_sample_file_peaks,
-    get_sample_file_spectrum,
-    get_sample_peak_timeseries,
-    get_sample_peaks,
-    get_sample_spectrum,
-    get_samples,
-    get_samples_spectra,
-    get_workspaces,
-)
+# Agent-internal helpers (used by file-agent)
+from ._agents import SERVICE_NAME, api_post_file  # noqa: F401
 
-# New API exports
+# Public API
 from .client import MascopeClient
 from .exceptions import (
     AuthenticationError,
     ConfigurationError,
-    ConnectionError,
     MascopeAPIError,
     MascopeConnectionError,
     MascopeError,
     MascopeTimeoutError,
     NotFoundError,
     ServerError,
-    TimeoutError,
     ValidationError,
 )
 
@@ -86,7 +60,6 @@ def copy_examples(dest: str = "./mascope_examples") -> None:
 
 
 __all__ = [
-    # New API (recommended)
     "MascopeClient",
     "copy_examples",
     # Exceptions
@@ -97,28 +70,9 @@ __all__ = [
     "NotFoundError",
     "ValidationError",
     "ServerError",
-    "ConnectionError",  # Alias for MascopeConnectionError
-    "TimeoutError",  # Alias for MascopeTimeoutError
     "MascopeConnectionError",
     "MascopeTimeoutError",
-    # Legacy functions (deprecated, kept for backwards compatibility)
-    "get_workspaces",
-    "get_sample_batches",
-    "get_sample_batch_data",
-    "get_samples",
-    "get_sample",
-    "get_sample_compound_matches",
-    "get_sample_compounds_matches",
-    "get_sample_peaks",
-    "get_sample_peak_timeseries",
-    "get_sample_spectrum",
-    "get_samples_spectra",
-    "get_sample_centroids_per_scan",
-    "get_sample_file_peaks",
-    "get_sample_file_peak_timeseries",
-    "get_sample_file_spectrum",
-    "get_sample_file_instrument_config",
-    "get_sample_file_metadata",
-    "get_ionization_mechanisms",
-    "get_cheminfo_by_mz",
+    # Agent helpers
+    "SERVICE_NAME",
+    "api_post_file",
 ]

@@ -24,7 +24,7 @@ Tests that verify individual components in isolation with external dependencies 
 Tests that verify interactions between multiple components but not the entire system.
 
 - **API integration tests**: Test complete HTTP request/response cycle with real dependencies
-  - Example: Testing CRUD operations on the `/api/datasets` endpoint with authentication, verifying role-based access control (RBAC) for different user roles
+  - Example: Testing CRUD operations on the `/api/workspaces/{workspace_id}/datasets` endpoint with authentication, verifying role-based access control (RBAC) for different user roles
   - Focus: HTTP status codes, response formats, role-based access control (RBAC)
 - **DB integration tests**: Verify multi-model interactions and complex query operations
   - Example: Testing relationships between tables and model, deep cascade-delete tests, database integrity tests, test backup/restore functionality
@@ -176,7 +176,7 @@ libraries/
 - **AsyncClient**: Primary HTTP test client for API integration tests
   - Uses `httpx.AsyncClient` with `ASGITransport(app=fast)` and `base_url="http://test"`
   - Runs in the same event loop as the test session — required for asyncpg compatibility (see [FastAPI Async Tests](https://fastapi.tiangolo.com/advanced/async-tests/#example))
-  - Simulates HTTP requests: `await client.get("/api/datasets")`
+  - Simulates HTTP requests: `await client.get("/api/workspaces")`
   - All API integration tests are `async def` with `@pytest.mark.asyncio`
 - **TestClient**: FastAPI's synchronous test client — not used in integration tests
   - Would cause `InterfaceError: cannot perform operation: another operation is in progress`

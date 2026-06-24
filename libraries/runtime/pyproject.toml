@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Karsa Mascope's shared runtime util library for config, state and logging"
 authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
 requires-python = ">=3.12,<3.13"
-license.text = "LicenseRef-Proprietary"
+license.text = "Apache-2.0"
 dependencies = [
     "rich>=13.7.1,<14",
     "pydantic>=2.8.2,<3",

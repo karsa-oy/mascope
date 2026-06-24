@@ -6,7 +6,9 @@ from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy import (
     asc,
     desc,
+    exists,
     func,
+    or_,
     select,
 )
 
@@ -33,7 +35,15 @@ from mascope_backend.api.models.sample.files.sample_file_pydantic_model import (
     SampleFileUpdate,
 )
 from mascope_backend.api.new.instruments import get_instruments
-from mascope_backend.db import SampleFile, User, async_session
+from mascope_backend.db import (
+    Dataset,
+    SampleBatch,
+    SampleFile,
+    SampleItem,
+    User,
+    WorkspaceMember,
+    async_session,
+)
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_backend.socket import event_emitter
@@ -58,50 +68,75 @@ FILE_UPLOAD_CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
 @api_controller()
 async def get_sample_files(
-    datetime_min: datetime = None,
-    datetime_max: datetime = None,
-    instrument: str = None,
-    filename: str = None,
+    datetime_min: datetime | None = None,
+    datetime_max: datetime | None = None,
+    instrument: str | None = None,
+    filename: str | None = None,
     sort: str = "datetime_utc",
     order: str = "asc",
     page: int | None = None,
     limit: int | None = None,
+    allowed_instruments: set[str] | None = None,
+    user_id: int | None = None,
 ) -> dict:
     """
-    Retrieves a paginated list of sample files, optionally filtered by date range, instrument, or filename, and sorted by a specified column.
-
-    Steps:
-    - Construct a query to select all sample files.
-    - Apply filtering based on provided date range, instrument, and filename parameters.
-    - Apply sorting based on the provided sort and order parameters.
-    - Apply pagination based on the provided page and limit parameters.
-    - Execute the query and fetch the results.
-    - Convert the results into a list of dictionaries for JSON serialization.
+    Retrieves a paginated list of sample files, optionally filtered by date range,
+    instrument, or filename, and sorted by a specified column.
 
     :param datetime_min: Minimum date and time for filtering sample files, optional.
-    :type datetime_min: datetime, optional
     :param datetime_max: Maximum date and time for filtering sample files, optional.
-    :type datetime_max: datetime, optional
     :param instrument: Instrument name for filtering sample files, optional.
-    :type instrument: str, optional
     :param filename: Filename for filtering sample files, optional.
-    :type filename: str, optional
     :param sort: Column to sort by, defaults to "datetime_utc".
-    :type sort: str, optional
-    :param order: Sorting order, "asc" for ascending or "desc" for descending, defaults to "asc".
-    :type order: str, optional
+    :param order: Sorting order, "asc" for ascending or "desc" for descending.
     :param page: Page number for pagination, defaults to None (no pagination).
-    :type page: int | None, optional
     :param limit: Number of items per page, defaults to None (no pagination).
-    :type limit: int | None, optional
-    :return: A dictionary containing the total count of filtered sample files and a list of sample file details.
-    :rtype: dict
+    :param allowed_instruments: Set of instrument names the user may see via
+        acquisition workspace membership.  ``None`` means no filtering (superuser).
+    :param user_id: When set, also includes files linked to sample items in
+        workspaces the user is a member of (item-based access).
+    :return: A dictionary containing the total count and list of sample files.
     """
     async with async_session() as session:
         # --- Construct query
         stmt = select(SampleFile)
 
-        # --- Apply filters
+        # --- Apply access filters
+        if allowed_instruments is not None:
+            # Build OR: instrument in allowed set, or file linked to user's workspaces
+            instrument_filter = (
+                SampleFile.instrument.in_(allowed_instruments)
+                if allowed_instruments
+                else None
+            )
+            item_filter = (
+                exists(
+                    select(SampleItem.sample_item_id)
+                    .join(
+                        SampleBatch,
+                        SampleBatch.sample_batch_id == SampleItem.sample_batch_id,
+                    )
+                    .join(Dataset, Dataset.dataset_id == SampleBatch.dataset_id)
+                    .join(
+                        WorkspaceMember,
+                        WorkspaceMember.workspace_id == Dataset.workspace_id,
+                    )
+                    .where(
+                        SampleItem.sample_file_id == SampleFile.sample_file_id,
+                        WorkspaceMember.user_id == user_id,
+                    )
+                )
+                if user_id is not None
+                else None
+            )
+            conditions = [c for c in (instrument_filter, item_filter) if c is not None]
+            if not conditions:
+                return {
+                    "message": "Sample files retrieved successfully.",
+                    "results": 0,
+                    "data": [],
+                }
+            stmt = stmt.where(or_(*conditions))
         if datetime_min:
             stmt = stmt.where(SampleFile.datetime_utc >= datetime_min)
         if datetime_max:
@@ -234,7 +269,7 @@ async def create_sample_file(
 
         if new_sample_file.instrument not in initial_instruments:
             # New instrument detected - create datasets and emit instrument events
-            await create_acquisition_datasets()
+            await create_acquisition_datasets(user_id=user_id)
 
         # Step 6: Trigger automatic processing of the sample file
         from mascope_backend.api.controllers.sample.files.process.service import (
@@ -615,19 +650,21 @@ async def delete_sample_files(
 
     # Determine response based on results
     if skipped_files and deleted_files:
-        # Partial success - some deleted, some skipped → 207 Multi-Status
+        # Partial success - some deleted, some skipped -> 207 Multi-Status
         raise_api_warning(message, data, status_code=207)
     elif skipped_files and not deleted_files:
-        # Complete failure - nothing deleted, everything skipped → 422 Error
+        # Complete failure - nothing deleted, everything skipped -> 422 Error
         raise ApiException(user_message=message, tech_message=data, status_code=422)
     else:
-        # Complete success - all files deleted, nothing skipped → 200 OK
+        # Complete success - all files deleted, nothing skipped -> 200 OK
         return {"message": message, "data": data}
 
 
 @api_controller()
 async def update_sample_file(
-    sample_file_id: str, sample_file_update_data: SampleFileUpdate
+    sample_file_id: str,
+    sample_file_update_data: SampleFileUpdate,
+    user_id: int | None = None,
 ) -> dict:
     """
     Updates an existing sample file with new data.
@@ -672,7 +709,7 @@ async def update_sample_file(
     )
     # Handle instrument changes and handle acquisition datasets creation/deletion
     if final_instruments > initial_instruments:  # Check for added instruments
-        await create_acquisition_datasets()
+        await create_acquisition_datasets(user_id=user_id)
     if initial_instruments > final_instruments:  # Check for removed instruments
         await delete_acquisition_datasets()
 
@@ -1196,8 +1233,11 @@ async def get_sample_file_spectrum(
     filename = sample_file_data.get("data").get("filename")
     intensity_unit = "counts/s"
 
-    # Step 2: Compute averaged spectrum in the time range
-    spectrum = m_compute.get_sum_signal(filename, t_min, t_max, average=True)
+    # Step 2: Compute averaged spectrum in the time range (reconstructed for
+    # display so it overlays the centroids).
+    spectrum = m_compute.get_sum_signal(
+        filename, t_min, t_max, average=True, reconstruct=True
+    )
 
     # Step 3: Filter by m/z range if provided
     if mz_min is not None and mz_max is not None:

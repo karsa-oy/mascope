@@ -11,7 +11,7 @@ import { api } from '@/api'
  * @param {Object} logger - Logger instance
  * @returns {Function} cleanup - Unregister socket listeners
  */
-export const useEvents = (name, key, refs, methods, events, logger) => {
+export const useEvents = (name, key, refs, methods, events, logger, deps = null) => {
   const { records, selection, detailed } = refs
   const { sync, reloadRecord } = methods
 
@@ -69,6 +69,19 @@ export const useEvents = (name, key, refs, methods, events, logger) => {
 
   const handleCreated = (record_id, record, index) => {
     if (index === -1) {
+      // Skip records that don't belong to the current scope (e.g. different workspace)
+      if (deps) {
+        const currentDeps = deps()
+        const outOfScope = Object.entries(currentDeps).some(
+          ([field, value]) =>
+            value != null && record[field] != null && String(record[field]) !== String(value)
+        )
+        if (outOfScope) {
+          logger.debug(`ignoring created ${record_id} (out of scope)`)
+          return
+        }
+      }
+
       // Not found → add new record
       records.value = [...records.value, record]
 

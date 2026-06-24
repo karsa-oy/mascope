@@ -11,6 +11,7 @@ from .ionization import IonizationResource
 from .matching import MatchingResource
 from .ms2 import Ms2Resource
 from .samples import SamplesResource
+from .workspaces import WorkspacesResource
 
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "Ms2Resource",
     "SamplesResource",
     "DatasetsResource",
+    "WorkspacesResource",
 ]

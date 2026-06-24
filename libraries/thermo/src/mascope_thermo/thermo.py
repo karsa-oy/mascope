@@ -1,28 +1,37 @@
 """
 This module provides functions to read and process Thermo Fisher raw files.
+
+The .NET (pythonnet) assemblies are loaded lazily -- inside the functions that
+use them, after ``_ensure_dotnet()`` -- so importing this module does not require
+the Thermo RawFileReader DLLs. Mascope ships without those proprietary DLLs and
+defaults to the OpenTFRaw backend; the Thermo backend is opt-in via
+``MASCOPE_THERMO_DLL_DIR`` (see ``mascope_thermo.lib`` and the README).
 """
 
-import re
+from __future__ import annotations
+
 from typing import Iterable, Literal
 
 import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray as xr
-from System import NullReferenceException
-from System.Collections.Generic import List
-from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
-from ThermoFisher.CommonCore.Data.Business import (
-    ChromatogramSignal,
-    ChromatogramTraceSettings,
-    Device,
-    MassOptions,
-    Range,
-    TraceType,
-)
-from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
 
+from mascope_thermo.backend import open_backend
+from mascope_thermo.lib import load_dotnet
 from mascope_thermo.runtime import runtime
+
+
+def _ensure_dotnet() -> None:
+    """Load the Thermo RawFileReader .NET assemblies (idempotent).
+
+    Raises a clear error when the DLLs are not configured -- see
+    ``mascope_thermo.lib.load_dotnet``."""
+    load_dotnet(
+        "ThermoFisher.CommonCore.Data",
+        "ThermoFisher.CommonCore.RawFileReader",
+        "System",
+    )
 
 
 SECONDS_PER_MINUTE = 60
@@ -64,6 +73,11 @@ class RawFileManager:
         self.RawFile = None
 
     def __enter__(self):
+        _ensure_dotnet()
+        from System import NullReferenceException
+        from ThermoFisher.CommonCore.Data.Business import Device
+        from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter
+
         try:
             self.RawFile = RawFileReaderAdapter.FileFactory(self.path)
             self.RawFile.SelectInstrument(Device.MS, 1)
@@ -143,7 +157,7 @@ class ScanSelector:
                 f"Invalid time range: t_min={t_min} s > t_max={t_max} s"
             )
 
-        # Adjust time range as `abs_eps(x) ~ |x∣ * eps` where eps is machine epsilon
+        # Adjust time range as `abs_eps(x) ~ |x| * eps` where eps is machine epsilon
         # to account for floating point precision issues
         epsilon = np.finfo(np.float64).eps * t_max
         t_min_adj = t_min - epsilon
@@ -168,6 +182,25 @@ class ScanSelector:
             ]
         )
 
+    def _bad_first_scan(self) -> bool:
+        """Checks if the TIC in the first scan is 5 times higher than
+        the median TIC of the other scans
+
+        This is a workaround for a common issue in Thermo raw files where the first scan
+        is an outlier with an abnormally high TIC.
+
+        #TODO: can be removed if Thermo releases a fix for this issue
+        """
+        has_only_one_scan = len(self.raw_scan_stats) == 1
+        if has_only_one_scan:
+            return False
+
+        tic_values = np.array([stats.TIC for stats in self.raw_scan_stats])
+        first_scan_tic = tic_values[0]
+        median_other_tic = np.median(tic_values[1:])
+
+        return first_scan_tic >= 5 * median_other_tic
+
     @property
     def scan_indices_1based(self) -> list[int]:
         """Returns the list of scan indices that match the specified polarity,
@@ -184,6 +217,13 @@ class ScanSelector:
 
         if self._ms_type:
             mask &= self._ms_type_mask()
+
+        if self._bad_first_scan():
+            runtime.logger.warning(
+                "The first scan appears to be an outlier with abnormally high TIC. "
+                "Excluding the first scan from selection."
+            )
+            mask[0] = False
 
         filtered_indices = np.array(self.all_scan_indices)[mask]
 
@@ -206,6 +246,8 @@ class ScanSelector:
     def scan_indices_dotnet(self) -> List[int]:
         """Returns the list of scan indices as a .NET List[int] for use with
         Thermo library functions."""
+        from System.Collections.Generic import List
+
         net_list = List[int]()
         for index in self.scan_indices_1based:
             net_list.Add(index)
@@ -224,6 +266,8 @@ class ScanSelector:
     @property
     def scans(self) -> tuple:
         """Returns the scan objects for the filtered scan indices."""
+        from ThermoFisher.CommonCore.Data import Extensions
+
         return tuple(Extensions.GetScans(self._RawFile, self.scan_indices_dotnet))
 
     @property
@@ -250,24 +294,20 @@ def get_polarity_options(datafile_path: str) -> str:
             both are present.
     :rtype: str
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(RawFile, ms_type=None)
+    with open_backend(datafile_path) as backend:
+        polarities = backend.polarities()
 
-        polarities = set(
-            filter.Polarity.ToString() for filter in scan_selector.raw_scan_filters
-        )
+    has_positive = "+" in polarities
+    has_negative = "-" in polarities
 
-        has_positive = "Positive" in polarities
-        has_negative = "Negative" in polarities
-
-        if has_positive and has_negative:
-            return "+-"
-        elif has_positive:
-            return "+"
-        elif has_negative:
-            return "-"
-        else:
-            raise PolarityError("No valid polarities found in the raw file.")
+    if has_positive and has_negative:
+        return "+-"
+    elif has_positive:
+        return "+"
+    elif has_negative:
+        return "-"
+    else:
+        raise PolarityError("No valid polarities found in the raw file.")
 
 
 def get_signal(
@@ -302,50 +342,38 @@ def get_signal(
     :return: An xarray Dataset containing the signal data
     :rtype: xr.Dataset
     """
-    with RawFileManager(datafile_path) as RawFile:
-        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
-        scan_selector = ScanSelector(RawFile, polarity, t_min, t_max)
-        scan_time = scan_selector.scan_times
-
-        scan_mzs, scan_specs = [], []
-        for scan in scan_selector.scans:
-            intensities = np.frombuffer(scan.SegmentedScan.Intensities)
-            positions = np.frombuffer(scan.SegmentedScan.Positions)
-
-            # Filter by m/z range
-            mz_mask = np.logical_and(mz_min <= positions, positions <= mz_max)
-            scan_mzs.append(positions[mz_mask])
-            scan_specs.append(intensities[mz_mask])
+    with open_backend(datafile_path) as backend:
+        scan_mzs, scan_specs, scan_time = backend.profile_per_scan(
+            polarity=polarity, t_min=t_min, t_max=t_max, mz_min=mz_min, mz_max=mz_max
+        )
 
         if not scan_mzs:
-            low_mass = RawFile.RunHeaderEx.LowMass
-            high_mass = RawFile.RunHeaderEx.HighMass
-
+            low_mass, high_mass = backend.mass_range()
             raise InvalidRangeError(
                 f"""No data found in the specified m/z range.
                 M/z range of the raw file: {low_mass} - {high_mass}
                 """
             )
 
-        # Create a sorted union of all unique m/z values
-        all_mzs = np.unique(np.concatenate(scan_mzs))
+    # Create a sorted union of all unique m/z values
+    all_mzs = np.unique(np.concatenate(scan_mzs))
 
-        # Initialize output array
-        signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
+    # Initialize output array
+    signal_array = np.zeros((len(all_mzs), len(scan_time)), dtype=np.float64)
 
-        # Fill the 2D array using exact mz matching
-        for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
-            # Find indices where the current scan mz values appear in all_mzs
-            indices = np.searchsorted(all_mzs, mz)
-            # Only fill values that exist in this scan
-            signal_array[indices, scan_idx] = intensity
+    # Fill the 2D array using exact mz matching
+    for scan_idx, (mz, intensity) in enumerate(zip(scan_mzs, scan_specs)):
+        # Find indices where the current scan mz values appear in all_mzs
+        indices = np.searchsorted(all_mzs, mz)
+        # Only fill values that exist in this scan
+        signal_array[indices, scan_idx] = intensity
 
-        signal_dask = da.from_array(signal_array, chunks="auto")
+    signal_dask = da.from_array(signal_array, chunks="auto")
 
-        return xr.Dataset(
-            {"signal": (("mz", "time"), signal_dask)},
-            coords={"mz": all_mzs, "time": scan_time},
-        )
+    return xr.Dataset(
+        {"signal": (("mz", "time"), signal_dask)},
+        coords={"mz": all_mzs, "time": scan_time},
+    )
 
 
 def compute_sum_signal(
@@ -354,6 +382,7 @@ def compute_sum_signal(
     t_max: float | None = None,
     ppm: int = 1,
     polarity: Literal["+", "-"] | None = None,
+    reconstruct: bool = False,
 ) -> tuple[xr.DataArray, int]:
     """Computes sum signal, binning counts within ``ppm`` value.
     Polarity and time filters may be optionally provided.
@@ -371,39 +400,35 @@ def compute_sum_signal(
     :param polarity: + or -, Polarity of the scans to be retrieved, optional,
                     defaults to None
     :type polarity: str, optional
+    :param reconstruct: When True, return a profile reconstructed as one Gaussian
+                    per centroid (overlays the centroids exactly; matches Thermo's
+                    profile, which is also a reconstruction) -- intended for
+                    display. The default False returns the real measured profile,
+                    which the instrument-function fit needs.
+    :type reconstruct: bool, optional
     :raises ValueError: If the specified time range is invalid, or if no data is found
                         in the specified filters, or the specified polarity is not found
                         in the raw file.
     :return: The sum signal and the number of combined scans
     :rtype: tuple[xr.DataArray, float]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        # Setup mz tolerance - counts within ppm are binned
-        mass_option = MassOptions(ppm, ToleranceUnits.ppm)
-
-        scan_selector = ScanSelector(RawFile, polarity, t_min, t_max)
+    with open_backend(datafile_path) as backend:
+        indices = backend.scan_indices(polarity=polarity, t_min=t_min, t_max=t_max)
         runtime.logger.debug(
-            f"Selected {len(scan_selector.scan_indices_1based)} scans "
-            "for sum signal computation. "
-            f"Polarity: {polarity}, binning ppm: {ppm}."
+            f"Selected {len(indices)} scans for sum signal computation. "
+            f"Polarity: {polarity}, binning ppm: {ppm}, reconstruct: {reconstruct}."
         )
-        average_scan = Extensions.AverageScans(
-            RawFile, scan_selector.scan_indices_dotnet, mass_option
-        )
-        averaged_spec = average_scan.SegmentedScan
-
-        # Extract averaged signal, multiply by number of combined scans
-        # to restore sum signal.
-        num_of_combined_scans = average_scan.ScansCombined
-        mz = np.frombuffer(averaged_spec.Positions)
-        sum_signal = np.frombuffer(averaged_spec.Intensities) * num_of_combined_scans
-
-        sum_signal_dask = da.from_array(sum_signal, chunks="auto")
-        sum_signal = xr.DataArray(
-            data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
+        # average=False restores the sum signal (averaged * scans combined).
+        mz, sum_signal, num_of_combined_scans = backend.average_profile(
+            indices, ppm=ppm, average=False, reconstruct=reconstruct
         )
 
-        return sum_signal, num_of_combined_scans
+    sum_signal_dask = da.from_array(sum_signal, chunks="auto")
+    sum_signal = xr.DataArray(
+        data=sum_signal_dask, dims=["mz"], coords={"mz": mz}, name="sum_signal"
+    )
+
+    return sum_signal, num_of_combined_scans
 
 
 def get_tic_per_scan(
@@ -427,37 +452,28 @@ def get_tic_per_scan(
     :return: Tuple containing the scan timestamps [s] and TIC values as numpy arrays
     :rtype: tuple
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(RawFile, polarity=polarity)
-        scan_timestamp = scan_selector.scan_times  # already in seconds
+    with open_backend(datafile_path) as backend:
+        scan_timestamp, scan_tic = backend.tic_per_scan(polarity=polarity)
 
-        scan_tic = np.asarray(
-            [
-                RawFile.GetScanStatsForScanNumber(i).TIC
-                for i in scan_selector.scan_indices_1based
-            ],
-            dtype=np.float64,
-        )
+    if timestamps is not None:
+        requested_timestamps = np.asarray(list(timestamps), dtype=np.float64)
 
-        if timestamps is not None:
-            requested_timestamps = np.asarray(list(timestamps), dtype=np.float64)
+        if requested_timestamps.size == 0:
+            return requested_timestamps, requested_timestamps
 
-            if requested_timestamps.size == 0:
-                return requested_timestamps, requested_timestamps
+        # Find nearest scan index for each requested timestamp
+        right_idx = np.searchsorted(scan_timestamp, requested_timestamps)
+        right_idx = np.clip(right_idx, 0, len(scan_timestamp) - 1)
+        left_idx = np.clip(right_idx - 1, 0, len(scan_timestamp) - 1)
 
-            # Find nearest scan index for each requested timestamp
-            right_idx = np.searchsorted(scan_timestamp, requested_timestamps)
-            right_idx = np.clip(right_idx, 0, len(scan_timestamp) - 1)
-            left_idx = np.clip(right_idx - 1, 0, len(scan_timestamp) - 1)
+        left_distance = np.abs(requested_timestamps - scan_timestamp[left_idx])
+        right_distance = np.abs(scan_timestamp[right_idx] - requested_timestamps)
+        nearest_idx = np.where(left_distance <= right_distance, left_idx, right_idx)
 
-            left_distance = np.abs(requested_timestamps - scan_timestamp[left_idx])
-            right_distance = np.abs(scan_timestamp[right_idx] - requested_timestamps)
-            nearest_idx = np.where(left_distance <= right_distance, left_idx, right_idx)
+        scan_timestamp = scan_timestamp[nearest_idx]
+        scan_tic = scan_tic[nearest_idx]
 
-            scan_timestamp = scan_timestamp[nearest_idx]
-            scan_tic = scan_tic[nearest_idx]
-
-        return scan_timestamp, scan_tic
+    return scan_timestamp, scan_tic
 
 
 def get_scan_timestamps(
@@ -481,10 +497,8 @@ def get_scan_timestamps(
     :return: Array of filtered scan timestamps [s]
     :rtype: np.ndarray
     """
-    with RawFileManager(datafile_path) as RawFile:
-        return ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max
-        ).scan_times
+    with open_backend(datafile_path) as backend:
+        return backend.scan_times(polarity=polarity, t_min=t_min, t_max=t_max)
 
 
 def get_peak_timeseries(
@@ -516,48 +530,19 @@ def get_peak_timeseries(
     """
     mzs = np.asarray(mzs, dtype=float)
 
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max
-        )
-        indices_0based = scan_selector.scan_indices_0based
-
-        # Preallocate the array for intensities
-        intensities_for_mz_values = np.zeros(
-            (len(mzs), len(indices_0based)), dtype=np.float64
+    with open_backend(datafile_path) as backend:
+        intensities_for_mz_values, scan_times = backend.xic(
+            mzs, ppm=ppm, polarity=polarity, t_min=t_min, t_max=t_max
         )
 
-        # Precompute the mass ranges for each m/z value
-        mz_lows = mzs - (mzs * ppm / 1e6)
-        mz_highs = mzs + (mzs * ppm / 1e6)
+    peak_timeseries_dask = da.from_array(intensities_for_mz_values, chunks="auto")
 
-        settings = []
-        for i, (mz_low, mz_high) in enumerate(zip(mz_lows, mz_highs)):
-            mz_range = Range()
-            mz_range.Low = mz_low
-            mz_range.High = mz_high
-
-            setting = ChromatogramTraceSettings(TraceType.MassRange)
-            setting.MassRanges = [mz_range]
-            settings.append(setting)
-
-        # Get timeseries for the m/z values, -1 for all scans
-        chromatogram = RawFile.GetChromatogramData(settings, -1, -1)
-        traces = ChromatogramSignal.FromChromatogramData(chromatogram)
-
-        for i, trace in enumerate(traces):
-            intensities_for_mz_values[i] = np.fromiter(
-                trace.Intensities, dtype=np.float64, count=len(trace.Intensities)
-            )[indices_0based]
-
-        peak_timeseries_dask = da.from_array(intensities_for_mz_values, chunks="auto")
-
-        return xr.DataArray(
-            peak_timeseries_dask,
-            dims=("mz", "time"),
-            coords={"mz": mzs, "time": np.array(scan_selector.scan_times)},
-            name="signal",
-        )
+    return xr.DataArray(
+        peak_timeseries_dask,
+        dims=("mz", "time"),
+        coords={"mz": mzs, "time": np.array(scan_times)},
+        name="signal",
+    )
 
 
 def _average_scans_centroids(
@@ -587,6 +572,11 @@ def _average_scans_centroids(
     """
     if ppm <= 0:
         raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
+
+    _ensure_dotnet()
+    from System.Collections.Generic import List
+    from ThermoFisher.CommonCore.Data import Extensions, ToleranceUnits
+    from ThermoFisher.CommonCore.Data.Business import MassOptions
 
     dotnet_indices = List[int]()
     for index in scan_indices_1based:
@@ -662,16 +652,9 @@ def get_centroids(
              the criteria.
     :rtype: tuple of np.ndarray
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile,
-            polarity=polarity,
-            t_min=t_min,
-            t_max=t_max,
-        )
-        return _average_scans_centroids(
-            RawFile, scan_selector.scan_indices_1based, ppm=ppm, average=average
-        )
+    with open_backend(datafile_path) as backend:
+        indices = backend.scan_indices(polarity=polarity, t_min=t_min, t_max=t_max)
+        return backend.average_centroids(indices, ppm=ppm, average=average)
 
 
 def get_centroids_per_scan(
@@ -710,94 +693,37 @@ def get_centroids_per_scan(
              signal-to-noise ratios, and timestamps.
     :rtype: list[dict[str, np.ndarray]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        mz_min, mz_max = _validate_mz_range(RawFile, mz_min, mz_max)
-        scan_selector = ScanSelector(
-            RawFile,
+    with open_backend(datafile_path) as backend:
+        return backend.centroids_per_scan(
             polarity=polarity,
             t_min=t_min,
             t_max=t_max,
             ms_type=scan_type,
+            mz_min=mz_min,
+            mz_max=mz_max,
         )
 
-        centroids = []
-        for scan, timestamp in zip(scan_selector.scans, scan_selector.scan_times):
-            centroid_scan = scan.CentroidScan
 
-            if centroid_scan is None or centroid_scan.Length == 0:
-                masses = np.array([], dtype=np.float64)
-                intensities = np.array([], dtype=np.float64)
-                resolutions = np.array([], dtype=np.float64)
-                signal_to_noise = np.array([], dtype=np.float64)
-            else:
-                scan_centroids = centroid_scan.GetLabelPeaks()
-                n_centroids = len(scan_centroids)
-
-                masses = np.fromiter(
-                    (c.Mass for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                intensities = np.fromiter(
-                    (c.Intensity for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                resolutions = np.fromiter(
-                    (c.Resolution for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-                signal_to_noise = np.fromiter(
-                    (c.SignalToNoise for c in scan_centroids),
-                    dtype=np.float64,
-                    count=n_centroids,
-                )
-
-                mz_mask = np.logical_and(mz_min <= masses, masses <= mz_max)
-                masses = masses[mz_mask]
-                intensities = intensities[mz_mask]
-                resolutions = resolutions[mz_mask]
-                signal_to_noise = signal_to_noise[mz_mask]
-
-            centroids.append(
-                {
-                    "masses": masses,
-                    "intensities": intensities,
-                    "resolutions": resolutions,
-                    "signal_to_noise": signal_to_noise,
-                    "timestamp": timestamp,
-                }
-            )
-
-        return centroids
-
-
-def _group_ms2_scans_by_parent(
-    scan_selector: ScanSelector,
+def _cluster_scans_by_parent(
+    scan_precursors: dict[int, float],
     parent_peak_tolerance: float = 0.001,
 ) -> dict[float, list[int]]:
-    """Group MS2 scans by their parent peak m/z.
+    """Cluster MS2 scans by precursor m/z.
 
-    Parses each MS2 scan filter to extract the precursor m/z, clusters
-    near-duplicate values within tolerance, and returns a mapping of
-    canonical parent peak m/z to 1-based scan indices.
+    Takes a ``{scan_number: precursor_mz}`` mapping (from a backend), clusters
+    near-duplicate precursors within tolerance, and returns a mapping of
+    canonical parent peak m/z to scan numbers. Backend-agnostic: the precursor
+    extraction itself lives in the backend (``ms2_precursor_by_scan``).
 
-    :param scan_selector: A ScanSelector already filtered for MS2 scans.
-    :type scan_selector: ScanSelector
+    :param scan_precursors: Mapping of scan number to precursor m/z.
+    :type scan_precursors: dict[int, float]
     :param parent_peak_tolerance: Tolerance in Da for merging
                                   near-duplicate parent peaks.
     :type parent_peak_tolerance: float
-    :return: Mapping of canonical parent peak m/z to list of 1-based scan indices.
+    :return: Mapping of canonical parent peak m/z to list of scan numbers.
     :rtype: dict[float, list[int]]
     """
-    scan_parent_peaks: list[tuple[int, float]] = []
-    for scan_idx, scan_filter in zip(
-        scan_selector.scan_indices_1based, scan_selector.scan_filters, strict=True
-    ):
-        match = re.search(r"ms2 ([\d.]+)@", scan_filter.ToString())
-        if match:
-            scan_parent_peaks.append((scan_idx, float(match.group(1))))
+    scan_parent_peaks: list[tuple[int, float]] = list(scan_precursors.items())
 
     if not scan_parent_peaks:
         return {}
@@ -867,13 +793,12 @@ def get_ms2_centroids_by_parent(
              (masses, intensities, resolutions, signal_to_noise).
     :rtype: dict[float, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        scan_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
+    with open_backend(datafile_path) as backend:
+        precursors = backend.ms2_precursor_by_scan(
+            polarity=polarity, t_min=t_min, t_max=t_max
         )
-
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            scan_selector, parent_peak_tolerance
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
         if not parent_peak_mapping:
             return {}
@@ -902,8 +827,8 @@ def get_ms2_centroids_by_parent(
                     np.array([], dtype=np.float64),
                 )
                 continue
-            centroid_mapping[pp] = _average_scans_centroids(
-                RawFile, scan_indices, ppm=ppm, average=average
+            centroid_mapping[pp] = backend.average_centroids(
+                scan_indices, ppm=ppm, average=average
             )
 
         return centroid_mapping
@@ -935,17 +860,17 @@ def get_ms2_summary_metadata(
              ms1_scan_count, ms2_scan_count, parent_peak_tolerance.
     :rtype: dict
     """
-    with RawFileManager(datafile_path) as RawFile:
-        # Get all scans to count MS1 vs MS2
-        all_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type=None
+    with open_backend(datafile_path) as backend:
+        all_count = len(
+            backend.scan_indices(polarity, t_min, t_max, ms_type=None)
         )
-        ms2_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
-        )
-
-        all_count = len(all_selector.scan_indices_1based)
-        ms2_count = len(ms2_selector.scan_indices_1based)
+        # scan_indices raises NoScansFoundError when nothing matches, so an
+        # MS1-only file would otherwise blow up here instead of reaching the
+        # graceful empty-MS2 return below.
+        try:
+            ms2_count = len(backend.scan_indices(polarity, t_min, t_max, ms_type="Ms2"))
+        except NoScansFoundError:
+            ms2_count = 0
         ms1_count = all_count - ms2_count
 
         if ms2_count == 0:
@@ -959,33 +884,18 @@ def get_ms2_summary_metadata(
             }
 
         # Get MS2 scans grouped by parent peak
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            ms2_selector, parent_peak_tolerance
+        precursors = backend.ms2_precursor_by_scan(polarity, t_min, t_max)
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
         parent_peaks = list(parent_peak_mapping.keys())
 
-        first_scan_idx = ms2_selector.scan_indices_1based[0]
-        trailer_info = RawFile.GetTrailerExtraInformation(first_scan_idx)
-        trailer_labels = list(trailer_info.Labels)
-
-        isolation_width_idx = trailer_labels.index("MS2 Isolation Width:")
-        hcd_label_idx = trailer_labels.index("HCD Energy V:")
-
-        isolation_widths = set()
-        scan_idx_to_hcd: dict[int, str] = {}
-
-        for scan_idx in ms2_selector.scan_indices_1based:
-            trailer = RawFile.GetTrailerExtraInformation(scan_idx)
-            trailer_values = list(trailer.Values)
-            isolation_widths.add(trailer_values[isolation_width_idx])
-            scan_idx_to_hcd[scan_idx] = trailer_values[hcd_label_idx]
-
-        isolation_widths.discard(None)
-        isolation_widths.discard("")
-        if len(isolation_widths) == 1:
-            isolation_width = float(isolation_widths.pop().replace(",", "."))
-        else:
-            raise ValueError("Multiple isolation widths found for MS2 scans.")
+        # Isolation width + (calibrated) HCD energy per MS2 scan. Thermo reads
+        # these from the trailer ("MS2 Isolation Width:" / "HCD Energy V:");
+        # backends that lack the calibrated HCD energy raise NotImplementedError.
+        isolation_width, scan_idx_to_hcd = backend.ms2_acquisition_info(
+            polarity, t_min, t_max
+        )
 
         # Average HCD energies per parent peak, handling step dissociation
         # where energy values may contain multiple comma-separated values
@@ -1049,13 +959,10 @@ def get_ms2_centroids_per_scan_for_parent(
              signal_to_noise, timestamp.
     :rtype: tuple[list[dict], list[float]]
     """
-    with RawFileManager(datafile_path) as RawFile:
-        ms2_selector = ScanSelector(
-            RawFile, polarity=polarity, t_min=t_min, t_max=t_max, ms_type="Ms2"
-        )
-
-        parent_peak_mapping = _group_ms2_scans_by_parent(
-            ms2_selector, parent_peak_tolerance
+    with open_backend(datafile_path) as backend:
+        precursors = backend.ms2_precursor_by_scan(polarity, t_min, t_max)
+        parent_peak_mapping = _cluster_scans_by_parent(
+            precursors, parent_peak_tolerance
         )
 
         # Find the matching parent peak cluster
@@ -1068,50 +975,7 @@ def get_ms2_centroids_per_scan_for_parent(
         if not matching_scan_indices:
             return [], []
 
-        centroids: list[dict[str, np.ndarray | float]] = []
-        tic_values: list[float] = []
-
-        for scan_idx in matching_scan_indices:
-            scan = Extensions.GetScans(RawFile, scan_idx, scan_idx)
-            scan_obj = list(scan)[0]
-            stats = ms2_selector.raw_scan_stats[scan_idx - 1]
-            timestamp = stats.StartTime * SECONDS_PER_MINUTE
-            tic = float(stats.TIC)
-
-            centroid_scan = scan_obj.CentroidScan
-            if centroid_scan is None or centroid_scan.Length == 0:
-                masses = np.array([], dtype=np.float64)
-                intensities = np.array([], dtype=np.float64)
-                resolutions = np.array([], dtype=np.float64)
-                signal_to_noise = np.array([], dtype=np.float64)
-            else:
-                scan_centroids = centroid_scan.GetLabelPeaks()
-                n = len(scan_centroids)
-                masses = np.fromiter(
-                    (c.Mass for c in scan_centroids), dtype=np.float64, count=n
-                )
-                intensities = np.fromiter(
-                    (c.Intensity for c in scan_centroids), dtype=np.float64, count=n
-                )
-                resolutions = np.fromiter(
-                    (c.Resolution for c in scan_centroids), dtype=np.float64, count=n
-                )
-                signal_to_noise = np.fromiter(
-                    (c.SignalToNoise for c in scan_centroids), dtype=np.float64, count=n
-                )
-
-            centroids.append(
-                {
-                    "masses": masses,
-                    "intensities": intensities,
-                    "resolutions": resolutions,
-                    "signal_to_noise": signal_to_noise,
-                    "timestamp": timestamp,
-                }
-            )
-            tic_values.append(tic)
-
-        return centroids, tic_values
+        return backend.ms2_centroids_for_scans(matching_scan_indices)
 
 
 class RawFileMetadata:
@@ -1137,91 +1001,26 @@ class RawFileMetadata:
         """Information about the instrument used for the acquisition.
         ChannelLabels and Units are not included as they are not serializable.
         """
-        with RawFileManager(self.datafile_path) as RawFile:
-            instrument_data = RawFile.GetInstrumentData()
-
-            instrument_data_list = [
-                "Name",
-                "Model",
-                "SerialNumber",
-                "SoftwareVersion",
-                "HardwareVersion",
-                "Flags",
-                "AxisLabelX",
-                "AxisLabelY",
-                "IsValid",
-                "HasAccurateMassPrecursors",
-            ]
-
-            return {row: getattr(instrument_data, row) for row in instrument_data_list}
+        with open_backend(self.datafile_path) as backend:
+            return backend.instrument_details()
 
     @property
     def scan_acquisition_settings(self) -> dict:
         """Acquisition settings for each scan (injection time, AGC target,
         isolation width, HCD energy, lock-mass info, etc.)
         """
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(
-                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+        with open_backend(self.datafile_path) as backend:
+            return backend.scan_acquisition_settings(
+                self.polarity, self.t_min, self.t_max, self.scan_type
             )
-            settings_dict = {}
-            header_labels = None
-            for i in scan_selector.scan_indices_1based:
-                header = RawFile.GetTrailerExtraInformation(i)
-                if header_labels is None:
-                    header_labels = list(header.Labels)
-                settings_dict[i] = list(header.Values)
-
-            return {
-                "header_labels": header_labels,
-                "settings": settings_dict,
-            }
 
     @property
     def scan_statistics(self) -> dict:
         """Get per scan statistics"""
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(
-                RawFile, self.polarity, self.t_min, self.t_max, self.scan_type
+        with open_backend(self.datafile_path) as backend:
+            return backend.scan_statistics(
+                self.polarity, self.t_min, self.t_max, self.scan_type
             )
-            stat_names = [
-                "HighMass",
-                "LowMass",
-                "LongWavelength",
-                "ShortWavelength",
-                "BasePeakIntensity",
-                "BasePeakMass",
-                "TIC",
-                "StartTime",
-                "PacketCount",
-                "NumberOfChannels",
-                "ScanNumber",
-                "ScanEventNumber",
-                "SegmentNumber",
-                "IsCentroidScan",
-                "Frequency",
-                "IsUniformTime",
-                "AbsorbanceUnitScale",
-                "WavelengthStep",
-                "ScanType",
-                "CycleNumber",
-            ]
-            # The scan type is not included in the scan statistics,
-            # so we need to get it from the raw scan filters
-            return {
-                scan_index: {
-                    **{
-                        name: getattr(
-                            scan_selector.raw_scan_stats[scan_index - 1], name
-                        )
-                        for name in stat_names
-                    },
-                    "MsType": scan_selector.raw_scan_filters[
-                        scan_index - 1
-                    ].MSOrder.ToString(),
-                }
-                for scan_index in scan_selector.scan_indices_1based
-            }
 
 
 class RawFileMetadataLegacy(RawFileMetadata):
@@ -1230,8 +1029,8 @@ class RawFileMetadataLegacy(RawFileMetadata):
     @property
     def num_of_scans(self):
         """Number of scans in the raw file."""
-        with RawFileManager(self.datafile_path) as RawFile:
-            return RawFile.RunHeaderEx.SpectraCount
+        with open_backend(self.datafile_path) as backend:
+            return backend.num_scans()
 
     @property
     def instrument(self):
@@ -1279,42 +1078,8 @@ class RawFileMetadataLegacy(RawFileMetadata):
             }
         }
         """
-        result = {"time": [], "data": []}
-        with RawFileManager(self.datafile_path) as RawFile:
-            scan_selector = ScanSelector(RawFile, ms_type=None)
-            scans = scan_selector.scans
-            scan_times = scan_selector.scan_times
-            for timestamp, scan in zip(scan_times, scans):
-                centroid_scan = scan.CentroidScan
-                if centroid_scan is not None and centroid_scan.Length > 0:
-                    mzs = np.frombuffer(centroid_scan.Masses)
-                    intensities = np.frombuffer(centroid_scan.Intensities)
-                    resolutions = np.frombuffer(centroid_scan.Resolutions)
-                    noises = np.frombuffer(centroid_scan.Noises)
-
-                    valid_resolution_mask = np.isfinite(resolutions) & (resolutions > 0)
-                    valid_intensity_mask = np.isfinite(intensities) & (intensities > 0)
-                    valid_mask = valid_resolution_mask & valid_intensity_mask
-
-                    mzs = mzs[valid_mask].tolist()
-                    intensities = intensities[valid_mask].tolist()
-                    resolutions = resolutions[valid_mask].tolist()
-                    noises = noises[valid_mask].tolist()
-                else:
-                    mzs = []
-                    intensities = []
-                    resolutions = []
-                    noises = []
-                result["time"].append(timestamp)
-                result["data"].append(
-                    {
-                        "intensities": intensities,
-                        "mzs": mzs,
-                        "resolutions": resolutions,
-                        "noises": noises,
-                    }
-                )
-        return result
+        with open_backend(self.datafile_path) as backend:
+            return backend.centroids_meta()
 
     def to_dict(self):
         """Convert the metadata to a dictionary.

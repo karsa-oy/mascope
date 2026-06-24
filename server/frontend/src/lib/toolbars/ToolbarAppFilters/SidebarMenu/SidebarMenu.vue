@@ -10,21 +10,25 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import ContextMenu from 'primevue/contextmenu'
 
-import { DialogDatasetOp } from '@/lib/dialogs'
+import { DialogWorkspaceOp, DialogWorkspaceMembership, DialogDatasetOp } from '@/lib/dialogs'
 import { BatchContextMenu, useBatchContextMenu, useBatchTableConfig } from '@/lib/panes'
 
 import { useSidebarMenu } from './state.js'
-import DatasetPane from './DatasetPane.vue'
+import WorkspacePane from './WorkspacePane.vue'
 import UserSettingsPane from './UserSettingsPane.vue'
 import NotificationPane from './NotificationPane.vue'
 import NotificationOverlay from './NotificationOverlay.vue'
 
 import { useApp } from '@/stores'
+import { workspaceIcon } from '@/stores/data/modules/workspace'
 
 const app = useApp()
 const sidebarMenu = useSidebarMenu()
 
 const dialog = ref()
+const datasetDialog = ref()
+const workspaceContextMenu = ref()
+const workspaceMembersDialog = ref(false)
 const datasetContextMenu = ref()
 const batchContextMenu = useBatchContextMenu()
 const batchTable = useBatchTableConfig()
@@ -55,9 +59,32 @@ const nextBatch = () => {
 
 watchEffect(() => {
   if (!sidebarMenu.open) {
-    sidebarMenu.tab = 'datasets'
+    sidebarMenu.tab = 'workspaces'
   }
 })
+
+// Auto-open sidebar when no workspace is selected
+watchEffect(() => {
+  if (!app.data.workspace.focused && !sidebarMenu.open) {
+    sidebarMenu.open = true
+  }
+})
+
+// Prevent closing without a workspace selected
+const canClose = computed(() => !!app.data.workspace.focused)
+
+// PrimeVue's Drawer closes on any document click outside its DOM tree.
+// Dialogs and overlays with appendTo="body" are teleported out of the Drawer,
+// so clicking inside them triggers the Drawer's outside-click handler. We block
+// the close when any PrimeVue overlay layer is present in the DOM.
+const onDrawerVisibleUpdate = (val) => {
+  if (
+    !val &&
+    document.querySelector('.p-dialog-mask, .p-overlay-mask, [data-pc-section="overlay"]')
+  )
+    return
+  sidebarMenu.open = val
+}
 
 watchEffect(() => {
   if (sidebarMenu.open && sidebarMenu.tab === 'notifications') {
@@ -88,26 +115,50 @@ watchEffect(() => {
     </NotificationOverlay>
     <span class="pi ph ph-caret-right" style="opacity: 0.5" />
     <Button
-      icon="pi ph ph-folder"
-      :label="app.data.dataset.focused?.dataset_name"
+      :icon="`pi ph ${workspaceIcon(app.data.workspace.focused)}`"
+      :label="app.data.workspace.focused?.workspace_name"
       v-tooltip.bottom="
-        `${app.data.dataset.focused?.dataset_description ?? 'No description'}
+        `${app.data.workspace.focused?.workspace_description ?? 'No description'}
                          (right click for options)`
       "
       severity="secondary"
       text
       @click="
         () => {
-          app.data.batch.unfocus()
+          app.data.dataset.unfocus()
         }
       "
       @contextmenu="
         (event) => {
           event.preventDefault()
-          datasetContextMenu.toggle(event)
+          workspaceContextMenu.toggle(event)
         }
       "
     />
+    <template v-if="app.data.dataset.focused">
+      <span class="pi ph ph-caret-right" style="opacity: 0.5" />
+      <Button
+        icon="pi ph ph-folder-open"
+        :label="app.data.dataset.focused?.dataset_name"
+        v-tooltip.bottom="
+          `${app.data.dataset.focused?.dataset_description ?? 'No description'}
+                         (right click for options)`
+        "
+        severity="secondary"
+        text
+        @click="
+          () => {
+            app.data.batch.unfocus()
+          }
+        "
+        @contextmenu="
+          (event) => {
+            event.preventDefault()
+            datasetContextMenu.toggle(event)
+          }
+        "
+      />
+    </template>
     <template v-if="app.data.batch.focused">
       <span class="pi ph ph-caret-right" style="opacity: 0.5" />
       <Button
@@ -159,17 +210,19 @@ watchEffect(() => {
   </menu>
   <Tabs v-model:value="sidebarMenu.tab">
     <Drawer
-      v-model:visible="sidebarMenu.open"
+      :visible="sidebarMenu.open"
+      @update:visible="onDrawerVisibleUpdate"
       header="Mascope"
       position="left"
       :style="`width: calc(${app.ui.split.left}vw + 1rem);`"
-      :modal="false"
-      :dismissable="false"
+      :modal="!canClose"
+      :dismissable="canClose"
+      :closable="canClose"
     >
       <template #header>
         <TabList>
-          <Tab value="datasets" v-tooltip.bottom="'Datasets'">
-            <span class="pi ph ph-folder" />
+          <Tab value="workspaces" v-tooltip.bottom="'Workspaces'">
+            <span class="pi ph ph-briefcase" />
           </Tab>
           <Tab value="notifications" v-tooltip.bottom="'Notifications'">
             <NotificationOverlay>
@@ -182,8 +235,8 @@ watchEffect(() => {
         </TabList>
       </template>
       <TabPanels>
-        <TabPanel value="datasets">
-          <DatasetPane />
+        <TabPanel value="workspaces">
+          <WorkspacePane />
         </TabPanel>
         <TabPanel value="notifications">
           <NotificationPane />
@@ -206,25 +259,25 @@ watchEffect(() => {
     </Drawer>
   </Tabs>
   <ContextMenu
-    ref="datasetContextMenu"
+    ref="workspaceContextMenu"
     appendTo="self"
     :model="[
       {
-        label: 'Create dataset',
-        icon: 'pi pi-plus',
+        label: 'Manage members',
+        icon: 'pi pi-users',
         command: () => {
-          dialog = 'create'
+          workspaceMembersDialog = true
         }
       },
       {
-        label: 'Edit dataset',
+        label: 'Edit workspace',
         icon: 'pi pi-pen-to-square',
         command: () => {
           dialog = 'edit'
         }
       },
       {
-        label: 'Delete dataset',
+        label: 'Delete workspace',
         icon: 'pi pi-trash',
         command: () => {
           dialog = 'delete'
@@ -232,7 +285,32 @@ watchEffect(() => {
       }
     ]"
   />
-  <DialogDatasetOp v-model:action="dialog" />
+  <DialogWorkspaceOp v-model:action="dialog" />
+  <ContextMenu
+    ref="datasetContextMenu"
+    appendTo="self"
+    :model="[
+      {
+        label: 'Edit dataset',
+        icon: 'pi pi-pen-to-square',
+        command: () => {
+          datasetDialog = 'edit'
+        }
+      },
+      {
+        label: 'Delete dataset',
+        icon: 'pi pi-trash',
+        command: () => {
+          datasetDialog = 'delete'
+        }
+      }
+    ]"
+  />
+  <DialogDatasetOp v-model:action="datasetDialog" :dataset="app.data.dataset.focused" />
+  <DialogWorkspaceMembership
+    v-model:visible="workspaceMembersDialog"
+    :workspace="app.data.workspace.focused"
+  />
   <BatchContextMenu />
 </template>
 

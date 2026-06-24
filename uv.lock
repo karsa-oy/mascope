@@ -1265,7 +1265,7 @@ wheels = [
 
 [[package]]
 name = "jupyterlab"
-version = "4.5.7"
+version = "4.5.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "async-lru" },
@@ -1282,9 +1282,9 @@ dependencies = [
     { name = "tornado" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/22/8440ec827762146e7cdecf04335bd348795899d29dc6ae82238707353a2c/jupyterlab-4.5.7.tar.gz", hash = "sha256:55a9822c4754da305f41e113452c68383e214dcf96de760146af89ce5d5117b0", size = 23992763, upload-time = "2026-04-29T16:43:51.328Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/52/a8d4895bef501ffeb6af448e8bf7079541c7772978211963aa653518c2d9/jupyterlab-4.5.9.tar.gz", hash = "sha256:dd79a073fecae7a39066ea99e4627ed6c76269ac926e95a810e1e1df6358d865", size = 23994445, upload-time = "2026-06-17T15:42:16.406Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/aa/537b8f7d80e799af19af35fb3ddfc970b951088a13c57dd9387dcfbb7f61/jupyterlab-4.5.7-py3-none-any.whl", hash = "sha256:fba4cb0e2c44a52859669d8c98b45de029d5e515f8407bf8534d2a8fc5f0964d", size = 12450123, upload-time = "2026-04-29T16:43:46.639Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/bb/2f9b425062416fba58f580c9b89c3b07277ccdf0a292501fedbca8ea00ea/jupyterlab-4.5.9-py3-none-any.whl", hash = "sha256:5ff0f908e8ac0afbed32b106fdef360f101c0a6654d1bf4a81e98a293ae1b336", size = 12449803, upload-time = "2026-06-17T15:42:12.18Z" },
 ]
 
 [[package]]
@@ -1600,7 +1600,7 @@ requires-dist = [
     { name = "pandas", specifier = "~=2.2" },
     { name = "psycopg2-binary", specifier = ">=2.9.11" },
     { name = "pyarrow", specifier = ">=18.0.0" },
-    { name = "python-multipart", specifier = ">=0.0.27,<0.0.28" },
+    { name = "python-multipart", specifier = ">=0.0.31,<0.0.32" },
     { name = "python-socketio", specifier = "~=5.11" },
     { name = "pyyaml", specifier = "~=6.0" },
     { name = "redis", extras = ["hiredis"], specifier = ">=7.1.0,<8" },
@@ -1747,7 +1747,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-sdk"
-version = "2026.5.12"
+version = "2026.6.12"
 source = { editable = "libraries/sdk" }
 dependencies = [
     { name = "loguru" },
@@ -1809,6 +1809,7 @@ dependencies = [
     { name = "mascope-file" },
     { name = "mascope-runtime" },
     { name = "numpy" },
+    { name = "opentfraw" },
     { name = "pythonnet" },
     { name = "xarray" },
 ]
@@ -1818,6 +1819,7 @@ requires-dist = [
     { name = "mascope-file", editable = "libraries/file" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
     { name = "numpy", specifier = "~=1.26" },
+    { name = "opentfraw", specifier = "~=1.2" },
     { name = "pythonnet", specifier = "~=3.0" },
     { name = "xarray", specifier = ">=2025.6.1" },
 ]
@@ -2090,6 +2092,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
+]
+
+[[package]]
+name = "opentfraw"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/28/ee27dd951941eaf13c70a99cb68db4de962386aaee190f2fbd7bc656dfd2/opentfraw-1.2.0.tar.gz", hash = "sha256:181c6bb9e2bcab97285221025c87eb9d843ab02244801cdfcdd53d52988a6586", size = 71195, upload-time = "2026-06-23T02:57:28.692Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/72/eb28f87822d246fdaa12fa3de0161bace556160555c224e764e8babe879a/opentfraw-1.2.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:4c4d0eaca8f45770580020f9e39f9e45240f8b83bf973efd122d5156903eab31", size = 367367, upload-time = "2026-06-23T02:57:22.101Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/35/4b1075fc47cdf8abedf97d4ef4a5781889cbddc1813b35471fa2b31b1df2/opentfraw-1.2.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:328eb17d4adc821e2bda229a66f194d2282185df996f33d0060d915f4d9c9e9e", size = 363766, upload-time = "2026-06-23T02:57:23.577Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/f9/0cb566be633a3b9221ff866d48f7a0191299a2b2c37cf2c54fc87400f7fc/opentfraw-1.2.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:45a1a5558cbcfe82acd5a7f1ca835a21cb386be6996e39223567a4896136adbf", size = 405089, upload-time = "2026-06-23T02:57:24.967Z" },
+    { url = "https://files.pythonhosted.org/packages/22/bd/8f569a87ac1d52037795266957d23e838bebd31adc6658033c890b9b2e7e/opentfraw-1.2.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1601777f97d8d609c191da7d58cef1d6130810c21e9cf0215182391c2cb5f071", size = 416097, upload-time = "2026-06-23T02:57:26.256Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/25/3bf1cd0f3d8ffc6936e2e2885b072a3fd1b405ef9c042f7a6683a445fd9d/opentfraw-1.2.0-cp38-abi3-win_amd64.whl", hash = "sha256:bd02b80507804773eeaff7c00f26c38fbd166fac09fb56aeb0635cacc02db0f0", size = 266240, upload-time = "2026-06-23T02:57:27.606Z" },
 ]
 
 [[package]]
@@ -2553,11 +2571,11 @@ wheels = [
 
 [[package]]
 name = "python-multipart"
-version = "0.0.27"
+version = "0.0.31"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/69/9b/f23807317a113dc36e74e75eb265a02dd1a4d9082abc3c1064acd22997c4/python_multipart-0.0.27.tar.gz", hash = "sha256:9870a6a8c5a20a5bf4f07c017bd1489006ff8836cff097b6933355ee2b49b602", size = 44043, upload-time = "2026-04-27T10:51:26.649Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/7e/9b35ad8f3d9ca680f7c87a88f19612fdd8da9796c4d3b46e560ac79dcc4a/python_multipart-0.0.31.tar.gz", hash = "sha256:fc631183bb13e56db3158a4909908dfb2e23565286744e798241e63750e5d680", size = 46689, upload-time = "2026-06-04T08:27:49.014Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/78/4126abcbdbd3c559d43e0db7f7b9173fc6befe45d39a2856cc0b8ec2a5a6/python_multipart-0.0.27-py3-none-any.whl", hash = "sha256:6fccfad17a27334bd0193681b369f476eda3409f17381a2d65aa7df3f7275645", size = 29254, upload-time = "2026-04-27T10:51:24.997Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/1e/7f7f299527a5a8ad90acd5f2f78dfa6c8495c6301a3205106ea68a84de96/python_multipart-0.0.31-py3-none-any.whl", hash = "sha256:8408153d68a9773291fc1da39a8b85a50044bddbabd2dd72e9229776b7b15e28", size = 29996, upload-time = "2026-06-04T08:27:47.804Z" },
 ]
 
 [[package]]

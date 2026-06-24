@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path
 
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import admin_user
+from mascope_backend.api.new.auth.dependencies import admin_user, current_active_user
 from mascope_backend.api.new.users.schemas import (
     GetUsersQueryParams,
 )
@@ -18,19 +18,22 @@ users_router = APIRouter(prefix="/api/users", tags=["Users"])
 @api_route()
 async def get_users_route(
     query_params: GetUsersQueryParams = Depends(),
-    user=Depends(admin_user),
+    user=Depends(current_active_user),
 ):
     """
     Retrieve a paginated list of all users.
 
+    Returns full user details for admins/owners, or reduced public
+    details for regular users.
+
     :param query_params: Query parameters for pagination and sorting.
     :type query_params: GetUsersQueryParams
-    :param user: The current authenticated user with admin permissions or higher.
+    :param user: The current authenticated user.
     :type user: User
     :return: A dictionary containing the user list and metadata.
     :rtype: dict
     """
-    return await get_users(**query_params.model_dump())
+    return await get_users(**query_params.model_dump(), caller=user)
 
 
 @users_router.get("/{user_id}")

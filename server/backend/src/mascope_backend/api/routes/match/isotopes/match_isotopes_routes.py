@@ -14,7 +14,13 @@ from mascope_backend.api.models.match.isotopes.match_isotopes_pydantic_model imp
     GetMatchesQueryParams,
     MatchIsotopeBase,
 )
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import (
+    check_batch_access,
+    check_sample_access,
+    check_sample_access_bulk,
+)
+from mascope_backend.db import User
 
 
 match_isotopes_router = APIRouter(prefix="/api/match/isotopes", tags=["Match Isotopes"])
@@ -24,17 +30,23 @@ match_isotopes_router = APIRouter(prefix="/api/match/isotopes", tags=["Match Iso
 @api_route()
 async def get_match_isotopes_route(
     query_params: GetMatchesQueryParams = Depends(),
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
 ):
     """Retrieve a list of match isotopes based on query parameters.
 
     :param query_params: Query parameters for filtering and pagination.
     :type query_params: GetMatchesQueryParams
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
     :return: A dictionary containing total count and list of match isotopes.
     :rtype: dict
     """
+    if query_params.sample_item_id:
+        await check_sample_access(query_params.sample_item_id, user, "guest")
+    elif query_params.sample_batch_id:
+        await check_batch_access(query_params.sample_batch_id, user, "guest")
+    else:
+        raise ValueError("Either sample_item_id or sample_batch_id must be provided.")
     return await get_match_isotopes(**query_params.model_dump())
 
 
@@ -42,35 +54,39 @@ async def get_match_isotopes_route(
 @api_route()
 async def get_match_isotope_route(
     match_isotope_id: str,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
 ):
     """Retrieve details of a specific match isotope by ID.
 
     :param match_isotope_id: The unique identifier of the match isotope.
     :type match_isotope_id: str
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
     :return: A dictionary containing the match isotope details.
     :rtype: dict
     """
-    return await get_match_isotope(match_isotope_id)
+    result = await get_match_isotope(match_isotope_id)
+    await check_sample_access(result["data"]["sample_item_id"], user, "guest")
+    return result
 
 
 @match_isotopes_router.post("")
 @api_route(status_code=201)
 async def create_match_isotopes_route(
     body: List[MatchIsotopeBase],
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
 ):
     """Create new match isotopes.
 
     :param body: A list of match isotope data for creation.
     :type body: List[MatchIsotopeBase]
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user. Requires workspace editor role.
     :type user: User
     :return: A dictionary containing the created match isotopes and messages.
     :rtype: dict
     """
+    sample_ids = list({item.sample_item_id for item in body})
+    await check_sample_access_bulk(sample_ids, user, "editor")
     return await create_match_isotopes(
         match_isotopes=body, independent_transaction=True
     )
@@ -80,17 +96,23 @@ async def create_match_isotopes_route(
 @api_route()
 async def delete_match_isotopes_route(
     body: DeleteMatchIsotopesPayload,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
 ):
     """Delete specific match isotopes based on sample item or batch.
 
     :param body: Data payload specifying sample item, batch, and isotope IDs.
     :type body: DeleteMatchIsotopesPayload
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user. Requires workspace editor role.
     :type user: User
     :return: A dictionary confirming the deletion outcome.
     :rtype: dict
     """
+    if body.sample_item_id:
+        await check_sample_access(body.sample_item_id, user, "editor")
+    elif body.sample_batch_id:
+        await check_batch_access(body.sample_batch_id, user, "editor")
+    else:
+        raise ValueError("Either sample_item_id or sample_batch_id must be provided.")
     return await delete_match_isotopes(
         sample_item_id=body.sample_item_id,
         sample_batch_id=body.sample_batch_id,

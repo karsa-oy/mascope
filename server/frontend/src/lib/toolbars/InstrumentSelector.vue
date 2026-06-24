@@ -16,6 +16,7 @@ const app = useApp()
     :options="app.data.instrument.list"
     dataKey="instrument"
     optionLabel="instrument"
+    optionDisabled="disabled"
     v-tooltip.left="'Instrument'"
     :pt="
       app.ui.help.bottom_end(`

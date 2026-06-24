@@ -168,9 +168,8 @@ class SampleBatchUpdateStatusBody(BaseModel):
 
 
 class GetSampleBatchesQueryParams(QueryParamsModel):
-    dataset_id: str | None = Field(
-        None,
-        description="Filter by the dataset ID for which you want to fetch the sample batches.",
+    dataset_id: str = Field(
+        description="The dataset ID for which to fetch sample batches.",
     )
     sample_batch_name: str | None = Field(
         None, description="Filter by name of the sample batch"

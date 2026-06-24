@@ -137,7 +137,7 @@ const contextMenuItems = ref([
         ({ sample_file_id }) => sample_file_id
       )
       confirm.require({
-        message: `Are you sure you want to re-process the selected sample files?
+        message: `Are you sure you want to re-process the selected files?
           This will delete existing acquisition data and recreate it. The action is
           only available for files not associated with user-created batches.
 
@@ -410,7 +410,7 @@ const currentPageReportTemplate =
             </DataTable>
             <div v-if="!acquisitions?.length" class="center" style="min-height: 150px">
               <i class="info-line">
-                <span class="pi pi-inbox" /><span>No acquisitions found</span>
+                <span class="pi pi-inbox" /><span>No raw files found with current filters</span>
               </i>
             </div>
           </div>

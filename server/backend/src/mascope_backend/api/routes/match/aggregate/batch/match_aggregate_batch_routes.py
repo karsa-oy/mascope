@@ -14,7 +14,9 @@ from mascope_backend.api.models.match.aggregate.match_aggregate_pydantic_model i
     AggregateAndCreateMatchesBody,
     AggregateMatchIsotopeFilteredDataBody,
 )
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.workspaces.dependencies import require_batch_role
+from mascope_backend.db import User
 
 
 match_aggregate_batch_router = APIRouter(
@@ -28,7 +30,8 @@ match_aggregate_batch_router = APIRouter(
 async def aggregate_batch_match_isotope_filtered_data_route(
     sample_batch_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("guest")),
 ):
     """Fetch filtered match isotope data for a specific sample batch.
 
@@ -36,8 +39,10 @@ async def aggregate_batch_match_isotope_filtered_data_route(
     :type sample_batch_id: str
     :param body: Filter parameters for match isotope data.
     :type body: AggregateMatchIsotopeFilteredDataBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the batch.
+    :type membership: WorkspaceMember
     :return: Filtered isotope match data with count and message.
     :rtype: dict
     """
@@ -56,7 +61,8 @@ async def aggregate_batch_match_isotope_filtered_data_route(
         return {
             "results": len(data_dict),
             "message": (
-                f"Filtered match isotope data fetched successfully for batch '{sample_batch_name}'"
+                f"Filtered match isotope data fetched successfully for batch "
+                f"'{sample_batch_name}'"
             ),
             "data": data_dict,
         }
@@ -72,7 +78,8 @@ async def aggregate_batch_match_isotope_filtered_data_route(
 async def aggregate_batch_matches_route(
     sample_batch_id: str,
     body: AggregateMatchIsotopeFilteredDataBody,
-    user=Depends(guest_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("guest")),
 ):
     """Aggregate match data for a specific sample batch.
 
@@ -80,8 +87,10 @@ async def aggregate_batch_matches_route(
     :type sample_batch_id: str
     :param body: Aggregation parameters for match data.
     :type body: AggregateMatchIsotopeFilteredDataBody
-    :param user: The current authenticated user with guest permissions.
+    :param user: The current authenticated user. Requires workspace guest role.
     :type user: User
+    :param membership: Workspace membership with guest role on the batch.
+    :type membership: WorkspaceMember
     :return: Aggregated match data with count and message.
     :rtype: dict
     """
@@ -112,7 +121,8 @@ async def aggregate_batch_matches_route(
 async def aggregate_and_create_batch_matches_route(
     sample_batch_id: str,
     body: AggregateAndCreateMatchesBody,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Aggregate and save new matches for a sample batch.
 
@@ -120,8 +130,10 @@ async def aggregate_and_create_batch_matches_route(
     :type sample_batch_id: str
     :param body: Parameters for creating matches.
     :type body: AggregateAndCreateMatchesBody
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user. Requires workspace editor role.
     :type user: User
+    :param membership: Workspace membership with editor role on the batch.
+    :type membership: WorkspaceMember
     :return: Success message and any associated logs.
     :rtype: dict
     """
@@ -146,7 +158,8 @@ async def aggregate_and_create_batch_matches_route(
 async def aggregate_and_recreate_matches_route(
     sample_batch_id: str,
     body: AggregateAndCreateMatchesBody,
-    user=Depends(editor_user),
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
 ):
     """Recreate matches for a sample batch.
 
@@ -154,8 +167,10 @@ async def aggregate_and_recreate_matches_route(
     :type sample_batch_id: str
     :param body: Parameters for recreating matches.
     :type body: AggregateAndCreateMatchesBody
-    :param user: The current authenticated user with editor permissions.
+    :param user: The current authenticated user. Requires workspace editor role.
     :type user: User
+    :param membership: Workspace membership with editor role on the batch.
+    :type membership: WorkspaceMember
     :return: Success message and any associated logs.
     :rtype: dict
     """

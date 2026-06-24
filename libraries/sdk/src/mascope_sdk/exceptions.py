@@ -92,8 +92,3 @@ class MascopeTimeoutError(MascopeConnectionError):
     """Raised when a request times out."""
 
     pass
-
-
-# Aliases for backwards compatibility (deprecated)
-ConnectionError = MascopeConnectionError
-TimeoutError = MascopeTimeoutError

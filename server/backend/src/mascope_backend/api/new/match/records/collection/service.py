@@ -39,9 +39,11 @@ async def get_match_collection_records(
     :type sample_item_id: str | None
     :param sample_batch_id: Unique identifier of the sample batch, defaults to None
     :type sample_batch_id: str | None
-    :param target_collection_id: Optional filter by specific target collection, defaults to None
+    :param target_collection_id: Optional filter by specific target collection, defaults
+                                 to None
     :type target_collection_id: str | None
-    :return: Dictionary containing status, message, results count, and match collection records data
+    :return: Dictionary containing status, message, results count, and match collection
+             records data
     :rtype: dict
     """
     if sample_item_id:
@@ -50,7 +52,7 @@ async def get_match_collection_records(
         entity_type = "sample"
 
         data = await _get_sample_match_collection_records(sample, target_collection_id)
-    else:
+    elif sample_batch_id:
         sample_batch = await fetch_sample_batch(sample_batch_id)
         entity_name = sample_batch.sample_batch_name
         entity_type = "batch"
@@ -69,7 +71,10 @@ async def get_match_collection_records(
 
     return {
         "status": "success",
-        "message": f"Successfully retrieved match collection records for {entity_type} '{entity_name}'",
+        "message": (
+            f"Successfully retrieved match collection records for {entity_type} "
+            f"'{entity_name}'"
+        ),
         "results": len(data),
         "data": data,
     }
@@ -127,22 +132,25 @@ async def _get_sample_match_collection_records(
 
         data = []
         for row in rows:
+            tc = row.TargetCollection
             collection_data = {
-                "target_collection_id": row.TargetCollection.target_collection_id,
-                "target_collection_name": row.TargetCollection.target_collection_name,
-                "target_collection_description": row.TargetCollection.target_collection_description,
-                "target_collection_type": row.TargetCollection.target_collection_type,
+                "target_collection_id": tc.target_collection_id,
+                "target_collection_name": tc.target_collection_name,
+                "target_collection_description": tc.target_collection_description,
+                "target_collection_type": tc.target_collection_type,
+                "workspace_id": tc.workspace_id,
             }
 
             if row.MatchCollection:
+                mc = row.MatchCollection
                 match_data = {
-                    "match_collection_id": row.MatchCollection.match_collection_id,
-                    "sample_item_id": row.MatchCollection.sample_item_id,
-                    "match_score": row.MatchCollection.match_score,
-                    "match_category": row.MatchCollection.match_category,
-                    "sample_peak_intensity_sum": row.MatchCollection.sample_peak_intensity_sum,
-                    "match_collection_utc_created": row.MatchCollection.match_collection_utc_created,
-                    "match_collection_utc_modified": row.MatchCollection.match_collection_utc_modified,
+                    "match_collection_id": mc.match_collection_id,
+                    "sample_item_id": mc.sample_item_id,
+                    "match_score": mc.match_score,
+                    "match_category": mc.match_category,
+                    "sample_peak_intensity_sum": mc.sample_peak_intensity_sum,
+                    "match_collection_utc_created": mc.match_collection_utc_created,
+                    "match_collection_utc_modified": mc.match_collection_utc_modified,
                     "alarming": row.alarming,
                 }
             else:
@@ -206,11 +214,13 @@ async def _get_batch_match_collection_records(
 
         data = []
         for row in rows:
+            tc = row.TargetCollection
             collection_data = {
-                "target_collection_id": row.TargetCollection.target_collection_id,
-                "target_collection_name": row.TargetCollection.target_collection_name,
-                "target_collection_description": row.TargetCollection.target_collection_description,
-                "target_collection_type": row.TargetCollection.target_collection_type,
+                "target_collection_id": tc.target_collection_id,
+                "target_collection_name": tc.target_collection_name,
+                "target_collection_description": tc.target_collection_description,
+                "target_collection_type": tc.target_collection_type,
+                "workspace_id": tc.workspace_id,
             }
 
             collection_data["match"] = {

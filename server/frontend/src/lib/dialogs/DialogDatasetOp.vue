@@ -4,6 +4,7 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import FloatLabel from 'primevue/floatlabel'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
@@ -92,12 +93,7 @@ async function execute() {
      * - Sets up a one-time watcher to focus on the new dataset after the current one is deleted.
      */
     case 'delete': {
-      if (app.data.dataset.list.length > 1) {
-        app.data.dataset.delete(original.value)
-      } else {
-        info.message =
-          'You cannot delete the last remaining dataset in the database. Create a new dataset before deleting this one.'
-      }
+      app.data.dataset.delete(original.value)
       break
     }
   }
@@ -120,15 +116,15 @@ const invalid = computed(() =>
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" :header="title" modal style="max-width: 600px">
+  <Dialog v-model:visible="visible" :header="title" modal style="width: 720px">
     <section>
       <template v-if="action !== 'delete'">
         <FloatLabel>
-          <InputText id="dataset-name" v-model="info.name" />
+          <InputText id="dataset-name" v-model="info.name" style="width: 100%" />
           <label for="dataset-name">Name</label>
         </FloatLabel>
         <FloatLabel>
-          <InputText id="dataset-desc" v-model="info.desc" />
+          <Textarea id="dataset-desc" v-model="info.desc" rows="4" style="width: 100%" />
           <label for="dataset-desc">Description</label>
         </FloatLabel>
       </template>

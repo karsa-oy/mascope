@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Mascope's instrument machine agent. Sends sample files to the Mascope server."
 authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
 requires-python = ">=3.12,<3.13"
-license = "LicenseRef-Proprietary"
+license = "Apache-2.0"
 dependencies = [
     "mascope_runtime",
     "mascope_sdk",

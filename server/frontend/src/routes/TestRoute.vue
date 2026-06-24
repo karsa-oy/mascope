@@ -7,10 +7,10 @@
 import { api } from '@/api'
 
 api.http
-  .get('/datasets', {
+  .get('/workspaces', {
     headers: {
       use: 'read',
-      type: 'load_datasets'
+      type: 'load_workspaces'
     }
   })
   .then(console.log)

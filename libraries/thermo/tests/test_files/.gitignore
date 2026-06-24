@@ -1,0 +1,6 @@
+# Local-only test data: large .raw acquisitions stay on developer machines.
+# The test suite discovers whatever .raw files are present here; only the small
+# KORBI MS1 fixtures are committed so a fresh clone can run the portable tests.
+*.raw
+!KORBI2_AMB_POS_20260109174345.raw
+!KORBI2_AMB_NEG_20260108144525.raw

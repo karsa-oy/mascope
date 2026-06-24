@@ -12,7 +12,6 @@ Python SDK for the Mascope mass spectrometry data analysis platform. Designed fo
 - [Caching](#caching)
 - [API Reference](#api-reference)
 - [Examples](#examples)
-- [Migration from Legacy API](#migration-from-legacy-api)
 - [For Developers](#for-developers)
 
 ## Installation
@@ -96,7 +95,7 @@ MASCOPE_ACCESS_TOKEN=your-api-token
 from mascope_sdk import MascopeClient
 
 # Auto-loads credentials from .env
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 
 # List datasets (returns a DataFrame)
 datasets = mascope.datasets.list()
@@ -139,7 +138,8 @@ The `MascopeClient` can be configured in three ways (in override priority order)
    ```python
    mascope = MascopeClient(
        url="https://example.mascope.app",
-       access_token="your-token"
+       access_token="your-token",
+       workspace="My Workspace",
    )
    ```
 
@@ -172,6 +172,17 @@ The `MascopeClient` can be configured in three ways (in override priority order)
    ```python
    mascope = MascopeClient()
    ```
+
+### Workspace Selection
+
+The `workspace` parameter selects which workspace to operate on. It accepts a name, substring, or ID:
+
+```python
+# Explicit workspace selection
+mascope = MascopeClient(workspace="My Workspace")
+```
+
+If omitted and your account belongs to exactly one workspace, it is auto-selected. If you belong to multiple workspaces, a `ConfigurationError` is raised listing the available options.
 
 ## High-Level Loaders
 
@@ -270,7 +281,7 @@ mascope.clear_cache()
 ```python
 from mascope_sdk import MascopeClient
 
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 ```
 
 ### Resources
@@ -334,7 +345,7 @@ Columns: `ionization_mechanism_id`, `ionization_mechanism` (human-readable name)
 ```python
 from mascope_sdk import MascopeClient
 
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 
 peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 
@@ -350,7 +361,7 @@ summary.sort_values(ascending=False).head(10).plot.barh()
 import matplotlib.pyplot as plt
 from mascope_sdk import MascopeClient
 
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 
 ts = mascope.load_peak_timeseries(
     dataset="My Dataset",
@@ -372,7 +383,7 @@ plt.show()
 ```python
 from mascope_sdk import MascopeClient
 
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 
 # First load samples so the name is cached for resolution
 mascope.samples.list(batch="My Batch")
@@ -393,7 +404,7 @@ peaks.groupby("stage_name")[["area", "height"]].mean()
 import matplotlib.pyplot as plt
 from mascope_sdk import MascopeClient
 
-mascope = MascopeClient()
+mascope = MascopeClient(workspace="My Workspace")
 
 ts = mascope.samples.get_peak_timeseries(
     sample_id="sample-123",
@@ -408,23 +419,6 @@ if ts is not None:
     plt.title(f"Peak at m/z {ts['mz'].iloc[0]:.3f}")
     plt.show()
 ```
-
-## Migration from Legacy API
-
-| Old API                                                       | New API                                               |
-| ------------------------------------------------------------- | ----------------------------------------------------- |
-| `get_workspaces(url, token)`                                  | `mascope.datasets.list()`                             |
-| `get_sample_batches(url, token, ws_id)`                       | `mascope.batches.list("Dataset Name")`                |
-| `get_samples(url, token, batch_id)`                           | `mascope.samples.list(batch="Batch Name")`            |
-| `get_sample(url, token, sample_id)`                           | `mascope.samples.get(sample_id)`                      |
-| `get_sample_peaks(url, token, sample_id)`                     | `mascope.samples.get_peaks(sample_id)`                |
-| `get_sample_spectrum(url, token, sample_id)`                  | `mascope.samples.get_spectrum(sample_id)`             |
-| `get_sample_peak_timeseries(url, token, sample_id, mz)`       | `mascope.samples.get_peak_timeseries(sample_id, mz)`  |
-| `get_sample_compound_matches(url, token, sample_id, formula)` | `mascope.matching.match_compound(sample_id, formula)` |
-| `get_ionization_mechanisms(url, token)`                       | `mascope.ionization.list()`                           |
-| `get_cheminfo_by_mz(url, token, mz, mech_ids)`                | `mascope.cheminfo.query_by_mz(mz, mech_ids)`          |
-
----
 
 ## For Developers
 
@@ -506,15 +500,16 @@ mascope_sdk/
 ├── _resolve.py          # Name-to-ID resolution helpers
 ├── _loaders.py          # High-level loaders (load_peaks, load_peak_timeseries, load_peaks_by_stage)
 ├── _concurrent.py       # ThreadPoolExecutor wrapper with progress bars and cancellation
-├── _legacy.py           # Deprecated functional API (get_datasets, get_samples, etc.)
+├── _agents.py           # Internal HTTP helpers for Mascope agents (file-agent)
 ├── resources/
 │   ├── _base.py         # BaseResource: shared HTTP helpers and datetime coercion
-│   ├── datasets.py    # DatasetsResource
 │   ├── batches.py       # BatchesResource
-│   ├── samples.py       # SamplesResource (peaks, spectra, timeseries)
-│   ├── matching.py      # MatchingResource (compound matching)
+│   ├── cheminfo.py      # CheminfoResource (m/z queries)
+│   ├── datasets.py      # DatasetsResource
 │   ├── ionization.py    # IonizationResource
-│   └── cheminfo.py      # CheminfoResource (m/z queries)
+│   ├── matching.py      # MatchingResource (compound matching)
+│   ├── samples.py       # SamplesResource (peaks, spectra, timeseries)
+│   └── workspaces.py    # WorkspacesResource
 └── examples/            # Jupyter notebook examples
 ```
 
@@ -524,4 +519,4 @@ mascope_sdk/
 - **`resources/`** contains one class per API domain. Each resource inherits `BaseResource` which provides `_get()` / `_post()` helpers and automatic datetime column coercion.
 - **`_concurrent.py`** centralises `ThreadPoolExecutor` usage with `run_concurrent()`, which handles progress bars (tqdm), `None`-filtering, future cancellation on error, and the `max_workers <= 8` guard.
 - **`_resolve.py`** handles name -> ID resolution with substring/regex matching (used by resources and loaders).
-- **Underscore-prefixed modules** (`_http`, `_loaders`, `_concurrent`, `_resolve`, `_legacy`) are internal - not part of the public API.
+- **Underscore-prefixed modules** (`_http`, `_loaders`, `_concurrent`, `_resolve`, `_agents`) are internal — not part of the public API.

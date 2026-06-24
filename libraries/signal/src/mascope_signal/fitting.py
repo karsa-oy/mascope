@@ -10,6 +10,11 @@ from scipy.spatial.distance import pdist
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 
+# Number of integration nodes used to compute an m/z peak area on a self-built
+# grid spanning +-3 sigma. Dense enough that Simpson's rule is exact to well
+# below measurement precision for the smooth analytic peak model.
+PEAK_AREA_NODES = 101
+
 # Penalty factor for too close peaks
 # The fitted region is normalized, so 1e3 is a reasonable value
 PEAK_SEPARATION_PENALTY_FACTOR = 1e3
@@ -382,9 +387,19 @@ def calculate_peak_area(
     :rtype: float
     """
     pos, hei, res = peak
-    peak_y = gen_peak(x, pos, hei, res, peak_shape)
     if sample_interval:
-        # calculate peak area in TOF space
+        # calculate peak area in TOF space, over the supplied sample grid
+        peak_y = gen_peak(x, pos, hei, res, peak_shape)
         return np.sum(peak_y) * sample_interval
-    # calculate peak area in mz space
-    return simpson(y=peak_y, x=x)
+    # Calculate peak area in m/z space. The area is the integral of the analytic
+    # peak model (gen_peak), so it does not depend on the measured-profile grid;
+    # `x` is ignored here. Integrate on a dense, self-built grid over +-3 sigma so
+    # the area is independent of how densely the reader samples the profile. The
+    # Thermo profile is dense, but OpenTFRaw's is sparse and can leave a centroid
+    # in an empty/near-empty window, which would make simpson(x=...) fail.
+    if not (np.isfinite(res) and res > 0 and np.isfinite(pos) and pos > 0):
+        return 0.0
+    sigma = pos / res / SIGMA_MULTIPLIER
+    grid = np.linspace(pos - 3 * sigma, pos + 3 * sigma, PEAK_AREA_NODES)
+    peak_y = gen_peak(grid, pos, hei, res, peak_shape)
+    return float(simpson(y=peak_y, x=grid))

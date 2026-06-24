@@ -4,14 +4,13 @@ from mascope_backend.api.new.users.exceptions import UsernameAlreadyExistsExcept
 from mascope_backend.db import User, async_session
 
 
-async def check_username_exists(username: str) -> bool:
+async def check_username_exists(username: str) -> None:
     """
     Check if a username already exists in the database.
 
     :param username: The username to check.
     :type username: str
-    :return: True if the username exists, False otherwise.
-    :rtype: bool
+    :raises UsernameAlreadyExistsException: If the username already exists.
     """
     async with async_session() as session:
         query = select(User).filter(User.username == username)

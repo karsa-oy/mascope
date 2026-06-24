@@ -214,8 +214,13 @@ export const useSelection = (name, key, records, options = {}) => {
       // Verify the restored ID exists in current records
       const exists = records().some((record) => record[key] === state)
       if (!exists) {
-        logger.debug('stored state no longer valid', { data: { storageKey, state } })
-        localStorage.removeItem(storageKey) // Clean up invalid state
+        // Only clean up if there are records to compare against.
+        // If records are empty (e.g. deps not yet met), keep the entry
+        // so it can be restored once data arrives.
+        if (records().length > 0) {
+          logger.debug('stored state no longer valid', { data: { storageKey, state } })
+          localStorage.removeItem(storageKey)
+        }
         return false
       }
 
@@ -229,17 +234,22 @@ export const useSelection = (name, key, records, options = {}) => {
   }
   const persistState = (record) => {
     if (record && record[key] != null) {
-      logger.debug(`'saving focus to storage`, {
+      logger.debug(`saving focus to storage`, {
         icon: '💾',
         data: { record, storageKey }
       })
       localStorage.setItem(storageKey, record[key])
     } else {
-      logger.warn(`'invalid record to save to storage`, {
+      logger.debug(`clearing focus from storage`, {
         icon: '💾',
         data: { storageKey }
       })
+      localStorage.removeItem(storageKey)
     }
+  }
+  const resetPersist = () => {
+    stateLoaded.value = false
+    localStorage.removeItem(storageKey)
   }
   if (persist) {
     watch(focused, persistState)
@@ -281,6 +291,12 @@ export const useSelection = (name, key, records, options = {}) => {
 
     // --- try to unfocus if allowed ---
     if (allowUnfocus) {
+      unfocus()
+      return focused.value
+    }
+
+    // --- force unfocus when records are empty (even in single-select mode) ---
+    if (records().length === 0) {
       unfocus()
       return focused.value
     }
@@ -355,6 +371,7 @@ export const useSelection = (name, key, records, options = {}) => {
     focus,
     unfocus,
     prepRefocus,
-    lazyFocus
+    lazyFocus,
+    resetPersist
   }
 }
