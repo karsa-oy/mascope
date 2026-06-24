@@ -17,3 +17,6 @@ dist
 
 tofdaq
 /.runtime/env/*
+
+# MkDocs build output
+/site/
