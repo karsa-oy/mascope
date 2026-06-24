@@ -117,6 +117,7 @@ class MascopeClient:
         workspace: str | None = None,
         env_file: Path | str | None = None,
         verify_ssl: bool | None = None,
+        timeout: float | tuple[int, int] | None = None,
         service_name: str = "mascope_sdk",
     ):
         """Initialize the Mascope client.
@@ -138,6 +139,12 @@ class MascopeClient:
         :type env_file: Path | str | None, optional
         :param verify_ssl: Whether to verify SSL certificates. Defaults to True.
         :type verify_ssl: bool, optional
+        :param timeout: Request timeout in seconds. A single number sets the READ
+                        timeout (connect stays at the default); a (connect, read)
+                        tuple is used as-is. Falls back to the ``MASCOPE_SDK_TIMEOUT``
+                        environment variable, else (30, 300). Raise it for slow
+                        servers (e.g. heavy match_compounds scoring).
+        :type timeout: float | tuple[int, int], optional
         :param service_name: Service name for request headers.
         :type service_name: str, optional
         :raises ConfigurationError: If URL or access token cannot be determined,
@@ -202,6 +209,27 @@ class MascopeClient:
             )
         else:
             self._verify_ssl = verify_ssl
+
+        # Resolve timeout (parameter > env var > default (30, 300)). A single number
+        # is the READ timeout (connect stays at the default); a (connect, read) tuple
+        # is used as-is. $MASCOPE_SDK_TIMEOUT raises it for slow servers without code
+        # changes (mirrors MASCOPE_SDK_VERIFY_SSL).
+        from ._http import DEFAULT_TIMEOUT
+
+        if timeout is None:
+            env_val = os.environ.get("MASCOPE_SDK_TIMEOUT") or env_vars.get(
+                "MASCOPE_SDK_TIMEOUT"
+            )
+            try:
+                self._timeout = (
+                    (DEFAULT_TIMEOUT[0], float(env_val)) if env_val else DEFAULT_TIMEOUT
+                )
+            except (TypeError, ValueError):
+                self._timeout = DEFAULT_TIMEOUT
+        elif isinstance(timeout, (int, float)):
+            self._timeout = (DEFAULT_TIMEOUT[0], float(timeout))
+        else:
+            self._timeout = tuple(timeout)
 
         self._service_name = service_name
 
