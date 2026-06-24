@@ -24,8 +24,11 @@ ENV MASCOPE_PATH=/app
 # copy build outputs
 COPY --from=frontend-build /dist /app/frontend/
 
-# copy nginx config
-COPY ./nginx.conf /etc/nginx/conf.d/nginx.conf
+# stage both nginx configs; the entrypoint picks one based on MASCOPE_TLS
+COPY ./nginx.conf /etc/nginx/mascope/nginx.conf
+COPY ./nginx.http.conf /etc/nginx/mascope/nginx.http.conf
+COPY ./docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-# SERVE API & FRONTEND
-CMD nginx -g 'daemon off;'
+# SERVE API & FRONTEND (HTTPS by default; MASCOPE_TLS=off serves HTTP on :80)
+CMD ["/docker-entrypoint.sh"]
