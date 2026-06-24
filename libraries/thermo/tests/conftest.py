@@ -28,7 +28,7 @@ def backend(request, monkeypatch):
     """Run a contract test once per reader backend.
 
     Sets ``MASCOPE_THERMO_BACKEND`` for the test. The OpenTFRaw backend (the
-    default, via the pinned ``mascope-opentfraw`` fork) is always available and
+    default, via the pinned ``opentfraw`` package) is always available and
     expected to pass. The Thermo backend needs the proprietary RawFileReader
     DLLs, which Mascope does not ship, so its runs are skipped unless
     ``MASCOPE_THERMO_DLL_DIR`` points at them.

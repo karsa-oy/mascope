@@ -114,7 +114,7 @@ If this doesn't work for some reason, the `tooling` scripts accept are `reinstal
 
 Mascope reads Thermo `.raw` files through a pluggable reader backend, selected by the `MASCOPE_THERMO_BACKEND` environment variable:
 
-- **`opentfraw` (default)** — the open-source [OpenTFRaw](https://github.com/karsa-oy/OpenTFRaw) reader (Rust), installed from PyPI as `mascope-opentfraw`. Mascope ships and runs on this with **no Thermo dependency** and no proprietary binaries.
+- **`opentfraw` (default)** — the open-source [OpenTFRaw](https://github.com/karsa-oy/OpenTFRaw) reader (Rust), installed from PyPI as `opentfraw`. Mascope ships and runs on this with **no Thermo dependency** and no proprietary binaries.
 - **`thermo` (optional)** — Thermo's proprietary RawFileReader (.NET, via `pythonnet`). Fully supported, but **not shipped**: the RawFileReader DLLs are proprietary and are deliberately not included in this repository.
 
 The two backends are parity-validated against each other (centroids, XIC, profile, MS² precursor, averaged spectra); OpenTFRaw reproduces the numbers the pipeline depends on, so it is the dependency-free default.
@@ -141,10 +141,6 @@ For the Docker backend image, the .NET Runtime is **not installed by default** (
 docker build --build-arg INSTALL_DOTNET=true -f server/backend/Dockerfile -t mascope-backend .
 # or via compose: add `args: [INSTALL_DOTNET=true]` under the backend service's build section
 ```
-
-#### The `mascope-opentfraw` fork
-
-OpenTFRaw support relies on a few capabilities — profile spectra, per-peak resolution/S:N, Exploris scan-event decoding, and the per-scan trailer — that are submitted upstream as pull requests but not yet in an upstream release. Until they land, Mascope depends on **`mascope-opentfraw`**, a Karsa fork that ships the same `opentfraw` module with those additions (imports are unchanged). Switch the dependency in `libraries/thermo/pyproject.toml` back to upstream `opentfraw` once the PRs are released.
 
 ### CLI
 

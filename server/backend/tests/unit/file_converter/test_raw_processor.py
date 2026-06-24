@@ -9,8 +9,8 @@ RawFileReader DLLs not found". If any processor property regresses to the .NET
 reader, ``_get_sample_file_props`` raises here instead of returning.
 
 Also pins the acquisition-timestamp behaviour: it must be the file's recorded
-wall-clock (from the Xcalibur audit tag via mascope-opentfraw >= 1.3), to the
-second, and independent of this machine's timezone -- not the file mtime.
+wall-clock (from the Xcalibur audit tag), to the second, and independent of this
+machine's timezone -- not the file mtime.
 """
 
 from datetime import datetime
@@ -18,7 +18,6 @@ from pathlib import Path
 from queue import Queue
 from threading import Event
 
-import opentfraw
 import pytest
 
 from mascope_thermo.processor import RawProcessor
@@ -68,8 +67,6 @@ def test_ingestion_is_dll_free_and_correct(props):
 def test_acquisition_timestamp_is_exact_and_tz_independent(props):
     """The timestamp must be the file's recorded acquisition wall-clock to the
     second, not the file mtime, and naive (no machine-timezone applied)."""
-    if not hasattr(opentfraw.RawFile, "created"):
-        pytest.skip("installed mascope-opentfraw lacks RawFile.created (< 1.3)")
     ts = datetime.fromisoformat(props.timestamp)
     assert ts.tzinfo is None  # instrument-local wall-clock, no machine tz applied
     assert ts.replace(microsecond=0) == EXPECTED_CREATED_TO_SEC

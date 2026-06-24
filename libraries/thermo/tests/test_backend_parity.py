@@ -206,7 +206,7 @@ def test_ms2_precursor_matches_thermo(monkeypatch, path):
     """OpenTFRaw's MS2 precursor m/z must match Thermo's.
 
     Both backends parse the precursor from the rendered scan-filter string; on
-    Exploris this relies on the mascope-opentfraw scan-event decoding. Skips
+    Exploris this relies on opentfraw's scan-event decoding. Skips
     files with no MS2 scans.
     """
     path = str(path)

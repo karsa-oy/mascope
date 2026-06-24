@@ -7,7 +7,7 @@ caring which.
 
 Select with the ``MASCOPE_THERMO_BACKEND`` environment variable::
 
-    "opentfraw"  -> OpenTFRawBackend (default; mascope-opentfraw wheel)
+    "opentfraw"  -> OpenTFRawBackend (default; opentfraw wheel)
     "thermo"     -> ThermoBackend (opt-in; pythonnet + external .NET DLLs)
 
 :class:`ReaderBackend` is a capability protocol (profile arrays, centroids,
@@ -165,8 +165,7 @@ class ReaderBackend(Protocol):
         """Per-scan profile spectra: ``(scan_mzs, scan_intensities, scan_times)``,
         the m/z and intensity arrays already restricted to ``[mz_min, mz_max]``.
 
-        OpenTFRaw's base Python bindings expose centroids only; the profile
-        arrays come from the ``mascope-opentfraw`` profile accessor."""
+        The profile arrays come from the ``opentfraw`` profile accessor."""
         ...
 
     def average_profile(
@@ -215,7 +214,7 @@ class ReaderBackend(Protocol):
         precursor is resolvable).
 
         Both backends parse the precursor from the rendered scan-filter string;
-        on Exploris this relies on the ``mascope-opentfraw`` scan-event decoding."""
+        on Exploris this relies on ``opentfraw``'s scan-event decoding."""
         ...
 
     def ms2_acquisition_info(
@@ -227,10 +226,9 @@ class ReaderBackend(Protocol):
         """``(isolation_width, {scan_number: hcd_energy_string})`` for MS2 scans.
 
         ``isolation_width`` is the single MS2 isolation width across the scans;
-        the HCD energy strings may be comma-separated (step dissociation). Thermo
-        reads both from the trailer (``"MS2 Isolation Width:"`` /
-        ``"HCD Energy V:"``); a backend lacking the calibrated HCD energy raises
-        ``NotImplementedError``."""
+        the HCD energy strings may be comma-separated (step dissociation). Both
+        backends read these from the trailer (``"MS2 Isolation Width:"`` /
+        ``"HCD Energy V:"``)."""
         ...
 
     def ms2_centroids_for_scans(
@@ -825,7 +823,7 @@ class OpenTFRawBackend:
     Reads centroids, profiles and metadata directly from OpenTFRaw, and
     reimplements in NumPy the operations Thermo's .NET library computes natively
     (ppm-binned averaging, the XIC). The profile, per-peak label and scan-event
-    accessors it relies on are provided by the ``mascope-opentfraw`` build.
+    accessors it relies on are provided by the ``opentfraw`` package.
     """
 
     def __init__(self, datafile_path: str):
@@ -971,13 +969,12 @@ class OpenTFRawBackend:
     def created(self):
         from datetime import datetime, timezone
 
-        # ``RawFile.created`` (mascope-opentfraw) is the Xcalibur audit timestamp:
-        # the instrument's local wall-clock encoded as a Windows FILETIME, with no
-        # timezone in the file. Interpret it as UTC to recover that exact
-        # wall-clock independent of this machine's timezone, then drop tzinfo to
-        # match the legacy (naive) CreationDate. Returns None on builds without
-        # the accessor, or files without an audit timestamp.
-        ts = getattr(self._raw, "created", None)
+        # ``RawFile.created`` is the Xcalibur audit timestamp: the instrument's
+        # local wall-clock encoded as a Windows FILETIME, with no timezone in the
+        # file. Interpret it as UTC to recover that exact wall-clock independent of
+        # this machine's timezone, then drop tzinfo to match the legacy (naive)
+        # CreationDate. Returns None for files without an audit timestamp.
+        ts = self._raw.created
         if ts is None:
             return None
         return datetime.fromtimestamp(float(ts), tz=timezone.utc).replace(tzinfo=None)
@@ -1063,17 +1060,6 @@ class OpenTFRawBackend:
             for s in selected
         }
 
-    def _require_centroid_labels(self) -> None:
-        """Per-peak labels (resolution / S:N) come from the ``mascope-opentfraw``
-        ``centroid_labels`` accessor. Raise a clear error if a build without it
-        is ever installed, rather than an opaque ``AttributeError``.
-        """
-        if not hasattr(self._raw, "centroid_labels"):
-            raise NotImplementedError(
-                "Per-peak resolution / S:N require the centroid_labels accessor "
-                "from mascope-opentfraw; the installed opentfraw build lacks it."
-            )
-
     def _validate_mz_range(
         self, mz_min: float | None, mz_max: float | None
     ) -> tuple[float, float]:
@@ -1098,7 +1084,6 @@ class OpenTFRawBackend:
         mz_min: float | None = None,
         mz_max: float | None = None,
     ) -> list[dict]:
-        self._require_centroid_labels()
         mz_min, mz_max = self._validate_mz_range(mz_min, mz_max)
         selected = self._selected(polarity, t_min, t_max, ms_type)
 
@@ -1143,7 +1128,6 @@ class OpenTFRawBackend:
         # re-centroids the averaged profile, whose apex incurs an interpolation
         # loss that a per-scan centroid-apex sum does not, so the ppm-bin sum runs
         # ~5-6% high; the profile apex matches Thermo to ~1-2%.
-        self._require_centroid_labels()
         if ppm <= 0:
             raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
 
@@ -1198,17 +1182,14 @@ class OpenTFRawBackend:
 
         # Source the height from the frequency-averaged profile apex (matches
         # Thermo's re-centroid-of-the-averaged-profile), falling back to the
-        # ppm-bin value where the profile has no peak or no profile build. Use
-        # the real measured profile (reconstruct=False) -- a reconstruction is
-        # built *from* these heights, and average_profile defaults to it, so this
-        # must be explicit to avoid recursion.
-        if masses.size and hasattr(self._raw, "profile"):
-            try:
-                grid_mz, profile, _ = self.average_profile(
-                    scan_indices, ppm=ppm, average=average, reconstruct=False
-                )
-            except NotImplementedError:
-                grid_mz = np.array([])
+        # ppm-bin value where the profile has no peak. Use the real measured
+        # profile (reconstruct=False) -- a reconstruction is built *from* these
+        # heights, and average_profile defaults to it, so this must be explicit
+        # to avoid recursion.
+        if masses.size:
+            grid_mz, profile, _ = self.average_profile(
+                scan_indices, ppm=ppm, average=average, reconstruct=False
+            )
             if grid_mz.size:
                 intensities = self._heights_from_profile_apex(
                     masses, intensities, grid_mz, profile
@@ -1305,7 +1286,6 @@ class OpenTFRawBackend:
         return out
 
     def centroids_meta(self) -> dict:
-        self._require_centroid_labels()
         result = {"time": [], "data": []}
         for s in self._all_scans():
             labels = self._raw.centroid_labels(int(s["scan_number"]))
@@ -1340,11 +1320,6 @@ class OpenTFRawBackend:
         mz_min: float | None = None,
         mz_max: float | None = None,
     ) -> tuple[list[np.ndarray], list[np.ndarray], np.ndarray]:
-        if not hasattr(self._raw, "profile"):
-            raise NotImplementedError(
-                "Profile arrays require the profile accessor from "
-                "mascope-opentfraw; the installed opentfraw build lacks it."
-            )
         mz_min, mz_max = self._validate_mz_range(mz_min, mz_max)
         selected = self._selected(polarity, t_min, t_max, ms_type)
 
@@ -1409,13 +1384,7 @@ class OpenTFRawBackend:
         #      still omits Thermo's per-scan calibration compensations (~10-20
         #      ppm), which the exact centroid m/z carry.
         # Falls back to a constant-ppm m/z grid when the Conversion Parameters
-        # are unavailable (non-FTMS, or an opentfraw build without
-        # scan_parameters).
-        if not hasattr(self._raw, "profile"):
-            raise NotImplementedError(
-                "Profile arrays require the profile accessor from "
-                "mascope-opentfraw; the installed opentfraw build lacks it."
-            )
+        # are unavailable (non-FTMS data).
         if ppm <= 0:
             raise ValueError(f"Invalid ppm value: {ppm}. ppm must be > 0.")
 
@@ -1475,9 +1444,7 @@ class OpenTFRawBackend:
         self, scan_number: int
     ) -> tuple[float | None, float | None]:
         """Per-scan freq->m/z Conversion Parameter B/C from the trailer, or
-        (None, None) if unavailable (non-FTMS / no scan_parameters accessor)."""
-        if not hasattr(self._raw, "scan_parameters"):
-            return None, None
+        (None, None) if unavailable (non-FTMS data)."""
         params = self._raw.scan_parameters(scan_number)
         if not params:
             return None, None
@@ -1618,10 +1585,9 @@ class OpenTFRawBackend:
         calibrated m/z. We use the centroids as a reference: match the strongest
         well-separated profile peaks to their nearest centroid, reject outliers,
         and fit a low-order m/z correction. Returns the corrected grid, or the
-        original grid unchanged when there is too little signal to fit reliably
-        or the centroid labels are unavailable.
+        original grid unchanged when there is too little signal to fit reliably.
         """
-        if grid.size == 0 or not hasattr(self._raw, "centroid_labels"):
+        if grid.size == 0:
             return grid
 
         # Reference m/z from centroid labels of a sample of the selected scans
@@ -1751,14 +1717,7 @@ class OpenTFRawBackend:
     ) -> tuple[float | None, dict[int, str]]:
         # The calibrated "HCD Energy V:" and "MS2 Isolation Width:" live in the
         # per-scan trailer (generic record), surfaced by the scan_parameters()
-        # accessor from mascope-opentfraw. Raise a clear error if a build without
-        # it is ever installed, rather than an opaque AttributeError.
-        if not hasattr(self._raw, "scan_parameters"):
-            raise NotImplementedError(
-                "MS2 isolation width / calibrated HCD energy require the "
-                "scan_parameters accessor from mascope-opentfraw; the installed "
-                "opentfraw build lacks it."
-            )
+        # accessor.
 
         def _as_float(value) -> float:
             if isinstance(value, (int, float)):
@@ -1787,7 +1746,6 @@ class OpenTFRawBackend:
     def ms2_centroids_for_scans(
         self, scan_indices: list[int]
     ) -> tuple[list[dict], list[float]]:
-        self._require_centroid_labels()
         by_num = {int(s["scan_number"]): s for s in self._all_scans()}
         centroids: list[dict] = []
         tic_values: list[float] = []

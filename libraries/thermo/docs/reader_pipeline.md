@@ -19,7 +19,7 @@ All file reading goes through a `ReaderBackend` (see
 environment variable:
 
 - **`opentfraw`** (default) -- the open-source OpenTFRaw reader (Rust), via the
-  `mascope-opentfraw` wheel. No proprietary dependency.
+  `opentfraw` wheel. No proprietary dependency.
 - **`thermo`** -- Thermo's RawFileReader (.NET via pythonnet). Opt-in; needs the
   proprietary DLLs.
 

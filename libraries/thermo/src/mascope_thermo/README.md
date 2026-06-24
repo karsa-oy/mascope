@@ -11,7 +11,7 @@ The implementation is selected by the `MASCOPE_THERMO_BACKEND` environment
 variable (see `backend.py`):
 
 - **`opentfraw`** (default) — the open-source reader, via the
-  [`mascope-opentfraw`](https://pypi.org/project/mascope-opentfraw/) wheel. No
+  [`opentfraw`](https://pypi.org/project/opentfraw/) wheel. No
   proprietary dependency; nothing to install beyond the package.
 - **`thermo`** — Thermo's RawFileReader (.NET via pythonnet). Opt-in: it needs
   the proprietary `ThermoFisher.CommonCore.*` DLLs, which are **not** shipped in
