@@ -1,0 +1,48 @@
+site_name: Mascope
+site_description: High-resolution mass spectrometry data analysis platform
+docs_dir: docs/user
+site_dir: site
+
+# Activate locally with:
+#   uv add --group docs mkdocs-material
+#   uv run mkdocs serve        # live preview at http://localhost:8000
+#   uv run mkdocs build --strict
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started/index.md
+  - Concepts: concepts/index.md
+  - Guides: guides/index.md
+  - Instruments & acquisition: instruments/index.md
+  - SDK & API: sdk/index.md
+  - Reference: reference/index.md
