@@ -8,7 +8,7 @@ harness, which requires the dev stack + secrets to collect):
    checksums (skips if no bundle is cached).
 2. **Full pipeline**: re-runs ingestion + matching from the bundle's raw files
    and asserts the produced peaks reproduce the golden outputs within the
-   manifest tolerances. Skipped until the live export seam is wired - see
+   manifest tolerances. Skipped: it drives a live rebuilt demo stack - see
    ``docs/demo_dataset.md``.
 
 The pure comparison logic (``compare_peaks``) is tested separately and without
@@ -35,12 +35,12 @@ def test_pipeline_reproduces_goldens():
     and assert the produced peaks reproduce the golden outputs within the
     manifest tolerances.
 
-    The export + comparison seams now exist:
+    Building blocks:
     ``mascope_backend.db.scripts.export_goldens.get_golden_peaks`` reads the
     produced peaks and ``demo.verify.compare_peaks`` asserts them against
-    ``expected/peaks.parquet`` (keyed on ``target_isotope_formula``). What
-    remains is the heavy stack orchestration this test would drive: stage raw ->
-    run converter -> wait for ingestion -> trigger matching -> get_golden_peaks
-    -> compare_peaks. Tracked in docs/demo_dataset.md.
+    ``expected/peaks.parquet`` (keyed on ``(filename, target_isotope_id)``).
+    This test drives the surrounding stack orchestration: stage raw -> run
+    converter -> wait for ingestion -> trigger matching -> get_golden_peaks ->
+    compare_peaks. Tracked in docs/demo_dataset.md.
     """
     raise NotImplementedError
