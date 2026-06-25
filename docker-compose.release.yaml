@@ -64,7 +64,9 @@ services:
         condition: service_healthy
     environment:
       MASCOPE_ENV: ${MASCOPE_ENV:-default}
-      MASCOPE_DB_NAME: ${MASCOPE_DB_NAME:-mascope}
+      # The app derives its database name as {base}_{env} (e.g. mascope_default);
+      # db_init must create that exact name. Keep MASCOPE_ENV hyphen-free.
+      MASCOPE_DB_NAME: mascope_${MASCOPE_ENV:-default}
       MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
@@ -101,7 +103,9 @@ services:
     environment:
       MASCOPE_ENV: ${MASCOPE_ENV:-default}
       MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL:-info}
-      MASCOPE_DB_NAME: ${MASCOPE_DB_NAME:-mascope}
+      # The app derives its database name as {base}_{env} (e.g. mascope_default);
+      # db_init must create that exact name. Keep MASCOPE_ENV hyphen-free.
+      MASCOPE_DB_NAME: mascope_${MASCOPE_ENV:-default}
       MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
       # Local HTTP on localhost is a secure context, so the auth cookie does not
       # need the Secure flag. Do NOT set this false for networked deployments.
