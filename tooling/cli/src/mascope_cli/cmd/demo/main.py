@@ -15,11 +15,13 @@ from typing import Annotated, Optional
 
 import typer
 
-from mascope_cli.cmd.demo import _fetch, _rebuild, _seed, bundles, verify as verify_mod
+from mascope_cli.cmd.demo import _fetch, _rebuild, _seed, bundles
+from mascope_cli.cmd.demo import verify as verify_mod
 from mascope_cli.cmd.demo._seed import DEMO_ENV, env_dir
 from mascope_cli.cmd.env._create import create_env_local
 from mascope_cli.cmd.env._paths import env_exists_local
 from mascope_cli.runtime import runtime
+
 
 _MODE = "dev"
 
@@ -158,7 +160,11 @@ def _run(
     # Imported lazily to avoid pulling the dev module graph for `fetch`/`verify`.
     from mascope_cli.cmd.dev.db import create_database, wait_for_server
     from mascope_cli.cmd.dev.docker import check_and_start_docker
-    from mascope_cli.cmd.dev.main import _resolve_modules, _run_application, _run_dev_compose
+    from mascope_cli.cmd.dev.main import (
+        _resolve_modules,
+        _run_application,
+        _run_dev_compose,
+    )
     from mascope_cli.cmd.dev.migrate import (
         check_pending_migrations,
         run_migrations,
@@ -171,7 +177,10 @@ def _run(
         pass
     elif local is not None:
         local = local.expanduser().resolve()
-        if not (local / "raw").is_dir() and not (local / bundles.MANIFEST_NAME).is_file():
+        if (
+            not (local / "raw").is_dir()
+            and not (local / bundles.MANIFEST_NAME).is_file()
+        ):
             runtime.logger.error(
                 f"--local {local} has neither a raw/ directory nor {bundles.MANIFEST_NAME}"
             )
@@ -376,7 +385,14 @@ def verify(
         Optional[Path],
         typer.Option(
             "--actual",
-            help="Parquet of peaks produced by a rebuild, to compare against the goldens",
+            help="Parquet of peaks to compare instead of the live demo database",
+        ),
+    ] = None,
+    local: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--local",
+            help="Verify against a local bundle directory instead of the cached one",
         ),
     ] = None,
     bundle_version: Annotated[
@@ -387,29 +403,54 @@ def verify(
     """
     Compare produced peaks against the bundle's golden outputs.
 
-    Pass `--actual <parquet>` exported from a rebuilt demo to run the
-    comparison. Without it, the live export from the running demo stack is not
-    yet wired (tracked in docs/demo_dataset.md), so a path is required for now.
+    The goldens come from the cached/registered bundle, or a local bundle
+    directory with `--local <dir>` (e.g. while authoring before publishing).
+
+    The 'actual' peaks default to a live export from the current demo database
+    (run after `mascope demo --rebuild`); pass `--actual <parquet>` to compare a
+    pre-exported file instead.
     """
+    import json
+
     import pandas as pd
 
-    manifest = bundles.load_manifest(bundle_version)
+    # Resolve the goldens (manifest + expected/peaks.parquet) from a local
+    # bundle dir (pre-publish) or the cached/registered bundle.
+    if local is not None:
+        local = local.expanduser().resolve()
+        manifest = json.loads(
+            (local / bundles.MANIFEST_NAME).read_text(encoding="utf-8")
+        )
+        bundle_root = local
+    else:
+        manifest = bundles.load_manifest(bundle_version)
+        bundle_root = bundles.bundle_dir(bundle_version)
+
     expected_rel = manifest.get("expected", {}).get("peaks")
     if not expected_rel:
         runtime.logger.error("Bundle manifest has no expected/peaks goldens")
         raise typer.Exit(1)
-    expected_path = bundles.bundle_dir(bundle_version) / expected_rel
+    expected_path = bundle_root / expected_rel
 
-    if actual is None:
-        runtime.logger.error(
-            "Live export from the running demo is not wired yet. "
-            "Pass --actual <parquet> produced by a rebuild for now."
-        )
-        raise typer.Exit(2)
+    # Resolve the 'actual' peaks: an explicit parquet, or a live export from the
+    # current (rebuilt) demo database via the shared golden-export query.
+    if actual is not None:
+        actual_df = pd.read_parquet(actual)
+    else:
+        from mascope_backend.db.scripts.export_goldens import get_golden_peaks
+
+        rows = get_golden_peaks()
+        if not rows:
+            runtime.logger.error(
+                "No matched peaks in the demo database to verify. "
+                "Run 'mascope demo --rebuild' and confirm matching first."
+            )
+            raise typer.Exit(2)
+        actual_df = pd.DataFrame(rows)
 
     problems = verify_mod.compare_peaks(
         expected=pd.read_parquet(expected_path),
-        actual=pd.read_parquet(actual),
+        actual=actual_df,
         tolerances=manifest.get("tolerances"),
     )
     if problems:

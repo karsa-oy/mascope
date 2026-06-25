@@ -24,12 +24,14 @@ import json
 import re
 import shutil
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError, version as pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 from mascope_cli.cmd.demo import bundles
 from mascope_cli.cmd.demo._seed import DEMO_ENV, env_dir
 from mascope_cli.runtime import runtime
+
 
 # Full acquisition filename, e.g.
 #   KORBI2_2025.08.11-14h23m12s_pos_Ur_NoRI_1_20250811142302.raw
@@ -317,7 +319,9 @@ def export_snapshot(out_dir: Path) -> dict:
             shutil.rmtree(dest_filestore)
         shutil.copytree(src_filestore, dest_filestore)
     else:
-        runtime.logger.warning(f"No demo filestore at {src_filestore}; snapshot has DB only")
+        runtime.logger.warning(
+            f"No demo filestore at {src_filestore}; snapshot has DB only"
+        )
 
     runtime.logger.success(f"Exported snapshot to {out_dir / 'snapshot'}")
     return {
@@ -327,24 +331,48 @@ def export_snapshot(out_dir: Path) -> dict:
     }
 
 
-def export_goldens(out_dir: Path) -> dict:
+def export_goldens(out_dir: Path) -> dict | None:
     """
     Export golden peak outputs for the reproducibility test.
 
-    NOT YET WIRED: this requires reading the produced peaks from the running
-    demo (via the SDK or a direct query) and writing them to
-    ``expected/peaks.parquet``. The comparison side already exists in
-    ``verify.compare_peaks``; this is the export side. Tracked in
-    ``docs/demo_dataset.md``.
+    Reads the matched isotope peaks from the demo database (the ``m/z`` +
+    intensity the pipeline produced, keyed by ``target_isotope_formula``) and
+    writes them to ``expected/peaks.parquet``. The matching comparison side is
+    :func:`verify.compare_peaks`.
+
+    Requires a populated ``mascope_demo`` database (run ``mascope demo
+    --rebuild`` and confirm matching first). The demo callback pins
+    ``MASCOPE_ENV=demo``, so the in-process query targets ``mascope_demo``.
 
     :param out_dir: Bundle output directory.
-    :raises NotImplementedError: Always, until the export is wired to a live stack.
+    :return: The manifest ``expected`` block, or ``None`` if no peaks have been
+             matched yet (logged as a warning so ``--update`` still records the
+             snapshot rather than aborting).
     """
-    raise NotImplementedError(
-        "Golden export is not wired yet - see docs/demo_dataset.md. "
-        "Export peaks from the rebuilt demo to expected/peaks.parquet, then "
-        "verify.compare_peaks asserts against it."
-    )
+    import pandas as pd
+
+    # Lazy import: pulls the backend DB graph (needs MASCOPE_ENV + the postgres
+    # secret, both present in the demo flow). Mirrors `_seed_credentials`.
+    from mascope_backend.db.scripts.export_goldens import get_golden_peaks
+
+    rows = get_golden_peaks()
+    if not rows:
+        runtime.logger.warning(
+            "No matched peaks in the demo database - skipping golden export. "
+            "Run 'mascope demo --rebuild' and confirm matching before --update."
+        )
+        return None
+
+    dest_dir = out_dir / "expected"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    peaks_path = dest_dir / "peaks.parquet"
+    pd.DataFrame(rows).to_parquet(peaks_path, index=False)
+
+    runtime.logger.success(f"Exported {len(rows)} golden peak(s) to {peaks_path}")
+    return {
+        "peaks": "expected/peaks.parquet",
+        "sha256": bundles.sha256_file(peaks_path),
+    }
 
 
 def build(
@@ -444,10 +472,10 @@ def build(
         manifest["seed"] = export_seed(out_dir)
     if update:
         manifest["snapshot"] = export_snapshot(out_dir)
-        try:
-            manifest["expected"] = export_goldens(out_dir)
-        except NotImplementedError as e:
-            runtime.logger.warning(str(e))
+        # Keep any prior goldens (copied above) if this run matched nothing.
+        expected = export_goldens(out_dir)
+        if expected is not None:
+            manifest["expected"] = expected
 
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     runtime.logger.success(f"Demo bundle built at {out_dir}")

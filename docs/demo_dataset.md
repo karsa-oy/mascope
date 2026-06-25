@@ -1,7 +1,8 @@
 # Demo dataset & end-to-end reproducibility
 
-Status: `mascope demo` (create/load/update + seeding + two-dump bundle)
-implemented and run locally; golden export and Zenodo publishing still pending.
+Status: `mascope demo` (create/load/update + seeding + two-dump bundle) and the
+golden export + keyed reproducibility comparison implemented and run locally;
+driving the heavy full-stack test and Zenodo publishing still pending.
 Last revised June 2026.
 
 This document describes how Mascope ships a public **demo dataset** so that a
@@ -238,17 +239,28 @@ The test is the asserted form of the `--rebuild` path:
 1. Spin up a clean throwaway DB/env (system-test harness).
 2. Assert input integrity: every `raw/` file SHA-256 matches the manifest.
 3. Run the real conversion + peak detection + matching pipeline on `raw/`.
-4. Load the produced peaks/matches and compare against `expected/*.parquet`
-   within the manifest's tolerances:
-   - m/z within `mz_ppm`,
-   - peak height/intensity within `intensity_rel`,
-   - peak area within `area_rel`,
-   - matched-compound set identical.
+4. Export the produced peaks and compare against `expected/peaks.parquet`. The
+   goldens are the **found** isotope peaks (`match_score > 0`); matching scores
+   every possible isotopologue but the vast majority have negligible abundance
+   and are never detected (scored 0). Each peak is joined on the **stable key**
+   `(filename, target_isotope_id)` - both survive a rebuild, unlike
+   `sample_item_id`, which is regenerated every ingestion - and asserted within
+   the manifest's tolerances:
+   - every golden peak has a produced peak with the same key,
+   - m/z within `mz_ppm`, intensity within `intensity_rel`,
+   - no unexpected extra peaks.
 5. Pin `opentfraw` to `produced_with.opentfraw_version`; a mismatch fails loudly.
 
-The comparison logic is shared with `mascope demo verify` (one implementation in
+The export seam is `mascope_backend.db.scripts.export_goldens.get_golden_peaks`
+(a plain ORM read, so the backend stays free of pandas); the CLI
+(`build_bundle.export_goldens`) writes it to `expected/peaks.parquet`. The
+comparison logic is shared with `mascope demo verify` (one implementation in
 `tooling/cli/src/mascope_cli/cmd/demo/verify.py`, unit-tested in
 `tooling/cli/tests/test_demo_verify.py`) so the CLI and the test never drift.
+
+Because the key includes `filename`, the goldens must be captured from a
+from-bundle rebuild (step A4 below) so the stored filenames match what a
+reproducibility rebuild of the same `raw/` produces.
 
 Because it boots the stack and ingests 166 files, this is a **heavy** test -
 tagged so it runs on a schedule / pre-release rather than on every commit.
@@ -466,6 +478,8 @@ Two cheap, high-leverage wins that compound with the demo command:
 - **Demo target collection.** Which target compounds/collection ships seeded so
   matching produces something interesting out of the box? (Needs the data
   owner's input - likely urea + bromide + common contaminants.)
-- **Subset for CI.** The full 166-file rebuild is heavy. Do we ship a smaller
+- **Subset for CI.** The full 161-file rebuild is heavy. Do we ship a smaller
   N-file subset bundle for a fast CI reproducibility check, with the full bundle
-  reserved for scheduled runs?
+  reserved for scheduled runs? (The cost is the rebuild + ingestion, not the
+  comparison: the golden set is ~42k found peaks and the keyed compare runs in a
+  fraction of a second.)
