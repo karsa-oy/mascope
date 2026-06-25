@@ -14,10 +14,10 @@ calibration, and explore results in the web UI or via the Python SDK.
 | **An SDK / notebook user** | [SDK & API](sdk/index.md) |
 
 !!! note "This is the user documentation"
-    Developer and contributor docs (building the monorepo, runtime internals,
-    deployment) live in `docs/dev/`. Self-hosting and the demo dataset are
-    covered in the repository docs (`docs/ADOPTION_PLAN.md`,
-    `docs/demo_dataset.md`).
+    Developer and contributor docs (building the monorepo, runtime internals)
+    live in `docs/dev/`. Hosting/deployment is covered in
+    [Hosting & deployment](../hosting.md), and the demo dataset in
+    `docs/demo_dataset.md`.
 
 <!-- TODO: short annotated screenshot/GIF of the UI; one-paragraph "what is
 Mascope" aimed at scientists; link to a public demo instance once available. -->

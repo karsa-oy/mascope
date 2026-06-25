@@ -1,24 +1,23 @@
 # Mascope
 
-**A platform for analysing high-resolution mass spectrometry data** - import
+**A platform for analysing and storing high-resolution mass spectrometry data** - import
 instrument files, browse samples and batches, run targeted matching and
 calibration, and explore results in the web UI or from Python.
 
-<!--
-TODO: add a screenshot or short GIF of the web UI here, e.g.:
-![Mascope web UI](docs/assets/mascope-ui.png)
-Drop the image at docs/assets/mascope-ui.png and uncomment the line above.
--->
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/mascope-ui-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mascope-ui-dark.png">
+  <img alt="Mascope web UI" src="docs/assets/mascope-ui-dark.png">
+</picture>
 
-Mascope ingests Thermo Orbitrap (`.raw`) and Tofwerk (TOF) data, processes it
-through a calibration + peak-detection + targeted-matching pipeline, and serves
+Mascope ingests Thermo Orbitrap (`.raw`) and Tofwerk TOF (`.h5`) data, processes it
+through a peak-detection + calibration + targeted-matching pipeline, and serves
 it through a multi-user web application and a Python SDK. It is built for
 laboratories that need reproducible, high-throughput analysis of complex spectra.
 
 ## Try it in 5 minutes
 
-Run Mascope on your machine with Docker (the only prerequisite) over plain HTTP
-on `localhost` - no certificates, no build:
+Run Mascope on your machine with Docker (the only prerequisite):
 
 ```sh
 # get docker-compose.release.yaml + .env.example from this repo, then:
@@ -33,32 +32,42 @@ head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/server_owner_secret_ke
 # pull the published images and start
 docker compose -f docker-compose.release.yaml pull
 docker compose -f docker-compose.release.yaml up -d
+
+# follow the application logs (Ctrl+C just detaches; containers keep running)
+docker compose -f docker-compose.release.yaml logs -f backend frontend file_converter
 ```
 
 Then open <http://localhost:8080>. See
-[docs/user/getting-started](docs/user/getting-started/index.md) for loading the
-demo dataset, and [docs/ADOPTION_PLAN.md](docs/ADOPTION_PLAN.md) for sharing
-Mascope on a LAN.
+[Getting started](docs/user/getting-started/index.md) for loading the demo
+dataset.
+
+## Hosting
+
+- **Managed** - let Karsa run Mascope for you, with no infrastructure to manage.
+  Contact [sales@karsa.fi](mailto:sales@karsa.fi) for a quote.
+- **Self-host** - Mascope ships as Docker images. Try it locally (above), or see
+  [Hosting & deployment](docs/hosting.md) for sharing it on a LAN or in
+  production (HTTPS, TLS options, secrets, backups, upgrades).
 
 ## Tech stack
 
-| Layer | Technologies |
-| --- | --- |
-| **Backend** | Python, FastAPI, Uvicorn, Socket.IO, PostgreSQL 16, SQLAlchemy 2 (async), Alembic, Redis, Pydantic |
-| **Frontend** | Vue 3, PrimeVue, Vite, served by nginx |
-| **SDK** | Python (`mascope_sdk`) for notebooks and scripts |
-| **Instrument readers** | OpenTFRaw (open-source Thermo `.raw` reader, default), Tofwerk TOF |
-| **Tooling & deploy** | uv workspace, Docker / Docker Compose, GHCR images, the `mascope` CLI |
+| Layer                  | Technologies                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| **Backend**            | Python, FastAPI, Uvicorn, Socket.IO, PostgreSQL 16, SQLAlchemy 2 (async), Alembic, Redis, Pydantic |
+| **Frontend**           | Vue 3, PrimeVue, Vite, served by nginx                                                             |
+| **SDK**                | Python (`mascope_sdk`) for notebooks and scripts                                                   |
+| **Instrument readers** | OpenTFRaw (Thermo `.raw`), h5py (Tofwerk `.h5`)                                                    |
+| **Tooling & deploy**   | uv workspace, Docker / Docker Compose, GHCR images, the `mascope` CLI                              |
 
 ## Documentation
 
-| For | Where |
-| --- | --- |
-| **Users** (scientists, operators) | [User docs](docs/user/index.md) (MkDocs site under `docs/user/`) |
-| **SDK / notebook users** | [SDK readme](libraries/sdk/README.md) |
-| **Developers / contributors** | [Developer guide](docs/dev/developer_guide.md) (build, run, runtime, backend, database, deploy) |
-| **Self-hosting & onboarding** | [Adoption plan](docs/ADOPTION_PLAN.md) |
-| **Demo dataset & reproducibility** | [Demo dataset](docs/demo_dataset.md) |
+| For                                | Where                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Users** (scientists, operators)  | [User docs](docs/user/index.md) (MkDocs site under `docs/user/`)                                |
+| **SDK / notebook users**           | [SDK readme](libraries/sdk/README.md)                                                           |
+| **Developers / contributors**      | [Developer guide](docs/dev/developer_guide.md) (build, run, runtime, backend, database, deploy) |
+| **Hosting & deployment**           | [Hosting](docs/hosting.md) (managed, local, LAN/production)                                     |
+| **Demo dataset & reproducibility** | [Demo dataset](docs/demo_dataset.md)                                                            |
 
 ## License
 
