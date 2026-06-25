@@ -42,6 +42,12 @@ nav:
   - Home: index.md
   - Getting started: getting-started/index.md
   - Concepts: concepts/index.md
+  - How it works:
+      - Overview: how-it-works/index.md
+      - Instrument functions: how-it-works/instrument_functions.md
+      - Peak detection: how-it-works/peak_detection.md
+      - Calibration: how-it-works/calibration.md
+      - Matching: how-it-works/matching.md
   - Guides: guides/index.md
   - Instruments & acquisition: instruments/index.md
   - SDK & API: sdk/index.md
