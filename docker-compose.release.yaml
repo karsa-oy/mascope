@@ -49,8 +49,10 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./.runtime/database/prod:/var/lib/postgresql/data
-      - ./.runtime/database/backups/prod:/backups
+      # Own data dir, isolated from the dev/prod stacks so the release stack
+      # never picks up an unrelated database.
+      - ./.runtime/database/release:/var/lib/postgresql/data
+      - ./.runtime/database/backups/release:/backups
     secrets:
       - postgres_password
 
@@ -71,7 +73,7 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
-      - ./.runtime/database/backups/prod:/backups
+      - ./.runtime/database/backups/release:/backups
     secrets:
       - postgres_password
     restart: "no"
