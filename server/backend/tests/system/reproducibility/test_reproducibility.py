@@ -35,7 +35,12 @@ def test_pipeline_reproduces_goldens():
     and assert the produced peaks reproduce the golden outputs within the
     manifest tolerances.
 
-    Wiring tracked in docs/demo_dataset.md: stage raw -> run converter -> wait
-    for ingestion -> trigger matching -> export produced peaks -> compare_peaks.
+    The export + comparison seams now exist:
+    ``mascope_backend.db.scripts.export_goldens.get_golden_peaks`` reads the
+    produced peaks and ``demo.verify.compare_peaks`` asserts them against
+    ``expected/peaks.parquet`` (keyed on ``target_isotope_formula``). What
+    remains is the heavy stack orchestration this test would drive: stage raw ->
+    run converter -> wait for ingestion -> trigger matching -> get_golden_peaks
+    -> compare_peaks. Tracked in docs/demo_dataset.md.
     """
     raise NotImplementedError
