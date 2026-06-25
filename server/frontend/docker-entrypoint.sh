@@ -14,6 +14,11 @@ if [ "${MASCOPE_TLS:-on}" = "off" ]; then
   echo "MASCOPE_TLS=off -> serving over HTTP (localhost only)"
   cp /etc/nginx/mascope/nginx.http.conf /etc/nginx/conf.d/nginx.conf
 else
+  if [ ! -s /run/secrets/ssl_certificate ] || [ ! -s /run/secrets/ssl_secret_key ]; then
+    echo "ERROR: MASCOPE_TLS is on but the SSL certificate/key secret is missing or empty." >&2
+    echo "       Generate one with 'mascope cert gen', or set MASCOPE_TLS=off for a localhost HTTP trial." >&2
+    exit 1
+  fi
   cp /etc/nginx/mascope/nginx.conf /etc/nginx/conf.d/nginx.conf
 fi
 
