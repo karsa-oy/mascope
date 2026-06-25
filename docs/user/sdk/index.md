@@ -17,4 +17,4 @@ Full reference, configuration, and tutorial notebooks: see the SDK readme
 (`libraries/sdk/README.md`).
 
 <!-- TODO Phase 3: publish the SDK README content into this section as the single
-source, or keep this page thin and deep-link. Decide per USER_DOCS_PLAN.md. -->
+source, or keep this page thin and deep-link. See the roadmap. -->

@@ -37,7 +37,7 @@ export const useHelp = defineStore('app.ui.help', () => {
   // v-help accepts either a string (the message) or an object
   //   { message, doc } where `doc` is an optional URL the popover links to
   //   ("Learn more"). Keep popover text short and put longer explanations in
-  //   the docs site, linked via `doc` -- see docs/USER_DOCS_PLAN.md.
+  //   the docs site, linked via `doc` -- see docs/ROADMAP.md.
   const directive = (layer = 'default') => ({
     mounted: (element, { value, modifiers }) => {
       const [placement] = Object.keys(modifiers)
