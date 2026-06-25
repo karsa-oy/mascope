@@ -48,8 +48,8 @@ populated instance immediately. See the demo dataset guide for how to load it.
 
 - [Concepts](../concepts/index.md) - the domain model (samples, batches, matching, calibration).
 - [Guides](../guides/index.md) - task-by-task how-tos.
-- Sharing Mascope with a team on a LAN, or production deployment: see the
-  self-hosting section in `docs/ADOPTION_PLAN.md`.
+- Sharing Mascope with a team on a LAN, or production deployment: see
+  [Hosting & deployment](../../hosting.md).
 
 <!-- TODO Phase 1: replace the manual download/secret steps with a one-liner
 once the standalone CLI or a bootstrap script exists. -->
