@@ -348,14 +348,17 @@ def export_goldens(out_dir: Path) -> dict:
 
 
 def build(
-    raw_dir: Path, out_dir: Path, update: bool = False, seed: bool = False
+    out_dir: Path,
+    raw_dir: Path | None = None,
+    update: bool = False,
+    seed: bool = False,
 ) -> Path:
     """
-    Build (or refresh) a demo bundle directory from raw files.
+    Build (or refresh) a demo bundle directory.
 
-    Always (re)writes ``raw/``, ``manifest.json``, and ``deid_report.md``. The
-    derived database dumps are captured at different times in the authoring
-    workflow and accumulate in the manifest across invocations:
+    The raw files are the source of truth and only need copying once. The derived
+    database dumps are captured at different times in the authoring workflow and
+    accumulate in the manifest across invocations:
 
     - ``seed=True`` exports ``seed/`` - the reference data (ionization modes,
       instrument config, calibration/diagnostic collections) captured *before*
@@ -367,43 +370,71 @@ def build(
     A block already present in the manifest is preserved when not regenerated, so
     you can run ``--seed`` and ``--update`` in separate steps.
 
-    :param raw_dir: Directory of de-identified raw files (source of truth).
+    ``raw_dir`` is required the first time (to populate ``raw/`` + the manifest).
+    On a later refresh it may be omitted: the bundle's existing ``raw/`` and
+    measurement metadata are reused, skipping the copy + re-hash of every raw
+    file. Pass it again only to deliberately refresh the raw set.
+
     :param out_dir: Bundle output directory (created if missing).
+    :param raw_dir: Directory of de-identified raw files (source of truth).
+        Required on first build; optional when refreshing an existing bundle.
     :param update: Rebuild the derived snapshot + goldens.
     :param seed: Capture the reference seed dump.
     :return: The output bundle directory.
+    :raises FileNotFoundError: If ``raw_dir`` is given but missing, or if it is
+        omitted and the bundle has no raw set to reuse.
     """
-    if not raw_dir.is_dir():
-        raise FileNotFoundError(f"Raw directory not found: {raw_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_entries, renames = _copy_raw(raw_dir, out_dir)
-    _write_deid_report(out_dir, renames)
-
-    # Preserve previously-captured derived blocks not regenerated this run.
+    # Load any prior manifest first: it carries the derived blocks across runs
+    # and, when --raw is omitted, the raw set + measurement metadata to reuse.
     prior: dict = {}
     manifest_path = out_dir / bundles.MANIFEST_NAME
     if manifest_path.is_file():
         prior = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    # Derive measurement metadata from the parsed originals. The published
-    # instrument label is the alias, never the original.
-    parsed = next((r["parsed"] for r in renames if r["parsed"]), {})
-    orig_instrument = parsed.get("instrument", "")
+    if raw_dir is not None:
+        # First build, or an explicit raw refresh: (re)copy + de-identify the raw
+        # files, recompute their checksums, and rewrite the de-id report. The
+        # published instrument label is the alias, never the original.
+        if not raw_dir.is_dir():
+            raise FileNotFoundError(f"Raw directory not found: {raw_dir}")
+        raw_entries, renames = _copy_raw(raw_dir, out_dir)
+        _write_deid_report(out_dir, renames)
+        parsed = next((r["parsed"] for r in renames if r["parsed"]), {})
+        orig_instrument = parsed.get("instrument", "")
+        measurement = {
+            "instrument": INSTRUMENT_ALIASES.get(orig_instrument, orig_instrument)
+            or None,
+            "instrument_type": "orbi",
+            "acquired": parsed.get("date"),
+        }
+    elif "raw" in prior:
+        # Refresh only: reuse the raw set + metadata already in the bundle so a
+        # seed/snapshot capture need not re-copy and re-hash the raw source.
+        raw_entries = prior["raw"]
+        measurement = prior.get("measurement", {})
+        runtime.logger.info(
+            f"Reusing {len(raw_entries)} raw file(s) already in {out_dir} "
+            "(--raw omitted)"
+        )
+    else:
+        raise FileNotFoundError(
+            f"--raw is required: {out_dir} has no raw set in its manifest yet. "
+            "Pass --raw once to create the bundle, then omit it on refreshes."
+        )
+
     manifest: dict = {
         "bundle_version": out_dir.name,
         "created": datetime.now(timezone.utc).isoformat(),
-        "measurement": {
-            "instrument": INSTRUMENT_ALIASES.get(orig_instrument, orig_instrument) or None,
-            "instrument_type": "orbi",
-            "acquired": parsed.get("date"),
-        },
+        "measurement": measurement,
         "produced_with": {
             "mascope_version": runtime.parse_version(),
             "opentfraw_version": _opentfraw_version(),
         },
         "raw": raw_entries,
-        "tolerances": _DEFAULT_TOLERANCES,
+        # Preserve hand-tuned tolerances across a refresh; default on first build.
+        "tolerances": prior.get("tolerances", _DEFAULT_TOLERANCES),
     }
     for key in ("seed", "snapshot", "expected"):
         if key in prior:

@@ -352,11 +352,13 @@ tooling builds and accumulates into (e.g. `mascope-demo-dataset-v1/`).
 5. **Capture the full snapshot + goldens:**
 
    ```sh
-   mascope demo snapshot --raw <RAW> --out <BUNDLE> --update
+   mascope demo snapshot --out <BUNDLE> --update
    ```
 
-   This exports `snapshot/` (pg_dump + filestore) and `expected/` goldens, and
-   preserves the `seed/` block already in the manifest. `<BUNDLE>` now holds
+   `--raw` is omitted here: step 3 already copied the raw files into `<BUNDLE>`,
+   so the refresh reuses them (no re-copy/re-hash). This exports `snapshot/`
+   (pg_dump + filestore) and `expected/` goldens, and preserves the `seed/`
+   block already in the manifest. `<BUNDLE>` now holds
    `raw/ + seed/ + snapshot/ + expected/ + manifest.json`.
 
 6. **Publish** to Zenodo and register the bundle — see
