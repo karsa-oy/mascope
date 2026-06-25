@@ -443,7 +443,7 @@ def _predict_isotopes_custom(
 
 
 def predict_isotopes(
-    ion_formula: str, ion_charge: int
+    ion_formula: str, ion_charge: int, purity: float | None = None
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Predict isotopic pattern for a given ion formula and charge.
 
@@ -451,12 +451,20 @@ def predict_isotopes(
     :type ion_formula: str
     :param ion_charge: Ion charge (e.g., +1, -1).
     :type ion_charge: int
+    :param purity: Isotopic purity of labelled '^X' elements (heaviest-isotope
+        fraction, e.g. 0.98 for a 98% 15N reagent). A property of the labelled
+        reagent; the caller passes its value. Ignored for non-labelled ions.
+        Defaults to ``LABELLED_REAGENT_PURITY``.
+    :type purity: float, optional
     :return: Tuple of predicted m/z values, relative intensities, and isotope labels.
     :rtype: tuple[np.ndarray, np.ndarray, list[str]]
     """
     if "^" in ion_formula:
         try:
-            return _predict_isotopes_custom(ion_formula, ion_charge, LABELLED_REAGENT_PURITY)
+            return _predict_isotopes_custom(
+                ion_formula, ion_charge,
+                LABELLED_REAGENT_PURITY if purity is None else purity,
+            )
         except Exception:
             return [], [], []
     try:
