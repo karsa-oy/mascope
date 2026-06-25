@@ -4,8 +4,12 @@ function initRuntime() {
   // build the full api base path
   const host = location.hostname
   const mode = import.meta.env.MODE
+  // In a production build the app is served behind nginx (which proxies /api/),
+  // so use the page's actual origin -- this works whether served over HTTPS
+  // (e.g. https://mascope.app) or plain HTTP (e.g. http://localhost:8080),
+  // instead of assuming HTTPS.
   const api_path =
-    mode === 'production' ? `https://${host}` : `http://${host}:${runtime.meta.api_port}`
+    mode === 'production' ? location.origin : `http://${host}:${runtime.meta.api_port}`
   runtime['api_path'] = api_path
 
   return runtime
