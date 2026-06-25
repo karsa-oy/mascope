@@ -422,14 +422,21 @@ def verify(
 
 @demo_app.command()
 def snapshot(
-    raw: Annotated[
-        Path,
-        typer.Option("--raw", help="Directory of de-identified raw files (source of truth)"),
-    ],
     out: Annotated[
         Path,
         typer.Option("--out", help="Output bundle directory to (re)build"),
     ],
+    raw: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--raw",
+            help=(
+                "Directory of de-identified raw files (source of truth). Required "
+                "the first time; omit on later refreshes to reuse the raw files "
+                "already in the bundle (skips re-copying + re-hashing them)."
+            ),
+        ),
+    ] = None,
     seed: Annotated[
         bool,
         typer.Option(
@@ -458,19 +465,21 @@ def snapshot(
 
     Writes manifest.json + the de-identification report, and (with --seed /
     --update) the derived database dumps. The two dumps are captured at different
-    points in the authoring workflow and accumulate in the manifest:
+    points in the authoring workflow and accumulate in the manifest. Pass --raw
+    once to create the bundle; omit it afterwards and the existing raw files are
+    reused (no re-copy/re-hash):
 
     \b
-        # 1. author reference data in a clean demo env, then:
+        # 1. first build - copy raw + author reference data, then capture seed:
         mascope demo snapshot --raw <dir> --out <bundle> --seed
-        # 2. ingest raw + run matching, then:
-        mascope demo snapshot --raw <dir> --out <bundle> --update
+        # 2. ingest raw + run matching, then refresh the snapshot (raw reused):
+        mascope demo snapshot --out <bundle> --update
 
     See docs/demo_dataset.md for the full publish workflow.
     """
     from mascope_cli.cmd.demo import build_bundle
 
-    build_bundle.build(raw_dir=raw, out_dir=out, update=update, seed=seed)
+    build_bundle.build(out_dir=out, raw_dir=raw, update=update, seed=seed)
 
 
 @demo_app.command()
