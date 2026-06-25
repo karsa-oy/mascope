@@ -404,7 +404,13 @@ def _predict_isotopes_custom(
 
     combos_per_element = [
         [
-            (mass, prob, n_light, _CUSTOM_ELEMENT_DATA[sym][0], _CUSTOM_ELEMENT_DATA[sym][1][0][1])
+            (
+                mass,
+                prob,
+                n_light,
+                _CUSTOM_ELEMENT_DATA[sym][0],
+                _CUSTOM_ELEMENT_DATA[sym][1][0][1],
+            )
             for (mass, prob, n_light) in _custom_isotope_combinations(sym, cnt, purity)
         ]
         for sym, cnt in customs.items()
@@ -436,7 +442,9 @@ def _predict_isotopes_custom(
                 merged[key] = [mass, prob, label]
 
     items = sorted(merged.values(), key=lambda x: -x[1])  # most-abundant first
-    mzs = np.array([(m - ELECTRON_MASS * ion_charge) / abs(ion_charge) for m, _, _ in items])
+    mzs = np.array(
+        [(m - ELECTRON_MASS * ion_charge) / abs(ion_charge) for m, _, _ in items]
+    )
     probs = np.array([p for _, p, _ in items])
     labels = [lab for _, _, lab in items]
     return mzs, probs, labels
@@ -462,7 +470,8 @@ def predict_isotopes(
     if "^" in ion_formula:
         try:
             return _predict_isotopes_custom(
-                ion_formula, ion_charge,
+                ion_formula,
+                ion_charge,
                 LABELLED_REAGENT_PURITY if purity is None else purity,
             )
         except Exception:

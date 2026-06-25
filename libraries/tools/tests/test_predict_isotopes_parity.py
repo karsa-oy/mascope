@@ -11,6 +11,7 @@ includes the ~2% 14N satellite of a labelled reagent). Trace peaks below that ar
 threshold/grouping-convention dependent between IsoSpec and molmass and are not
 asserted -- they are negligible for scoring (mass-dominated 0.6/0.2/0.2).
 """
+
 import numpy as np
 import pytest
 
@@ -26,12 +27,12 @@ INT_TOL = 0.04
 
 # (tools ion formula without charge sign, charge, equivalent molmass formula)
 CASES = [
-    ("C6H12O6", -1, "C6H12O6"),        # non-labelled (regression)
-    ("C6H12BrO6", -1, "C6H12BrO6"),    # bromine envelope (M+2 ~ base)
-    ("C5H8O6^N", -1, "C5H8^NO6"),      # 15N-nitrate adduct ion
+    ("C6H12O6", -1, "C6H12O6"),  # non-labelled (regression)
+    ("C6H12BrO6", -1, "C6H12BrO6"),  # bromine envelope (M+2 ~ base)
+    ("C5H8O6^N", -1, "C5H8^NO6"),  # 15N-nitrate adduct ion
     ("C10H15O3^N", -1, "C10H15^NO3"),  # another 15N case
-    ("C3H4O3^N2", -1, "C3H4^N2O3"),    # two labelled atoms (multinomial)
-    ("C8H10O3^N", 1, "C8H10^NO3"),     # positive charge
+    ("C3H4O3^N2", -1, "C3H4^N2O3"),  # two labelled atoms (multinomial)
+    ("C8H10O3^N", 1, "C8H10^NO3"),  # positive charge
 ]
 
 
