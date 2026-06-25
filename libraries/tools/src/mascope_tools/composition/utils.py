@@ -41,8 +41,11 @@ def combine_formula_and_ionization(
     """
     # Parse formula (Pyteomics requires element-first notation)
     comp_formula = Composition(formula=to_pyteomics(formula))
+    # Parse the adduct with parse_composition (not raw pyteomics) so custom
+    # labelled elements like '^N' (the 15N-nitrate reagent) survive; pyteomics
+    # rejects the bare '^N' symbol.
     comp_ionization = (
-        Composition(formula=ionization_mechanism.formula)
+        parse_composition(ionization_mechanism.formula)
         if ionization_mechanism
         else Composition(formula="")
     )
