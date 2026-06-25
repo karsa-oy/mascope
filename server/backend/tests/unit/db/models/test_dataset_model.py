@@ -100,5 +100,10 @@ async def test_cascade_delete(session, db_test_workspace):
     await session.delete(dataset)
     await session.flush()
 
+    # passive_deletes=True hands the cascade to the database (ON DELETE
+    # CASCADE) rather than the ORM, so the child is never removed from the
+    # session's identity map. Expunge it and re-query so the assertion reflects
+    # the real DB state instead of the stale cached object.
+    session.expunge(sample_batch)
     result = await session.get(SampleBatch, sample_batch.sample_batch_id)
     assert result is None
