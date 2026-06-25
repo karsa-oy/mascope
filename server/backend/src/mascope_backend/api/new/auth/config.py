@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from mascope_backend.api.new.auth.access_token.config import AccessTokenConfig
 from mascope_backend.api.new.auth.secrets import jwt_secret_key
+from mascope_backend.roles import ROLE_ACCESS_LEVELS as _ROLE_ACCESS_LEVELS
 from mascope_backend.runtime import runtime
 
 
@@ -82,7 +83,7 @@ class AuthConfig(BaseModel):
 
     # Role access levels for RBAC
     # Role names correspond to the role_id values in the database (access_level)
-    ROLE_ACCESS_LEVELS: dict = {"guest": 100, "editor": 200, "admin": 300, "owner": 400}
+    ROLE_ACCESS_LEVELS: dict = _ROLE_ACCESS_LEVELS  # see mascope_backend.roles
 
     # Access token settings
     access_token: AccessTokenConfig = AccessTokenConfig()

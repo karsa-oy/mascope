@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 from mascope_backend.db.views import Sample
+from mascope_backend.roles import ROLE_ACCESS_LEVELS
 
 
 # revision identifiers, used by Alembic.
@@ -66,6 +67,23 @@ def upgrade() -> None:
         sa.Column("permissions", sa.JSON(), nullable=True),
         sa.PrimaryKeyConstraint("role_id", name=op.f("pk_role")),
         sa.UniqueConstraint("role_name", name=op.f("uq_role_role_name")),
+    )
+    # Seed the fixed role rows (the canonical name -> access_level mapping).
+    # These are reference data the app relies on, and first-owner registration
+    # needs them present. Seeded in the initial schema so every fresh database
+    # has them; existing databases already past this revision are unaffected.
+    # ROLE_ACCESS_LEVELS lives in a secret-free module so it is safe to import
+    # here (this migration runs in db_init, which has no JWT secret).
+    op.bulk_insert(
+        sa.table(
+            "role",
+            sa.column("role_id", sa.Integer),
+            sa.column("role_name", sa.String),
+        ),
+        [
+            {"role_id": level, "role_name": name}
+            for name, level in ROLE_ACCESS_LEVELS.items()
+        ],
     )
     op.create_table(
         "target_collection",
