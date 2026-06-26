@@ -41,6 +41,20 @@ Then open <http://localhost:8080>. See
 [Getting started](docs/user/getting-started/index.md) for loading the demo
 dataset.
 
+### See real data instantly
+
+If you've cloned this repo (with [uv](https://docs.astral.sh/uv/) and Docker
+running), one command fetches a published demo dataset from Zenodo and
+launches Mascope preloaded with it, plus a ready-to-use login
+(`demo@mascope.app` / `mascope-demo`) and SDK token, no setup:
+
+```sh
+mascope demo
+```
+
+See [Demo dataset](docs/demo_dataset.md) for what's in the bundle and the
+`--rebuild` path that re-runs the full pipeline from the included raw files.
+
 ## Hosting
 
 - **Managed** - let Karsa run Mascope for you, with no infrastructure to manage.
