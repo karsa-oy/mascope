@@ -130,6 +130,7 @@ def score_ion_v2(
     k_detect: float = 3.0,
     miss_penalty: float = 0.3,
     sigma_ppm: float = 2.0,
+    snr_intensity: bool = True,
 ) -> float | None:
     """Detectability-gated score (DESIGN.md §4). Unlike v1, a predicted
     isotopologue that is ABSENT but *should have been visible* is penalized rather
@@ -173,9 +174,23 @@ def score_ion_v2(
             k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
             ppm_err = abs(mzs[k] - pmz) / pmz * 1e6
             rel_obs = ints[k] / base_int
-            ierr = abs(pred_rel[i] - rel_obs) / pred_rel[i]
             L_mz = np.exp(-0.5 * (ppm_err / sigma_ppm) ** 2)
-            L_int = max(0.0, 1.0 - ierr / INT_TOL)
+            if snr_intensity and snrs is not None and base_snr:
+                # intensity tolerance set by the isotopologue's own noise: a low-SNR
+                # (near-noise) peak gets a wide tolerance, so a noisy-but-present
+                # isotopologue no longer tanks a true ion. Floor at 5% of the
+                # predicted abundance for the prediction model's own error.
+                snr_i = max(float(snrs[k]), 1e-6)
+                sigma_rel = max(
+                    rel_obs * np.sqrt(1.0 / snr_i**2 + 1.0 / base_snr**2),
+                    0.05 * pred_rel[i],
+                    1e-3,
+                )
+                z_int = (rel_obs - pred_rel[i]) / sigma_rel
+                L_int = np.exp(-0.5 * z_int * z_int)
+            else:
+                ierr = abs(pred_rel[i] - rel_obs) / pred_rel[i]
+                L_int = max(0.0, 1.0 - ierr / INT_TOL)
             L = L_mz * L_int
         else:
             # absent: evidence-against only if it should have been detectable
@@ -216,6 +231,24 @@ def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
     return float((ranks[y_true == 1].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
 
 
+def _platt_fit(s: np.ndarray, y: np.ndarray) -> tuple:
+    """Platt scaling: fit P(correct) = sigmoid(a*score + b) by log-loss. Returns
+    (a, b). This is the calibration LAYER — it turns the raw fit score into a
+    probability; it would be fit once on the golden set and shipped with the
+    SCORE_VERSION."""
+    from scipy.optimize import minimize
+
+    def nll(p):
+        z = p[0] * s + p[1]
+        return float(np.where(y == 1, np.logaddexp(0, -z), np.logaddexp(0, z)).mean())
+
+    return tuple(minimize(nll, [3.0, -1.5], method="Nelder-Mead").x)
+
+
+def _sigmoid(z: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-z))
+
+
 def _ece(scores: np.ndarray, correct: np.ndarray, bins: int = 10) -> float:
     edges = np.linspace(0, 1, bins + 1)
     ece = 0.0
@@ -235,6 +268,8 @@ def main() -> int:
     ap.add_argument("--k-detect", type=float, default=3.0, help="v2: min expected SNR to call an absent isotopologue 'missing'")
     ap.add_argument("--miss-penalty", type=float, default=0.3, help="v2: likelihood for a detectable-but-absent isotopologue")
     ap.add_argument("--sigma-ppm", type=float, default=2.0, help="v2: mass-error Gaussian width")
+    ap.add_argument("--intensity", choices=["snr", "linear"], default="snr",
+                    help="v2: intensity term — snr-normalised (default) or linear")
     ap.add_argument("--baseline", help="JSON to compare against (regression gate)")
     ap.add_argument("--out", help="write metrics JSON here")
     a = ap.parse_args()
@@ -283,7 +318,7 @@ def main() -> int:
             if a.scorer == "v2":
                 s = score_ion_v2(mzs, ints, snrs, r.candidate_ion, ppm=a.ppm, noise=noise,
                                  k_detect=a.k_detect, miss_penalty=a.miss_penalty,
-                                 sigma_ppm=a.sigma_ppm)
+                                 sigma_ppm=a.sigma_ppm, snr_intensity=(a.intensity == "snr"))
             else:
                 s = score_ion(mzs, ints, r.candidate_ion, ppm=a.ppm)
             if s is not None:
@@ -309,9 +344,23 @@ def main() -> int:
 
     auc = _roc_auc(cands["is_true"].to_numpy(int), np.nan_to_num(cands["score"].to_numpy(), nan=0.0))
 
-    # ---- calibration over the candidate pool ----
-    valid = cands.dropna(subset=["score"])
-    ece = _ece(valid["score"].to_numpy(), valid["is_true"].to_numpy(int))
+    # ---- calibration over the candidate pool (raw, in-sample) ----
+    valid = cands.dropna(subset=["score"]).copy()
+    sc = valid["score"].to_numpy()
+    yy = valid["is_true"].to_numpy(int)
+    ece = _ece(sc, yy)
+
+    # ---- calibration LAYER: fit P(correct)=sigmoid(a*score+b), honest train/test
+    # split by file so a calibrated score is a probability. ECE_cal is out-of-sample.
+    rng = np.random.default_rng(0)
+    files = valid["filename"].to_numpy()
+    uniq = np.unique(files)
+    test_files = set(rng.choice(uniq, size=max(1, len(uniq) // 2), replace=False))
+    te = np.array([f in test_files for f in files])
+    ece_cal = None
+    if te.any() and (~te).any() and yy[~te].any() and (yy[~te] == 0).any():
+        a_pl, b_pl = _platt_fit(sc[~te], yy[~te])
+        ece_cal = _ece(_sigmoid(a_pl * sc[te] + b_pl), yy[te])
 
     # ---- baseline score distribution of the TRUE assignments ----
     true_scores = valid.loc[valid["is_true"], "score"].to_numpy()
@@ -324,6 +373,7 @@ def main() -> int:
         "rank_top1_contested": round(float(np.mean(top1_contested)), 4) if top1_contested else None,
         "roc_auc": round(auc, 4),
         "ece": round(ece, 4),
+        "ece_calibrated": round(float(ece_cal), 4) if ece_cal is not None else None,
         "true_score_median": round(float(np.median(true_scores)), 4) if len(true_scores) else None,
         "true_score_p10": round(float(np.percentile(true_scores, 10)), 4) if len(true_scores) else None,
     }
