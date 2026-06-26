@@ -92,8 +92,19 @@ from mascope_cli.cmd.demo import _fetch; _fetch.fetch()"
     log_info "Recreating '$DB' and restoring the snapshot..."
     psql -h "$PGHOST" -U "$PGUSER" -d postgres -c "DROP DATABASE IF EXISTS \"$DB\"" >/dev/null
     psql -h "$PGHOST" -U "$PGUSER" -d postgres -c "CREATE DATABASE \"$DB\"" >/dev/null
-    pg_restore -h "$PGHOST" -U "$PGUSER" --no-owner --no-acl -d "$DB" "$DUMP"
-    log_info "Snapshot restored into '$DB'"
+    # pg_restore continues past individual errors and then exits non-zero - e.g.
+    # a snapshot dumped by a newer pg_dump carries SET directives (like
+    # transaction_timeout) that an older server rejects. That is harmless, so
+    # don't abort on its exit code; confirm the data actually landed instead.
+    pg_restore -h "$PGHOST" -U "$PGUSER" --no-owner --no-acl -d "$DB" "$DUMP" \
+        || log_warn "pg_restore reported ignored errors (verifying the result)..."
+    RESTORED=$(psql -h "$PGHOST" -U "$PGUSER" -d "$DB" -tAc \
+        "SELECT count(*) FROM sample_item" 2>/dev/null || echo "0")
+    if ! { [[ "${RESTORED//[[:space:]]/}" =~ ^[0-9]+$ ]] && [[ "${RESTORED//[[:space:]]/}" -gt 0 ]]; }; then
+        log_error "Restore failed: '$DB' has no sample data"
+        exit 1
+    fi
+    log_info "Snapshot restored into '$DB' ($RESTORED sample items)"
 
     # --- Restore the filestore ---------------------------------------------
     FILESTORE_SRC="$BUNDLE/snapshot/filestore"
