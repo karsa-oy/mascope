@@ -115,14 +115,14 @@ def fetch(version: str | None = None, force: bool = False) -> Path:
     archive = bundles.cache_root() / f"{bundle.version}{_suffix(bundle.url)}"
     _download(bundle.url, archive)
 
-    if bundle.archive_sha256:
-        actual = bundles.sha256_file(archive)
-        # Case-insensitive: hashlib emits lowercase, but a hash pasted into the
-        # registry from e.g. PowerShell's Get-FileHash is uppercase.
-        if actual.lower() != bundle.archive_sha256.lower():
+    if bundle.archive_md5:
+        actual = bundles.md5_file(archive)
+        # Case-insensitive: hashlib emits lowercase, but a checksum pasted from
+        # Zenodo (or PowerShell's Get-FileHash) may be uppercase.
+        if actual.lower() != bundle.archive_md5.lower():
             raise RuntimeError(
                 f"Archive checksum mismatch for '{bundle.version}': "
-                f"expected {bundle.archive_sha256[:12]}..., got {actual[:12]}..."
+                f"expected {bundle.archive_md5[:12]}..., got {actual[:12]}..."
             )
 
     runtime.logger.info("Extracting bundle...")

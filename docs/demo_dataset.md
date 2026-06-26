@@ -440,11 +440,10 @@ plain archive of the directory contains nothing sensitive - no excludes needed.
      point.
 
 3. **Get the permanent file URL** from the published version (the direct
-   `.../records/<id>/files/mascope-demo-v1.zip` link) and the archive checksum:
-
-   ```sh
-   sha256sum mascope-demo-v1.zip
-   ```
+   `.../records/<id>/files/mascope-demo-v1.zip` link) and the archive **MD5** -
+   Zenodo displays the MD5 fingerprint next to the file, so just copy it (no
+   local hashing needed). The strong per-file integrity check uses the SHA-256s
+   already recorded in `manifest.json`.
 
 4. **Register** the version in
    [`tooling/cli/src/mascope_cli/cmd/demo/bundles.py`](../tooling/cli/src/mascope_cli/cmd/demo/bundles.py):
@@ -454,7 +453,7 @@ plain archive of the directory contains nothing sensitive - no excludes needed.
        "v1": Bundle(
            version="v1",
            url="https://zenodo.org/records/<id>/files/mascope-demo-v1.zip",
-           archive_sha256="<sha256 from step 3>",
+           archive_md5="<MD5 shown by Zenodo>",
            doi="10.5281/zenodo.<version-id>",
        ),
    }

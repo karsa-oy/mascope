@@ -34,16 +34,17 @@ class Bundle:
     :param url: Permanent download URL of the bundle archive (Zenodo). ``None``
                 until the bundle has been published, in which case only a
                 locally-built bundle (via ``mascope demo snapshot``) can be used.
-    :param archive_sha256: Expected SHA-256 of the downloaded archive, if known.
-                           Verified before extraction. ``None`` skips the
-                           archive-level check (the manifest still verifies every
-                           file inside).
+    :param archive_md5: Expected MD5 of the downloaded archive, if known. This is
+                        the checksum Zenodo displays for the file, so it can be
+                        copied straight from the record. Verified before
+                        extraction. ``None`` skips the archive-level check (the
+                        manifest still verifies every file inside with SHA-256).
     :param doi: Zenodo DOI for citation, if published.
     """
 
     version: str
     url: Optional[str] = None
-    archive_sha256: Optional[str] = None
+    archive_md5: Optional[str] = None
     doi: Optional[str] = None
 
 
@@ -58,7 +59,7 @@ BUNDLES: dict[str, Bundle] = {
         version="v1",
         # TODO(demo-dataset): set once the bundle is published to Zenodo.
         url=None,
-        archive_sha256=None,
+        archive_md5=None,
         doi=None,
     ),
 }
@@ -145,6 +146,25 @@ def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
     :return: Lowercase hex digest.
     """
     digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def md5_file(path: Path, chunk_size: int = 1 << 20) -> str:
+    """
+    Compute the MD5 hex digest of a file, streaming to bound memory.
+
+    Used only for the archive-level download check, because MD5 is the checksum
+    Zenodo publishes for each file. Per-file bundle integrity uses the stronger
+    :func:`sha256_file`.
+
+    :param path: File to hash.
+    :param chunk_size: Read chunk size in bytes (default 1 MiB).
+    :return: Lowercase hex digest.
+    """
+    digest = hashlib.md5()
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(chunk_size), b""):
             digest.update(chunk)
