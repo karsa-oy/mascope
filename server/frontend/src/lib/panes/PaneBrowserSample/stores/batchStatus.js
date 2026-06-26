@@ -2,6 +2,14 @@ import { defineStore } from 'pinia'
 
 export const useBatchStatus = defineStore('browser.sample.batchStatus', () => {
   const config = {
+    recalibrate: {
+      type: 'button',
+      icon: 'ph ph-scales',
+      tooltip:
+        'Calibration collection changed. Click to re-calibrate this batch so the new ' +
+        'calibration takes effect (afterwards the batch will need re-matching)',
+      severity: 'warn'
+    },
     rematch: {
       type: 'button',
       icon: 'ph ph-arrows-clockwise',
