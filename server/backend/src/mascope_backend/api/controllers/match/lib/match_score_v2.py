@@ -18,6 +18,8 @@ PROXY SNR is used only as a fallback when that column is absent/all-NaN.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -26,6 +28,16 @@ from mascope_tools.composition.heuristic_filter import calibrate_score, score_pa
 # Correct matches spread wider than the calibration-anchor precision (centroiding +
 # prediction error + analyte tail); added in quadrature to the fitted instrument sigma.
 PRED_SIGMA_PPM = 0.5
+
+
+def match_score_version() -> int:
+    """Backend match-score switch: 1 = legacy Sum(score*rel_ab), 2 = mascope_tools
+    v2. Env `MASCOPE_MATCH_SCORE_VERSION` (default 1). Both paths stay wired so a
+    sample can be scored each way and compared."""
+    try:
+        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "1"))
+    except (TypeError, ValueError):
+        return 1
 
 
 def fit_sample_mass_accuracy(match_isotope_df: pd.DataFrame) -> tuple[float, float | None]:
@@ -71,6 +83,11 @@ def ion_score_v2(
     pr = np.nan_to_num(pr) / np.nanmax(pr)  # base-relative
     oi = pd.to_numeric(g["sample_peak_intensity"], errors="coerce").fillna(0.0).to_numpy(float)
     me = pd.to_numeric(g["match_mz_error"], errors="coerce").fillna(0.0).to_numpy(float) - mu
+    # A predicted isotopologue that "matched" a satellite (artifact near an intense
+    # peak) is not a real match — treat it as absent so the detectability gate applies.
+    if "is_satellite" in g.columns:
+        sat = g["is_satellite"].fillna(False).astype(bool).to_numpy()
+        oi = np.where(sat, 0.0, oi)
     snr_col = pd.to_numeric(g.get("signal_to_noise"), errors="coerce") if "signal_to_noise" in g else None
     if snr_col is not None and snr_col.notna().any():
         snr = snr_col.fillna(0.0).to_numpy(float)
