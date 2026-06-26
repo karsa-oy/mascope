@@ -88,6 +88,12 @@ A top-level CLI app (`tooling/cli/src/mascope_cli/cmd/demo/`) that always
 operates on a dedicated `demo` runtime env in `dev` mode, so it never touches a
 developer's working env.
 
+> **Just want to run the demo (no clone)?** Use the containerized stack instead:
+> `docker compose -f docker-compose.demo.yaml up` pulls the published images and
+> loads the same bundle (its `demo_init` step runs `tooling/demo-init.sh`, which
+> reuses the fetch + `seed_demo` paths below). The `mascope demo` command here is
+> the from-source path for contributors and maintainers.
+
 ```sh
 mascope demo                 # fetch (if needed) -> restore snapshot -> launch
 mascope demo --fresh         # clean empty env (no bundle) for authoring reference data

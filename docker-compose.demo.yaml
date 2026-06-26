@@ -1,0 +1,139 @@
+# Mascope - one-command DEMO stack (real data, no repo clone, no Python).
+#
+# Pulls the published GHCR images and comes up preloaded with the published demo
+# dataset and a ready-to-use login, over http://localhost:8080. Everything lives
+# in named volumes, so this single file is all you need:
+#
+#   curl -O https://raw.githubusercontent.com/karsa-oy/mascope/develop/docker-compose.demo.yaml
+#   docker compose -f docker-compose.demo.yaml up
+#   # open http://localhost:8080  ->  log in  demo@mascope.app / mascope-demo
+#
+# The demo_init step fetches + checksum-verifies the bundle from Zenodo, restores
+# the snapshot database + filestore, and seeds the demo credentials before the
+# app starts (first run downloads ~150 MB; later `up`s reuse the cache volume).
+#
+# Tear down with `docker compose -f docker-compose.demo.yaml down -v`.
+#
+# The secrets here are FIXED, THROWAWAY, and for this localhost demo only. For a
+# real deployment use docker-compose.release.yaml / docker-compose.yaml instead.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mascope_demo_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - demo_redis:/data
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mascope_demo_postgres
+    environment:
+      POSTGRES_USER: ${MASCOPE_DB_USER:-mascope_user}
+      # Plain password (postgres supports it); demo_init writes the same value to
+      # the secret file the app reads, so the two always match.
+      POSTGRES_PASSWORD: ${MASCOPE_DEMO_DB_PASSWORD:-mascope_demo_pw}
+    shm_size: ${MASCOPE_DB_SHM_SIZE:-1g}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h localhost -U ${MASCOPE_DB_USER:-mascope_user} -d postgres",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - demo_db:/var/lib/postgresql/data
+
+  demo_init:
+    image: ghcr.io/karsa-oy/mascope/backend:${MASCOPE_VERSION:-latest}
+    container_name: mascope_demo_init
+    entrypoint: []
+    command: ["/bin/bash", "/app/tooling/demo-init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &demo_env
+      MASCOPE_ENV: demo
+      MASCOPE_DB_NAME: mascope_demo
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      MASCOPE_DEMO_DB_PASSWORD: ${MASCOPE_DEMO_DB_PASSWORD:-mascope_demo_pw}
+      MASCOPE_DEMO_JWT_SECRET: ${MASCOPE_DEMO_JWT_SECRET:-mascope_demo_jwt_secret}
+      MASCOPE_DEMO_OWNER_SECRET: ${MASCOPE_DEMO_OWNER_SECRET:-mascope_demo_owner_secret}
+    volumes:
+      - demo_secrets:/app/.runtime/secrets
+      - demo_env:/app/.runtime/env/demo
+      - demo_cache:/app/.runtime/demo
+    restart: "no"
+
+  backend: &backend
+    image: ghcr.io/karsa-oy/mascope/backend:${MASCOPE_VERSION:-latest}
+    command: "api-server"
+    container_name: mascope_demo_backend
+    restart: unless-stopped
+    depends_on:
+      demo_init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect((''localhost'', 8090)); s.close()" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    tty: true
+    volumes:
+      # Secret files the app reads via runtime.secret()'s fallback path, plus the
+      # restored env dir (config/state + filestore). Both written by demo_init.
+      - demo_secrets:/app/.runtime/secrets:ro
+      - demo_env:/app/.runtime/env/demo
+    environment:
+      <<: *demo_env
+      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL:-info}
+      # Local HTTP on localhost is a secure context, so the auth cookie does not
+      # need the Secure flag. Do NOT set this false for networked deployments.
+      MASCOPE_COOKIE_SECURE: ${MASCOPE_COOKIE_SECURE:-false}
+
+  file_converter:
+    <<: *backend
+    container_name: mascope_demo_file_converter
+    command: "file-converter"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck: {}
+
+  frontend:
+    image: ghcr.io/karsa-oy/mascope/frontend:${MASCOPE_VERSION:-latest}
+    container_name: mascope_demo_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Serve plain HTTP for local single-machine use (no SSL certs needed).
+      MASCOPE_TLS: "off"
+      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE:-Etc/UTC}
+    tty: true
+    ports:
+      - "${MASCOPE_HTTP_PORT:-8080}:80"
+
+volumes:
+  demo_redis:
+  demo_db:
+  demo_env:
+  demo_cache:
+  demo_secrets:
