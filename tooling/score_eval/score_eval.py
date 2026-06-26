@@ -84,6 +84,76 @@ def score_ion(mzs: np.ndarray, ints: np.ndarray, ion: str, *, ppm: float) -> flo
     return float(score_pattern(obs_mz, obs_mz_err, obs_int, obs_int_err, pred_rel))
 
 
+def score_ion_v2(
+    mzs: np.ndarray,
+    ints: np.ndarray,
+    ion: str,
+    *,
+    ppm: float,
+    noise: float,
+    k_detect: float = 3.0,
+    miss_penalty: float = 0.3,
+    sigma_ppm: float = 2.0,
+) -> float | None:
+    """Detectability-gated score (DESIGN.md §4). Unlike v1, a predicted
+    isotopologue that is ABSENT but *should have been visible* (expected height
+    `rel·base ≥ k_detect·noise`, i.e. SNR ≥ ~3) is penalized rather than ignored —
+    this is the fix for over-crediting incomplete envelopes. Mass uses a Gaussian
+    likelihood normalised by `sigma_ppm` (instrument accuracy); aggregation is a
+    predicted-abundance-weighted geometric mean (harsh: a missing detectable peak
+    drags the score down). Satellite peaks should be removed from `mzs/ints` by
+    the caller."""
+    from mascope_tools.composition.heuristic_filter import predict_isotopes
+
+    sign = ion[-1] if ion and ion[-1] in "+-" else ""
+    if not sign:
+        return None
+    charge = 1 if sign == "+" else -1
+    try:
+        pred_mz, pred_int, _ = predict_isotopes(ion[:-1], charge, None)
+    except Exception:
+        return None
+    if len(pred_mz) == 0:
+        return None
+    pred_rel = pred_int / pred_int[0]
+
+    base_int = None
+    logL, wsum = 0.0, 0.0
+    for i, pmz in enumerate(pred_mz):
+        d = pmz * ppm * 1e-6
+        lo = np.searchsorted(mzs, pmz - d, "left")
+        hi = np.searchsorted(mzs, pmz + d, "right")
+        matched = hi > lo
+        if i == 0:
+            if not matched:
+                return None  # monoisotopic must be present
+            k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
+            base_int = ints[k]
+            ppm_err = abs(mzs[k] - pmz) / pmz * 1e6
+            L = np.exp(-0.5 * (ppm_err / sigma_ppm) ** 2)
+        elif matched:
+            k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
+            ppm_err = abs(mzs[k] - pmz) / pmz * 1e6
+            rel_obs = ints[k] / base_int
+            ierr = abs(pred_rel[i] - rel_obs) / pred_rel[i]
+            L_mz = np.exp(-0.5 * (ppm_err / sigma_ppm) ** 2)
+            L_int = max(0.0, 1.0 - ierr / INT_TOL)
+            L = L_mz * L_int
+        else:
+            # absent: evidence-against only if it should have been detectable
+            expected = pred_rel[i] * base_int
+            if expected >= k_detect * noise:
+                L = miss_penalty
+            else:
+                continue  # below noise floor -> not evidence, exclude
+        L = max(L, 1e-6)
+        logL += pred_rel[i] * np.log(L)
+        wsum += pred_rel[i]
+    if base_int is None or wsum == 0:
+        return None
+    return float(np.exp(logL / wsum))  # abundance-weighted geometric mean
+
+
 def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
     """Rank-based ROC-AUC (P[true scored above a random decoy]); no sklearn dep."""
     pos, neg = y_score[y_true == 1], y_score[y_true == 0]
@@ -119,18 +189,35 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("bundle_dir")
     ap.add_argument("--ppm", type=float, default=MZ_PPM)
+    ap.add_argument("--scorer", choices=["v1", "v2"], default="v1",
+                    help="v1 = current mascope_tools; v2 = detectability-gated")
     ap.add_argument("--baseline", help="JSON to compare against (regression gate)")
     ap.add_argument("--out", help="write metrics JSON here")
     a = ap.parse_args()
 
     peaks = pd.read_parquet(f"{a.bundle_dir}/expected/peaks.parquet")
-    # per-file observed peak arrays (matched-target proxy for the spectrum)
-    obs = {
-        f: (g["mz"].to_numpy(float), g["height"].to_numpy(float))
-        for f, g in peaks.assign(mz=peaks["mz"].astype(float))
-        .sort_values("mz")
-        .groupby("filename")
-    }
+    peaks = peaks.assign(mz=peaks["mz"].astype(float))
+    has_snr = "signal_to_noise" in peaks.columns
+    has_sat = "is_satellite" in peaks.columns
+    print(f"scorer={a.scorer}  signal_to_noise={'present' if has_snr else 'PROXY (from heights)'}"
+          f"  satellites={'excluded' if has_sat else 'n/a'}")
+
+    # per-file observed peak arrays (+ a noise floor for the v2 detectability gate).
+    # Satellites (signal artifacts near intense peaks) are dropped from the observed
+    # set when flagged. noise = median(height/SNR) when SNR is exported, else a low
+    # height percentile as a per-file floor proxy.
+    obs = {}
+    for f, g in peaks.sort_values("mz").groupby("filename"):
+        if has_sat:
+            g = g[~g["is_satellite"].astype(bool)]
+        h = g["height"].to_numpy(float)
+        if has_snr:
+            snr = g["signal_to_noise"].to_numpy(float)
+            ok = snr > 0
+            noise = float(np.median(h[ok] / snr[ok])) if ok.any() else float(np.min(h) if len(h) else 1.0)
+        else:
+            noise = float(np.percentile(h, 2)) if len(h) else 1.0
+        obs[f] = (g["mz"].to_numpy(float), h, noise)
 
     cand_path = f"{a.bundle_dir}/expected/candidates.parquet"
     try:
@@ -143,10 +230,14 @@ def main() -> int:
     def score_all() -> np.ndarray:
         out = np.full(len(cands), np.nan)
         for idx, r in enumerate(cands.itertuples()):
-            mzs, ints = obs.get(r.filename, (None, None))
-            if mzs is None:
+            rec = obs.get(r.filename)
+            if rec is None:
                 continue
-            s = score_ion(mzs, ints, r.candidate_ion, ppm=a.ppm)
+            mzs, ints, noise = rec
+            if a.scorer == "v2":
+                s = score_ion_v2(mzs, ints, r.candidate_ion, ppm=a.ppm, noise=noise)
+            else:
+                s = score_ion(mzs, ints, r.candidate_ion, ppm=a.ppm)
             if s is not None:
                 out[idx] = s
         return out
