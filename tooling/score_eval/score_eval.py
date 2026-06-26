@@ -132,16 +132,13 @@ def score_ion_v2(
     sigma_ppm: float = 2.0,
     snr_intensity: bool = True,
 ) -> float | None:
-    """Detectability-gated score (DESIGN.md §4). Unlike v1, a predicted
-    isotopologue that is ABSENT but *should have been visible* is penalized rather
-    than ignored — the fix for over-crediting incomplete envelopes. "Should have
-    been visible" uses the base peak's real SNR when available: expected
-    SNR(isotopologue i) = rel_i · SNR_base ≥ k_detect; else falls back to a noise
-    floor (rel_i·base ≥ k_detect·noise). Mass uses a Gaussian likelihood normalised
-    by `sigma_ppm`; aggregation is a predicted-abundance-weighted geometric mean
-    (harsh: a missing detectable peak drags the score down). Satellites are dropped
-    from `mzs/ints/snrs` by the caller."""
-    from mascope_tools.composition.heuristic_filter import predict_isotopes
+    """Match the candidate ion's predicted envelope to the observed peaks, then
+    delegate to the PROMOTED library scorer `mascope_tools...score_pattern_v2` (the
+    single source of truth). Builds the matched arrays (per predicted isotopologue:
+    ppm error, observed intensity, observed SNR; 0 if unmatched). When real per-peak
+    SNR isn't available, derives it from the noise floor (`SNR ≈ height/noise`).
+    `snr_intensity` is retained for signature compat; v2 always uses SNR intensity."""
+    from mascope_tools.composition.heuristic_filter import predict_isotopes, score_pattern_v2
 
     sign = ion[-1] if ion and ion[-1] in "+-" else ""
     if not sign:
@@ -155,59 +152,26 @@ def score_ion_v2(
         return None
     pred_rel = pred_int / pred_int[0]
 
-    base_int = base_snr = None
-    logL, wsum = 0.0, 0.0
+    n = len(pred_mz)
+    obs_int = np.zeros(n)
+    obs_me = np.zeros(n)
+    obs_snr = np.zeros(n)
     for i, pmz in enumerate(pred_mz):
         d = pmz * ppm * 1e-6
         lo = np.searchsorted(mzs, pmz - d, "left")
         hi = np.searchsorted(mzs, pmz + d, "right")
-        matched = hi > lo
-        if i == 0:
-            if not matched:
-                return None  # monoisotopic must be present
-            k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
-            base_int = ints[k]
-            base_snr = float(snrs[k]) if snrs is not None else None
-            ppm_err = abs(mzs[k] - pmz) / pmz * 1e6
-            L = np.exp(-0.5 * (ppm_err / sigma_ppm) ** 2)
-        elif matched:
-            k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
-            ppm_err = abs(mzs[k] - pmz) / pmz * 1e6
-            rel_obs = ints[k] / base_int
-            L_mz = np.exp(-0.5 * (ppm_err / sigma_ppm) ** 2)
-            if snr_intensity and snrs is not None and base_snr:
-                # intensity tolerance set by the isotopologue's own noise: a low-SNR
-                # (near-noise) peak gets a wide tolerance, so a noisy-but-present
-                # isotopologue no longer tanks a true ion. Floor at 5% of the
-                # predicted abundance for the prediction model's own error.
-                snr_i = max(float(snrs[k]), 1e-6)
-                sigma_rel = max(
-                    rel_obs * np.sqrt(1.0 / snr_i**2 + 1.0 / base_snr**2),
-                    0.05 * pred_rel[i],
-                    1e-3,
-                )
-                z_int = (rel_obs - pred_rel[i]) / sigma_rel
-                L_int = np.exp(-0.5 * z_int * z_int)
-            else:
-                ierr = abs(pred_rel[i] - rel_obs) / pred_rel[i]
-                L_int = max(0.0, 1.0 - ierr / INT_TOL)
-            L = L_mz * L_int
-        else:
-            # absent: evidence-against only if it should have been detectable
-            if base_snr is not None:
-                detectable = pred_rel[i] * base_snr >= k_detect
-            else:
-                detectable = pred_rel[i] * base_int >= k_detect * noise
-            if detectable:
-                L = miss_penalty
-            else:
-                continue  # below detection -> not evidence, exclude
-        L = max(L, 1e-6)
-        logL += pred_rel[i] * np.log(L)
-        wsum += pred_rel[i]
-    if base_int is None or wsum == 0:
-        return None
-    return float(np.exp(logL / wsum))  # abundance-weighted geometric mean
+        if hi <= lo:
+            continue
+        k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
+        obs_int[i] = ints[k]
+        obs_me[i] = abs(mzs[k] - pmz) / pmz * 1e6
+        obs_snr[i] = float(snrs[k]) if snrs is not None else 0.0
+    if obs_int[0] <= 0:
+        return None  # monoisotopic must be present
+    if snrs is None:  # proxy SNR from the noise floor
+        obs_snr = np.where(obs_int > 0, obs_int / max(noise, 1e-9), 0.0)
+    return score_pattern_v2(obs_me, obs_int, obs_snr, pred_rel,
+                            k_detect=k_detect, miss_penalty=miss_penalty, sigma_ppm=sigma_ppm)
 
 
 def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
