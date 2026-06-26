@@ -1847,7 +1847,7 @@ requires-dist = [
 
 [[package]]
 name = "mascope-tools"
-version = "2026.5.4"
+version = "2026.6.25"
 source = { editable = "libraries/tools" }
 dependencies = [
     { name = "isospecpy" },
@@ -1864,6 +1864,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mascope-molmass" },
     { name = "pytest" },
 ]
 
@@ -1882,7 +1883,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.4.1" }]
+dev = [
+    { name = "mascope-molmass", editable = "libraries/molmass" },
+    { name = "pytest", specifier = ">=8.4.1" },
+]
 
 [[package]]
 name = "matplotlib"
