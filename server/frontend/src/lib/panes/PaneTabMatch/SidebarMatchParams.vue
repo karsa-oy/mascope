@@ -138,6 +138,18 @@ const matchRangeMiddle = computed(
         app.data.match.params.ui.probable_match_threshold)) /
     2
 )
+
+// Backend stores the isotope abundance threshold as a fraction (e.g. 0.0001).
+// Present it in percent so small values remain readable in the number input.
+const isotopeAbundanceThresholdPercent = computed({
+  get() {
+    return (app.data.match.params.ui?.isotope_abundance_threshold ?? 0) * 100
+  },
+  set(value) {
+    // Round to kill float dust so re-entering the default doesn't read as "changed"
+    app.data.match.params.ui.isotope_abundance_threshold = Math.round((value / 100) * 1e9) / 1e9
+  }
+})
 </script>
 
 <template>
@@ -179,7 +191,7 @@ const matchRangeMiddle = computed(
             Configure the parameters used for isotope matching.
             <ul>
               <li><strong>m/z tolerance:</strong> The maximum allowed mass error (in ppm) when matching isotopes.</li>
-              <li><strong>Min. isotope abundance:</strong> The minimum relative abundance of isotopes to consider when matching.</li>
+              <li><strong>Min. isotope abundance:</strong> The minimum relative abundance (%) an isotope must have to be matched and stored. Isotopes below this are skipped when (re)matching, which keeps negligible isotopes out of the database. Applies on the next match/rematch.</li>
               <li><strong>Isotope ratio tolerance:</strong> The maximum allowed deviation in expected isotope ratios.</li>
             </ul>
           </p>
@@ -192,6 +204,15 @@ const matchRangeMiddle = computed(
         v-model:param="app.data.match.params.ui.mz_tolerance"
         @change="app.data.match.visualized.reload"
         :range="{ min: 0, max: 100, step: 1 }"
+        small
+        :key="key"
+      />
+      <BaseParamField
+        label="Min. isotope abundance [%]"
+        v-model:param="isotopeAbundanceThresholdPercent"
+        @change="app.data.match.visualized.reload"
+        :range="{ min: 0, max: 1, step: 0.01 }"
+        hideSlider
         small
         :key="key"
       />

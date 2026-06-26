@@ -25,6 +25,18 @@ ORBI_DEFAULT_MZ_TOLERANCE = 5
 ORBI_DEFAULT_ISOTOPE_RATIO_TOLERANCE = 0.2
 ORBI_DEFAULT_PEAK_MIN_INTENSITY = 0
 
+# Isotope abundance thresholds: minimum target isotope relative abundance for a match
+# to be generated and stored. Isotopes below this are skipped during matching, which
+# prunes the long tail of negligible (mostly unmatched) isotopes from the database.
+# Both values are below the practical detectable floor for a typical-intensity ion, so
+# they don't cost real matches; strong (e.g. reagent) ions whose base peak sits near the
+# top of the dynamic range can opt into a lower threshold via per-ion filter_params.
+#   - Orbi: empirically lossless on real data (lowest ever-matched abundance ~1.9e-4).
+#   - TOF:  a typical ion's detectable floor (noise / median peak) is ~0.5-4% across
+#           sampled TOF spectra, well above this default.
+TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-3  # 0.1 %
+ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-4  # 0.01 %
+
 # default values for unmatched isotopes
 DEFAULT_UNMATCHED_SAMPLE_PEAK_ID = ""
 DEFAULT_UNMATCHED_SAMPLE_PEAK_INTENSITY = 0.0
@@ -57,6 +69,12 @@ class BaseMatchParams(BaseModel):
     peak_min_intensity: float = Field(
         description="Minimum peak intensity threshold for considering a match.",
     )
+    isotope_abundance_threshold: float = Field(
+        description=(
+            "Minimum target isotope relative abundance for a match to be generated "
+            "and stored. Isotopes below this are skipped during matching."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_thresholds(self):
@@ -86,6 +104,13 @@ class TofMatchParams(BaseMatchParams):
         TOF_DEFAULT_PEAK_MIN_INTENSITY,
         description="Minimum peak intensity threshold for considering a match.",
     )
+    isotope_abundance_threshold: float = Field(
+        TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
+        description=(
+            "Minimum target isotope relative abundance for a match to be generated "
+            "and stored. Isotopes below this are skipped during matching."
+        ),
+    )
 
 
 class OrbiMatchParams(BaseMatchParams):
@@ -102,6 +127,13 @@ class OrbiMatchParams(BaseMatchParams):
     peak_min_intensity: float = Field(
         ORBI_DEFAULT_PEAK_MIN_INTENSITY,
         description="Minimum peak intensity threshold for considering a match.",
+    )
+    isotope_abundance_threshold: float = Field(
+        ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
+        description=(
+            "Minimum target isotope relative abundance for a match to be generated "
+            "and stored. Isotopes below this are skipped during matching."
+        ),
     )
 
 

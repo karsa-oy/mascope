@@ -1,4 +1,6 @@
 import pandas as pd
+from sqlalchemy import func
+from sqlalchemy.sql.elements import ColumnElement
 
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_file.name import resolve_instrument_type
@@ -15,6 +17,29 @@ def instrument_default_match_params(instrument_name: str):
         return OrbiMatchParams()
     elif instrument_type == "tof":
         return TofMatchParams()
+
+
+def isotope_abundance_threshold_expr(
+    filter_params_col: ColumnElement,
+    instrument: str,
+    default_threshold: float,
+) -> ColumnElement:
+    """Build the effective isotope abundance threshold SQL expression for an ion.
+
+    Resolves the per-ion override stored in ``TargetIon.filter_params`` (keyed by
+    instrument name) and falls back to the provided instrument default when the ion
+    carries no override. Lets strong-signal reagent ions opt into a lower threshold.
+
+    :param filter_params_col: The ``TargetIon.filter_params`` JSON column.
+    :param instrument: Instrument name used as the JSON key for ion-scoped overrides.
+    :param default_threshold: Instrument default applied when no override is present.
+    :return: A COALESCE SQL expression yielding the effective threshold per row.
+    :rtype: ColumnElement
+    """
+    return func.coalesce(
+        filter_params_col[instrument]["isotope_abundance_threshold"].as_float(),
+        default_threshold,
+    )
 
 
 async def default_match_params(sample_item_id: str):
