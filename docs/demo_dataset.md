@@ -1,9 +1,9 @@
 # Demo dataset & end-to-end reproducibility
 
-Status: `mascope demo` (create/load/update + seeding + two-dump bundle) and the
-golden export + keyed reproducibility comparison implemented and run locally;
-driving the heavy full-stack test and Zenodo publishing still pending.
-Last revised June 2026.
+Status: `mascope demo` (create/load/update + seeding + two-dump bundle), the
+golden export, and the keyed reproducibility comparison are implemented; the
+**v1.0.0** demo bundle is published to Zenodo. Remaining: driving the heavy
+full-stack reproducibility test in CI. Last revised June 2026.
 
 This document describes how Mascope ships a public **demo dataset** so that a
 newcomer can install Mascope and immediately have real data to explore, and how
@@ -450,17 +450,20 @@ plain archive of the directory contains nothing sensitive - no excludes needed.
 
    ```python
    BUNDLES = {
-       "v1": Bundle(
-           version="v1",
-           url="https://zenodo.org/records/<id>/files/mascope-demo-v1.zip",
+       "1.0.0": Bundle(
+           version="1.0.0",
+           url="https://zenodo.org/records/<id>/files/mascope-demo-dataset-v1.zip",
            archive_md5="<MD5 shown by Zenodo>",
            doi="10.5281/zenodo.<version-id>",
        ),
    }
-   DEFAULT_BUNDLE_VERSION = "v1"
+   DEFAULT_BUNDLE_VERSION = "1.0.0"
    ```
 
-   Add a new key (e.g. `"v2"`) for each new version and bump
+   Use a semver version string (Zenodo recommends it): bump PATCH when a
+   pipeline/scoring change regenerates the goldens, MINOR when samples or
+   reference collections are added, MAJOR when the underlying data changes. Add a
+   new key (e.g. `"1.1.0"`) for each new version and bump
    `DEFAULT_BUNDLE_VERSION`; keep old entries so pinned reproducibility runs stay
    resolvable. Reference the **concept DOI** in the top-level README.
 

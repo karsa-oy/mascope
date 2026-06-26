@@ -29,7 +29,7 @@ class Bundle:
     """
     A published demo bundle version.
 
-    :param version: Bundle version tag (e.g. ``"v1"``). Also the cache
+    :param version: Bundle version tag (semver, e.g. ``"1.0.0"``). Also the cache
                     subdirectory name.
     :param url: Permanent download URL of the bundle archive (Zenodo). ``None``
                 until the bundle has been published, in which case only a
@@ -55,16 +55,15 @@ class Bundle:
 # runs remain resolvable.
 
 BUNDLES: dict[str, Bundle] = {
-    "v1": Bundle(
-        version="v1",
-        # TODO(demo-dataset): set once the bundle is published to Zenodo.
-        url=None,
-        archive_md5=None,
-        doi=None,
+    "1.0.0": Bundle(
+        version="1.0.0",
+        url="https://zenodo.org/records/20929489/files/mascope-demo-dataset-v1.zip",
+        archive_md5="921e9d22c7be4a1e5bc78ab515b60f8b",
+        doi="10.5281/zenodo.20929489",
     ),
 }
 
-DEFAULT_BUNDLE_VERSION = "v1"
+DEFAULT_BUNDLE_VERSION = "1.0.0"
 
 
 def get_bundle(version: Optional[str] = None) -> Bundle:
