@@ -28,6 +28,7 @@ import pandas as pd
 
 from mascope_tools.composition import CompositionSearchConfig
 from mascope_tools.composition.finder import find_compositions
+from mascope_tools.composition.heuristic_filter import apply_heuristic_rules
 from mascope_tools.composition import utils
 
 # Ionization channels + grid element ranges per polarity (mirrors peaky's Br/Ur
@@ -67,9 +68,12 @@ def _norm_ion(formula: str) -> str:
 
 def candidates_for_peak(mz: float, polarity: str, *, ppm: float, cap: int) -> dict:
     """Enumerate candidate ion formulas near `mz` across the polarity's channels.
-    Returns {normalised_ion_formula: ionization}."""
+    Returns {normalised_ion_formula: (ionization, is_plausible)} where is_plausible
+    is whether the neutral passes mascope_tools' structural gates (Senior/valence/
+    element-ratio) — so a score-only ranking can compete the truth against the
+    chemically plausible decoys, not the implausible-but-mass-degenerate ones."""
     spec = CHANNELS[polarity]
-    out: dict[str, str] = {}
+    out: dict[str, tuple] = {}
     for mech in spec["ionizations"]:
         try:
             im = utils.parse_ionization(mech)
@@ -79,12 +83,21 @@ def candidates_for_peak(mz: float, polarity: str, *, ppm: float, cap: int) -> di
                 mass_range_ppm=ppm,
                 max_result_rows=cap,
             )
-            for r in find_compositions(mz, cfg):
+            results = find_compositions(mz, cfg)
+            try:
+                plaus, _ = apply_heuristic_rules(results)
+                plausible_neutrals = {d.get("formula") for d in plaus}
+            except Exception:
+                plausible_neutrals = {r.get("formula") for r in results}  # fail open
+            for r in results:
                 neutral = r.get("formula")
                 if not neutral or neutral == "---":
                     continue
                 ion = utils.combine_formula_and_ionization(neutral, im)
-                out.setdefault(_norm_ion(ion), mech)
+                key = _norm_ion(ion)
+                is_plaus = neutral in plausible_neutrals
+                prev = out.get(key)
+                out[key] = (mech, is_plaus) if prev is None else (prev[0], prev[1] or is_plaus)
         except Exception:
             continue
     return out
@@ -114,12 +127,14 @@ def main() -> int:
             continue
         true_ion = _norm_ion(r.target_isotope_formula)
         pool = candidates_for_peak(float(r.mz), pol, ppm=a.ppm, cap=a.max_per_channel)
-        # Guarantee the truth is in the pool even if enumeration narrowly missed it.
+        # Guarantee the truth is in the pool even if enumeration narrowly missed it
+        # (the true assignment is plausible by definition).
         if true_ion not in pool:
-            pool[true_ion] = "true"
+            pool[true_ion] = ("true", True)
         else:
             n_true_found += 1
-        for ion, mech in pool.items():
+        for ion, (mech, plaus) in pool.items():
+            is_true = ion == true_ion
             rows.append(
                 {
                     "filename": r.filename,
@@ -127,7 +142,8 @@ def main() -> int:
                     "true_ion": true_ion,
                     "candidate_ion": ion,
                     "ionization": mech,
-                    "is_true": ion == true_ion,
+                    "is_true": is_true,
+                    "is_plausible": bool(plaus or is_true),
                 }
             )
         if n % 500 == 0:
