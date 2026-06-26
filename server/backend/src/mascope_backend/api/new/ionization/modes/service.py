@@ -198,10 +198,11 @@ async def update_ionization_mode(
     - Fetch the ionization mode by its ID from the database.
     - Check for token conflicts if token is being updated.
     - Validate mechanism-polarity consistency.
-    - Validate calibration and diagnostic collection updates (only adding is allowed).
+    - Allow changing the calibration/diagnostic collection (but not clearing it).
     - Check for conflicts with existing acquisition batches.
     - Block updates if any affected batch is currently processing.
-    - If mechanisms changed, set affected batches to "rematch" status.
+    - Flag affected batches: "recalibrate" if the calibration collection changed,
+      otherwise "rematch" if mechanisms or the diagnostic collection changed.
     - Update the fields that were provided in the request.
     - Commit the changes and return the updated ionization mode.
 
@@ -272,37 +273,29 @@ async def update_ionization_mode(
                     f"polarity '{new_polarity}'"
                 )
 
-        # Check for calibration and diagnostic collection updates
-        # Only allow adding if not yet defined, don't allow removal or changing
-        if (
-            "calibration_collection_id" in update_data
-            and update_data["calibration_collection_id"] is not None
-            and ionization_mode.calibration_collection_id
-            and update_data["calibration_collection_id"]
-            != ionization_mode.calibration_collection_id
-        ):
-            raise ValueError(
-                "Cannot update calibration collection, as it is already defined"
-            )
+        # Calibration and diagnostic collections may be changed to another
+        # collection, but not cleared (un-set to null). Dropping the key when the
+        # incoming value is None preserves the currently-defined collection.
         if update_data.get("calibration_collection_id") is None:
             update_data.pop("calibration_collection_id", None)
-        if (
-            "diagnostic_collection_id" in update_data
-            and update_data["diagnostic_collection_id"] is not None
-            and ionization_mode.diagnostic_collection_id
-            and update_data["diagnostic_collection_id"]
-            != ionization_mode.diagnostic_collection_id
-        ):
-            raise ValueError(
-                "Cannot update diagnostic collection, as it is already defined"
-            )
         if update_data.get("diagnostic_collection_id") is None:
             update_data.pop("diagnostic_collection_id", None)
 
-        # Determine if mechanisms are changing
+        # Determine which fields are changing (used to flag affected batches).
+        # Computed against the current entity before the values are applied below.
         mechanisms_changed = "ionization_mechanism_ids" in update_data and set(
             update_data["ionization_mechanism_ids"]
         ) != set(ionization_mode.ionization_mechanism_ids)
+        calibration_changed = (
+            "calibration_collection_id" in update_data
+            and update_data["calibration_collection_id"]
+            != ionization_mode.calibration_collection_id
+        )
+        diagnostic_changed = (
+            "diagnostic_collection_id" in update_data
+            and update_data["diagnostic_collection_id"]
+            != ionization_mode.diagnostic_collection_id
+        )
 
         # Find affected sample batches (batches containing samples using this mode)
         affected_batch_ids_result = await session.execute(
@@ -369,13 +362,23 @@ async def update_ionization_mode(
         await session.commit()
         await session.refresh(ionization_mode)
 
-    # If mechanisms changed and there are affected batches, set them to rematch
-    if mechanisms_changed and affected_batch_ids:
-        await update_sample_batch_status(
-            sample_batch_ids=affected_batch_ids,
-            status="rematch",
-            independent_transaction=True,
-        )
+    # Flag affected batches so stale results are reprocessed. A calibration
+    # collection change requires a re-fit of m/z calibration to take effect
+    # (which itself ends in a rematch), so it gets the stronger "recalibrate"
+    # signal. Mechanism or diagnostic collection changes only need a rematch.
+    if affected_batch_ids:
+        if calibration_changed:
+            await update_sample_batch_status(
+                sample_batch_ids=affected_batch_ids,
+                status="recalibrate",
+                independent_transaction=True,
+            )
+        elif mechanisms_changed or diagnostic_changed:
+            await update_sample_batch_status(
+                sample_batch_ids=affected_batch_ids,
+                status="rematch",
+                independent_transaction=True,
+            )
 
     await emit_record_updated(
         record_type="ionization_mode",

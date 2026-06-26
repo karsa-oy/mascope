@@ -90,7 +90,9 @@ class IonizationModeUpdate(
         max_length=16,
         description=(
             "ID of the calibration collection to use for the scheme. "
-            "When updating, only allowed if calibration collection is not yet defined."
+            "When updating, the collection may be changed to another one, but "
+            "not cleared (un-set to null). Changing it flags affected batches "
+            "for re-calibration."
         ),
     )
     diagnostic_collection_id: str | None = Field(
@@ -98,7 +100,9 @@ class IonizationModeUpdate(
         max_length=16,
         description=(
             "ID of the diagnostic collection to use for the scheme. "
-            "When updating, only allowed if diagnostic collection is not yet defined."
+            "When updating, the collection may be changed to another one, but "
+            "not cleared (un-set to null). Changing it flags affected batches "
+            "for re-matching."
         ),
     )
 
