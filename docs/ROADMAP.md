@@ -15,28 +15,29 @@ Settled, so they need not be re-litigated.
   **self-hosting**. Local trials run over plain HTTP on `localhost` (the release
   stack); networked/production deployments run over HTTPS. See
   [Hosting & deployment](hosting.md).
-- **Demo dataset:** one versioned bundle with de-identified raw files as the
-  source of truth, a reference *seed* dump plus a full *snapshot*, published on
-  Zenodo with a citable DOI, and loaded via `mascope demo`. See
+- **Demo dataset:** one versioned bundle (de-identified raw files as the source
+  of truth, a reference *seed* dump, a full *snapshot*, and golden outputs),
+  published on Zenodo with a citable DOI. Loaded with one command via the
+  containerized stack (`docker-compose.demo.yaml`, no clone) or from source via
+  `mascope demo`. A standalone PyPI CLI was considered and rejected - the demo
+  runs straight from the published images, so it needs no Python or clone. See
   [Demo dataset](demo_dataset.md).
-- **Approachability fixes shipped:** one-command local HTTP release stack
-  (pull-and-run GHCR images), plus the cold-start fixes (role seeding, frontend
-  origin/protocol, TLS cert hardening, release-stack isolation).
+- **Approachability fixes shipped:** a one-command demo stack
+  (`docker-compose.demo.yaml`) that comes up preloaded with the published
+  dataset, the one-command local HTTP release stack (pull-and-run GHCR images),
+  and the cold-start fixes (role seeding, frontend origin/protocol, TLS cert
+  hardening, release-stack isolation).
 
 ## In progress / planned
 
 ### Demo dataset & reproducibility
 
-- Author the reference data (ionization modes, instrument config,
-  calibration/diagnostic collections), capture the seed + snapshot, publish the
-  bundle to Zenodo, and register its URL/DOI in the bundle registry.
-- Wire `export_goldens` and enable the end-to-end reproducibility test.
-- Container-mode `mascope demo` so the demo loads onto the published images.
+- Drive the heavy end-to-end reproducibility test (a full from-raw rebuild) in
+  CI, and decide whether to ship a smaller sample subset for a fast check. The
+  export + keyed-comparison seams already exist.
 
 ### Onboarding & hosting
 
-- One-command load of the published demo bundle onto a running stack.
-- Standalone CLI on PyPI (`pipx install mascope` -> `mascope demo`).
 - Self-hosting niceties: documented mkcert / reverse-proxy (Let's Encrypt) TLS
   paths for warning-free LAN access.
 
@@ -51,5 +52,3 @@ Settled, so they need not be re-litigated.
 - Consolidate in-app help: keep popovers to a short hint and move longer
   explanations into the docs, linked via the popover `doc` field (mechanism
   already in place) - a single source of truth.
-- README polish: light/dark screenshot via `<picture>`; add a citation once a
-  Zenodo DOI exists.

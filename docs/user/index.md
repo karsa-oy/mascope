@@ -16,8 +16,8 @@ calibration, and explore results in the web UI or via the Python SDK.
 !!! note "This is the user documentation"
     Developer and contributor docs (building the monorepo, runtime internals)
     live in `docs/dev/`. Hosting/deployment is covered in
-    [Hosting & deployment](../hosting.md), and the demo dataset in
-    `docs/demo_dataset.md`.
+    [Hosting & deployment](../hosting.md), and the
+    [demo dataset](../demo_dataset.md) has its own guide.
 
 <!-- TODO: short annotated screenshot/GIF of the UI; one-paragraph "what is
 Mascope" aimed at scientists; link to a public demo instance once available. -->

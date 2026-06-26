@@ -90,9 +90,3 @@ Then open <http://localhost:8080>.
 ## License
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attributions.
-
-## Citation
-
-If you use the Mascope demo dataset, please cite the archived Zenodo record:
-
-> Mascope demo dataset v1.0.0. Zenodo. https://doi.org/10.5281/zenodo.20929489
