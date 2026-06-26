@@ -6,6 +6,7 @@ import pandas as pd
 from mascope_backend.api.controllers.match.lib.match_score_v2 import (
     fit_sample_mass_accuracy,
     ion_score_v2,
+    match_score_version,
     sample_noise_floor,
 )
 
@@ -68,3 +69,20 @@ def test_fit_sample_mass_accuracy():
 def test_sample_noise_floor_positive():
     df = pd.DataFrame({"sample_peak_intensity": [1.0, 10.0, 100.0, 1000.0]})
     assert sample_noise_floor(df) > 0
+
+
+def test_satellite_matched_isotopologue_treated_as_absent():
+    base = dict(_ion(110.0, snr=[500, 55]))
+    normal = ion_score_v2(pd.DataFrame({**base, "is_satellite": [False, False]}), sigma_ppm=0.5)
+    # M+1 "matched" a satellite artifact -> treated as absent -> detectability penalty
+    sat = ion_score_v2(pd.DataFrame({**base, "is_satellite": [False, True]}), sigma_ppm=0.5)
+    assert sat < normal
+
+
+def test_match_score_version_env(monkeypatch):
+    monkeypatch.delenv("MASCOPE_MATCH_SCORE_VERSION", raising=False)
+    assert match_score_version() == 1
+    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "2")
+    assert match_score_version() == 2
+    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "garbage")
+    assert match_score_version() == 1
