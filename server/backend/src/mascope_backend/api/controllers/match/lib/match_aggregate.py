@@ -1,7 +1,13 @@
+import os
 from typing import Optional, Tuple
 
 import pandas as pd
 
+from mascope_backend.api.controllers.match.lib.match_score_v2 import (
+    fit_sample_mass_accuracy,
+    ion_score_v2,
+    sample_noise_floor,
+)
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
@@ -10,6 +16,16 @@ from mascope_match.params import (
     DEFAULT_PROBABLE_MATCH_THRESHOLD,
     BaseMatchParams,
 )
+
+# Match-score backend switch (Phase C experiment): 1 = legacy Sum(score*rel_ab),
+# 2 = consolidated mascope_tools score_pattern_v2 (detectability-gated, SNR-aware,
+# calibrated). Both paths stay wired so a sample can be scored each way and compared;
+# v1 is the default and is left byte-identical. See tooling/score_eval/DESIGN.md.
+def _match_score_version() -> int:
+    try:
+        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "1"))
+    except (TypeError, ValueError):
+        return 1
 
 
 async def set_ions_match_category(
@@ -223,6 +239,29 @@ async def aggregate_match_ions(
         )
         .reset_index()
     )
+    # Phase C experiment: optionally replace the per-ion match_score with the
+    # consolidated mascope_tools v2 score (detectability-gated, SNR-aware, calibrated).
+    # Additive + gated: v1 above is computed unchanged; v2 overwrites only when enabled.
+    if _match_score_version() == 2:
+        keys = [
+            c
+            for c in match_ions_data_df.columns
+            if c not in ("match_score", "sample_peak_intensity_sum", "filter_params")
+        ]
+        mu, sigma = fit_sample_mass_accuracy(filtered_match_isotope_df)
+        noise = sample_noise_floor(filtered_match_isotope_df)
+        v2 = (
+            filtered_match_isotope_df.groupby(keys, sort=False, dropna=False)
+            .apply(lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise))
+            .rename("match_score_v2")
+            .reset_index()
+        )
+        match_ions_data_df = match_ions_data_df.merge(v2, on=keys, how="left")
+        match_ions_data_df["match_score"] = match_ions_data_df["match_score_v2"].fillna(
+            match_ions_data_df["match_score"]
+        )
+        match_ions_data_df = match_ions_data_df.drop(columns=["match_score_v2"])
+
     # Prepare a simplified DataFrame for storing in database (keep instrument and
     # match_params for correct set_ions_match_category)
     # Drop duplicates for match ions based on target_ion_id for each sample, so each
