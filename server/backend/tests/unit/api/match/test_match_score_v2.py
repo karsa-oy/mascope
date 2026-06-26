@@ -24,8 +24,9 @@ def _ion(m1_intensity, snr=None):
     return pd.DataFrame(d)
 
 
-def test_perfect_match_high_probability():
-    assert ion_score_v2(_ion(110.0, snr=[500, 55]), sigma_ppm=0.5) > 0.7
+def test_good_match_high_fit():
+    # default is the raw FIT score (not the calibrated probability): a good match is high
+    assert ion_score_v2(_ion(110.0, snr=[500, 55]), sigma_ppm=0.5) > 0.8
 
 
 def test_detectable_missing_isotopologue_penalized():
@@ -39,11 +40,10 @@ def test_absent_monoisotopic_scores_zero():
         {"relative_abundance": [1.0, 0.11], "match_mz_error": [0.0, 0.0],
          "sample_peak_intensity": [0.0, 0.0], "signal_to_noise": [0.0, 0.0]}
     )
-    # Absent monoisotopic -> raw score 0 (no match). The calibrated probability cannot
-    # be exactly 0 (sigmoid); it maps to the calibration floor ~0.0155, which is the
-    # observed live minimum for no-evidence ions.
-    assert ion_score_v2(g, sigma_ppm=0.5, calibrate=False) == 0.0
-    assert ion_score_v2(g, sigma_ppm=0.5) < 0.02
+    # Absent monoisotopic -> fit score 0 (no match); this is the default/headline value.
+    assert ion_score_v2(g, sigma_ppm=0.5) == 0.0
+    # The optional calibrated probability cannot be exactly 0 (sigmoid) -> floor ~0.0155.
+    assert ion_score_v2(g, sigma_ppm=0.5, calibrate=True) < 0.02
 
 
 def test_proxy_snr_path_when_column_absent():
@@ -57,6 +57,9 @@ def test_raw_vs_calibrated():
     raw = ion_score_v2(g, sigma_ppm=0.5, calibrate=False)
     cal = ion_score_v2(g, sigma_ppm=0.5, calibrate=True)
     assert 0.0 < raw <= 1.0 and 0.0 < cal < 1.0
+    # The default (raw fit) IS the headline score; calibration only compresses it.
+    assert ion_score_v2(g, sigma_ppm=0.5) == raw
+    assert cal < raw  # a good fit's calibrated probability sits below its fit quality
 
 
 def test_fit_sample_mass_accuracy():
@@ -93,8 +96,8 @@ def test_match_score_version_env(monkeypatch):
 
 
 def test_category_thresholds_are_score_version_aware(monkeypatch):
-    """Categories use version-aware default bands: v1 (0.8/0.7 on the ~0.95-clustered
-    fit score) vs v2 (0.7/0.3 on the calibrated-probability scale)."""
+    """Categories use version-aware default bands: v1 (0.8/0.7) vs v2 (0.8/0.5 on the
+    raw fit-quality scale)."""
     import asyncio
 
     from mascope_backend.api.controllers.match.lib.match_aggregate import (
@@ -109,5 +112,5 @@ def test_category_thresholds_are_score_version_aware(monkeypatch):
         out = asyncio.run(set_ions_match_category(df, None))
         return list(out["match_category"])
 
-    assert cats(2) == [2, 1, 0]  # 0.85>=0.7; 0.3<=0.5<0.7; 0.1<0.3
-    assert cats(1) == [2, 0, 0]  # 0.85>=0.8; 0.5<0.7; 0.1<0.7
+    assert cats(2) == [2, 1, 0]  # v2 0.8/0.5: 0.85>=0.8; 0.5<=0.5<0.8; 0.1<0.5
+    assert cats(1) == [2, 0, 0]  # v1 0.8/0.7: 0.85>=0.8; 0.5<0.7; 0.1<0.7
