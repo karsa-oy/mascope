@@ -45,11 +45,7 @@ def _extract_archive(archive: Path, dest: Path) -> None:
 
     # Flatten a single wrapping directory if present.
     entries = list(staging.iterdir())
-    root = (
-        entries[0]
-        if len(entries) == 1 and entries[0].is_dir()
-        else staging
-    )
+    root = entries[0] if len(entries) == 1 and entries[0].is_dir() else staging
 
     if dest.exists():
         shutil.rmtree(dest)
@@ -134,8 +130,7 @@ def fetch(version: str | None = None, force: bool = False) -> Path:
     problems = bundles.verify_manifest(version)
     if problems:
         raise RuntimeError(
-            "Bundle verification failed after download:\n  - "
-            + "\n  - ".join(problems)
+            "Bundle verification failed after download:\n  - " + "\n  - ".join(problems)
         )
 
     runtime.logger.success(f"Demo bundle '{bundle.version}' fetched and verified")

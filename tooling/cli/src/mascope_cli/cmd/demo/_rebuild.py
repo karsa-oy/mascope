@@ -20,6 +20,7 @@ from mascope_cli.cmd.demo import bundles
 from mascope_cli.cmd.demo._seed import DEMO_ENV  # noqa: F401 - re-exported convenience
 from mascope_cli.runtime import runtime
 
+
 # The fixed file-agent token + service name the demo seeds (mirror
 # server seed_demo.DEMO_TOKENS["file-agent"]). Using the file-agent service
 # replicates the File Agent's exact upload request.

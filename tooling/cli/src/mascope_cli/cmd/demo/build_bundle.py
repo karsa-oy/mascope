@@ -155,7 +155,8 @@ def _copy_raw(raw_dir: Path, out_dir: Path) -> tuple[list[dict], list[dict]]:
         if not parsed:
             unmatched += 1
             runtime.logger.warning(
-                f"Filename did not match the expected pattern, copied unchanged: {src.name}"
+                f"Filename did not match the expected pattern, "
+                f"copied unchanged: {src.name}"
             )
         if new_name in seen:
             raise RuntimeError(
@@ -219,9 +220,11 @@ def _write_deid_report(out_dir: Path, renames: list[dict]) -> None:
         "",
         "- Instrument label aliased:",
         *alias_lines,
-        "- Removed the redundant human-readable timestamp (e.g. `2025.08.11-14h23m12s`)",
+        "- Removed the redundant human-readable timestamp "
+        "(e.g. `2025.08.11-14h23m12s`)",
         "- Removed the run index (the `_1_` segment)",
-        "- Kept polarity, sample short-name, RI marker, and the compact acquisition stamp",
+        "- Kept polarity, sample short-name, RI marker, and the "
+        "compact acquisition stamp",
         "",
         f"Sample short-names retained: {', '.join(samples)}",
         f"Polarities: {', '.join(polarities)}",

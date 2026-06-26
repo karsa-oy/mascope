@@ -55,7 +55,10 @@ def main(
         bool,
         typer.Option(
             "--rebuild",
-            help="Ingest from raw through the real pipeline instead of restoring the snapshot",
+            help=(
+                "Ingest from raw through the real pipeline instead of "
+                "restoring the snapshot"
+            ),
         ),
     ] = False,
     no_launch: Annotated[
@@ -107,12 +110,12 @@ def main(
 
     \b
     Examples:
-        mascope demo                                   # seed from snapshot + launch
-        mascope demo --fresh                           # clean empty env (author reference data)
-        mascope demo --rebuild                         # ingest from raw + launch
-        mascope demo --rebuild --local path/to/bundle  # rebuild from a local raw/ dir
-        mascope demo --no-launch                       # seed only
-        mascope demo fetch                             # just download + verify the bundle
+        mascope demo  # fetch snapshot + launch
+        mascope demo --fresh  # clean empty env to author reference data
+        mascope demo --rebuild  # ingest from raw through the pipeline
+        mascope demo --rebuild --local path/to/bundle  # rebuild from a local bundle
+        mascope demo --no-launch  # seed only, do not launch
+        mascope demo fetch  # download + checksum-verify the bundle
     """
     # Pin the demo env + dev mode for every demo subcommand. MASCOPE_ENV is
     # checked first by the runtime's env resolution, so setting it here (before
@@ -182,7 +185,8 @@ def _run(
             and not (local / bundles.MANIFEST_NAME).is_file()
         ):
             runtime.logger.error(
-                f"--local {local} has neither a raw/ directory nor {bundles.MANIFEST_NAME}"
+                f"--local {local} has neither a raw/ directory "
+                f"nor {bundles.MANIFEST_NAME}"
             )
             raise typer.Exit(1)
         runtime.logger.info(f"Using local bundle directory: {local}")
