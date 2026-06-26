@@ -589,6 +589,94 @@ def score_pattern(
     return score
 
 
+# ---------------------------------------------------------------------------
+# Match score, version 2 (detectability-gated, SNR-aware, calibratable).
+#
+# v1 (`score_pattern`, above) averages errors over the MATCHED peaks only, so an
+# incomplete isotope envelope is not penalised, and it normalises mass by a fixed
+# 5 ppm. v2 fixes both: it penalises a predicted isotopologue that is ABSENT but
+# should have been visible (expected SNR `rel_i*SNR_base >= k_detect`), judges each
+# isotopologue's intensity against ITS OWN noise (per-peak SNR), uses a Gaussian
+# mass likelihood, and aggregates as a predicted-abundance-weighted geometric mean.
+# On the demo golden set vs v1: ROC-AUC 0.876->0.890, held-out calibrated ECE
+# 0.020->0.0069 (see tooling/score_eval/DESIGN.md). v1 is retained byte-identical;
+# callers select via SCORE_VERSION. Inputs use the same matched-array convention as
+# v1 (unmatched isotopologues carry 0), PLUS the matched peaks' signal_to_noise.
+# ---------------------------------------------------------------------------
+SCORE_VERSION = 2
+
+# Platt calibration (raw fit score -> P(correct)) fitted on the demo Br/Ur golden
+# set. Maps a raw v2 score to a probability; refit per instrument/dataset with the
+# score_eval harness (DESIGN.md §5.3) for production — a sensible default, not a
+# universal constant.
+DEFAULT_CALIBRATION_V2 = (7.3815, -6.1694)  # (a, b) fit on the demo Br/Ur golden set
+
+
+def calibrate_score(raw, calibration=None):
+    """Map a raw v2 score to a probability via `sigmoid(a*raw + b)`."""
+    a, b = calibration or DEFAULT_CALIBRATION_V2
+    return 1.0 / (1.0 + np.exp(-(a * np.asarray(raw, float) + b)))
+
+
+def score_pattern_v2(
+    observed_mass_errors_ppm: np.ndarray,
+    observed_intensities: np.ndarray,
+    observed_snr: np.ndarray,
+    predicted_rel: np.ndarray,
+    *,
+    k_detect: float = 3.0,
+    miss_penalty: float = 0.3,
+    sigma_ppm: float = 2.0,
+) -> float:
+    """Detectability-gated, SNR-aware match score in [0, 1].
+
+    Per predicted isotopologue i (predicted relative abundance `predicted_rel[i]`,
+    base = index 0): a matched peak contributes a Gaussian mass likelihood times an
+    intensity likelihood whose tolerance is set by the peak's own SNR; an ABSENT
+    peak contributes `miss_penalty` iff it should have been detectable
+    (`predicted_rel[i]*SNR_base >= k_detect`), else it is excluded (below noise, not
+    evidence). Aggregation is a predicted-abundance-weighted geometric mean. Returns
+    0 if the monoisotopic peak is absent. Satellite peaks must be excluded by the
+    caller. Pair with `calibrate_score` to get P(correct)."""
+    oi = np.asarray(observed_intensities, float)
+    if len(oi) == 0 or oi[0] <= 0:
+        return 0.0
+    me = np.abs(np.asarray(observed_mass_errors_ppm, float))
+    snr = np.maximum(np.asarray(observed_snr, float), 1e-6)
+    pr = np.asarray(predicted_rel, float)
+    base_int, base_snr = oi[0], snr[0]
+    n = len(pr)
+
+    matched = oi > 0
+    mass_L = np.exp(-0.5 * (me / sigma_ppm) ** 2)
+    rel_obs = oi / base_int
+    sigma_rel = np.maximum.reduce(
+        [
+            rel_obs * np.sqrt(1.0 / snr**2 + 1.0 / base_snr**2),
+            0.05 * pr,
+            np.full(n, 1e-3),
+        ]
+    )
+    int_L = np.exp(-0.5 * ((rel_obs - pr) / sigma_rel) ** 2)
+
+    L = np.full(n, np.nan)
+    L[0] = mass_L[0]
+    m = matched.copy()
+    m[0] = False
+    L[m] = mass_L[m] * int_L[m]
+    absent = ~matched
+    absent[0] = False
+    detectable = absent & (pr * base_snr >= k_detect)
+    L[detectable] = miss_penalty
+    include = ~np.isnan(L)
+    L = np.where(include, np.maximum(L, 1e-6), 1.0)
+    w = pr * include
+    wsum = w.sum()
+    if wsum <= 0:
+        return 0.0
+    return float(np.exp((w * np.log(L)).sum() / wsum))
+
+
 def conf_to_label(conf, elements, isotope_masses):
     """Return isotope label string.
 
