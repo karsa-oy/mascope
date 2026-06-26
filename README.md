@@ -73,5 +73,8 @@ dataset.
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attributions.
 
-<!-- TODO: add a citation (Zenodo DOI) once the demo dataset / a release is
-archived. -->
+## Citation
+
+If you use the Mascope demo dataset, please cite the archived Zenodo record:
+
+> Mascope demo dataset v1.0.0. Zenodo. https://doi.org/10.5281/zenodo.20929489
