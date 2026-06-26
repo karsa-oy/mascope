@@ -20,7 +20,7 @@ class TargetCollectionConfig(BaseModel):
     DEFAULT_TARGET_COLLECTION_TYPE: str = "TARGETS"
 
     # Collection type constraints for sample batches
-    TARGETS_BATCH_TYPES: list = ["ANALYSIS"]
+    TARGETS_BATCH_TYPES: list = ["ANALYSIS", "ACQUISITION"]
     DIAGNOSTICS_BATCH_TYPES: list = ["ACQUISITION", "ANALYSIS"]
     CALIBRANTS_BATCH_TYPES: list = ["ANALYSIS"]
 
