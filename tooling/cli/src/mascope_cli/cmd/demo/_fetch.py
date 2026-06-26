@@ -117,7 +117,9 @@ def fetch(version: str | None = None, force: bool = False) -> Path:
 
     if bundle.archive_sha256:
         actual = bundles.sha256_file(archive)
-        if actual != bundle.archive_sha256:
+        # Case-insensitive: hashlib emits lowercase, but a hash pasted into the
+        # registry from e.g. PowerShell's Get-FileHash is uppercase.
+        if actual.lower() != bundle.archive_sha256.lower():
             raise RuntimeError(
                 f"Archive checksum mismatch for '{bundle.version}': "
                 f"expected {bundle.archive_sha256[:12]}..., got {actual[:12]}..."
