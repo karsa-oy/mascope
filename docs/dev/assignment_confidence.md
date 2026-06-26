@@ -188,6 +188,21 @@ formulas above implausible mass-degenerate ones?). This is the smallest, fully
 self-contained step that turns the spike into the first real evidence layer — and it needs
 no backend or DB, only `mascope_tools` + tests.
 
+### P1 progress
+
+- **`rule_senior` implemented** (Lewis/RDBE + Senior connectivity), replacing the stub, with
+  conservative fail-open behaviour and unit tests (`test_rule_senior.py`). Still **boolean**
+  for now; the move to a graded `plausibility ∈ [0,1]` and the DB element-ratio
+  probabilities (Rule 6) are the remaining P1 work.
+- **Integration caveat discovered.** Validated against all 92 demo target compounds: the rule
+  flags 5 of them (`C9H15O6`, `C10H15O5`, `C10H17O7`, `C6H17NO4`, `Br`). These are *correct*
+  chemistry calls — odd-electron radicals / over-saturated / lone-atom **as neutrals** — and
+  reveal that the demo stores some targets in **charge-adjusted (ionic) form**, not as
+  closed-shell neutrals. **The structural rules are valid only for neutral formulas.** In the
+  live pipeline this is satisfied (`find_compositions` enumerates neutral compositions before
+  ionization), but P1 must guarantee the rule is never applied to ion/charge-adjusted
+  formulas — and any golden validation must neutralise the stored formulas first.
+
 ## 5. References
 
 - Kind, T.; Fiehn, O. *Mass accuracy is insufficient even at less than 1 ppm.* BMC

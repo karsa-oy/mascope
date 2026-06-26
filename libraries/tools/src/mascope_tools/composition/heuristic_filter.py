@@ -150,12 +150,58 @@ def rule_valence(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[st
     return mask, log_messages  # Placeholder, always returns True
 
 
+# Standard valences for the RDBE / Senior structural checks (Golden Rule 2: Lewis &
+# Senior). The classic organic convention (N,P trivalent; O,S divalent; halogens
+# monovalent) makes RDBE a non-negative integer for any valid neutral, even-electron
+# molecule. Any element OUTSIDE this table makes the check fail-open (the candidate is
+# never rejected on valence grounds) so unusual chemistry is never wrongly cut.
+_SENIOR_VALENCE = {
+    "H": 1, "D": 1, "T": 1,
+    "B": 3, "C": 4, "N": 3, "O": 2, "F": 1,
+    "Si": 4, "P": 3, "S": 2, "Cl": 1,
+    "Br": 1, "I": 1,
+}
+
+
 def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str]]:
-    """Senior's rules (structural feasibility)."""
-    # TODO: requires graph theory/structure generation
-    mask = pl.Series([True] * candidates.height)
-    log_messages = []
-    return mask, log_messages  # Placeholder, always returns True
+    """Lewis & Senior structural feasibility (Seven Golden Rules, Rule 2).
+
+    Rejects a neutral formula that cannot correspond to any valid molecular graph:
+
+    1. **Lewis / RDBE** — the ring-and-double-bond equivalents
+       ``RDBE = 1 + sum_i n_i (v_i - 2) / 2`` must be a **non-negative integer**
+       (negative ⇒ over-saturated/impossible; non-integer ⇒ odd-electron radical, not a
+       closed-shell neutral).
+    2. **Senior connectivity** — the sum of valences must be at least ``2*(N_atoms - 1)``
+       so the atoms can form a single connected graph.
+
+    Conservative by design: a formula containing any element outside ``_SENIOR_VALENCE``
+    (or that fails to parse) is **never rejected** here, so exotic compositions are never
+    lost to this filter. See Kind & Fiehn 2007, BMC Bioinformatics 8:105 (Rule 2).
+    """
+    log_messages: list[str] = []
+    if candidates.is_empty():
+        return pl.Series([], dtype=pl.Boolean), log_messages
+
+    mask: list[bool] = []
+    for formula in candidates.get_column("formula").to_list():
+        try:
+            counts = Composition(formula=normalize_formula_with_isotopes(formula))
+            elems = {el: n for el, n in counts.items() if n}
+        except Exception:
+            mask.append(True)  # unparseable here -> defer, never reject
+            continue
+        if not elems or any(el not in _SENIOR_VALENCE for el in elems):
+            mask.append(True)  # fail-open on unknown elements
+            continue
+        n_atoms = sum(elems.values())
+        valence_sum = sum(_SENIOR_VALENCE[el] * n for el, n in elems.items())
+        # twice_rdbe = 2*RDBE ; integer & >= 0 for a valid closed-shell neutral.
+        twice_rdbe = 2 + sum((_SENIOR_VALENCE[el] - 2) * n for el, n in elems.items())
+        lewis_ok = twice_rdbe >= 0 and twice_rdbe % 2 == 0
+        connect_ok = n_atoms <= 1 or valence_sum >= 2 * (n_atoms - 1)
+        mask.append(bool(lewis_ok and connect_ok))
+    return pl.Series(mask, dtype=pl.Boolean), log_messages
 
 
 def rule_known_chemical_space(
