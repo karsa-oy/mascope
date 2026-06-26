@@ -54,8 +54,8 @@ A joint mathematical scoring routine assigns each candidate a **fit-quality scor
 between 0.0 and 1.0. This score measures *how well the observed data fit the candidate's
 predicted spectrum* — it is a reproducible measurement, **not** a probability of correctness
 (mass alone cannot prove a composition), and deciding *which* of several well-fitting
-candidates is the real one is a separate identification-confidence layer (see
-[`assignment_confidence.md`](../../../docs/dev/assignment_confidence.md)).
+candidates is the real one is a separate identification-confidence layer (a distinct
+workstream that builds on this score).
 
 The current score is **v2** (`score_pattern_v2`, `SCORE_VERSION = 2`), fully documented in
 [`fit_score.md`](fit_score.md). In brief, each predicted isotopologue contributes a Gaussian
