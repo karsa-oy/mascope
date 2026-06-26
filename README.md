@@ -17,7 +17,22 @@ laboratories that need reproducible, high-throughput analysis of complex spectra
 
 ## Try it in 5 minutes
 
-Run Mascope on your machine with Docker (the only prerequisite):
+Run Mascope on your machine **with real data to explore**. Docker is the only
+prerequisite. One file, one command:
+
+```sh
+curl -O https://raw.githubusercontent.com/karsa-oy/mascope/develop/docker-compose.demo.yaml
+docker compose -f docker-compose.demo.yaml up
+```
+
+It pulls the published images and loads the published [demo dataset](docs/demo_dataset.md).
+When it's up, open <http://localhost:8080> and log in with:
+**`demo@mascope.app`** / **`mascope-demo`**.
+The first run downloads ~150 MB; tear it down with
+`docker compose -f docker-compose.demo.yaml down -v`.
+
+<details>
+<summary><b>Or start with an empty instance</b> (no demo data)</summary>
 
 ```sh
 # get docker-compose.release.yaml + .env.example from this repo, then:
@@ -37,23 +52,12 @@ docker compose -f docker-compose.release.yaml up -d
 docker compose -f docker-compose.release.yaml logs -f backend frontend file_converter
 ```
 
-Then open <http://localhost:8080>. See
-[Getting started](docs/user/getting-started/index.md) for loading the demo
-dataset.
+Then open <http://localhost:8080>.
 
-### See real data instantly
+</details>
 
-If you've cloned this repo (with [uv](https://docs.astral.sh/uv/) and Docker
-running), one command fetches a published demo dataset from Zenodo and
-launches Mascope preloaded with it, plus a ready-to-use login
-(`demo@mascope.app` / `mascope-demo`) and SDK token, no setup:
-
-```sh
-mascope demo
-```
-
-See [Demo dataset](docs/demo_dataset.md) for what's in the bundle and the
-`--rebuild` path that re-runs the full pipeline from the included raw files.
+> Contributors with the repo cloned can also run the demo from source with
+> `mascope demo` - see [Demo dataset](docs/demo_dataset.md).
 
 ## Hosting
 
