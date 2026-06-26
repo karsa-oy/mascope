@@ -18,6 +18,7 @@ from mascope_cli.cmd.demo import bundles
 from mascope_cli.pg import dirs, drop_database, pg_restore
 from mascope_cli.runtime import runtime
 
+
 # The demo always uses a dedicated env so it never touches a developer's work.
 DEMO_ENV = "demo"
 _MODE = "dev"
@@ -122,7 +123,9 @@ def _restore_block(
     runtime.logger.success(f"Demo database '{database}' restored from {block}")
 
 
-def restore_snapshot(version: str | None = None, source_dir: "Path | None" = None) -> None:
+def restore_snapshot(
+    version: str | None = None, source_dir: "Path | None" = None
+) -> None:
     """Restore the full ``snapshot`` dump (instant path). See :func:`_restore_block`."""
     _restore_block("snapshot", version, source_dir)
 
@@ -136,7 +139,9 @@ def restore_seed(version: str | None = None, source_dir: "Path | None" = None) -
     _restore_block("seed", version, source_dir)
 
 
-def restore_filestore(version: str | None = None, source_dir: "Path | None" = None) -> None:
+def restore_filestore(
+    version: str | None = None, source_dir: "Path | None" = None
+) -> None:
     """
     Copy the bundle's filestore tree into the demo env's filestore directory.
 
