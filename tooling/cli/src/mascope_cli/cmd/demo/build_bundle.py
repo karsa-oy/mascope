@@ -1,17 +1,20 @@
 """
 MAINTAINER tooling: build a demo bundle from the raw source of truth.
 
-Produces, in the output bundle directory:
+Produces, in the output bundle directory (the publishable tree):
 
 - ``raw/``            - a copy of the de-identified raw files (source of truth)
 - ``manifest.json``   - checksums, parsed measurement metadata, tool versions,
                         and the tolerances the reproducibility test uses
-- ``deid_report.md``  - everything readable from filenames (and, best-effort,
-                        embedded ``.raw`` metadata) for human sign-off before publishing
 - ``snapshot/``       - (with ``--update``) a ``pg_dump`` of the ``mascope_demo``
                         database plus its filestore tree, for the instant path
 - ``expected/``       - (with ``--update``) golden outputs for the reproducibility
                         test; see :func:`export_goldens`
+
+And, as a *sibling* of the bundle directory (NOT inside it, so it is never
+published): ``<bundle>.deid_report.md`` - everything readable from filenames
+(and, best-effort, embedded ``.raw`` metadata) for human sign-off before
+publishing. See :func:`_write_deid_report`.
 
 The raw files and their checksums are always (re)written. The derived
 ``snapshot/`` and ``expected/`` artifacts are only (re)built when ``--update`` is
@@ -182,14 +185,16 @@ def _copy_raw(raw_dir: Path, out_dir: Path) -> tuple[list[dict], list[dict]]:
     return entries, renames
 
 
-def _write_deid_report(out_dir: Path, renames: list[dict]) -> None:
+def _write_deid_report(out_dir: Path, renames: list[dict]) -> Path:
     """
     Write a human-readable de-identification report for sign-off.
 
     Shows the rename transformation applied to every file (original -> published)
     so the data owner can confirm nothing sensitive remains. Because it lists the
     ORIGINAL filenames (including the real instrument label), it is a LOCAL
-    sign-off artifact - exclude it from the published archive.
+    sign-off artifact and must never be published. It is therefore written as a
+    *sibling* of the bundle directory (``<bundle>.deid_report.md``), not inside
+    it, so it cannot be swept into the published archive by accident.
 
     Embedded ``.raw`` binary metadata (operator, sample comments, instrument
     serial) is intentionally NOT rewritten here - flag anything sensitive
@@ -197,6 +202,7 @@ def _write_deid_report(out_dir: Path, renames: list[dict]) -> None:
 
     :param out_dir: Bundle output directory.
     :param renames: ``{original, new, parsed}`` records from :func:`_copy_raw`.
+    :return: Path to the written report (a sibling of ``out_dir``).
     """
     parsed = [r["parsed"] for r in renames if r["parsed"]]
     src_instruments = sorted({p["instrument"] for p in parsed})
@@ -244,9 +250,12 @@ def _write_deid_report(out_dir: Path, renames: list[dict]) -> None:
         *[f"- `{r['original']}` -> `{r['new']}`" for r in renames],
         "",
     ]
-    report = out_dir / "deid_report.md"
+    # Sibling of the bundle dir, not inside it: keeps the original-name listing
+    # out of the publishable tree so it can't be archived by accident.
+    report = out_dir.parent / f"{out_dir.name}.deid_report.md"
     report.write_text("\n".join(lines), encoding="utf-8")
     runtime.logger.success(f"Wrote de-identification report: {report}")
+    return report
 
 
 def _dump_demo_db(out_dir: Path, subdir: str) -> Path:

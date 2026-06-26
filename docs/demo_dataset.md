@@ -309,9 +309,11 @@ KORBI2_2025.08.11-14h23m12s_pos_Ur_NoRI_1_20250811142302.raw
 - polarity, sample short-name, RI marker, and the compact acquisition stamp are kept.
 
 The published `manifest.json` records only the de-identified names and never the
-original instrument label. `deid_report.md` lists the full original -> published
-rename map for sign-off and is therefore a **local artifact — excluded from the
-published archive** (it contains the real instrument label).
+original instrument label. The de-identification report lists the full original
+-> published rename map for sign-off, so it contains the real instrument label
+and **must never be published**. The builder therefore writes it as a *sibling*
+of the bundle directory — `<BUNDLE>.deid_report.md`, never inside `<BUNDLE>/` —
+so it cannot be swept into the archive by accident.
 
 ## Step-by-step: create, load, and update
 
@@ -327,7 +329,8 @@ tooling builds and accumulates into (e.g. `mascope-demo-dataset-v1/`).
 1. **Prepare + de-identify the raw files.** Collect the `.raw` files into `<RAW>`.
    The build renames them on copy (instrument aliased, redundant timestamp + run
    index stripped); see [De-identification](#de-identification). Confirm the
-   `deid_report.md` (written in step 3) before publishing.
+   `<BUNDLE>.deid_report.md` sign-off report (written in step 3) before
+   publishing.
 
 2. **Author the reference data.** Bring up a clean, empty demo env (no bundle):
 
@@ -346,9 +349,10 @@ tooling builds and accumulates into (e.g. `mascope-demo-dataset-v1/`).
    mascope demo snapshot --raw <RAW> --out <BUNDLE> --seed
    ```
 
-   This copies `raw/`, writes `manifest.json` + `deid_report.md`, and exports
-   `seed/mascope_demo.dump` (the authored reference data). Stop the running demo
-   (Ctrl+C) before the next step so the database can be reset.
+   This copies `raw/`, writes `manifest.json`, exports `seed/mascope_demo.dump`
+   (the authored reference data), and writes the `<BUNDLE>.deid_report.md`
+   sign-off report as a sibling of `<BUNDLE>`. Stop the running demo (Ctrl+C)
+   before the next step so the database can be reset.
 
 4. **Rebuild from the seed** (restores the seed, then ingests raw through the
    real upload endpoint and runs the pipeline):
@@ -409,14 +413,20 @@ Either way, publish as a **new Zenodo version** (D) and bump the registry.
 
 ### D. Publish to Zenodo (versioning)
 
-The published artifact is a single archive of the `<BUNDLE>` directory. Exclude
-the local-only sign-off files from the archive.
+The published artifact is a single archive of the `<BUNDLE>` directory. The
+sign-off report lives *outside* `<BUNDLE>` (as `<BUNDLE>.deid_report.md`), so a
+plain archive of the directory contains nothing sensitive - no excludes needed.
 
-1. **Package** the bundle (zip), excluding `deid_report.md` (it lists original
-   instrument labels):
+1. **Package** the bundle (zip the whole `<BUNDLE>` directory):
 
    ```sh
-   cd <BUNDLE> && zip -r ../mascope-demo-v1.zip . -x deid_report.md && cd -
+   # POSIX
+   cd <BUNDLE> && zip -r ../mascope-demo-v1.zip . && cd -
+   ```
+
+   ```powershell
+   # Windows PowerShell
+   Compress-Archive -Path <BUNDLE>\* -DestinationPath ..\mascope-demo-v1.zip -Force
    ```
 
 2. **Upload to Zenodo:**
