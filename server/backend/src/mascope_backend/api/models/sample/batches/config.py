@@ -17,7 +17,7 @@ class SampleBatchConfig(BaseModel):
     """
 
     SAMPLE_BATCH_TYPES: list = ["ACQUISITION", "ANALYSIS"]
-    SAMPLE_BATCH_STATUSES: list = ["ready", "processing", "rematch"]
+    SAMPLE_BATCH_STATUSES: list = ["ready", "processing", "rematch", "recalibrate"]
 
     # Default values
     DEFAULT_SAMPLE_BATCH_TYPE: str = "ANALYSIS"

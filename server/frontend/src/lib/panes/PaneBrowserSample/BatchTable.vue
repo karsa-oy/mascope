@@ -44,6 +44,20 @@ watch(
 const { height } = useWindowSize()
 const padding = 100
 const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top) / 100 - 50)
+
+// Status-icon click handler. A "recalibrate" batch needs its m/z calibration
+// re-fit (e.g. after its ionization mode's calibration collection changed), so
+// open the calibration dialog for it - reusing the same flow as the context
+// menu's "Recalibrate" action. Any other actionable status (rematch) refreshes
+// matches.
+const onStatusAction = (batch) => {
+  if (batch.status === 'recalibrate') {
+    contextMenu.row = batch
+    contextMenu.dialog.calibration = true
+  } else {
+    app.data.batch.rematch({ sample_batch_id: batch.sample_batch_id })
+  }
+}
 </script>
 
 <template v-if="app.data.batch.list">
@@ -137,7 +151,7 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
               <BaseStatusIcon
                 :status="data.status"
                 :config="batchStatusStore.config"
-                :onAction="() => app.data.batch.rematch({ sample_batch_id: data.sample_batch_id })"
+                :onAction="() => onStatusAction(data)"
               />
             </div>
             <BaseCopyableField
