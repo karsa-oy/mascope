@@ -21,6 +21,7 @@ from mascope_backend.api.new.ionization.modes.util import (
 )
 from mascope_backend.api.new.match.params.lib import (
     instrument_default_match_params,
+    isotope_abundance_threshold_expr,
 )
 from mascope_backend.db import (
     IonizationMechanism,
@@ -36,7 +37,11 @@ from mascope_backend.db import (
     async_session,
 )
 from mascope_file.name import get_instrument_name, resolve_instrument_type
-from mascope_match.params import BaseMatchParams
+from mascope_match.params import (
+    ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
+    TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
+    BaseMatchParams,
+)
 
 
 @api_controller()
@@ -46,6 +51,7 @@ async def get_match_isotope_records(
     target_collection_id: str | None = None,
     target_ion_id: str | None = None,
     match_params: BaseMatchParams | None = None,
+    include_subthreshold: bool = False,
 ) -> dict:
     """
     Retrieves target isotopes with match isotope data for sample or batch.
@@ -65,6 +71,10 @@ async def get_match_isotope_records(
     :type target_ion_id: str | None
     :param match_params: Match parameters containing settings for filtering, default to None
     :type match_params: BaseMatchParams | None
+    :param include_subthreshold: When True, also return isotopes below the abundance
+        threshold (which carry no stored match data). Defaults to False so the table
+        mirrors what is actually matched and stored.
+    :type include_subthreshold: bool
     :return: Dictionary containing status, message, results count, and match isotope records data
     :rtype: dict
     """
@@ -74,7 +84,11 @@ async def get_match_isotope_records(
         entity_type = "sample"
 
         data = await _get_sample_match_isotope_records(
-            sample, target_collection_id, target_ion_id, match_params
+            sample,
+            target_collection_id,
+            target_ion_id,
+            match_params,
+            include_subthreshold,
         )
     else:
         sample_batch = await fetch_sample_batch(sample_batch_id)
@@ -82,7 +96,7 @@ async def get_match_isotope_records(
         entity_type = "batch"
 
         data = await _get_batch_match_isotope_records(
-            sample_batch, target_collection_id, target_ion_id
+            sample_batch, target_collection_id, target_ion_id, include_subthreshold
         )
 
     if not data:
@@ -106,6 +120,7 @@ async def _get_sample_match_isotope_records(
     target_collection_id: str | None = None,
     target_ion_id: str | None = None,
     match_params: BaseMatchParams | None = None,
+    include_subthreshold: bool = False,
 ) -> list[dict]:
     """
     Retrieves target isotopes with match isotope data for a sample.
@@ -193,6 +208,20 @@ async def _get_sample_match_isotope_records(
                 )
             )
         )
+
+        if not include_subthreshold:
+            # Hide isotopes below the effective abundance threshold (ion-scoped
+            # override in filter_params, else instrument default). These carry no
+            # stored match data; the switch lets a future UI opt into showing them.
+            default_threshold = (
+                match_params or instrument_default_match_params(sample.instrument)
+            ).isotope_abundance_threshold
+            query = query.where(
+                TargetIsotope.relative_abundance
+                >= isotope_abundance_threshold_expr(
+                    TargetIon.filter_params, sample.instrument, default_threshold
+                )
+            )
 
         if target_collection_id:
             query = query.where(
@@ -364,6 +393,7 @@ async def _get_batch_match_isotope_records(
     sample_batch: SampleBatch,
     target_collection_id: str | None = None,
     target_ion_id: str | None = None,
+    include_subthreshold: bool = False,
 ) -> list[dict]:
     """
     Retrieves target isotopes with placeholder match data for a batch.
@@ -447,6 +477,17 @@ async def _get_batch_match_isotope_records(
                 )
             )
         )
+
+        if not include_subthreshold:
+            # Batch overview spans potentially mixed instruments; apply the default
+            # threshold for the chosen resolution (HIGH=Orbi, LOW=ToF). Per-ion
+            # overrides are not resolved here as the view carries placeholder data.
+            default_threshold = (
+                ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD
+                if isotope_resolution == "HIGH"
+                else TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD
+            )
+            query = query.where(TargetIsotope.relative_abundance >= default_threshold)
 
         if target_collection_id:
             query = query.where(

@@ -93,6 +93,13 @@ class MatchIsotopeRecordsQueryParams(MatchRecordsQueryParams):
     target_ion_id: str | None = Field(
         None, description="Optional filter by specific target ion"
     )
+    include_subthreshold: bool = Field(
+        False,
+        description=(
+            "Include isotopes below the abundance threshold (no stored match data). "
+            "Defaults to False so results mirror what is actually matched and stored."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_target_filter(self):
