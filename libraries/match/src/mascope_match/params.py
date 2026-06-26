@@ -15,14 +15,14 @@ ORBI_FITTING_THRESHOLD = 0.6
 DEFAULT_PROBABLE_MATCH_THRESHOLD = 0.8
 DEFAULT_POSSIBLE_MATCH_THRESHOLD = 0.7
 
-# v2 score (consolidated mascope_tools score) is a calibrated P(correct) on a
-# compressed scale (ceiling ~0.87, true-target median ~0.81). Its category bands sit
-# at the bimodal valley of the demo (Orbitrap) distribution: the corroborated mode
-# begins at ~0.70 (probable), and the no/contradicted-evidence floor spike sits below
-# ~0.30 (possible). These are calibrated-probability cutoffs, not v1 fit-score cutoffs;
-# refit alongside the per-instrument calibration when TOF goldens are available.
-DEFAULT_PROBABLE_MATCH_THRESHOLD_V2 = 0.7
-DEFAULT_POSSIBLE_MATCH_THRESHOLD_V2 = 0.3
+# v2 score is the FIT QUALITY (geom-mean of mass/intensity/detectability likelihoods),
+# [0,1] with 1.0 = perfect fit — NOT a probability (mass alone can't prove composition;
+# identification confidence is a separate layer). Good fits cluster high (demo median
+# ~0.92), so these tiers are fit-quality bands: strong fit >= 0.8 (probable), partial
+# fit >= 0.5 (possible), weak fit below (the no/contradicted-evidence floor). Instrument-
+# fair via the per-sample fitted mass sigma; revisit if the fit components are retuned.
+DEFAULT_PROBABLE_MATCH_THRESHOLD_V2 = 0.8
+DEFAULT_POSSIBLE_MATCH_THRESHOLD_V2 = 0.5
 
 # TOF-specific defaults
 TOF_DEFAULT_MZ_TOLERANCE = 15

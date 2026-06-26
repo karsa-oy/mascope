@@ -76,14 +76,22 @@ def ion_score_v2(
     sigma_ppm: float | None = None,
     mu: float = 0.0,
     noise: float = 1.0,
-    calibrate: bool = True,
+    calibrate: bool = False,
 ) -> float:
-    """v2 match score for ONE ion, from its isotopologue rows (matched + unmatched).
+    """v2 match score for ONE ion: the FIT QUALITY of its isotopologue rows against the
+    predicted pattern (matched + unmatched).
+
+    This is a pure measurement of *how well the data fits this assignment* (mass,
+    intensity, SNR-detectability, isotopic pattern) on [0, 1], 1.0 = perfect. It is
+    deliberately competitor-blind: mass alone cannot prove a composition, so deciding
+    *which* of several well-fitting formulas is correct is a separate identification /
+    arbitration layer (peaky), NOT this score. `calibrate=True` applies the Platt curve
+    to recast the fit as a single-candidate P(correct) — that belongs to the confidence
+    layer and is not the headline match score.
 
     `group` must contain `relative_abundance`, `match_mz_error`, `sample_peak_intensity`
     (and optionally `signal_to_noise`). Sorts by predicted abundance (base first), builds
-    the matched arrays, and calls `score_pattern_v2`. Returns the calibrated P(correct)
-    (or the raw fit score if `calibrate=False`)."""
+    the matched arrays, and calls `score_pattern_v2`."""
     g = group.sort_values("relative_abundance", ascending=False)
     pr = pd.to_numeric(g["relative_abundance"], errors="coerce").to_numpy(float)
     if pr.size == 0 or not np.isfinite(pr).any() or np.nanmax(pr) <= 0:
