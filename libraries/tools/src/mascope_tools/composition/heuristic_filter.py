@@ -166,18 +166,23 @@ _SENIOR_VALENCE = {
 def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str]]:
     """Lewis & Senior structural feasibility (Seven Golden Rules, Rule 2).
 
-    Rejects a neutral formula that cannot correspond to any valid molecular graph:
+    Rejects only a neutral formula that cannot correspond to ANY molecular graph:
 
-    1. **Lewis / RDBE** — the ring-and-double-bond equivalents
-       ``RDBE = 1 + sum_i n_i (v_i - 2) / 2`` must be a **non-negative integer**
-       (negative ⇒ over-saturated/impossible; non-integer ⇒ odd-electron radical, not a
-       closed-shell neutral).
+    1. **RDBE ≥ 0** — the ring-and-double-bond equivalents
+       ``RDBE = 1 + sum_i n_i (v_i - 2) / 2`` must be non-negative (negative ⇒
+       over-saturated: more atoms than can be bonded, impossible for any structure).
     2. **Senior connectivity** — the sum of valences must be at least ``2*(N_atoms - 1)``
        so the atoms can form a single connected graph.
 
-    Conservative by design: a formula containing any element outside ``_SENIOR_VALENCE``
-    (or that fails to parse) is **never rejected** here, so exotic compositions are never
-    lost to this filter. See Kind & Fiehn 2007, BMC Bioinformatics 8:105 (Rule 2).
+    Conservative / fail-open by design:
+    - **Odd-electron (radical) formulas are NOT rejected.** A non-integer RDBE marks an
+      open-shell species, which can be genuine (e.g. APCI/APPI radical ions); only the
+      *impossible* (negative-RDBE) formulas are cut.
+    - a formula containing any element outside ``_SENIOR_VALENCE`` (or that fails to parse)
+      is never rejected here, so exotic compositions are never lost to this filter.
+
+    Applies to NEUTRAL formulas only (as produced by ``find_compositions`` before
+    ionization). See Kind & Fiehn 2007, BMC Bioinformatics 8:105 (Rule 2).
     """
     log_messages: list[str] = []
     if candidates.is_empty():
@@ -196,11 +201,13 @@ def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str
             continue
         n_atoms = sum(elems.values())
         valence_sum = sum(_SENIOR_VALENCE[el] * n for el, n in elems.items())
-        # twice_rdbe = 2*RDBE ; integer & >= 0 for a valid closed-shell neutral.
+        # twice_rdbe = 2*RDBE. RDBE >= 0 rejects over-saturated formulas (impossible for
+        # ANY structure). We deliberately do NOT require integer RDBE: an odd-electron
+        # (radical) formula is left to pass, since radical species can be genuine.
         twice_rdbe = 2 + sum((_SENIOR_VALENCE[el] - 2) * n for el, n in elems.items())
-        lewis_ok = twice_rdbe >= 0 and twice_rdbe % 2 == 0
+        not_oversaturated = twice_rdbe >= 0
         connect_ok = n_atoms <= 1 or valence_sum >= 2 * (n_atoms - 1)
-        mask.append(bool(lewis_ok and connect_ok))
+        mask.append(bool(not_oversaturated and connect_ok))
     return pl.Series(mask, dtype=pl.Boolean), log_messages
 
 
