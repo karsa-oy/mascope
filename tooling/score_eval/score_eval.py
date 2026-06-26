@@ -405,7 +405,12 @@ def main() -> int:
     cands = cands.assign(score=s1)
 
     # ---- ranking: per anchor, is the true candidate the argmax? ----
-    top1, top1_contested, n_contested = [], [], 0
+    # `_plausible` variants restrict decoys to the chemically plausible ones (the
+    # score-only test: rejecting implausible mass-degenerate formulas is chemistry's
+    # job, so the score should beat the PLAUSIBLE alternatives).
+    has_plaus = "is_plausible" in cands.columns
+    top1, top1_contested = [], []
+    top1_contested_plausible, n_contested, n_contested_plaus = [], 0, 0
     for (_, _), g in cands.groupby(["filename", "anchor_mz"]):
         g = g.dropna(subset=["score"])
         if g.empty or not g["is_true"].any():
@@ -415,6 +420,13 @@ def main() -> int:
         if len(g) > 1:  # contested = has at least one decoy
             n_contested += 1
             top1_contested.append(win_true)
+        if has_plaus:
+            gp = g[g["is_plausible"].fillna(False) | g["is_true"]]
+            if gp["is_true"].any() and len(gp) > 1:
+                n_contested_plaus += 1
+                top1_contested_plausible.append(
+                    bool(gp.loc[gp["score"].idxmax(), "is_true"])
+                )
 
     auc = _roc_auc(cands["is_true"].to_numpy(int), np.nan_to_num(cands["score"].to_numpy(), nan=0.0))
 
@@ -471,6 +483,11 @@ def main() -> int:
         "reproducible": reproducible,
         "rank_top1_all": round(float(np.mean(top1)), 4) if top1 else None,
         "rank_top1_contested": round(float(np.mean(top1_contested)), 4) if top1_contested else None,
+        "rank_top1_contested_plausible": (
+            round(float(np.mean(top1_contested_plausible)), 4)
+            if top1_contested_plausible else None
+        ),
+        "n_contested_plausible": int(n_contested_plaus),
         "roc_auc": round(auc, 4),
         "ece": round(ece, 4),
         "ece_calibrated": round(float(ece_cal), 4) if ece_cal is not None else None,
