@@ -17,7 +17,7 @@ from its isotopologue peaks. It is deliberately:
 - **not a probability of correctness** — mass alone cannot prove a composition
   ([Kind & Fiehn 2006](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-7-234)),
   so "is this the *right* formula among the ones that fit?" is a separate
-  **identification-confidence** layer (see [`assignment_confidence.md`](../../../docs/dev/assignment_confidence.md));
+  **identification-confidence** layer (a distinct workstream that builds on this score);
 - **deterministic and reproducible** — the same spectrum always yields the same score,
   with no dependence on a trained/calibrated model.
 
@@ -159,8 +159,8 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 - **Single-ion:** it scores one ion's isotope envelope; cross-peak corroboration (adducts,
   in-source fragments) is the confidence layer's job, not the score's.
 - **Not a probability:** pairing with `calibrate_score` (Platt) yields a single-candidate
-  $P(\text{correct})$, but that belongs to the confidence layer — see
-  [`assignment_confidence.md`](../../../docs/dev/assignment_confidence.md).
+  $P(\text{correct})$, but that belongs to the identification-confidence layer (a separate
+  workstream), not the fit score.
 
 ## References
 
