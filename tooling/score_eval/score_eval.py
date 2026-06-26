@@ -161,27 +161,12 @@ def score_ion(mzs: np.ndarray, ints: np.ndarray, ion: str, *, ppm: float) -> flo
     return float(score_pattern(obs_mz, obs_mz_err, obs_int, obs_int_err, pred_rel))
 
 
-def score_ion_v2(
-    mzs: np.ndarray,
-    ints: np.ndarray,
-    snrs: "np.ndarray | None",
-    ion: str,
-    *,
-    ppm: float,
-    noise: float = 0.0,
-    k_detect: float = 3.0,
-    miss_penalty: float = 0.3,
-    sigma_ppm: float | None = None,
-    mu: float = 0.0,
-    snr_intensity: bool = True,
-) -> float | None:
-    """Match the candidate ion's predicted envelope to the observed peaks, then
-    delegate to the PROMOTED library scorer `mascope_tools...score_pattern_v2` (the
-    single source of truth). Builds the matched arrays (per predicted isotopologue:
-    ppm error, observed intensity, observed SNR; 0 if unmatched). When real per-peak
-    SNR isn't available, derives it from the noise floor (`SNR ≈ height/noise`).
-    `snr_intensity` is retained for signature compat; v2 always uses SNR intensity."""
-    from mascope_tools.composition.heuristic_filter import predict_isotopes, score_pattern_v2
+def _match_arrays(mzs, ints, snrs, ion, *, ppm, mu=0.0, noise=0.0):
+    """Build v2's per-isotopologue matched arrays (obs_me, obs_int, obs_snr, pred_rel)
+    for one ion by matching its predicted envelope to the observed peaks. None if the
+    ion can't be predicted or its monoisotopic peak is absent. Mass errors are
+    offset-centred by mu; SNR falls back to height/noise when not provided."""
+    from mascope_tools.composition.heuristic_filter import predict_isotopes
 
     sign = ion[-1] if ion and ion[-1] in "+-" else ""
     if not sign:
@@ -194,7 +179,6 @@ def score_ion_v2(
     if len(pred_mz) == 0:
         return None
     pred_rel = pred_int / pred_int[0]
-
     n = len(pred_mz)
     obs_int = np.zeros(n)
     obs_me = np.zeros(n)
@@ -213,8 +197,59 @@ def score_ion_v2(
         return None  # monoisotopic must be present
     if snrs is None:  # proxy SNR from the noise floor
         obs_snr = np.where(obs_int > 0, obs_int / max(noise, 1e-9), 0.0)
+    return obs_me, obs_int, obs_snr, pred_rel
+
+
+def score_ion_v2(
+    mzs: np.ndarray,
+    ints: np.ndarray,
+    snrs: "np.ndarray | None",
+    ion: str,
+    *,
+    ppm: float,
+    noise: float = 0.0,
+    k_detect: float = 3.0,
+    miss_penalty: float = 0.3,
+    sigma_ppm: float | None = None,
+    mu: float = 0.0,
+    snr_intensity: bool = True,
+) -> float | None:
+    """Match the candidate ion's envelope and delegate to the PROMOTED library scorer
+    `mascope_tools...score_pattern_v2` (single source of truth). `snr_intensity` is
+    retained for signature compat; v2 always uses SNR-set intensity tolerance."""
+    from mascope_tools.composition.heuristic_filter import score_pattern_v2
+
+    arrs = _match_arrays(mzs, ints, snrs, ion, ppm=ppm, mu=mu, noise=noise)
+    if arrs is None:
+        return None
+    obs_me, obs_int, obs_snr, pred_rel = arrs
     return score_pattern_v2(obs_me, obs_int, obs_snr, pred_rel,
                             k_detect=k_detect, miss_penalty=miss_penalty, sigma_ppm=sigma_ppm)
+
+
+def score_v2_resample_std(mzs, ints, snrs, ion, *, ppm, mu=0.0, noise=0.0,
+                          sigma_ppm=None, k_detect=3.0, miss_penalty=0.3, n=16, rng=None):
+    """ROBUSTNESS metric: std of the v2 score when each matched peak's intensity is
+    resampled within its own measurement noise (Gaussian, sigma = intensity/SNR). A
+    robust score barely moves under noise. None if the ion can't be scored."""
+    from mascope_tools.composition.heuristic_filter import score_pattern_v2
+
+    arrs = _match_arrays(mzs, ints, snrs, ion, ppm=ppm, mu=mu, noise=noise)
+    if arrs is None:
+        return None
+    obs_me, obs_int, obs_snr, pred_rel = arrs
+    rng = rng or np.random.default_rng(0)
+    matched = obs_int > 0
+    sigma_int = np.where(matched & (obs_snr > 0), obs_int / np.maximum(obs_snr, 1e-9), 0.0)
+    scores = []
+    for _ in range(n):
+        pert = np.where(matched, np.maximum(obs_int + rng.normal(0.0, sigma_int), 0.0), 0.0)
+        if pert[0] <= 0:  # base perturbed below zero -> skip this draw
+            continue
+        scores.append(score_pattern_v2(obs_me, pert, obs_snr, pred_rel,
+                                       k_detect=k_detect, miss_penalty=miss_penalty,
+                                       sigma_ppm=sigma_ppm))
+    return float(np.std(scores)) if len(scores) >= 2 else None
 
 
 def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -336,6 +371,15 @@ def main() -> int:
         print(f"!! {cand_path} not found — run make_candidates.py first.")
         return 2
 
+    # per-file v2 mass-term params: (match window, scoring sigma, mu). Fitted +
+    # prediction-spread quadrature when available, else the fixed/fallback sigma.
+    def _v2_params(filename):
+        mu, sigma, _ = cal.get(filename, (0.0, None, 0))
+        if a.fit_sigma and sigma is not None:
+            sigma = float(np.hypot(sigma, PRED_SIGMA_PPM))
+            return max(a.match_k * sigma, 1.0), sigma, mu
+        return a.ppm, a.sigma_ppm, 0.0
+
     # score every candidate
     def score_all() -> np.ndarray:
         out = np.full(len(cands), np.nan)
@@ -345,12 +389,7 @@ def main() -> int:
                 continue
             mzs, ints, snrs, noise = rec
             if a.scorer == "v2":
-                mu, sigma, _ = cal.get(r.filename, (0.0, None, 0))
-                if a.fit_sigma and sigma is not None:
-                    sigma = float(np.hypot(sigma, PRED_SIGMA_PPM))  # + prediction spread
-                    window = max(a.match_k * sigma, 1.0)
-                else:  # fixed / fallback
-                    sigma, mu, window = a.sigma_ppm, 0.0, a.ppm
+                window, sigma, mu = _v2_params(r.filename)
                 s = score_ion_v2(mzs, ints, snrs, r.candidate_ion, ppm=window, noise=noise,
                                  k_detect=a.k_detect, miss_penalty=a.miss_penalty,
                                  sigma_ppm=sigma, mu=mu, snr_intensity=(a.intensity == "snr"))
@@ -403,6 +442,29 @@ def main() -> int:
     # ---- baseline score distribution of the TRUE assignments ----
     true_scores = valid.loc[valid["is_true"], "score"].to_numpy()
 
+    # ---- robustness: how much does a TRUE assignment's score wobble when its peak
+    # intensities are resampled within their noise? (v2 only; small = robust) ----
+    robustness = None
+    if a.scorer == "v2":
+        tr = valid[valid["is_true"]]
+        tr = tr.sample(min(len(tr), 800), random_state=0) if len(tr) else tr
+        rrng = np.random.default_rng(0)
+        stds = []
+        for r in tr.itertuples():
+            rec = obs.get(r.filename)
+            if rec is None:
+                continue
+            mzs, ints, snrs, noise = rec
+            window, sigma, mu = _v2_params(r.filename)
+            sd = score_v2_resample_std(
+                mzs, ints, snrs, r.candidate_ion, ppm=window, mu=mu, noise=noise,
+                sigma_ppm=sigma, k_detect=a.k_detect, miss_penalty=a.miss_penalty, rng=rrng,
+            )
+            if sd is not None:
+                stds.append(sd)
+        if stds:
+            robustness = round(float(np.median(stds)), 4)
+
     metrics = {
         "n_anchors": int(len(top1)),
         "n_contested": int(n_contested),
@@ -412,6 +474,7 @@ def main() -> int:
         "roc_auc": round(auc, 4),
         "ece": round(ece, 4),
         "ece_calibrated": round(float(ece_cal), 4) if ece_cal is not None else None,
+        "robustness_score_std": robustness,
         "true_score_median": round(float(np.median(true_scores)), 4) if len(true_scores) else None,
         "true_score_p10": round(float(np.percentile(true_scores, 10)), 4) if len(true_scores) else None,
     }
