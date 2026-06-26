@@ -25,27 +25,33 @@ import pandas as pd
 
 from mascope_tools.composition.heuristic_filter import calibrate_score, score_pattern_v2
 
+
 # Correct matches spread wider than the calibration-anchor precision (centroiding +
 # prediction error + analyte tail); added in quadrature to the fitted instrument sigma.
 PRED_SIGMA_PPM = 0.5
 
 
 def match_score_version() -> int:
-    """Backend match-score switch: 1 = legacy Sum(score*rel_ab), 2 = mascope_tools
-    v2. Env `MASCOPE_MATCH_SCORE_VERSION` (default 1). Both paths stay wired so a
-    sample can be scored each way and compared."""
+    """Backend match-score switch: 1 = legacy Sum(score*rel_ab), 2 = consolidated
+    mascope_tools v2. Env `MASCOPE_MATCH_SCORE_VERSION` (default 2 — v2 is the
+    consolidated default; set =1 to fall back to the legacy score). Both paths stay
+    wired so a sample can be scored each way and compared."""
     try:
-        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "1"))
+        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "2"))
     except (TypeError, ValueError):
-        return 1
+        return 2  # malformed value -> the default, not a silent downgrade to v1
 
 
-def fit_sample_mass_accuracy(match_isotope_df: pd.DataFrame) -> tuple[float, float | None]:
+def fit_sample_mass_accuracy(
+    match_isotope_df: pd.DataFrame,
+) -> tuple[float, float | None]:
     """Robust (mu, sigma) ppm of the matched isotopologues' mass error — the
     instrument's measured mass accuracy (resolution-correct, Orbitrap vs TOF).
     Returns sigma=None when there are too few matched anchors (caller falls back)."""
     me = pd.to_numeric(match_isotope_df.get("match_mz_error"), errors="coerce")
-    inten = pd.to_numeric(match_isotope_df.get("sample_peak_intensity"), errors="coerce")
+    inten = pd.to_numeric(
+        match_isotope_df.get("sample_peak_intensity"), errors="coerce"
+    )
     me = me[(inten.fillna(0) > 0) & me.notna()]
     if len(me) < 8:
         return 0.0, None
@@ -57,7 +63,9 @@ def fit_sample_mass_accuracy(match_isotope_df: pd.DataFrame) -> tuple[float, flo
 def sample_noise_floor(match_isotope_df: pd.DataFrame) -> float:
     """Proxy per-sample noise floor from the matched intensities (used for the proxy
     SNR until real signal_to_noise is carried on the isotope rows)."""
-    inten = pd.to_numeric(match_isotope_df.get("sample_peak_intensity"), errors="coerce")
+    inten = pd.to_numeric(
+        match_isotope_df.get("sample_peak_intensity"), errors="coerce"
+    )
     inten = inten[inten > 0]
     return float(np.percentile(inten, 2)) if len(inten) else 1.0
 
@@ -81,14 +89,25 @@ def ion_score_v2(
     if pr.size == 0 or not np.isfinite(pr).any() or np.nanmax(pr) <= 0:
         return 0.0
     pr = np.nan_to_num(pr) / np.nanmax(pr)  # base-relative
-    oi = pd.to_numeric(g["sample_peak_intensity"], errors="coerce").fillna(0.0).to_numpy(float)
-    me = pd.to_numeric(g["match_mz_error"], errors="coerce").fillna(0.0).to_numpy(float) - mu
+    oi = (
+        pd.to_numeric(g["sample_peak_intensity"], errors="coerce")
+        .fillna(0.0)
+        .to_numpy(float)
+    )
+    me = (
+        pd.to_numeric(g["match_mz_error"], errors="coerce").fillna(0.0).to_numpy(float)
+        - mu
+    )
     # A predicted isotopologue that "matched" a satellite (artifact near an intense
     # peak) is not a real match — treat it as absent so the detectability gate applies.
     if "is_satellite" in g.columns:
         sat = g["is_satellite"].fillna(False).astype(bool).to_numpy()
         oi = np.where(sat, 0.0, oi)
-    snr_col = pd.to_numeric(g.get("signal_to_noise"), errors="coerce") if "signal_to_noise" in g else None
+    snr_col = (
+        pd.to_numeric(g.get("signal_to_noise"), errors="coerce")
+        if "signal_to_noise" in g
+        else None
+    )
     if snr_col is not None and snr_col.notna().any():
         snr = snr_col.fillna(0.0).to_numpy(float)
     else:  # proxy SNR from intensity / per-sample noise floor

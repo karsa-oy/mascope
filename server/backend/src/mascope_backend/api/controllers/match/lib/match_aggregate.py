@@ -13,7 +13,9 @@ from mascope_backend.api.models.target.collections.config import (
 )
 from mascope_match.params import (
     DEFAULT_POSSIBLE_MATCH_THRESHOLD,
+    DEFAULT_POSSIBLE_MATCH_THRESHOLD_V2,
     DEFAULT_PROBABLE_MATCH_THRESHOLD,
+    DEFAULT_PROBABLE_MATCH_THRESHOLD_V2,
     BaseMatchParams,
 )
 
@@ -48,13 +50,20 @@ async def set_ions_match_category(
             match_params.possible_match_threshold, index=match_ions_df.index
         )
     else:
-        # Ion-specific overrides (filter_params keyed by instrument), falling
-        # back to the module defaults.
+        # Ion-specific overrides (filter_params keyed by instrument), falling back to
+        # the score-version-aware module defaults: v2 is a fit-quality score whose
+        # category bands differ from v1's cutoffs (see params.py).
+        if match_score_version() == 2:
+            default_probable = DEFAULT_PROBABLE_MATCH_THRESHOLD_V2
+            default_possible = DEFAULT_POSSIBLE_MATCH_THRESHOLD_V2
+        else:
+            default_probable = DEFAULT_PROBABLE_MATCH_THRESHOLD
+            default_possible = DEFAULT_POSSIBLE_MATCH_THRESHOLD
         probable = pd.Series(
-            DEFAULT_PROBABLE_MATCH_THRESHOLD, index=match_ions_df.index, dtype=float
+            default_probable, index=match_ions_df.index, dtype=float
         )
         possible = pd.Series(
-            DEFAULT_POSSIBLE_MATCH_THRESHOLD, index=match_ions_df.index, dtype=float
+            default_possible, index=match_ions_df.index, dtype=float
         )
         if "filter_params" in match_ions_df.columns:
             for i, (instrument, filter_params) in enumerate(
