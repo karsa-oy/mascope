@@ -155,8 +155,9 @@ def verify_manifest(version: Optional[str] = None) -> list[str]:
     """
     Verify every file listed in a cached bundle's manifest against its SHA-256.
 
-    Checks the raw files and the snapshot dump. Returns a list of human-readable
-    problems; an empty list means the bundle is intact.
+    Checks the raw files, the seed/snapshot dumps, and the expected goldens.
+    Returns a list of human-readable problems; an empty list means the bundle is
+    intact.
 
     :param version: Bundle version tag. Defaults to the registry default.
     :return: List of mismatch/missing-file messages (empty when all good).
@@ -186,5 +187,9 @@ def verify_manifest(version: Optional[str] = None) -> list[str]:
         dump = manifest.get(block, {})
         if dump.get("dump"):
             _check(dump["dump"], dump.get("sha256"))
+
+    expected = manifest.get("expected", {})
+    if expected.get("peaks"):
+        _check(expected["peaks"], expected.get("sha256"))
 
     return problems
