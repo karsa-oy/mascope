@@ -20,9 +20,15 @@ import { useConfirm } from 'primevue/useconfirm'
 import { FilterMatchMode } from '@primevue/core/api'
 
 import { useApp } from '@/stores'
+import { ROLES } from '@/lib/roles'
 
 const app = useApp()
 const confirm = useConfirm()
+
+// Editing or deleting a mode has a global effect on every sample processed
+// under it, so those operations are restricted to admins. Creating stays at
+// editor level (the create form remains visible to all editors).
+const isAdmin = computed(() => app.auth.user.role_id >= ROLES.admin)
 
 const add = reactive({
   ionization_mode_name: '',
@@ -125,9 +131,13 @@ const mode = {
   save: async () => {
     if (!edited.value) return
 
+    const e = edited.value
+    const o = e._original
     const mechanismsChanged =
-      JSON.stringify([...edited.value.ionization_mechanism_ids].sort()) !==
-      JSON.stringify([...edited.value._original.ionization_mechanism_ids].sort())
+      JSON.stringify([...e.ionization_mechanism_ids].sort()) !==
+      JSON.stringify([...o.ionization_mechanism_ids].sort())
+    const calibrationChanged = e.calibration_collection_id !== o.calibration_collection_id
+    const diagnosticChanged = e.diagnostic_collection_id !== o.diagnostic_collection_id
 
     const doSave = async () => {
       const { ionization_mode_id, _original, ...updateData } = edited.value
@@ -135,23 +145,34 @@ const mode = {
       resetEdit()
     }
 
-    if (mechanismsChanged) {
+    // Editing a mode affects every sample processed under it. A calibration
+    // collection change requires re-calibration to take effect (stronger
+    // signal); mechanism/diagnostic changes only need a rematch. Warn
+    // accordingly before persisting.
+    if (calibrationChanged) {
       confirm.require({
         icon: 'pi pi-exclamation-triangle',
         header: 'Confirm ionization mode update',
         message:
-          'Changing the ionization mechanisms will affect all associated samples.' +
-          'Batches containing those samples will need to be re-matched. Do you want to proceed?',
+          'Changing the calibration collection affects how all samples processed under ' +
+          'this mode are mass-calibrated. Affected batches will be flagged for re-calibration ' +
+          'and must be re-calibrated (then re-matched) for the new collection to take effect. ' +
+          'Do you want to proceed?',
         accept: doSave,
-        acceptProps: {
-          icon: 'pi pi-check',
-          label: 'Update',
-          severity: 'warn'
-        },
-        rejectProps: {
-          label: 'Cancel',
-          severity: 'secondary'
-        }
+        acceptProps: { icon: 'pi pi-check', label: 'Update', severity: 'warn' },
+        rejectProps: { label: 'Cancel', severity: 'secondary' }
+      })
+    } else if (mechanismsChanged || diagnosticChanged) {
+      confirm.require({
+        icon: 'pi pi-exclamation-triangle',
+        header: 'Confirm ionization mode update',
+        message:
+          'Changing the ionization mechanisms or diagnostic collection affects all associated ' +
+          'samples. Batches containing those samples will be flagged for re-matching. ' +
+          'Do you want to proceed?',
+        accept: doSave,
+        acceptProps: { icon: 'pi pi-check', label: 'Update', severity: 'warn' },
+        rejectProps: { label: 'Cancel', severity: 'secondary' }
       })
     } else {
       await doSave()
@@ -430,7 +451,7 @@ defineExpose({
       <Column header="Calibration Collection" style="min-width: 150px">
         <template #body="{ data }">
           <Select
-            v-if="editing(data) && data.calibration_collection_id === null"
+            v-if="editing(data)"
             v-model="edited.calibration_collection_id"
             :options="calibrationCollections"
             optionLabel="target_collection_name"
@@ -458,7 +479,7 @@ defineExpose({
       <Column header="Diagnostic Collection" style="min-width: 150px">
         <template #body="{ data }">
           <Select
-            v-if="editing(data) && data.diagnostic_collection_id === null"
+            v-if="editing(data)"
             v-model="edited.diagnostic_collection_id"
             :options="diagnosticCollections"
             optionLabel="target_collection_name"
@@ -505,7 +526,7 @@ defineExpose({
                 @click="mode.save"
               />
             </template>
-            <template v-else>
+            <template v-else-if="isAdmin">
               <Button
                 v-tooltip="{ value: 'Edit ionization mode', showDelay: 500 }"
                 icon="pi pi-pencil"
@@ -519,6 +540,13 @@ defineExpose({
                 text
                 size="small"
                 @click="mode.delete(data)"
+              />
+            </template>
+            <template v-else>
+              <i
+                class="pi pi-lock"
+                style="opacity: 0.4"
+                v-tooltip="{ value: 'Editing ionization modes requires admin access', showDelay: 500 }"
               />
             </template>
           </div>
