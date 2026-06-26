@@ -33,6 +33,10 @@ import pandas as pd
 
 MZ_PPM = 5.0
 INT_TOL = 0.4  # mascope_tools ISOTOPE_MATCHING_INTENSITY_TOLERANCE
+# Correct matches spread WIDER than the calibration-anchor precision (centroiding +
+# prediction error + the analyte tail). Added in quadrature to the fitted instrument
+# sigma so a tiny fitted sigma doesn't crush legitimate true ions. Instrument-agnostic.
+PRED_SIGMA_PPM = 0.5
 
 
 def load_filestore_peaks(bundle_dir: str, filename: str, _cache: dict = {}) -> "pd.DataFrame | None":
@@ -68,6 +72,44 @@ def load_filestore_peaks(bundle_dir: str, filename: str, _cache: dict = {}) -> "
     )
     _cache[filename] = df
     return df
+
+
+def fit_mass_accuracy(bundle_dir: str, filename: str, _cache: dict = {}, _exp: list = [None]) -> tuple:
+    """Robust (mu, sigma, n) of the ppm mass error for a sample, fit from its TRUE
+    M0 assignments (the seeded targets, observed m/z vs theoretical) — i.e. the
+    instrument's MEASURED mass accuracy. mu = median ppm error, sigma = 1.4826*MAD.
+    Returns sigma=None when there are too few anchors (caller falls back). This is
+    the value that makes the mass term resolution-correct (Orbitrap vs TOF)."""
+    if filename in _cache:
+        return _cache[filename]
+    from mascope_tools.composition.heuristic_filter import predict_isotopes
+
+    if _exp[0] is None:
+        _exp[0] = pd.read_parquet(f"{bundle_dir}/expected/peaks.parquet")
+    exp = _exp[0]
+    m0 = exp[
+        (exp["filename"] == filename)
+        & ~exp["target_isotope_formula"].astype(str).str.contains(r"\[", regex=True)
+    ]
+    errs = []
+    for r in m0.itertuples():
+        ion = str(r.target_isotope_formula)
+        if not ion or ion[-1] not in "+-":
+            continue
+        try:
+            theo = float(predict_isotopes(ion[:-1], 1 if ion[-1] == "+" else -1, None)[0][0])
+        except Exception:
+            continue
+        errs.append((float(r.mz) - theo) / theo * 1e6)
+    if len(errs) < 8:
+        res = (0.0, None, len(errs))
+    else:
+        e = np.asarray(errs)
+        mu = float(np.median(e))
+        sigma = max(float(1.4826 * np.median(np.abs(e - mu))), 0.05)  # honest fit
+        res = (mu, sigma, len(errs))
+    _cache[filename] = res
+    return res
 
 
 def score_ion(mzs: np.ndarray, ints: np.ndarray, ion: str, *, ppm: float) -> float | None:
@@ -129,7 +171,8 @@ def score_ion_v2(
     noise: float = 0.0,
     k_detect: float = 3.0,
     miss_penalty: float = 0.3,
-    sigma_ppm: float = 2.0,
+    sigma_ppm: float | None = None,
+    mu: float = 0.0,
     snr_intensity: bool = True,
 ) -> float | None:
     """Match the candidate ion's predicted envelope to the observed peaks, then
@@ -164,7 +207,7 @@ def score_ion_v2(
             continue
         k = lo + int(np.argmin(np.abs(mzs[lo:hi] - pmz)))
         obs_int[i] = ints[k]
-        obs_me[i] = abs(mzs[k] - pmz) / pmz * 1e6
+        obs_me[i] = (mzs[k] - pmz) / pmz * 1e6 - mu  # offset-centred; library abs()es
         obs_snr[i] = float(snrs[k]) if snrs is not None else 0.0
     if obs_int[0] <= 0:
         return None  # monoisotopic must be present
@@ -231,9 +274,17 @@ def main() -> int:
                     help="v1 = current mascope_tools; v2 = detectability-gated")
     ap.add_argument("--k-detect", type=float, default=3.0, help="v2: min expected SNR to call an absent isotopologue 'missing'")
     ap.add_argument("--miss-penalty", type=float, default=0.3, help="v2: likelihood for a detectable-but-absent isotopologue")
-    ap.add_argument("--sigma-ppm", type=float, default=2.0, help="v2: mass-error Gaussian width")
+    ap.add_argument("--fit-sigma", action=argparse.BooleanOptionalAction, default=True,
+                    help="v2: fit per-sample mass accuracy (mu,sigma) from true assignments "
+                         "and use it (resolution-correct); --no-fit-sigma uses --sigma-ppm")
+    ap.add_argument("--sigma-ppm", type=float, default=None,
+                    help="v2: fixed mass-error width when --no-fit-sigma (else fitted)")
+    ap.add_argument("--match-k", type=float, default=6.0,
+                    help="v2: match window in units of sigma (scales with resolution)")
     ap.add_argument("--intensity", choices=["snr", "linear"], default="snr",
                     help="v2: intensity term — snr-normalised (default) or linear")
+    ap.add_argument("--dump-calibration", action="store_true",
+                    help="print the full-set Platt (a,b) for DEFAULT_CALIBRATION_V2")
     ap.add_argument("--baseline", help="JSON to compare against (regression gate)")
     ap.add_argument("--out", help="write metrics JSON here")
     a = ap.parse_args()
@@ -265,6 +316,20 @@ def main() -> int:
         "matched-target proxy (no SNR)"
     print(f"scorer={a.scorer}  peaks: {n_fs}/{len(filenames)} files from {src}")
 
+    # Per-sample fitted mass accuracy (mu, sigma) for the resolution-correct mass term.
+    cal = {}
+    if a.scorer == "v2" and a.fit_sigma:
+        for f in filenames:
+            cal[f] = fit_mass_accuracy(a.bundle_dir, f)
+        sig = [v[1] for v in cal.values() if v[1] is not None]
+        if sig:
+            print(f"fitted mass accuracy sigma: median {np.median(sig):.2f} ppm "
+                  f"(range {min(sig):.2f}-{max(sig):.2f}) over {len(sig)} files; "
+                  f"match window = {a.match_k}*sigma")
+    elif a.scorer == "v2":
+        fb = a.sigma_ppm if a.sigma_ppm is not None else "FALLBACK"
+        print(f"v2 mass term: FIXED sigma_ppm={fb}, match window={a.ppm} ppm (--no-fit-sigma)")
+
     try:
         cands = pd.read_parquet(cand_path)
     except Exception:
@@ -280,9 +345,15 @@ def main() -> int:
                 continue
             mzs, ints, snrs, noise = rec
             if a.scorer == "v2":
-                s = score_ion_v2(mzs, ints, snrs, r.candidate_ion, ppm=a.ppm, noise=noise,
+                mu, sigma, _ = cal.get(r.filename, (0.0, None, 0))
+                if a.fit_sigma and sigma is not None:
+                    sigma = float(np.hypot(sigma, PRED_SIGMA_PPM))  # + prediction spread
+                    window = max(a.match_k * sigma, 1.0)
+                else:  # fixed / fallback
+                    sigma, mu, window = a.sigma_ppm, 0.0, a.ppm
+                s = score_ion_v2(mzs, ints, snrs, r.candidate_ion, ppm=window, noise=noise,
                                  k_detect=a.k_detect, miss_penalty=a.miss_penalty,
-                                 sigma_ppm=a.sigma_ppm, snr_intensity=(a.intensity == "snr"))
+                                 sigma_ppm=sigma, mu=mu, snr_intensity=(a.intensity == "snr"))
             else:
                 s = score_ion(mzs, ints, r.candidate_ion, ppm=a.ppm)
             if s is not None:
@@ -313,6 +384,9 @@ def main() -> int:
     sc = valid["score"].to_numpy()
     yy = valid["is_true"].to_numpy(int)
     ece = _ece(sc, yy)
+    if a.dump_calibration:
+        a_pl, b_pl = _platt_fit(sc, yy)
+        print(f"DEFAULT_CALIBRATION (full-set Platt fit): ({a_pl:.4f}, {b_pl:.4f})")
 
     # ---- calibration LAYER: fit P(correct)=sigmoid(a*score+b), honest train/test
     # split by file so a calibrated score is a probability. ECE_cal is out-of-sample.

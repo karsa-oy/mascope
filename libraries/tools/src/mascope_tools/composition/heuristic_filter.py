@@ -605,11 +605,18 @@ def score_pattern(
 # ---------------------------------------------------------------------------
 SCORE_VERSION = 2
 
+# Mass-error Gaussian width used ONLY when the caller does not supply the
+# instrument's fitted mass accuracy. The mass term is `exp(-0.5*(ppm/sigma)^2)`, so
+# `sigma_ppm` must match the instrument: ~0.5-2 ppm for an Orbitrap, ~5-10 ppm for a
+# TOF. This fallback is Orbitrap-appropriate and is WRONG for a TOF (it would tank
+# valid low-resolution matches) — pass the per-sample fitted sigma instead.
+FALLBACK_SIGMA_PPM = 2.0
+
 # Platt calibration (raw fit score -> P(correct)) fitted on the demo Br/Ur golden
 # set. Maps a raw v2 score to a probability; refit per instrument/dataset with the
 # score_eval harness (DESIGN.md §5.3) for production — a sensible default, not a
 # universal constant.
-DEFAULT_CALIBRATION_V2 = (7.3815, -6.1694)  # (a, b) fit on the demo Br/Ur golden set
+DEFAULT_CALIBRATION_V2 = (6.0546, -4.1481)  # (a, b) fit on the demo Br/Ur golden set
 
 
 def calibrate_score(raw, calibration=None):
@@ -626,7 +633,7 @@ def score_pattern_v2(
     *,
     k_detect: float = 3.0,
     miss_penalty: float = 0.3,
-    sigma_ppm: float = 2.0,
+    sigma_ppm: float | None = None,
 ) -> float:
     """Detectability-gated, SNR-aware match score in [0, 1].
 
@@ -637,7 +644,14 @@ def score_pattern_v2(
     (`predicted_rel[i]*SNR_base >= k_detect`), else it is excluded (below noise, not
     evidence). Aggregation is a predicted-abundance-weighted geometric mean. Returns
     0 if the monoisotopic peak is absent. Satellite peaks must be excluded by the
-    caller. Pair with `calibrate_score` to get P(correct)."""
+    caller. Pair with `calibrate_score` to get P(correct).
+
+    `sigma_ppm` is the instrument's mass-error std (the mass-term width); pass the
+    fitted per-sample value so the score is resolution-correct (Orbitrap vs TOF).
+    `observed_mass_errors_ppm` should be offset-centred (subtract the fitted mu).
+    When `sigma_ppm` is None, `FALLBACK_SIGMA_PPM` is used — Orbitrap-only; see it."""
+    if sigma_ppm is None:
+        sigma_ppm = FALLBACK_SIGMA_PPM
     oi = np.asarray(observed_intensities, float)
     if len(oi) == 0 or oi[0] <= 0:
         return 0.0
