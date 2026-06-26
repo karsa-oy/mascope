@@ -10,10 +10,10 @@ See tooling/score_eval/DESIGN.md. The score returned is the CALIBRATED P(correct
 (Platt curve fit on the demo golden set; refit per instrument class).
 
 NOTE: this is a pure function (unit-tested via mascope_tools). End-to-end behaviour
-in the live match pipeline must be validated with the backend test suite. The first
-experiment uses a PROXY SNR derived from intensities when `signal_to_noise` isn't yet
-carried on the isotope rows; real SNR is plumbed by keeping `signal_to_noise` through
-`_parse_and_filter_peaks` -> `_match_assign`.
+in the live match pipeline must be validated with the backend test suite. Real
+`signal_to_noise` is now carried on the isotope rows (compute_match_isotopes ->
+load_peaks coord -> _parse_and_filter_peaks -> _match_assign); the intensity-derived
+PROXY SNR is used only as a fallback when that column is absent/all-NaN.
 """
 
 from __future__ import annotations
