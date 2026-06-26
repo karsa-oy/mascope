@@ -122,6 +122,20 @@ def _opentfraw_version() -> str | None:
     return None
 
 
+def _match_score_version() -> int | None:
+    """The match-score implementation behind expected/ions.parquet (1 = legacy
+    Sum(score*rel_ab), 2 = consolidated mascope_tools v2), so a bundle self-identifies
+    which scorer produced its goldens. Best-effort; None if the backend is unavailable."""
+    try:
+        from mascope_backend.api.controllers.match.lib.match_score_v2 import (
+            match_score_version,
+        )
+
+        return match_score_version()
+    except Exception:
+        return None
+
+
 def _copy_raw(raw_dir: Path, out_dir: Path) -> tuple[list[dict], list[dict]]:
     """
     Copy + de-identify raw files into ``out_dir/raw``.
@@ -485,6 +499,7 @@ def build(
         "produced_with": {
             "mascope_version": runtime.parse_version(),
             "opentfraw_version": _opentfraw_version(),
+            "match_score_version": _match_score_version(),
         },
         "raw": raw_entries,
         # Preserve hand-tuned tolerances across a refresh; default on first build.
