@@ -190,18 +190,23 @@ no backend or DB, only `mascope_tools` + tests.
 
 ### P1 progress
 
-- **`rule_senior` implemented** (Lewis/RDBE + Senior connectivity), replacing the stub, with
-  conservative fail-open behaviour and unit tests (`test_rule_senior.py`). Still **boolean**
-  for now; the move to a graded `plausibility ∈ [0,1]` and the DB element-ratio
-  probabilities (Rule 6) are the remaining P1 work.
-- **Integration caveat discovered.** Validated against all 92 demo target compounds: the rule
-  flags 5 of them (`C9H15O6`, `C10H15O5`, `C10H17O7`, `C6H17NO4`, `Br`). These are *correct*
-  chemistry calls — odd-electron radicals / over-saturated / lone-atom **as neutrals** — and
-  reveal that the demo stores some targets in **charge-adjusted (ionic) form**, not as
-  closed-shell neutrals. **The structural rules are valid only for neutral formulas.** In the
-  live pipeline this is satisfied (`find_compositions` enumerates neutral compositions before
-  ionization), but P1 must guarantee the rule is never applied to ion/charge-adjusted
-  formulas — and any golden validation must neutralise the stored formulas first.
+- **`rule_senior` implemented** (RDBE ≥ 0 + Senior connectivity), replacing the stub, with
+  unit tests (`test_rule_senior.py`). It is conservative and **fails open**: only
+  over-saturated (negative-RDBE, impossible-for-any-structure) and disconnectable formulas
+  are rejected; **odd-electron radicals pass** (they can be genuine in APCI/APPI), and any
+  element outside the standard valence table passes. Still **boolean** for now; the move to a
+  graded `plausibility ∈ [0,1]` and the DB element-ratio probabilities (Rule 6) are the
+  remaining P1 work.
+- **Validated against all 92 demo target compounds** (confirmed they are genuine
+  `target_compound.target_compound_formula` *neutral* formulas — ions are built `compound +
+  ionization`, e.g. `C10H15O5` + `+H+` → `C10H16O5+`). After the radical fail-open, the rule
+  flags exactly **1**: `C6H17NO4` (17 H on a C6NO4 skeleton; max is 15 — impossible for any
+  neutral structure), almost certainly a data error.
+- **Data-quality finding for later chemical review** (`analyze carefully afterwards`): four
+  demo compounds are **odd-electron radicals as neutrals** — `C9H15O6`, `C10H15O5`,
+  `C10H17O7` (odd H, no N) and `Br` (a lone halogen, the bromide reagent). These now *pass*
+  the rule (fail-open), but it is worth confirming whether they are legitimate radical
+  species or off-by-one-H / reagent-representation artefacts in the test data.
 
 ## 5. References
 
