@@ -103,7 +103,7 @@ reproducibility test verify exactly what they loaded. Shape:
   "seed": { "dump": "seed/mascope_demo.dump", "sha256": "..." },
   "snapshot": { "dump": "snapshot/mascope_demo.dump", "sha256": "...", "filestore": "snapshot/filestore" },
   "expected": { "peaks": "expected/peaks.parquet", "sha256": "..." },
-  "tolerances": { "mz_ppm": 1.0, "intensity_rel": 0.01, "area_rel": 0.02 }
+  "tolerances": { "mz_ppm": 0.1, "intensity_rel": 0.01, "area_rel": 0.02 }
 }
 ```
 

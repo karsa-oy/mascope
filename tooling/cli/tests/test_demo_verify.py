@@ -40,10 +40,10 @@ def test_identical_peaks_reproduce():
 
 
 def test_mz_within_tolerance_passes():
-    """A sub-ppm m/z shift on a matched key is within the default 1 ppm."""
+    """A sub-tolerance m/z shift on a matched key is within the default 0.1 ppm."""
     golden = _peaks([_UREA])
     f, i, fo, mz, h = _UREA
-    actual = _peaks([(f, i, fo, mz * (1 + 0.5e-6), h)])
+    actual = _peaks([(f, i, fo, mz * (1 + 0.05e-6), h)])
     assert compare_peaks(golden, actual) == []
 
 
