@@ -1,0 +1,151 @@
+"""#1 — Scoring-quality extension for the demo golden dataset.
+
+The demo bundle (`mascope-demo-dataset-v1`) records, per detected peak, the TRUE
+assigned formula (the seeded target) and the current match score. That anchors
+*reproducibility* but not scoring *quality*: to test whether a scorer RANKS the
+true formula above plausible wrong ones, and whether its score is CALIBRATED, we
+need, per peak, a candidate pool = {true formula} ∪ {near-mass decoys}.
+
+This script generates that pool. For each M0 peak in `expected/peaks.parquet` it
+enumerates, via `mascope_tools.find_compositions`, the formulas whose ion lands
+within a small m/z window for the polarity's ionization channels, forms the ion
+formula, dedupes, and flags `is_true` against the bundle's assigned ion. Output:
+`expected/candidates.parquet` (filename, anchor_mz, true_ion, candidate_ion,
+ionization, is_true) — the labels the ranking + calibration metrics consume.
+
+Decoys are the assignability test: they are the mass-degenerate alternatives a good
+score must rank below the truth.
+
+    python make_candidates.py <bundle_dir> [--ppm 3] [--max-per-channel 25] [--limit N]
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+
+import pandas as pd
+
+from mascope_tools.composition import CompositionSearchConfig
+from mascope_tools.composition.finder import find_compositions
+from mascope_tools.composition import utils
+
+# Ionization channels + grid element ranges per polarity (mirrors peaky's Br/Ur
+# reagent profiles). '-H-' is deprotonation as a charge-−1 anion (mascope_tools
+# notation), '+Br-' bromide adduct, etc.
+CHANNELS = {
+    "neg": {
+        "ionizations": ["-H-", "+Br-", "+HBrBr-", "+CO3-"],
+        "ranges": "C0-40 H0-80 N0-3 O0-18 S0-2 Cl0-2 Br0-2",
+    },
+    "pos": {
+        "ionizations": ["+H+", "+NH4+", "+(CH4N2O)H+"],
+        "ranges": "C0-40 H0-90 N0-8 O0-15 S0-2",
+    },
+}
+
+
+def _polarity(filename: str) -> str | None:
+    if "_neg_" in filename:
+        return "neg"
+    if "_pos_" in filename:
+        return "pos"
+    return None
+
+
+def _norm_ion(formula: str) -> str:
+    """Normalise an ion formula string for stable equality (Hill order, keep the
+    trailing charge sign)."""
+    f = str(formula).strip()
+    sign = f[-1] if f and f[-1] in "+-" else ""
+    body = f[:-1] if sign else f
+    try:
+        return utils.to_hill_order(body) + sign
+    except Exception:
+        return f
+
+
+def candidates_for_peak(mz: float, polarity: str, *, ppm: float, cap: int) -> dict:
+    """Enumerate candidate ion formulas near `mz` across the polarity's channels.
+    Returns {normalised_ion_formula: ionization}."""
+    spec = CHANNELS[polarity]
+    out: dict[str, str] = {}
+    for mech in spec["ionizations"]:
+        try:
+            im = utils.parse_ionization(mech)
+            cfg = CompositionSearchConfig(
+                ionizations=mech,
+                element_count_ranges=spec["ranges"],
+                mass_range_ppm=ppm,
+                max_result_rows=cap,
+            )
+            for r in find_compositions(mz, cfg):
+                neutral = r.get("formula")
+                if not neutral or neutral == "---":
+                    continue
+                ion = utils.combine_formula_and_ionization(neutral, im)
+                out.setdefault(_norm_ion(ion), mech)
+        except Exception:
+            continue
+    return out
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("bundle_dir")
+    ap.add_argument("--ppm", type=float, default=3.0, help="enumeration m/z window")
+    ap.add_argument("--max-per-channel", type=int, default=25)
+    ap.add_argument("--limit", type=int, default=0, help="cap peaks (0 = all; for smoke)")
+    a = ap.parse_args()
+
+    peaks = pd.read_parquet(f"{a.bundle_dir}/expected/peaks.parquet")
+    # M0 anchors only: the assigned ion's monoisotopic row (no [isotope] label).
+    m0 = peaks[~peaks["target_isotope_formula"].astype(str).str.contains(r"\[", regex=True)]
+    m0 = m0.drop_duplicates(["filename", "target_isotope_formula"]).reset_index(drop=True)
+    if a.limit:
+        m0 = m0.head(a.limit)
+    print(f"M0 anchors: {len(m0)} (of {len(peaks)} isotopologue rows)")
+
+    rows = []
+    n_true_found = 0
+    for n, r in enumerate(m0.itertuples(), 1):
+        pol = _polarity(r.filename)
+        if pol is None:
+            continue
+        true_ion = _norm_ion(r.target_isotope_formula)
+        pool = candidates_for_peak(float(r.mz), pol, ppm=a.ppm, cap=a.max_per_channel)
+        # Guarantee the truth is in the pool even if enumeration narrowly missed it.
+        if true_ion not in pool:
+            pool[true_ion] = "true"
+        else:
+            n_true_found += 1
+        for ion, mech in pool.items():
+            rows.append(
+                {
+                    "filename": r.filename,
+                    "anchor_mz": float(r.mz),
+                    "true_ion": true_ion,
+                    "candidate_ion": ion,
+                    "ionization": mech,
+                    "is_true": ion == true_ion,
+                }
+            )
+        if n % 500 == 0:
+            print(f"  {n}/{len(m0)} anchors  ({len(rows)} candidates)")
+
+    out = pd.DataFrame(rows)
+    dst = f"{a.bundle_dir}/expected/candidates.parquet"
+    out.to_parquet(dst, index=False)
+    n_anchor = out["filename"].nunique() if len(out) else 0
+    per = (len(out) / len(m0)) if len(m0) else 0
+    print(
+        f"\nwrote {dst}\n"
+        f"  {len(out)} candidate rows over {len(m0)} anchors ({per:.1f} cand/anchor)\n"
+        f"  true ion recovered by enumeration: {n_true_found}/{len(m0)} "
+        f"({n_true_found / max(1, len(m0)):.1%})  (rest force-added as is_true)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
