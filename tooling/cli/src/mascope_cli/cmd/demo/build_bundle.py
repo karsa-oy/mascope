@@ -33,6 +33,7 @@ from pathlib import Path
 
 from mascope_cli.cmd.demo import bundles
 from mascope_cli.cmd.demo._seed import DEMO_ENV, env_dir
+from mascope_cli.cmd.demo.verify import DEFAULT_TOLERANCES
 from mascope_cli.runtime import runtime
 
 
@@ -62,8 +63,6 @@ _DEID_NAME = re.compile(
 
 # Instrument label aliasing for de-identification. Original -> published alias.
 INSTRUMENT_ALIASES = {"KORBI2": "Orbion"}
-
-_DEFAULT_TOLERANCES = {"mz_ppm": 1.0, "intensity_rel": 0.01, "area_rel": 0.02}
 
 
 def _deidentify_name(
@@ -474,7 +473,7 @@ def build(
         },
         "raw": raw_entries,
         # Preserve hand-tuned tolerances across a refresh; default on first build.
-        "tolerances": prior.get("tolerances", _DEFAULT_TOLERANCES),
+        "tolerances": prior.get("tolerances", DEFAULT_TOLERANCES),
     }
     for key in ("seed", "snapshot", "expected"):
         if key in prior:

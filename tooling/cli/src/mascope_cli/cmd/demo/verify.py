@@ -22,9 +22,13 @@ only owns the comparison.
 from typing import Any
 
 
-# Default tolerances if a manifest omits them.
+# Canonical default tolerances: written into a freshly built bundle's manifest
+# and used as the fallback when a manifest omits them. The m/z tolerance is
+# sub-ppm because the demo data is high-resolution Orbitrap - the Thermo reader
+# reproduces matched-peak m/z to sub-0.1 ppm (see libraries/thermo), so 1 ppm
+# would be far too loose to catch a real mass-accuracy regression.
 DEFAULT_TOLERANCES: dict[str, float] = {
-    "mz_ppm": 1.0,
+    "mz_ppm": 0.1,
     "intensity_rel": 0.01,
     "area_rel": 0.02,
 }
