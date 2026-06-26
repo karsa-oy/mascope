@@ -1,9 +1,9 @@
-"""Unit tests for the Lewis/Senior structural-feasibility rule (Golden Rule 2).
+"""Unit tests for the Senior/RDBE structural-feasibility rule (Golden Rule 2).
 
-Contract: the rule judges NEUTRAL, closed-shell formulas (as produced by
-`find_compositions` before ionization). Charge-adjusted/ionic formulas (e.g. a stored
-[M-H] form) can read as odd-electron or over-saturated and are correctly flagged — so the
-rule must never be applied to ion formulas. See docs/dev/assignment_confidence.md (P1).
+Contract: the rule judges NEUTRAL formulas (as produced by `find_compositions` before
+ionization) and rejects ONLY the impossible (over-saturated, negative-RDBE) ones. It
+deliberately FAILS OPEN on odd-electron radicals, which can be genuine in APCI/APPI.
+See docs/dev/assignment_confidence.md (P1).
 """
 
 import polars as pl
@@ -24,13 +24,14 @@ def test_valid_molecules_pass():
 
 
 def test_oversaturated_formulas_rejected():
-    # too many H for the carbon skeleton -> negative RDBE, impossible
-    assert _mask(["CH5", "C2H8", "C2H10"]) == [False, False, False]
+    # too many H for the carbon skeleton -> negative RDBE, impossible for any structure
+    assert _mask(["CH5", "C2H8", "C2H10", "C6H17NO4"]) == [False, False, False, False]
 
 
-def test_odd_electron_radicals_rejected():
-    # odd total valence (non-integer RDBE) -> not a closed-shell neutral
-    assert _mask(["CH3", "C2H5", "NH2"]) == [False, False, False]
+def test_odd_electron_radicals_fail_open():
+    # non-integer RDBE marks an open-shell radical; these can be genuine (APCI/APPI), so
+    # the rule passes them rather than rejecting (only impossible formulas are cut)
+    assert _mask(["CH3", "C2H5", "NH2", "C10H15O5", "C9H15O6", "Br"]) == [True] * 6
 
 
 def test_unknown_elements_fail_open():
