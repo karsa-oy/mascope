@@ -39,7 +39,11 @@ def test_absent_monoisotopic_scores_zero():
         {"relative_abundance": [1.0, 0.11], "match_mz_error": [0.0, 0.0],
          "sample_peak_intensity": [0.0, 0.0], "signal_to_noise": [0.0, 0.0]}
     )
-    assert ion_score_v2(g, sigma_ppm=0.5) == 0.0
+    # Absent monoisotopic -> raw score 0 (no match). The calibrated probability cannot
+    # be exactly 0 (sigmoid); it maps to the calibration floor ~0.0155, which is the
+    # observed live minimum for no-evidence ions.
+    assert ion_score_v2(g, sigma_ppm=0.5, calibrate=False) == 0.0
+    assert ion_score_v2(g, sigma_ppm=0.5) < 0.02
 
 
 def test_proxy_snr_path_when_column_absent():
@@ -81,8 +85,29 @@ def test_satellite_matched_isotopologue_treated_as_absent():
 
 def test_match_score_version_env(monkeypatch):
     monkeypatch.delenv("MASCOPE_MATCH_SCORE_VERSION", raising=False)
-    assert match_score_version() == 1
-    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "2")
-    assert match_score_version() == 2
+    assert match_score_version() == 2  # v2 is the consolidated default
+    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "1")
+    assert match_score_version() == 1  # explicit legacy escape hatch
     monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "garbage")
-    assert match_score_version() == 1
+    assert match_score_version() == 2  # malformed -> default, not a silent downgrade
+
+
+def test_category_thresholds_are_score_version_aware(monkeypatch):
+    """Categories use version-aware default bands: v1 (0.8/0.7 on the ~0.95-clustered
+    fit score) vs v2 (0.7/0.3 on the calibrated-probability scale)."""
+    import asyncio
+
+    from mascope_backend.api.controllers.match.lib.match_aggregate import (
+        set_ions_match_category,
+    )
+
+    def cats(version):
+        monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", str(version))
+        df = pd.DataFrame(
+            {"match_score": [0.85, 0.5, 0.1], "instrument": ["orbitrap"] * 3}
+        )
+        out = asyncio.run(set_ions_match_category(df, None))
+        return list(out["match_category"])
+
+    assert cats(2) == [2, 1, 0]  # 0.85>=0.7; 0.3<=0.5<0.7; 0.1<0.3
+    assert cats(1) == [2, 0, 0]  # 0.85>=0.8; 0.5<0.7; 0.1<0.7
