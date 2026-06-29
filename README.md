@@ -90,3 +90,15 @@ Then open <http://localhost:8080>.
 ## License
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attributions.
+
+## Citation
+
+If you use **Mascope** in your research, please cite the software using the
+metadata in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository"
+button) or the archived Zenodo release:
+
+[![DOI](https://zenodo.org/badge/767603004.svg)](https://doi.org/10.5281/zenodo.21037634)
+
+The bundled **demo dataset** has its own DOI:
+
+> Mascope demo dataset at Zenodo: https://doi.org/10.5281/zenodo.20929489
