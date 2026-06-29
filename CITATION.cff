@@ -1,0 +1,49 @@
+# Citation metadata for Mascope. Powers GitHub's "Cite this repository" widget
+# and seeds the Zenodo record created from a GitHub Release.
+
+cff-version: 1.2.0
+title: Mascope
+message: >-
+  If you use Mascope in your research, please cite it using the metadata in this
+  file.
+type: software
+abstract: >-
+  Mascope is a platform for analysing and storing high-resolution mass
+  spectrometry data: import instrument files, process, run targeted matching,
+  and explore results in a web application or from Python.
+authors:
+  - given-names: Oskari
+    family-names: Kausiala
+    email: oskari.kausiala@karsa.fi
+    affiliation: Karsa Oy
+    orcid: "https://orcid.org/0000-0001-6638-7066"
+  - given-names: Philip
+    family-names: Chernonog
+    email: philip.chernonog@karsa.fi
+    affiliation: Karsa Oy
+  - given-names: Konstantin
+    family-names: Tumashevich
+    email: konstantin.tumashevich@karsa.fi
+    affiliation: Karsa Oy
+    orcid: "https://orcid.org/0000-0002-2014-2183"
+  - given-names: Matan Bendix
+    family-names: Shenhav
+    email: matan@shenhav.fi
+    affiliation: Karsa Oy
+  - given-names: Alexei
+    family-names: Upornikov
+    email: alexei.upornikov@karsa.fi
+    affiliation: Karsa Oy
+repository-code: "https://github.com/karsa-oy/mascope"
+url: "https://github.com/karsa-oy/mascope"
+license: Apache-2.0
+version: 1.0.0
+date-released: "2026-06-29"
+# Bumped per release: `version` + `doi` (the version DOI) identify this exact
+# release for reproducible citation; the concept DOI under `identifiers` always
+# resolves to the latest version (and is what the README badge links to).
+doi: "10.5281/zenodo.21037635"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21037634"
+    description: Concept DOI - always resolves to the latest Mascope release.

@@ -2494,6 +2494,34 @@ Now you should be able to run `mascope prod pull` to pull the latest images from
 
 To ensure you are running the latest release, execute `mascope prod pull` and then `mascope prod up`.
 
+### Cutting a citable release
+
+Image builds happen on every merge (above) and are tagged `YYYY.MM.DD-<sha>`. A **release** is a deliberate milestone that gets a clean version and a citable Zenodo DOI - it is separate from those per-merge build tags.
+
+Releases use **SemVer** `vMAJOR.MINOR.PATCH`:
+
+- **MAJOR** - incompatible changes (API, a migration users must act on, removed features)
+- **MINOR** - backwards-compatible features
+- **PATCH** - backwards-compatible fixes
+
+To cut one, from `master` at the commit you want to release:
+
+1. Bump [`CITATION.cff`](../../CITATION.cff): set `version:` to the new `X.Y.Z` and `date-released:` to today, and merge it to `master` so it is part of the released commit.
+2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. Tag pushes do **not** trigger the build pipeline, so this won't rebuild images.
+3. On GitHub, **Releases → Draft a new release**, pick the `vX.Y.Z` tag, fill in the title + notes (below), and **Publish**.
+4. Zenodo archives the release automatically and mints a new version DOI; the concept DOI (the README badge / `CITATION.cff`) keeps resolving to the latest.
+
+**Release title:** the version, optionally with a short theme - `v1.2.0` or `v1.2.0 - calibration overhaul`. It becomes part of the Zenodo record title, so keep it terse.
+
+**Release notes:** user-facing and skimmable. Use GitHub's **Generate release notes** button to list merged PRs since the last tag, then trim to:
+
+- a one-to-two sentence summary of the release;
+- highlights grouped as **Added / Changed / Fixed**;
+- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade);
+- the matching image tag for deployers, e.g. `ghcr.io/karsa-oy/mascope/backend:2026.06.26-a1b2c3d` (it and `vX.Y.Z` point at the same commit).
+
+Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release) - never the per-merge build tags.
+
 ## 📒 Notebooks
 
 The notebooks - found in `tooling/notebooks` - provide a set of Jupyter notebooks along with a `uv` environment that includes
