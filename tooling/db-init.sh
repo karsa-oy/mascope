@@ -140,10 +140,23 @@ cd /app/server/backend || {
     exit 1
 }
 
-# Get head revision from migration files
-HEAD_REV=$("$ALEMBIC_BIN" heads 2>/dev/null | grep -o '[a-f0-9]\{12\}' | head -n1)
+# Get head revision from migration files.
+# Capture combined stdout+stderr so that if alembic fails to load (e.g. a
+# broken env.py or migration import), the real error is surfaced instead of a
+# silent exit. Without this, `set -euo pipefail` aborts on the failing pipeline
+# before the empty-check below ever runs, and `2>/dev/null` hides the cause.
+if ! ALEMBIC_HEADS_OUTPUT=$("$ALEMBIC_BIN" heads 2>&1); then
+    log_error "Failed to run 'alembic heads':"
+    log_error "${ALEMBIC_HEADS_OUTPUT}"
+    exit 1
+fi
+
+# `|| true` keeps pipefail from aborting when grep finds nothing; the
+# empty-check below then reports it with the full alembic output for context.
+HEAD_REV=$(echo "${ALEMBIC_HEADS_OUTPUT}" | grep -oE '[a-f0-9]{12}' | head -n1 || true)
 if [[ -z "$HEAD_REV" ]]; then
-    log_error "Failed to get head revision"
+    log_error "Could not parse head revision from 'alembic heads' output:"
+    log_error "${ALEMBIC_HEADS_OUTPUT}"
     exit 1
 fi
 

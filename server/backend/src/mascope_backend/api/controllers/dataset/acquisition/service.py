@@ -57,7 +57,12 @@ async def _ensure_instrument_workspace(
         ws_id = (
             await session.execute(
                 select(Workspace.workspace_id).where(
-                    Workspace.workspace_name == workspace_name,
+                    # Case-insensitive match: ix_workspace_name_ci is unique on
+                    # lower(workspace_name), so instrument case variants
+                    # (e.g. "orbihel" vs "OrbiHel") share a single workspace.
+                    # Matching exact-case here would miss the existing row and
+                    # trigger a duplicate-key INSERT below.
+                    func.lower(Workspace.workspace_name) == workspace_name.lower(),
                     Workspace.is_system.is_(True),
                 )
             )
@@ -106,7 +111,11 @@ async def _ensure_instrument_workspace(
             ws_id = (
                 await session.execute(
                     select(Workspace.workspace_id).where(
-                        Workspace.workspace_name == workspace_name,
+                        # Match case-insensitively (see note above): the row that
+                        # caused the IntegrityError may be a case variant of
+                        # workspace_name, so an exact-case lookup would miss it
+                        # and scalar_one() would raise NoResultFound.
+                        func.lower(Workspace.workspace_name) == workspace_name.lower(),
                         Workspace.is_system.is_(True),
                     )
                 )

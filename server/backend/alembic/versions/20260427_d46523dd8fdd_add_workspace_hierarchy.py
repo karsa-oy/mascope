@@ -171,22 +171,36 @@ def upgrade() -> None:
     # Track all workspace IDs for user membership seeding
     all_workspace_ids = [default_workspace_id]
 
-    for (instrument,) in acq_instruments:
-        instr_ws_id = _gen_id()
-        all_workspace_ids.append(instr_ws_id)
+    # Instrument names may have been recorded with inconsistent case or
+    # surrounding whitespace (e.g. "orbihel" vs "Orbihel ") that denote the
+    # same physical instrument. ix_workspace_name_ci is unique on
+    # lower(workspace_name), so deriving "Acquisitions <instrument>" per raw
+    # variant would collide. Map each normalized instrument key to a single
+    # workspace and reuse it for every variant, matching the case-insensitive
+    # uniqueness the index enforces.
+    ws_by_instrument_key: dict[str, str] = {}
 
-        conn.execute(
-            sa.text(
-                "INSERT INTO workspace "
-                "(workspace_id, workspace_name, workspace_description, "
-                " workspace_status, is_system, workspace_utc_created, workspace_utc_modified) "
-                "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
-            ).bindparams(
-                wid=instr_ws_id,
-                wname=f"Acquisitions {instrument}",
-                wdesc=f"System workspace for {instrument} acquisitions",
+    for (instrument,) in acq_instruments:
+        instrument_key = instrument.strip().lower()
+        instr_ws_id = ws_by_instrument_key.get(instrument_key)
+
+        if instr_ws_id is None:
+            instr_ws_id = _gen_id()
+            ws_by_instrument_key[instrument_key] = instr_ws_id
+            all_workspace_ids.append(instr_ws_id)
+
+            conn.execute(
+                sa.text(
+                    "INSERT INTO workspace "
+                    "(workspace_id, workspace_name, workspace_description, "
+                    " workspace_status, is_system, workspace_utc_created, workspace_utc_modified) "
+                    "VALUES (:wid, :wname, :wdesc, 'active', true, NOW(), NOW())"
+                ).bindparams(
+                    wid=instr_ws_id,
+                    wname=f"Acquisitions {instrument}",
+                    wdesc=f"System workspace for {instrument} acquisitions",
+                )
             )
-        )
 
         # Restructure: split the per-instrument dataset into year-based datasets.
         # Extract years from batch names (format: "YYYY-MM-DD <mode> acquisition").

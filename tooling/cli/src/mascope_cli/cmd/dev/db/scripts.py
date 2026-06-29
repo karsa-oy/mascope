@@ -92,11 +92,21 @@ def run_script(
         bool,
         typer.Option("--yes", "-y", help="Confirm execution against dev."),
     ] = False,
+    skip_backup: Annotated[
+        bool,
+        typer.Option(
+            "--skip-backup",
+            "-S",
+            help="Skip the pre-execution backup. Use for large databases "
+            "where pg_dump is prohibitively slow. NO BACKUP IS TAKEN.",
+        ),
+    ] = False,
 ) -> None:
     """
     Run a maintenance script against the development database.
 
-    Takes an automatic pre-execution backup before running.
+    Takes an automatic pre-execution backup before running, unless
+    `--skip-backup` is passed.
 
     Some scripts accept configuration via environment variables.
     For example, to pass MIN_DATETIME:
@@ -132,17 +142,33 @@ def run_script(
     db_cfg = runtime.full_config.backend.database
 
     # --- Backup ---
-    try:
-        container = db_cfg.get_postgres_container_name(_MODE)
-        database = db_cfg.get_postgres_database_name(runtime.env.name)
-        target_dir, mount = dirs(False, _MODE)
-        path = pg_dump(
-            container, db_cfg.user, database, target_dir, mount, label=f"pre-{script}"
+    if skip_backup:
+        runtime.logger.warning(
+            "Skipping pre-script backup (--skip-backup). "
+            "No restore point will exist if this script corrupts data."
         )
-        runtime.logger.success(f"Pre-script backup: {path.name}")
-    except RuntimeError as e:
-        runtime.logger.error(f"Backup failed — aborting: {e}")
-        raise typer.Exit(1)
+        if not yes:
+            typer.confirm(
+                f"Run '{script}' against dev '{runtime.env.name}' WITHOUT a backup?",
+                abort=True,
+            )
+    else:
+        try:
+            container = db_cfg.get_postgres_container_name(_MODE)
+            database = db_cfg.get_postgres_database_name(runtime.env.name)
+            target_dir, mount = dirs(False, _MODE)
+            path = pg_dump(
+                container,
+                db_cfg.user,
+                database,
+                target_dir,
+                mount,
+                label=f"pre-{script}",
+            )
+            runtime.logger.success(f"Pre-script backup: {path.name}")
+        except RuntimeError as e:
+            runtime.logger.error(f"Backup failed — aborting: {e}")
+            raise typer.Exit(1)
 
     # --- Execute ---
     module = scripts[script]

@@ -31,11 +31,8 @@ ORBI_DEFAULT_PEAK_MIN_INTENSITY = 0
 # Both values are below the practical detectable floor for a typical-intensity ion, so
 # they don't cost real matches; strong (e.g. reagent) ions whose base peak sits near the
 # top of the dynamic range can opt into a lower threshold via per-ion filter_params.
-#   - Orbi: empirically lossless on real data (lowest ever-matched abundance ~1.9e-4).
-#   - TOF:  a typical ion's detectable floor (noise / median peak) is ~0.5-4% across
-#           sampled TOF spectra, well above this default.
-TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-3  # 0.1 %
-ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-4  # 0.01 %
+TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-4  # 0.01 %
+ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD = 1e-5  # 0.001 %
 
 # default values for unmatched isotopes
 DEFAULT_UNMATCHED_SAMPLE_PEAK_ID = ""

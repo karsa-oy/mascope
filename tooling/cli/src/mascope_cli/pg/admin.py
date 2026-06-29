@@ -31,6 +31,7 @@ def _docker_exec(
     container: str,
     cmd: list[str],
     stdin_input: str = None,
+    timeout: int = 600,
 ) -> subprocess.CompletedProcess:
     """
     Execute a command inside a running Docker container.
@@ -41,7 +42,12 @@ def _docker_exec(
     :type cmd: list[str]
     :param stdin_input: Optional string to pass to stdin (enables -i flag automatically).
     :type stdin_input: str | None
+    :param timeout: Maximum seconds to wait for the command. Default: 600
+                    (10 min). Pass a larger value for dump/restore of large
+                    databases on slow disks.
+    :type timeout: int
     :return: CompletedProcess with stdout, stderr, returncode.
+    :raises subprocess.TimeoutExpired: If the command exceeds `timeout`.
     """
     docker_cmd = ["docker", "exec"]
     if stdin_input is not None:
@@ -54,7 +60,7 @@ def _docker_exec(
         capture_output=True,
         text=True,
         check=False,  # callers handle returncode with context-specific errors
-        timeout=600,  # 10 min ceiling (large db on slower disks)
+        timeout=timeout,
     )
 
 
@@ -122,6 +128,7 @@ def pg_dump(
     target_dir: Path,
     mount: str,
     label: str = "",
+    timeout: int = 7200,
 ) -> Path:
     """
     Create a compressed custom-format dump of a PostgreSQL database.
@@ -153,8 +160,13 @@ def pg_dump(
                   (e.g. `"pre-migration"`, `"manual"`). Sanitized to
                   alphanumeric + hyphens before use.
     :type label: str
-    :raises RuntimeError: If pg_dump exits non-zero, or the output file is
-                          not found on the host after the dump completes.
+    :param timeout: Maximum seconds to allow pg_dump to run. Default: 7200
+                    (2 hours) — dumps of large databases on slow disks can
+                    take far longer than the generic 10 min ceiling.
+    :type timeout: int
+    :raises RuntimeError: If pg_dump exits non-zero, exceeds `timeout`, or the
+                          output file is not found on the host after the dump
+                          completes.
     :return: Absolute path to the created `.dump` file on the host.
     :rtype: Path
     """
@@ -170,20 +182,27 @@ def pg_dump(
     filename = "_".join(name_parts) + ".dump"
     container_path = f"{mount}/{filename}"
 
-    result = _docker_exec(
-        container,
-        [
-            "pg_dump",
-            "--username",
-            user,
-            "--format",
-            "custom",  # -Fc equivalent, explicit for readability
-            "--no-password",
-            "--file",
-            container_path,
-            database,  # positional: database name last
-        ],
-    )
+    try:
+        result = _docker_exec(
+            container,
+            [
+                "pg_dump",
+                "--username",
+                user,
+                "--format",
+                "custom",  # -Fc equivalent, explicit for readability
+                "--no-password",
+                "--file",
+                container_path,
+                database,  # positional: database name last
+            ],
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError(
+            f"pg_dump for database '{database}' exceeded the {timeout}s timeout. "
+            f"For very large databases, increase the timeout or skip the backup."
+        ) from e
 
     if result.returncode != 0:
         raise RuntimeError(
