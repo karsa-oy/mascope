@@ -15,6 +15,7 @@ from mascope_file.name import (
     get_instrument_name,
     parse_path_from_item_filename,
 )
+from mascope_signal.instrument_func.fit import InsufficientPeaksError
 from mascope_signal.peak import compute_peaks, write_empty_peak_timeseries
 
 from .api import (
@@ -389,6 +390,18 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             runtime.logger.error(f"Failed to move file {file_path} to the error folder")
             runtime.logger.exception(e)
 
+    def _process_as_blank(self, sample_file_props: SampleFileProps) -> None:
+        """Ingest a file as a blank measurement.
+
+        Skips peak detection, writes an empty peak timeseries, and creates a
+        sample file DB record without an instrument config. Used both for files
+        classified as blank and for low-signal files whose instrument functions
+        cannot be fit.
+        """
+        write_empty_peak_timeseries(sample_file_props.filename)
+        self._create_db_record(sample_file_props, instrument_function_id=None)
+        self._emit_progress_notification(100)
+
     def _process_file(
         self, sample_file_props: SampleFileProps, file_path: str, retry_count: int = 0
     ) -> None:
@@ -406,15 +419,24 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 runtime.logger.warning(
                     f"Blank measurement detected: {filename}, skipping peak detection"
                 )
-                write_empty_peak_timeseries(filename)
-                self._create_db_record(sample_file_props, instrument_function_id=None)
-                self._emit_progress_notification(100)
+                self._process_as_blank(sample_file_props)
                 return
 
             # Fit instrument functions and get the ID
-            instrument_function_id, *instrument_functions = (
-                self._create_instrument_config(sample_file_props)
-            )
+            try:
+                instrument_function_id, *instrument_functions = (
+                    self._create_instrument_config(sample_file_props)
+                )
+            except InsufficientPeaksError:
+                # Low-signal file just above the blank threshold: the spectrum has
+                # too few quality peaks to fit instrument functions. Treat it as a
+                # blank measurement instead of failing the whole file.
+                runtime.logger.warning(
+                    f"Insufficient quality peaks to fit instrument functions for "
+                    f"{filename}, treating as blank measurement"
+                )
+                self._process_as_blank(sample_file_props)
+                return
 
             self._emit_progress_notification(25)
 

@@ -13,6 +13,15 @@ from mascope_signal.compute import get_sum_signal
 from mascope_signal.runtime import runtime
 
 
+class InsufficientPeaksError(ValueError):
+    """Raised when a spectrum has too few quality peaks to fit instrument functions.
+
+    Subclasses ValueError so existing ``except ValueError`` handlers keep working,
+    while allowing callers to distinguish this recoverable, low-signal case (e.g. to
+    fall back to blank-measurement handling) from other value errors.
+    """
+
+
 # Precompute sigma multiplier for peak generation
 SIGMA_MULTIPLIER = 2 * np.sqrt(2 * np.log(2))
 # Minimum number of peaks required to evaluate instrument functions
@@ -103,7 +112,7 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     if len(p_mzs) < MIN_NUM_PEAKS:
         error_message = "Not enough quality peaks to evaluate instrument functions"
         runtime.logger.error(error_message)
-        raise ValueError(error_message)
+        raise InsufficientPeaksError(error_message)
 
     peak_shape, ps_stats = _calculate_peakshape(p_x, p_ys)
     resolution_function, resfun_stats = _fit_resolution_function(
