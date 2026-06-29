@@ -16,12 +16,19 @@ RUN apt update && apt install -y \
     libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install latest PostgreSQL client (for db_init container)
+# Install PostgreSQL client for the db_init container.
+# Pinned to major 16 to match the postgres:16-alpine server image in
+# docker-compose*.yaml. The client major MUST NOT exceed the server major:
+# pg_dump's custom-format archive is forward-only, so a newer pg_dump (e.g. the
+# unpinned `postgresql-client` meta-package, which now resolves to PG18) writes
+# an archive header (v1.16) that the server's older pg_restore cannot read
+# ("unsupported version in file header"). Bump this in lockstep if the postgres
+# image major is upgraded.
 RUN wget -qO /etc/apt/keyrings/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     && echo "deb [signed-by=/etc/apt/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list \
     && apt update \
-    && apt install -y postgresql-client \
+    && apt install -y postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 # use jemalloc to avoid DLL segfaults (free(): invalid pointer)
