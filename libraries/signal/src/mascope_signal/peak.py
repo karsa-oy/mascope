@@ -604,6 +604,7 @@ def write_empty_peak_timeseries(filename: str) -> None:
                 np.empty((0, time_coord.size), dtype=np.float64),
             ),
             "is_timeseries_computed": (("mz",), np.empty(0, dtype=bool)),
+            "sparsity": (("mz",), np.empty(0, dtype=np.float64)),
             "is_weak": (("mz",), np.empty(0, dtype=bool)),
             "is_satellite": (("mz",), np.empty(0, dtype=bool)),
             "signal_to_noise": (("mz",), np.empty(0, dtype=np.float64)),
