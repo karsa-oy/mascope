@@ -19,8 +19,10 @@ const parser = {
 const host = location.hostname
 
 export async function initSocket() {
-  // init socket in `/` namespace
-  const url = runtime.mode === 'prod' ? `https://${host}` : `ws://${host}:${runtime.meta.api_port}`
+  // init socket in `/` namespace. In prod the socket is proxied by nginx on the
+  // same origin, so use the page's actual origin (http or https) rather than
+  // assuming HTTPS -- socket.io upgrades it to ws/wss accordingly.
+  const url = runtime.mode === 'prod' ? location.origin : `ws://${host}:${runtime.meta.api_port}`
   const socket = io(url, {
     withCredentials: true, // Enables cookie sending
     transports: ['websocket'],

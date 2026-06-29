@@ -13,6 +13,7 @@ from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.api.new.match.params import default_match_params
+from mascope_backend.api.new.match.params.lib import isotope_abundance_threshold_expr
 from mascope_backend.db import (
     IonizationMechanism,
     MatchIsotope,
@@ -143,6 +144,15 @@ async def fetch_sample_unmatched_target_isotopes(
             .distinct(MatchIsotope.target_isotope_id)
         )
 
+        # Effective isotope abundance threshold per ion (ion-scoped override in
+        # TargetIon.filter_params, else the instrument default from match_params).
+        # Isotopes below the threshold are never matched, pruning the negligible tail.
+        abundance_threshold = isotope_abundance_threshold_expr(
+            TargetIon.filter_params,
+            sample.instrument,
+            match_params.isotope_abundance_threshold,
+        )
+
         stmt = (
             select(
                 TargetIsotope.target_isotope_id,
@@ -180,6 +190,8 @@ async def fetch_sample_unmatched_target_isotopes(
                 TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
                 IonizationMechanism.ionization_mechanism_polarity == sample.polarity,
                 TargetIsotope.resolution == resolution_type,
+                # Skip negligible isotopes below the effective abundance threshold
+                TargetIsotope.relative_abundance >= abundance_threshold,
                 # Exclude already matched isotopes
                 TargetIsotope.target_isotope_id.notin_(matched_isotopes_subquery),
             )

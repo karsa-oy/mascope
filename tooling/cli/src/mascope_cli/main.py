@@ -22,6 +22,7 @@ from mascope_cli.runtime import runtime
 app = typer.Typer()
 
 app.add_typer(cmd.env_app, name="env")
+app.add_typer(cmd.demo_app, name="demo")
 app.add_typer(cmd.dev_app, name="dev")
 app.add_typer(cmd.prod_app, name="prod")
 app.add_typer(cmd.logs_app, name="logs")

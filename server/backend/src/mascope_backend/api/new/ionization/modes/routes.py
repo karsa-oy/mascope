@@ -5,7 +5,11 @@ FastAPI routes for ionization mode CRUD operations.
 from fastapi import APIRouter, Depends
 
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import editor_user, guest_user
+from mascope_backend.api.new.auth.dependencies import (
+    admin_user,
+    editor_user,
+    guest_user,
+)
 from mascope_backend.api.new.ionization.modes.schema import (
     GetIonizationModesQueryParams,
     IonizationModeCreate,
@@ -80,10 +84,11 @@ async def create_ionization_mode_route(
 async def update_ionization_mode_route(
     ionization_mode_id: str,
     ionization_mode_data: IonizationModeUpdate,
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """
-    Update an existing ionization mode.
+    Update an existing ionization mode. Admin-only: editing a mode affects how
+    all samples processed under it are calibrated and matched.
     """
     return await update_ionization_mode(ionization_mode_id, ionization_mode_data)
 
@@ -92,9 +97,9 @@ async def update_ionization_mode_route(
 @api_route()
 async def delete_ionization_mode_route(
     ionization_mode_id: str,
-    user=Depends(editor_user),
+    user=Depends(admin_user),
 ):
     """
-    Delete an ionization mode.
+    Delete an ionization mode. Admin-only.
     """
     return await delete_ionization_mode(ionization_mode_id)

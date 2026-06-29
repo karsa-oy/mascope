@@ -1,6 +1,6 @@
 [project]
 name = "mascope_tools"
-version = "2026.05.04"
+version = "2026.06.25"
 description = "Mascope's public library, containing tools for spectra postprocessing."
 classifiers = [
     "Topic :: Scientific/Engineering :: Atmospheric Science",
@@ -33,7 +33,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "mascope_molmass",   # test-only: isotope-pattern ground-truth for predict_isotopes parity
 ]
+
+[tool.uv.sources]
+mascope_molmass = { workspace = true }
 
 [project.urls]
 homepage = "https://karsa.fi/"

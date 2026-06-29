@@ -15,14 +15,14 @@ export const ANALYSIS_POLARITY = '+-'
 
 // Collection type constraints for sample batch types
 export const collectionBatchTypes = {
-  TARGETS: ['ANALYSIS'],
+  TARGETS: ['ANALYSIS', 'ACQUISITION'],
   DIAGNOSTICS: ['ACQUISITION', 'ANALYSIS'],
   CALIBRANTS: ['ANALYSIS']
 }
 
 export const batchCollectionTypes = {
   ANALYSIS: ['TARGETS', 'DIAGNOSTICS', 'CALIBRANTS'],
-  ACQUISITION: ['DIAGNOSTICS']
+  ACQUISITION: ['DIAGNOSTICS', 'TARGETS']
 }
 
 export const getAllowedDatasetTypes = (collectionType) => {

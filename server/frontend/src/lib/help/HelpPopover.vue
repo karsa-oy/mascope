@@ -110,6 +110,15 @@ watchDebounced(
 <template>
   <div ref="popoverEl" v-if="visible" :style="floatingStyles" class="help-popover">
     <div class="help-content" v-html="app.ui.help.current?.message" />
+    <a
+      v-if="app.ui.help.current?.doc"
+      class="help-learn-more"
+      :href="app.ui.help.current.doc"
+      target="_blank"
+      rel="noopener"
+    >
+      Learn more
+    </a>
     <div ref="arrowEl" class="help-popover-arrow"></div>
   </div>
 </template>
@@ -168,5 +177,12 @@ html.darkmode {
     font-weight: normal;
     font-style: italic;
   }
+}
+.help-learn-more {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  color: inherit;
 }
 </style>

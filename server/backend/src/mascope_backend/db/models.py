@@ -342,7 +342,10 @@ class Dataset(Base):
     # Relationships
     workspace = relationship("Workspace", back_populates="datasets")
     sample_batch = relationship(
-        "SampleBatch", back_populates="dataset", cascade="all, delete, delete-orphan"
+        "SampleBatch",
+        back_populates="dataset",
+        cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -387,11 +390,13 @@ class SampleBatch(Base):
         "SampleItem",
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     target_collection = relationship(
         "TargetCollectionInSampleBatch",
         back_populates="sample_batch",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -513,35 +518,45 @@ class SampleItem(Base):
     # Relationships
     sample_batch = relationship("SampleBatch", back_populates="sample_items")
     sample_file = relationship("SampleFile", back_populates="sample_items")
+    # passive_deletes=True: rely on the DB's ON DELETE CASCADE (defined on every
+    # match_*.sample_item_id FK) instead of loading every child row into the ORM
+    # to delete it. Essential for deleting samples/batches/datasets with large
+    # match tables (match_isotope) without timing out.
     match_sample = relationship(
         "MatchSample",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     match_collection = relationship(
         "MatchCollection",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     match_compound = relationship(
         "MatchCompound",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     match_ion = relationship(
         "MatchIon",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     match_isotope = relationship(
         "MatchIsotope",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
     match_rating = relationship(
         "MatchRating",
         back_populates="sample_item",
         cascade="all, delete, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -855,6 +870,7 @@ class MatchCollection(Base):
     target_collection_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_collection.target_collection_id", ondelete="CASCADE"),
+        index=True,
     )
     match_score: Mapped[float] = mapped_column(Float)
     match_category: Mapped[int] = mapped_column(Integer)
@@ -893,6 +909,7 @@ class MatchCompound(Base):
     target_compound_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="CASCADE"),
+        index=True,
     )
     match_score: Mapped[float] = mapped_column(Float)
     match_category: Mapped[int] = mapped_column(Integer)
@@ -960,10 +977,12 @@ class MatchRating(Base):
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
     )
     target_ion_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("target_ion.target_ion_id", ondelete="CASCADE"),
+        index=True,
     )
     match_rating_utc_created: Mapped[Optional[dt]] = mapped_column(
         TIMESTAMP(timezone=True)

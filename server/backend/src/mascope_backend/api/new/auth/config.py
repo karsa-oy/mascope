@@ -2,11 +2,32 @@
 Core authentication configuration including JWT, cookies, and access tokens settings.
 """
 
+import os
+
 from pydantic import BaseModel
 
 from mascope_backend.api.new.auth.access_token.config import AccessTokenConfig
 from mascope_backend.api.new.auth.secrets import jwt_secret_key
+from mascope_backend.roles import ROLE_ACCESS_LEVELS as _ROLE_ACCESS_LEVELS
 from mascope_backend.runtime import runtime
+
+
+def _resolve_cookie_secure() -> bool:
+    """
+    Whether the auth cookie is marked ``Secure`` (sent only over HTTPS).
+
+    Defaults to ``True`` in prod mode and ``False`` in dev. Override with the
+    ``MASCOPE_COOKIE_SECURE`` env var to support an HTTP-only deployment on
+    ``localhost`` (loopback is a browser "secure context", so cookie auth works
+    over plain HTTP there). Do NOT disable this for network-reachable
+    deployments -- serve those over HTTPS instead.
+
+    :return: ``True`` to set the Secure cookie flag.
+    """
+    override = os.environ.get("MASCOPE_COOKIE_SECURE")
+    if override is not None:
+        return override.strip().lower() in ("1", "true", "yes", "on")
+    return runtime.mode == "prod"
 
 
 # TODO_configuration for auth
@@ -32,8 +53,8 @@ class AuthConfig(BaseModel):
     # Lifetime of the cookie - 360 days in seconds (matches JWT expiration)
     COOKIE_MAX_AGE_SECONDS: int = 360 * 24 * 60 * 60
     COOKIE_SECURE: bool = (
-        runtime.mode == "prod"
-    )  # to send cookies only over HTTPS, True if in production, False if in dev
+        _resolve_cookie_secure()
+    )  # send cookies only over HTTPS; prod default, override via MASCOPE_COOKIE_SECURE
     COOKIE_HTTP_ONLY: bool = (
         True  # Set cookies as HTTPOnly to prevent access from JavaScript
     )
@@ -62,7 +83,7 @@ class AuthConfig(BaseModel):
 
     # Role access levels for RBAC
     # Role names correspond to the role_id values in the database (access_level)
-    ROLE_ACCESS_LEVELS: dict = {"guest": 100, "editor": 200, "admin": 300, "owner": 400}
+    ROLE_ACCESS_LEVELS: dict = _ROLE_ACCESS_LEVELS  # see mascope_backend.roles
 
     # Access token settings
     access_token: AccessTokenConfig = AccessTokenConfig()

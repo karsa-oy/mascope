@@ -67,7 +67,17 @@ const batchStatus = computed(() => {
   return {
     status: batch.value.status,
     config: batchStatusStore.config,
-    onRematch: () => app.data.batch.rematch({ sample_batch_id: batch.value.sample_batch_id })
+    // A "recalibrate" batch needs its m/z calibration re-fit (e.g. after its
+    // ionization mode's calibration collection changed), so open the calibration
+    // dialog for it; otherwise refresh matches.
+    onRematch: () => {
+      if (batch.value.status === 'recalibrate') {
+        contextMenu.row = batch.value
+        contextMenu.dialog.calibration = true
+      } else {
+        app.data.batch.rematch({ sample_batch_id: batch.value.sample_batch_id })
+      }
+    }
   }
 })
 

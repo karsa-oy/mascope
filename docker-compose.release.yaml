@@ -1,0 +1,156 @@
+# Mascope - LOCAL release stack (pull-and-run, no repo build required).
+#
+# For trying Mascope on a single machine over http://localhost:8080. It pulls the
+# published GHCR images instead of building from source, serves the frontend over
+# plain HTTP (loopback is a browser secure context, so auth + clipboard work),
+# and needs no SSL certificate.
+#
+#   1. Create the three secrets (see .env.example), e.g.:
+#        mkdir -p .runtime/secrets
+#        head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/postgres_password.txt
+#        head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/jwt_secret_key.txt
+#        head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/server_owner_secret_key.txt
+#   2. docker compose -f docker-compose.release.yaml pull
+#   3. docker compose -f docker-compose.release.yaml up -d
+#   4. open http://localhost:8080
+#
+# For a network-reachable / multi-user deployment use docker-compose.yaml
+# (HTTPS) instead -- see docs/ADOPTION_PLAN.md (self-hosting & TLS).
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mascope_release_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mascope_release_postgres
+    environment:
+      POSTGRES_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    shm_size: ${MASCOPE_DB_SHM_SIZE:-1g}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h localhost -U ${MASCOPE_DB_USER:-mascope_user} -d postgres",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # Own data dir, isolated from the dev/prod stacks so the release stack
+      # never picks up an unrelated database.
+      - ./.runtime/database/release:/var/lib/postgresql/data
+      - ./.runtime/database/backups/release:/backups
+    secrets:
+      - postgres_password
+
+  db_init:
+    image: ghcr.io/karsa-oy/mascope/backend:${MASCOPE_VERSION:-latest}
+    container_name: mascope_release_db_init
+    entrypoint: []
+    command: ["/bin/bash", "/app/tooling/db-init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MASCOPE_ENV: ${MASCOPE_ENV:-default}
+      # The app derives its database name as {base}_{env} (e.g. mascope_default);
+      # db_init must create that exact name. Keep MASCOPE_ENV hyphen-free.
+      MASCOPE_DB_NAME: mascope_${MASCOPE_ENV:-default}
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
+      - ./.runtime/database/backups/release:/backups
+    secrets:
+      - postgres_password
+    restart: "no"
+
+  backend: &backend
+    image: ghcr.io/karsa-oy/mascope/backend:${MASCOPE_VERSION:-latest}
+    command: "api-server"
+    container_name: mascope_release_backend
+    restart: unless-stopped
+    depends_on:
+      db_init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect((''localhost'', 8090)); s.close()" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    tty: true
+    volumes:
+      - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
+      - ${MASCOPE_FILESTORE:-./.runtime/env/default/filestore}:/app/.runtime/env/${MASCOPE_ENV:-default}/filestore
+    environment:
+      MASCOPE_ENV: ${MASCOPE_ENV:-default}
+      MASCOPE_LOGLEVEL: ${MASCOPE_LOGLEVEL:-info}
+      # The app derives its database name as {base}_{env} (e.g. mascope_default);
+      # db_init must create that exact name. Keep MASCOPE_ENV hyphen-free.
+      MASCOPE_DB_NAME: mascope_${MASCOPE_ENV:-default}
+      MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      # Local HTTP on localhost is a secure context, so the auth cookie does not
+      # need the Secure flag. Do NOT set this false for networked deployments.
+      MASCOPE_COOKIE_SECURE: ${MASCOPE_COOKIE_SECURE:-false}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      JWT_SECRET_KEY_FILE: /run/secrets/jwt_secret_key
+      SERVER_OWNER_SECRET_KEY_FILE: /run/secrets/server_owner_secret_key
+    secrets:
+      - jwt_secret_key
+      - postgres_password
+      - server_owner_secret_key
+
+  file_converter:
+    <<: *backend
+    container_name: mascope_release_file_converter
+    command: "file-converter"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck: {}
+
+  frontend:
+    image: ghcr.io/karsa-oy/mascope/frontend:${MASCOPE_VERSION:-latest}
+    container_name: mascope_release_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Serve plain HTTP for local single-machine use (no SSL certs needed).
+      MASCOPE_TLS: "off"
+      MASCOPE_TIMEZONE: ${MASCOPE_TIMEZONE:-Etc/UTC}
+    tty: true
+    ports:
+      - "${MASCOPE_HTTP_PORT:-8080}:80"
+
+volumes:
+  redis_data:
+
+secrets:
+  jwt_secret_key:
+    file: .runtime/secrets/jwt_secret_key.txt
+  postgres_password:
+    file: .runtime/secrets/postgres_password.txt
+  server_owner_secret_key:
+    file: .runtime/secrets/server_owner_secret_key.txt

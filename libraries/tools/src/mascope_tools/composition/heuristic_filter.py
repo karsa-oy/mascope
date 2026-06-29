@@ -26,6 +26,19 @@ from mascope_tools.composition.utils import (
 # Limit isotopic matching to the most plausible candidates
 ISOTOPE_CANDIDATE_LIMIT = 64
 
+# --- Labelled-reagent custom elements ('^X' notation) ------------------------
+# A labelled reagent atom is not 100% pure; e.g. 15N-nitrate is ~98% 15N / 2% 14N.
+# We model it as a custom element '^X' whose isotope abundances are the labelled
+# distribution, so predict_isotopes yields the heavy base AND the small light
+# satellite. `purity` is the heaviest-isotope fraction (e.g. 0.98 for 15N).
+# (Mirrors the backend's custom-element handling in target_ions_compute, but
+# self-contained -- no molmass dependency.)
+LABELLED_REAGENT_PURITY = 0.98
+# symbol -> (regular_symbol, [(mass, mass_number), ... lightest first])
+_CUSTOM_ELEMENT_DATA = {
+    "^N": ("N", [(14.0030740, 14), (15.0001089, 15)]),
+}
+
 
 def rule_element_ratio(
     candidates: pl.DataFrame, heuristics_config: HeuristicFilterConfig, **kwargs
@@ -346,18 +359,123 @@ def match_isotopic_pattern(
     return candidates_df.to_dicts(), all_isotope_data
 
 
+def _custom_isotope_combinations(
+    symbol: str, count: int, purity: float
+) -> list[tuple[float, float, int]]:
+    """Multinomial isotope combinations for `count` atoms of a labelled '^X'
+    (two-isotope) element. Returns [(added_mass, probability, n_light), ...]."""
+    from math import comb
+
+    isos = _CUSTOM_ELEMENT_DATA[symbol][1]
+    (m_light, _), (m_heavy, _) = isos[0], isos[-1]
+    p_heavy, p_light = purity, 1.0 - purity
+    out = []
+    for k in range(count + 1):  # k = number of heavy (labelled) atoms
+        n_light = count - k
+        prob = comb(count, k) * p_heavy**k * p_light**n_light
+        out.append((k * m_heavy + n_light * m_light, prob, n_light))
+    return out
+
+
+def _predict_isotopes_custom(
+    ion_formula: str, ion_charge: int, purity: float
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """predict_isotopes for an ion containing labelled '^X' custom elements: base
+    (non-custom) envelope via IsoSpec, convolved with the labelled distribution(s)
+    (multinomial; Cartesian product for several). Most-abundant peak first."""
+    import itertools
+
+    from mascope_tools.composition.utils import parse_composition, to_hill_order
+
+    comp = parse_composition(ion_formula)
+    customs = {s: int(comp[s]) for s in comp if s.startswith("^")}
+    base = {s: int(comp[s]) for s in comp if not s.startswith("^") and comp[s] > 0}
+    base_formula = to_hill_order(base) if base else ""
+
+    if base_formula:
+        peaks = IsoThreshold(
+            formula=base_formula, threshold=ISOTOPE_ABUNDANCE_THRESHOLD, get_confs=True
+        )
+        base_masses = [float(m) for m in peaks.masses]
+        base_probs = [float(p) for p in peaks.probs]
+        base_labels = extract_isotope_labels(base_formula, peaks)
+    else:
+        base_masses, base_probs, base_labels = [0.0], [1.0], ["M0"]
+
+    combos_per_element = [
+        [
+            (
+                mass,
+                prob,
+                n_light,
+                _CUSTOM_ELEMENT_DATA[sym][0],
+                _CUSTOM_ELEMENT_DATA[sym][1][0][1],
+            )
+            for (mass, prob, n_light) in _custom_isotope_combinations(sym, cnt, purity)
+        ]
+        for sym, cnt in customs.items()
+    ]
+
+    merged: dict[float, list] = {}
+    for bm, bp, bl in zip(base_masses, base_probs, base_labels):
+        for combo in itertools.product(*combos_per_element):
+            mass = bm + sum(c[0] for c in combo)
+            prob = bp
+            for c in combo:
+                prob *= c[1]
+            if prob < ISOTOPE_ABUNDANCE_THRESHOLD:
+                continue
+            deviations = [
+                f"{light_mn}{regular}" + (str(n_light) if n_light > 1 else "")
+                for (_, _, n_light, regular, light_mn) in combo
+                if n_light
+            ]
+            parts = ([] if bl in ("M0", "", "---") else [bl]) + deviations
+            label = "+".join(parts) if parts else "M0"
+            key = round(mass, 4)
+            if key in merged:
+                m0, p0, _ = merged[key]
+                tot = p0 + prob
+                merged[key][0] = (m0 * p0 + mass * prob) / tot
+                merged[key][1] = tot
+            else:
+                merged[key] = [mass, prob, label]
+
+    items = sorted(merged.values(), key=lambda x: -x[1])  # most-abundant first
+    mzs = np.array(
+        [(m - ELECTRON_MASS * ion_charge) / abs(ion_charge) for m, _, _ in items]
+    )
+    probs = np.array([p for _, p, _ in items])
+    labels = [lab for _, _, lab in items]
+    return mzs, probs, labels
+
+
 def predict_isotopes(
-    ion_formula: str, ion_charge: int
+    ion_formula: str, ion_charge: int, purity: float | None = None
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Predict isotopic pattern for a given ion formula and charge.
 
-    :param ion_formula: Ion formula string.
+    :param ion_formula: Ion formula string (may contain labelled '^X' elements).
     :type ion_formula: str
     :param ion_charge: Ion charge (e.g., +1, -1).
     :type ion_charge: int
+    :param purity: Isotopic purity of labelled '^X' elements (heaviest-isotope
+        fraction, e.g. 0.98 for a 98% 15N reagent). A property of the labelled
+        reagent; the caller passes its value. Ignored for non-labelled ions.
+        Defaults to ``LABELLED_REAGENT_PURITY``.
+    :type purity: float, optional
     :return: Tuple of predicted m/z values, relative intensities, and isotope labels.
     :rtype: tuple[np.ndarray, np.ndarray, list[str]]
     """
+    if "^" in ion_formula:
+        try:
+            return _predict_isotopes_custom(
+                ion_formula,
+                ion_charge,
+                LABELLED_REAGENT_PURITY if purity is None else purity,
+            )
+        except Exception:
+            return [], [], []
     try:
         predicted_peaks = IsoThreshold(
             formula=ion_formula,

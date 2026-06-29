@@ -17,7 +17,7 @@ class SampleBatchConfig(BaseModel):
     """
 
     SAMPLE_BATCH_TYPES: list = ["ACQUISITION", "ANALYSIS"]
-    SAMPLE_BATCH_STATUSES: list = ["ready", "processing", "rematch"]
+    SAMPLE_BATCH_STATUSES: list = ["ready", "processing", "rematch", "recalibrate"]
 
     # Default values
     DEFAULT_SAMPLE_BATCH_TYPE: str = "ANALYSIS"
@@ -35,7 +35,7 @@ class SampleBatchConfig(BaseModel):
     ACQUISITION_AUTO_LOCK: bool = True
 
     # Target collection constraints
-    ACQUISITION_COLLECTION_TYPES: list = ["CALIBRANTS", "DIAGNOSTICS"]
+    ACQUISITION_COLLECTION_TYPES: list = ["CALIBRANTS", "DIAGNOSTICS", "TARGETS"]
     ANALYSIS_COLLECTION_TYPES: list = target_collection_config.TARGET_COLLECTION_TYPES
 
     @property

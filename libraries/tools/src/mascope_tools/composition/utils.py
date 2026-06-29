@@ -17,6 +17,22 @@ def to_pyteomics(formula: str) -> str:
     return re.sub(r"\[(\d+)([A-Z][a-z]?)\]", r"\2[\1]", formula)
 
 
+# Caret-prefixed heavy isotopes used for labelled reagents, e.g. '^N' = 15N (the
+# 15N-labelled nitrate reagent '+^NO3-'). pyteomics masses isotopes via 'N[15]'
+# notation and cannot mass the bare '^N' symbol, so map them for mass computation.
+CARET_ISOTOPES = {"^N": "N[15]"}
+
+
+def composition_mass(composition: Composition) -> float:
+    """Monoisotopic mass of a parsed Composition, resolving caret-labelled heavy
+    isotopes ('^N' = 15N) that pyteomics cannot mass directly. Equivalent to
+    ``composition.mass()`` for compositions with no caret isotopes."""
+    total = 0.0
+    for sym, n in composition.items():
+        total += calculate_mass(formula=CARET_ISOTOPES.get(sym, sym)) * n
+    return total
+
+
 def combine_formula_and_ionization(
     formula: str, ionization_mechanism: IonizationMechanism
 ) -> str:
@@ -25,8 +41,11 @@ def combine_formula_and_ionization(
     """
     # Parse formula (Pyteomics requires element-first notation)
     comp_formula = Composition(formula=to_pyteomics(formula))
+    # Parse the adduct with parse_composition (not raw pyteomics) so custom
+    # labelled elements like '^N' (the 15N-nitrate reagent) survive; pyteomics
+    # rejects the bare '^N' symbol.
     comp_ionization = (
-        Composition(formula=ionization_mechanism.formula)
+        parse_composition(ionization_mechanism.formula)
         if ionization_mechanism
         else Composition(formula="")
     )
@@ -219,7 +238,7 @@ def parse_ionization(ionization_string: str) -> IonizationMechanism:
             composition = parse_composition(match.group(2))
             formula = to_hill_order(composition)
             charge = 1 if match.group(3) == "+" else -1
-            mass = composition.mass() - ELECTRON_MASS * charge
+            mass = composition_mass(composition) - ELECTRON_MASS * charge
         else:
             raise CompositionFinderException(
                 f"Unsupported ionization mechanism: '{ionization_string}'"

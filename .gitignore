@@ -17,3 +17,8 @@ dist
 
 tofdaq
 /.runtime/env/*
+# Downloaded/built demo bundles (large; fetched on demand by `mascope demo`)
+/.runtime/demo/
+
+# MkDocs build output
+/site/
