@@ -2480,19 +2480,24 @@ Mascope docker images are built by a release CI/CD pipeline (found in `.github/w
 
 ### Pulling images
 
-To pull images from the registry, you need the right permissions. Assuming you have a GitHub account with read permissions for the Karsa organization, do the following:
+The published images are public on GHCR, so no authentication is needed to pull them:
 
-1. Follow [these instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) to create a classic personal access token for your GitHub account. The **only** required scope is `packages:read`, and it is recommended _not_ to add any others. Save this token somewhere safe, since its only shown once.
-2. [Authenticate with your new access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic) on the machine you need to pull from, to ensure you can pull images from our package registry.
+```sh
+mascope prod docker pull
+```
 
-> [!CAUTION]
-> Your access token is **not** scoped at all, which means creating it grands the token read access to packages **all** the repositories you have access too. If this is undesirable, you can use the Karsa Developer account instead.
+`mascope prod up` also pulls automatically when the images are not present locally.
 
-Now you should be able to run `mascope prod pull` to pull the latest images from the registry. If no images exist on the system (which would be the case if you never built or pulled any) then `mascope prod up` would automatically pull the latest.
+### Running a specific release
 
-### Running the latest release
+The checked-out git tag selects the version (it sets `MASCOPE_VERSION`, which picks the image tag and the version the UI reports): a `vX.Y.Z` tag runs that release, `master` the latest build.
 
-To ensure you are running the latest release, execute `mascope prod pull` and then `mascope prod up`.
+```sh
+git checkout v1.0.0
+mascope prod docker pull && mascope prod up
+```
+
+See [Hosting & deployment](../hosting.md) for the full host setup and update walkthrough.
 
 ### Cutting a citable release
 
