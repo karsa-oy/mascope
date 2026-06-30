@@ -128,6 +128,10 @@ def _compose_env() -> dict[str, str]:
         MASCOPE_RUNTIME=mascope_runtime,
         MASCOPE_FILESTORE=runtime.meta.filestore,
         MASCOPE_TIMEZONE=timezone,
+        # Selects which image tag to pull/build (the compose `image:` field).
+        # Set by the CLI callback from git (parse_version) unless pinned, e.g.
+        # MASCOPE_VERSION=v1.0.0 to deploy a release.
+        MASCOPE_VERSION=os.environ.get("MASCOPE_VERSION", "latest"),
         # Forwarded explicitly so compose variable interpolation is always
         # satisfied — empty string when --log-level was not passed, which
         # compose treats as "no override" for the container environment.

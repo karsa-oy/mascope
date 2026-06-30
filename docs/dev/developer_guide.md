@@ -2509,7 +2509,14 @@ To cut one, from `master` at the commit you want to release:
 1. Bump [`CITATION.cff`](../../CITATION.cff): set `version:` to the new `X.Y.Z` and `date-released:` to today, and merge it to `master` so it is part of the released commit.
 2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. Tag pushes do **not** trigger the build pipeline, so this won't rebuild images.
 3. On GitHub, **Releases → Draft a new release**, pick the `vX.Y.Z` tag, fill in the title + notes (below), and **Publish**.
-4. Zenodo archives the release automatically and mints a new version DOI; the concept DOI (the README badge / `CITATION.cff`) keeps resolving to the latest.
+Publishing then triggers two automations:
+
+- **Zenodo** archives the release and mints a new version DOI; the concept DOI (the README badge / `CITATION.cff`) keeps resolving to the latest.
+- The **`build-release-images`** workflow (`.github/workflows/build-release-images.yaml`) **builds** the images from the tag and pushes `ghcr.io/karsa-oy/mascope/<service>:vX.Y.Z`. It rebuilds (rather than re-tagging) on purpose: on a tag checkout `parse_version()` resolves to the tag, so `vX.Y.Z` both tags the images and **bakes in** as the version the app reports.
+
+So the one version flows everywhere: git tag, GitHub Release, Zenodo DOI, the image tag, and the in-app version. To deploy a release, on the server `git checkout vX.Y.Z` (then `mascope prod docker pull && mascope prod up`) - `parse_version()` resolves the tag, so it pulls the `vX.Y.Z` images and the UI shows `vX.Y.Z`. A regular `master` checkout deploys/shows the build tag `{date}-{hash}` instead; `latest` keeps tracking master for dev/staging and the demo. (You can also pin explicitly with `MASCOPE_VERSION=vX.Y.Z`, which the CLI no longer overrides.)
+
+> `release` events run the workflow from the repository's **default branch**, so `build-release-images.yaml` must be present there to fire.
 
 **Release title:** the version, optionally with a short theme - `v1.2.0` or `v1.2.0 - calibration overhaul`. It becomes part of the Zenodo record title, so keep it terse.
 
@@ -2517,10 +2524,9 @@ To cut one, from `master` at the commit you want to release:
 
 - a one-to-two sentence summary of the release;
 - highlights grouped as **Added / Changed / Fixed**;
-- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade);
-- the matching image tag for deployers, e.g. `ghcr.io/karsa-oy/mascope/backend:2026.06.26-a1b2c3d` (it and `vX.Y.Z` point at the same commit).
+- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade).
 
-Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release) - never the per-merge build tags.
+Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release); deployers pin `MASCOPE_VERSION=X.Y.Z` - neither needs the per-merge build tags.
 
 ## 📒 Notebooks
 
