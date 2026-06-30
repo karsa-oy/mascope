@@ -20,34 +20,83 @@ run; it comes up preloaded with the demo dataset. See
 `http://localhost:8080`; loopback is a browser secure context, so everything
 (including clipboard) works over plain HTTP.
 
-### Shared / LAN / production (HTTPS)
+### Production (shared / LAN, over HTTPS)
 
 For a deployment reached over the network by multiple users, serve over
-**HTTPS**. This is not just good practice: browsers only treat `localhost` as a
-secure context over plain HTTP, so over a LAN address features like clipboard
-access require HTTPS.
+**HTTPS** - browsers only treat `localhost` as a secure context over plain HTTP,
+so over a LAN address features like clipboard access require HTTPS.
 
-1. **Prerequisites:** Docker + Docker Compose on a host your users can reach.
-2. **Secrets** (in `.runtime/secrets/`): `postgres_password.txt`,
-   `jwt_secret_key.txt`, `server_owner_secret_key.txt`, plus a TLS certificate
-   (`mascope.app.pem` / `mascope.app.key`).
-3. **TLS** - pick the option that fits your audience:
-   - **Self-signed** (`mascope cert gen`): works immediately; each user clicks
-     through a one-time browser warning. Fine for a small, trusted team. Make
-     sure the certificate's SAN matches the hostname/IP people use.
+Mascope is deployed from a clone of the repo: the `mascope` CLI drives Docker
+Compose, and the **checked-out git tag selects which release runs** (it sets
+`MASCOPE_VERSION`, which picks the image tag to pull and the version the UI
+reports).
+
+#### Set up (run the latest release)
+
+1. **Install prerequisites** on the host: Docker + Docker Compose, `git`, and
+   [uv](https://docs.astral.sh/uv/).
+2. **Get Mascope and pin the release.** Pick the latest version from
+   [Releases](https://github.com/karsa-oy/mascope/releases):
+
+   ```sh
+   git clone https://github.com/karsa-oy/mascope.git
+   cd mascope
+   git fetch --tags
+   git checkout v1.0.0           # the release you want to run
+   ./tooling/ubuntu.sh install   # installs the `mascope` CLI (Ubuntu)
+   ```
+
+3. **Create the secrets** in `.runtime/secrets/`:
+
+   ```sh
+   mkdir -p .runtime/secrets
+   head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/postgres_password.txt
+   head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/jwt_secret_key.txt
+   head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/server_owner_secret_key.txt
+   ```
+
+4. **Set up TLS** - pick the option that fits your audience:
+   - **Self-signed** (`mascope cert gen` writes `mascope.app.pem`/`.key` into
+     `.runtime/secrets/`): works immediately; each user clicks through a one-time
+     browser warning. Make sure the certificate's SAN matches the hostname/IP.
    - **Internal CA** (e.g. [mkcert](https://github.com/FiloSottile/mkcert) or an
-     org CA): warning-free on the LAN; install the CA certificate on client
-     machines once, then issue a certificate for the server's hostname.
+     org CA): warning-free on the LAN; install the CA on client machines once,
+     then issue a certificate for the server's hostname.
    - **Real certificate** via a domain + Let's Encrypt **DNS-01** (a reverse
      proxy such as Caddy or Traefik automates issuance/renewal): trusted, no
-     warnings, no client setup. Needs a DNS name you control; DNS-01 does not
-     require exposing the server to the internet.
-4. **Start:** `mascope prod up` (uses `docker-compose.yaml`). The `db_init`
-   container creates the database and applies migrations before the app starts.
-5. **Persistence:** state lives under `.runtime/` (PostgreSQL data and the
-   filestore). Back these up; see the database section of the developer guide.
-6. **Upgrades:** pull a newer image and `mascope prod up` again - `db_init`
-   applies pending migrations on start (taking a pre-migration backup first).
+     warnings, no client setup. DNS-01 does not require exposing the server to
+     the internet.
+
+5. **Pull the release images and start:**
+
+   ```sh
+   mascope prod docker pull   # pulls the v1.0.0 images from GHCR
+   mascope prod up
+   ```
+
+   `db_init` creates the database and applies migrations before the app starts.
+   Open `https://<host>` and register the first owner account (with `server_owner_secret_key`).
+
+#### Update to a new release
+
+```sh
+cd mascope
+git fetch --tags
+git checkout v1.1.0          # the new release tag
+mascope prod docker pull     # pulls the v1.1.0 images
+mascope prod up              # recreates the containers
+```
+
+On start, `db_init` takes a pre-migration backup and applies any pending
+migrations. To roll back, check out the previous tag and repeat
+`mascope prod docker pull && mascope prod up` (restore the pre-migration backup
+if a migration had run).
+
+#### Persistence & backups
+
+State lives under `.runtime/` (PostgreSQL data + the filestore) - back it up.
+`mascope prod db backup` takes a manual dump; see the database section of the
+developer guide.
 
 For the full operations reference (runtime, database tuning, backups, env sync,
 deployment internals), see the
