@@ -24,8 +24,8 @@ def gen():
 
     Writes mascope.app.key + mascope.app.pem into .runtime/secrets/. Use for
     local HTTPS prod testing or a small LAN deployment (clients see a
-    self-signed warning). For a localhost-only trial, prefer HTTP
-    (docker-compose.release.yaml) instead.
+    self-signed warning). For a localhost-only trial, prefer the HTTP demo
+    stack (docker-compose.demo.yaml) instead.
     """
     secrets_dir = Path(runtime.path(".runtime", "secrets"))
     secrets_dir.mkdir(parents=True, exist_ok=True)
