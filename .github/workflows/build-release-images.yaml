@@ -1,0 +1,57 @@
+name: Build release images
+
+# When a GitHub Release is published, build the images from the tagged commit
+# and push them as ghcr.io/karsa-oy/mascope/<service>:vX.Y.Z.
+#
+# It REBUILDS (rather than re-tagging a build image) so the release version
+# bakes into the images: on a tag checkout parse_version() resolves to the tag,
+# so the compose `image: ...:${MASCOPE_VERSION}` both tags the images :vX.Y.Z and
+# bakes vX.Y.Z in as the displayed version. A pinned deploy (MASCOPE_VERSION=
+# vX.Y.Z) then reports vX.Y.Z in the UI. `latest` is left untouched (it tracks
+# master).
+#
+# NOTE: `release` events run the workflow from the repository's DEFAULT branch,
+# so this file must be present there to take effect.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the release images
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          sudo snap install --classic astral-uv
+          export MASCOPE_PATH="$GITHUB_WORKSPACE"
+
+          # Pin the build to the release tag. The CLI uses setdefault, so this
+          # wins: the compose `image: ...:${MASCOPE_VERSION}` tags the images
+          # :$TAG and bakes $TAG in as the displayed version.
+          export MASCOPE_VERSION="$TAG"
+          echo "Building release images for $TAG"
+
+          uv run mascope prod build
+
+          for service in backend frontend; do
+            docker push "ghcr.io/${{ github.repository }}/$service:$TAG"
+            echo "Pushed ghcr.io/${{ github.repository }}/$service:$TAG"
+          done

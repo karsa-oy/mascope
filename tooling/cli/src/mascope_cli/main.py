@@ -68,8 +68,9 @@ def main(
     \b
     Type `mascope <cmd> --help` to learn more about a specific command.
     """
-    # construct the version string from git
-    os.environ["MASCOPE_VERSION"] = runtime.parse_version()
+    # Default the version from git, but let an explicitly-set MASCOPE_VERSION win
+    # (e.g. pinning a release image for a prod deploy: MASCOPE_VERSION=v1.0.0).
+    os.environ.setdefault("MASCOPE_VERSION", runtime.parse_version())
 
     # override active env with CLI option (null if not provided)
     runtime.state.override("env", env)
