@@ -15,7 +15,7 @@
 # Tear down with `docker compose -f docker-compose.demo.yaml down -v`.
 #
 # The secrets here are FIXED, THROWAWAY, and for this localhost demo only. For a
-# real deployment use docker-compose.release.yaml / docker-compose.yaml instead.
+# real deployment use docker-compose.yaml instead (see docs/hosting.md).
 
 services:
   redis:

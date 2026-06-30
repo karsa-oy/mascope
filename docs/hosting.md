@@ -14,8 +14,9 @@ Mascope ships as Docker images on GHCR, orchestrated with Docker Compose.
 
 ### Local trial (one machine)
 
-Run the HTTP release stack on `localhost` - no TLS, no build, just pull and run.
-See [Getting started](user/getting-started/index.md). The web UI is served at
+Run the one-command demo stack on `localhost` - no TLS, no build, just pull and
+run; it comes up preloaded with the demo dataset. See
+[Getting started](user/getting-started/index.md). The web UI is served at
 `http://localhost:8080`; loopback is a browser secure context, so everything
 (including clipboard) works over plain HTTP.
 
