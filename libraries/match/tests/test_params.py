@@ -15,12 +15,12 @@ class TestIsotopeAbundanceThreshold:
         assert (
             OrbiMatchParams().isotope_abundance_threshold
             == ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD
-            == 1e-4
+            == 1e-5
         )
         assert (
             TofMatchParams().isotope_abundance_threshold
             == TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD
-            == 1e-3
+            == 1e-4
         )
 
     def test_override_is_accepted(self):
