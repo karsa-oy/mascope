@@ -2480,19 +2480,58 @@ Mascope docker images are built by a release CI/CD pipeline (found in `.github/w
 
 ### Pulling images
 
-To pull images from the registry, you need the right permissions. Assuming you have a GitHub account with read permissions for the Karsa organization, do the following:
+The published images are public on GHCR, so no authentication is needed to pull them:
 
-1. Follow [these instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic) to create a classic personal access token for your GitHub account. The **only** required scope is `packages:read`, and it is recommended _not_ to add any others. Save this token somewhere safe, since its only shown once.
-2. [Authenticate with your new access token](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-with-a-personal-access-token-classic) on the machine you need to pull from, to ensure you can pull images from our package registry.
+```sh
+mascope prod docker pull
+```
 
-> [!CAUTION]
-> Your access token is **not** scoped at all, which means creating it grands the token read access to packages **all** the repositories you have access too. If this is undesirable, you can use the Karsa Developer account instead.
+`mascope prod up` also pulls automatically when the images are not present locally.
 
-Now you should be able to run `mascope prod pull` to pull the latest images from the registry. If no images exist on the system (which would be the case if you never built or pulled any) then `mascope prod up` would automatically pull the latest.
+### Running a specific release
 
-### Running the latest release
+The checked-out git tag selects the version (it sets `MASCOPE_VERSION`, which picks the image tag and the version the UI reports): a `vX.Y.Z` tag runs that release, `master` the latest build.
 
-To ensure you are running the latest release, execute `mascope prod pull` and then `mascope prod up`.
+```sh
+git checkout v1.0.0
+mascope prod docker pull && mascope prod up
+```
+
+See [Hosting & deployment](../hosting.md) for the full host setup and update walkthrough.
+
+### Cutting a citable release
+
+Image builds happen on every merge (above) and are tagged `YYYY.MM.DD-<sha>`. A **release** is a deliberate milestone that gets a clean version and a citable Zenodo DOI - it is separate from those per-merge build tags.
+
+Releases use **SemVer** `vMAJOR.MINOR.PATCH`:
+
+- **MAJOR** - incompatible changes (API, a migration users must act on, removed features)
+- **MINOR** - backwards-compatible features
+- **PATCH** - backwards-compatible fixes
+
+To cut one, from `master` at the commit you want to release:
+
+1. Bump [`CITATION.cff`](../../CITATION.cff): set `version:` to the new `X.Y.Z` and `date-released:` to today, and merge it to `master` so it is part of the released commit.
+2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. Tag pushes do **not** trigger the build pipeline, so this won't rebuild images.
+3. On GitHub, **Releases → Draft a new release**, pick the `vX.Y.Z` tag, fill in the title + notes (below), and **Publish**.
+Publishing then triggers two automations:
+
+- **Zenodo** archives the release and mints a new version DOI; the concept DOI (the README badge / `CITATION.cff`) keeps resolving to the latest.
+- The **`build-release-images`** workflow (`.github/workflows/build-release-images.yaml`) **builds** the images from the tag and pushes `ghcr.io/karsa-oy/mascope/<service>:vX.Y.Z`. It rebuilds (rather than re-tagging) on purpose: on a tag checkout `parse_version()` resolves to the tag, so `vX.Y.Z` both tags the images and **bakes in** as the version the app reports.
+
+So the one version flows everywhere: git tag, GitHub Release, Zenodo DOI, the image tag, and the in-app version. To deploy a release, on the server `git checkout vX.Y.Z` (then `mascope prod docker pull && mascope prod up`) - `parse_version()` resolves the tag, so it pulls the `vX.Y.Z` images and the UI shows `vX.Y.Z`. A regular `master` checkout deploys/shows the build tag `{date}-{hash}` instead; `latest` keeps tracking master for dev/staging and the demo. (You can also pin explicitly with `MASCOPE_VERSION=vX.Y.Z`, which the CLI no longer overrides.)
+
+> `release` events run the workflow from the repository's **default branch**, so `build-release-images.yaml` must be present there to fire.
+
+**Release title:** the version, optionally with a short theme - `v1.2.0` or `v1.2.0 - calibration overhaul`. It becomes part of the Zenodo record title, so keep it terse.
+
+**Release notes:** user-facing and skimmable. Use GitHub's **Generate release notes** button to list merged PRs since the last tag, then trim to:
+
+- a one-to-two sentence summary of the release;
+- highlights grouped as **Added / Changed / Fixed**;
+- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade).
+
+Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release); deployers pin `MASCOPE_VERSION=X.Y.Z` - neither needs the per-merge build tags.
 
 ## 📒 Notebooks
 

@@ -32,6 +32,7 @@ import { runtime } from '@/lib/runtime'
           />
         </g>
       </svg>
+      <span class="symbol">
       <svg
         height="24px"
         viewBox="0 0 112.53629 112.53629"
@@ -68,9 +69,10 @@ import { runtime } from '@/lib/runtime'
           />
         </g>
       </svg>
+        <span class="version">{{ runtime.version }}</span>
+      </span>
       <b style="font-size: 15px; margin-left: 2px">Mascope</b>
     </div>
-    <span class="version">{{ runtime.version }}</span>
   </div>
 </template>
 
@@ -84,14 +86,31 @@ div {
 .col {
   gap: 0;
   justify-content: center;
+  /* Reserve room for the version, which hangs below the row out of flow. */
+  padding-bottom: 0.75rem;
 }
 
 .row {
   justify-content: center;
 }
 
+/* Positioning context for the version label: wraps just the round symbol so
+   the absolutely-placed label is centred on it. */
+.symbol {
+  position: relative;
+  display: flex;
+}
+
 .version {
-  opacity: 0.3;
+  /* Anchored to the symbol, so it stays centred under it for any tag length and
+     never affects the logo's layout. */
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  /* The .row dims the whole logo to 0.5; 0.6 here nets the intended ~0.3. */
+  opacity: 0.6;
   pointer-events: none; /* Prevents the logo from affecting layout interactions */
   font-size: 10px;
 }

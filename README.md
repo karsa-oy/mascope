@@ -31,33 +31,10 @@ When it's up, open <http://localhost:8080> and log in with:
 The first run downloads ~150 MB; tear it down with
 `docker compose -f docker-compose.demo.yaml down -v`.
 
-<details>
-<summary><b>Or start with an empty instance</b> (no demo data)</summary>
-
-```sh
-# get docker-compose.release.yaml + .env.example from this repo, then:
-cp .env.example .env
-
-# create the secrets
-mkdir -p .runtime/secrets
-head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/postgres_password.txt
-head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/jwt_secret_key.txt
-head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/server_owner_secret_key.txt
-
-# pull the published images and start
-docker compose -f docker-compose.release.yaml pull
-docker compose -f docker-compose.release.yaml up -d
-
-# follow the application logs (Ctrl+C just detaches; containers keep running)
-docker compose -f docker-compose.release.yaml logs -f backend frontend file_converter
-```
-
-Then open <http://localhost:8080>.
-
-</details>
-
-> Contributors with the repo cloned can also run the demo from source with
-> `mascope demo` - see [Demo dataset](docs/demo_dataset.md).
+To run Mascope for real - your own data, on a server, over HTTPS - see
+[Hosting & deployment](docs/hosting.md). Contributors with the repo cloned can
+also run the demo from source with `mascope demo` (see
+[Demo dataset](docs/demo_dataset.md)).
 
 ## Hosting
 
@@ -90,3 +67,15 @@ Then open <http://localhost:8080>.
 ## License
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attributions.
+
+## Citation
+
+If you use **Mascope** in your research, please cite the software using the
+metadata in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository"
+button) or the archived Zenodo release:
+
+[![DOI](https://zenodo.org/badge/767603004.svg)](https://doi.org/10.5281/zenodo.21037634)
+
+The bundled **demo dataset** has its own DOI:
+
+> Mascope demo dataset at Zenodo: https://doi.org/10.5281/zenodo.20929489

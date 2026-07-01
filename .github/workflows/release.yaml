@@ -59,16 +59,18 @@ jobs:
           export MASCOPE_PATH=/home/runner/work/mascope/mascope/          
           VERSION=${{ needs.release-tag.outputs.version }}
           
-          # execute build using the CLI
+          # Build using the CLI. parse_version() derives the same VERSION on
+          # master, so the compose `image: ...:${MASCOPE_VERSION}` builds and
+          # tags the images as :$VERSION directly.
           uv run mascope prod build
 
           for service in backend frontend; do
             # alias image name
             IMAGE=ghcr.io/${{ github.repository }}/$service
-            
-            # tag with generated version and latest
-            docker tag $IMAGE:latest $IMAGE:$VERSION
-            
+
+            # also tag the build as :latest (rolling)
+            docker tag $IMAGE:$VERSION $IMAGE:latest
+
             # push to the github container registry
             docker push --all-tags $IMAGE
           done

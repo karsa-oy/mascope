@@ -18,7 +18,7 @@ license.text = "Apache-2.0"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "requests>=2.32.3",
+    "requests>=2.34.2,<3",
     "loguru>=0.7.3",
     "pandas>=2.0.0",
     "tqdm>=4.60.0",

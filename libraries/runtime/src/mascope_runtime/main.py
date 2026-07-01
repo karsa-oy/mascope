@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 import subprocess
 
@@ -310,17 +311,26 @@ class Runtime:
 
     def parse_version(self):
         """
-        Construct a version string for the app from git history.
-        The latest commit is used to construct the version, with
-        the format differing depend on branch:
+        Construct a version string for the app from git.
 
-        In `master`:
-          format: v{iso_date}-{short_commit_hash}
-          example: v2024.09.03-d06bfef9
+        If HEAD is exactly at a release tag (``v*``), that tag IS the version, so
+        a pinned release reports its release version:
+          example: v1.0.0
 
-        In other branches:
-          format: {branch}-v{iso_date}-{short_commit_hash}
-          example: feature/new-stuff-v2024.09.03-d06bfef9
+        Otherwise a build identifier from the latest commit is used (no ``v`` -
+        the leading ``v`` is what distinguishes a release from a build):
+
+        In `master` (or a detached checkout, e.g. CI):
+          format: {iso_date}-{short_commit_hash}
+          example: 2024.09.03-d06bfef9
+
+        In other branches ("/" in the branch name becomes "-" so the version
+        stays a valid Docker image tag):
+          format: {branch}-{iso_date}-{short_commit_hash}
+          example: feature-new-stuff-2024.09.03-d06bfef9
+
+        The build identifier matches the image tags the release pipeline pushes,
+        so it doubles as a deployable/pinnable tag.
         """
 
         def exec(cmd: str):
@@ -336,19 +346,26 @@ class Runtime:
             except Exception:
                 return None
 
-        # construct a prefix from branch
-        branch = exec("git rev-parse --abbrev-ref HEAD")
-        if branch == "master":
-            prefix = "v"
-        else:
-            prefix = f"{branch}-v"
-        # get the latest commit date and short hash
+        # A semver release tag at HEAD wins (e.g. v1.0.0) - report it as the
+        # version. Dated build tags (v{date}-{hash}) are intentionally excluded
+        # by the strict `vMAJOR.MINOR.PATCH` match.
+        tags = exec("git tag --points-at HEAD") or ""
+        for tag in tags.splitlines():
+            if re.fullmatch(r"v\d+\.\d+\.\d+", tag.strip()):
+                return tag.strip()
+
+        # Otherwise a build identifier from the latest commit's date + short hash.
         date_and_commit_hash = exec(
             'git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h"'
         )
-        # combine them to form the version string
-        return (
-            f"{prefix}{date_and_commit_hash}"
-            if date_and_commit_hash
-            else "unknown-version"
-        )
+        if not date_and_commit_hash:
+            return "unknown-version"
+        # No branch prefix on master or a detached checkout (HEAD).
+        branch = exec("git rev-parse --abbrev-ref HEAD")
+        if branch in (None, "master", "HEAD"):
+            return date_and_commit_hash
+        # The version doubles as a Docker image tag, which only permits
+        # [A-Za-z0-9_.-]; branch names routinely contain "/" (e.g. feat/x), so
+        # sanitize before prefixing or compose rejects the tag.
+        safe_branch = re.sub(r"[^A-Za-z0-9_.-]", "-", branch)
+        return f"{safe_branch}-{date_and_commit_hash}"
