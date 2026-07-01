@@ -13,7 +13,7 @@ over `http://localhost` - no certificates, no account signup.
 Download the demo compose file and start it:
 
 ```sh
-curl -O https://raw.githubusercontent.com/karsa-oy/mascope/develop/docker-compose.demo.yaml
+curl -O https://raw.githubusercontent.com/karsa-oy/mascope/master/docker-compose.demo.yaml
 docker compose -f docker-compose.demo.yaml up
 ```
 

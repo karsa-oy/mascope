@@ -21,7 +21,7 @@ Run Mascope on your machine **with real data to explore**. Docker is the only
 prerequisite. One file, one command:
 
 ```sh
-curl -O https://raw.githubusercontent.com/karsa-oy/mascope/develop/docker-compose.demo.yaml
+curl -O https://raw.githubusercontent.com/karsa-oy/mascope/master/docker-compose.demo.yaml
 docker compose -f docker-compose.demo.yaml up
 ```
 
