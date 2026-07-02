@@ -1,9 +1,9 @@
 name: Mascope Tests
-run-name: Running tests for PR to develop
+run-name: Running tests for PR to develop or master
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, master]
     types: [opened, synchronize, reopened]
 
 # Least privilege: this workflow only checks out code and runs tests.
