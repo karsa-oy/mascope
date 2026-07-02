@@ -355,11 +355,16 @@ class Runtime:
                 return tag.strip()
 
         # Otherwise a build identifier from the latest commit's date + short hash.
-        date_and_commit_hash = exec(
-            'git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h"'
-        )
-        if not date_and_commit_hash:
+        # Use a fixed 7-char hash, not git's %h: %h auto-scales its abbreviation
+        # length with the local object count, so a shallow CI clone (short) and a
+        # full deploy clone (longer) derive different tags - and the image tag the
+        # deploy pulls stops matching the one CI pushed. Slicing the full hash
+        # keeps the length stable on every machine.
+        date = exec('git log -1 --date=format:"%Y.%m.%d" --format="%ad"')
+        commit = exec("git rev-parse HEAD")
+        if not date or not commit:
             return "unknown-version"
+        date_and_commit_hash = f"{date}-{commit[:7]}"
         # No branch prefix on master or a detached checkout (HEAD).
         branch = exec("git rev-parse --abbrev-ref HEAD")
         if branch in (None, "master", "HEAD"):
