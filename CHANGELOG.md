@@ -20,6 +20,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Corrected the demo quickstart download URL after the `develop` branch was retired.
 - Fixed default values in the instrument parameter test.
+- Fixed the Ubuntu installation script `tooling/ubuntu.sh` to work on Ubuntu >= 26
 
 ## [v1.0.0] - 2026.06.29
 
