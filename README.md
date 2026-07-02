@@ -64,6 +64,12 @@ also run the demo from source with `mascope demo` (see
 | **Hosting & deployment**           | [Hosting](docs/hosting.md) (managed, local, LAN/production)                                     |
 | **Demo dataset & reproducibility** | [Demo dataset](docs/demo_dataset.md)                                                            |
 
+## Community
+
+Questions, help, and discussion happen on Discord - come say hello:
+
+[![Discord](https://img.shields.io/discord/1221735590890967070?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/R5kEKJcKe8)
+
 ## License
 
 [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for attributions.
