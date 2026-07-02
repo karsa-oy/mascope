@@ -4,11 +4,14 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## 2026.07.02
+
 ### Added
 
 - Version-pinned releases: a deployment can pin `MASCOPE_VERSION` to a release, and the web UI reports the running version.
 - Citation metadata (`CITATION.cff`) and a software DOI for archived releases.
 - Community health documents: contributing guide, code of conduct, and security policy.
+- SDK example notebooks `06-08`, SDK version `2026.7.2`.
 
 ### Changed
 
@@ -20,7 +23,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Corrected the demo quickstart download URL after the `develop` branch was retired.
 - Fixed default values in the instrument parameter test.
-- Fixed the Ubuntu installation script `tooling/ubuntu.sh` to work on Ubuntu >= 26
+- Fixed the Ubuntu installation script `tooling/ubuntu.sh` to work on Ubuntu >= 26.
+- Run tests on PR to `master`, make workflow permissions read-only explicitly.
 
 ## [v1.0.0] - 2026.06.29
 
