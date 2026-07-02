@@ -25,7 +25,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Create version tag
         id: make_version
-        run: echo "version=$(git log -1 --date=format:"%Y.%m.%d" --format="%ad-%h")" >> "$GITHUB_OUTPUT"
+        # Fixed 7-char hash (not %h, whose abbreviation length auto-scales with
+        # clone depth) so CI and deploy clones always derive the same image tag.
+        run: echo "version=$(git log -1 --date=format:"%Y.%m.%d" --format="%ad")-$(git rev-parse HEAD | cut -c1-7)" >> "$GITHUB_OUTPUT"
       - name: Push version tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
