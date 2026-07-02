@@ -97,7 +97,7 @@ class MatchingResource(BaseResource):
         formulas: list[str],
         match_params: dict[str, Any] | None = None,
         ionization_mechanism_ids: list[str] | None = None,
-    ) -> dict | None:
+    ) -> list[dict] | None:
         """Match multiple compounds in a sample.
 
         Searches for peaks in the sample that match any of the target compound
@@ -112,9 +112,9 @@ class MatchingResource(BaseResource):
         :type match_params: dict[str, Any], optional
         :param ionization_mechanism_ids: Optional list of mechanism IDs to use.
         :type ionization_mechanism_ids: list[str], optional
-        :return: A dictionary containing match data for all compounds.
+        :return: A list of match-data dictionaries, one per compound.
                  Returns None if no matches are found.
-        :rtype: dict | None
+        :rtype: list[dict] | None
         :raises AuthenticationError: If authentication fails.
         :raises NotFoundError: If the sample is not found.
         :raises ValidationError: If parameters are invalid.

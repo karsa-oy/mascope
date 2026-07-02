@@ -21,7 +21,7 @@ Run Mascope on your machine **with real data to explore**. Docker is the only
 prerequisite. One file, one command:
 
 ```sh
-curl -O https://raw.githubusercontent.com/karsa-oy/mascope/develop/docker-compose.demo.yaml
+curl -O https://raw.githubusercontent.com/karsa-oy/mascope/master/docker-compose.demo.yaml
 docker compose -f docker-compose.demo.yaml up
 ```
 
@@ -63,6 +63,12 @@ also run the demo from source with `mascope demo` (see
 | **Developers / contributors**      | [Developer guide](docs/dev/developer_guide.md) (build, run, runtime, backend, database, deploy) |
 | **Hosting & deployment**           | [Hosting](docs/hosting.md) (managed, local, LAN/production)                                     |
 | **Demo dataset & reproducibility** | [Demo dataset](docs/demo_dataset.md)                                                            |
+
+## Community
+
+Questions, help, and discussion happen on Discord - come say hello:
+
+[![Discord](https://img.shields.io/discord/1221735590890967070?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/R5kEKJcKe8)
 
 ## License
 

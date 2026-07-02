@@ -71,6 +71,10 @@ This creates a `tutorials/` folder with the following notebooks:
 | 3   | `03_intra_sample_timeseries.ipynb` | Per-scan intensity timeseries for specific compounds    |
 | 4   | `04_mass_defect_plot.ipynb`        | Mass defect visualization                               |
 | 5   | `05_peaks_by_stage.ipynb`          | Compare measurement stages within a single sample       |
+| 6   | `06_normalization.ipynb`           | Normalize intensities by TIC or reagent-ion signal      |
+| 7   | `07_background_subtraction.ipynb`  | Subtract a background sample (matched ions or m/z bins) |
+| 8   | `08_correlation_analysis.ipynb`    | Find co-varying peaks via correlation and clustering    |
+| 9   | `09_composition_assignment.ipynb`  | Assign elemental compositions to unmatched peaks        |
 
 Open them in VS Code (or any Jupyter-compatible IDE) and run the cells. Each notebook is self-contained, just make sure your `.env` credentials are set up first (see [Configuration](#configuration)).
 
@@ -319,10 +323,10 @@ plain substrings **or** regular expressions (case-insensitive). For example,
 
 #### `mascope.matching`
 
-| Method                                 | Description                  | Returns     |
-| -------------------------------------- | ---------------------------- | ----------- |
-| `match_compound(sample_id, formula)`   | Match a compound in a sample | `dict│None` |
-| `match_compounds(sample_id, formulas)` | Match multiple compounds     | `dict│None` |
+| Method                                 | Description                  | Returns           |
+| -------------------------------------- | ---------------------------- | ----------------- |
+| `match_compound(sample_id, formula)`   | Match a compound in a sample | `dict│None`       |
+| `match_compounds(sample_id, formulas)` | Match multiple compounds     | `list[dict]│None` |
 
 #### `mascope.ionization`
 

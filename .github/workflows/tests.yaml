@@ -1,10 +1,14 @@
 name: Mascope Tests
-run-name: Running tests for PR to develop
+run-name: Running tests for PR to develop or master
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, master]
     types: [opened, synchronize, reopened]
+
+# Least privilege: this workflow only checks out code and runs tests.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -32,6 +36,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Don't leave the GITHUB_TOKEN in git config; nothing after checkout needs it.
+          persist-credentials: false
 
       - name: Install uv via snap
         run: |
