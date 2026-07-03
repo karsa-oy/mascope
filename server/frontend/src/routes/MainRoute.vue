@@ -13,8 +13,9 @@ const ready = computed(() => !app.data.workspace.pending || app.data.workspace.l
 </script>
 
 <template>
-  <!-- App Dashboard  -->
-  <div id="app" v-if="ready">
+  <!-- App Dashboard. Not id="app": that is the Vue mount div in index.html,
+       and nesting a second element with the same id is invalid HTML. -->
+  <div id="dashboard" v-if="ready">
     <Dashboard />
   </div>
   <!-- Loading Spinner  -->
