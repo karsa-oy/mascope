@@ -58,6 +58,10 @@ class AuthConfig(BaseModel):
     COOKIE_HTTP_ONLY: bool = (
         True  # Set cookies as HTTPOnly to prevent access from JavaScript
     )
+    # SameSite policy for the auth cookie. "lax" is not sent on cross-site POST/
+    # PATCH/DELETE, which covers our state-changing routes and mitigates CSRF.
+    # Set explicitly rather than relying on the transport library's default.
+    COOKIE_SAMESITE: str = "lax"
 
     # Password reset token settings
     RESET_PASSWORD_TOKEN_SECRET: str = (

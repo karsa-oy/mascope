@@ -117,8 +117,12 @@ services:
       retries: 5
       start_period: 30s
     tty: true
-    ports:
-      - 8090:8090
+    # The backend API is intentionally NOT published to a host port. nginx reaches
+    # it over the internal Docker network (upstream backend -> backend:8090) and the
+    # container healthcheck hits localhost:8090 inside the container, so nothing on
+    # the host needs the raw port. Publishing it would expose the plaintext HTTP API
+    # directly, bypassing the frontend's TLS termination. To debug from the host,
+    # use `docker exec` or add a temporary `127.0.0.1:8090:8090` mapping.
     volumes:
       # Mount runtime env directory (contains config overrides)
       - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}

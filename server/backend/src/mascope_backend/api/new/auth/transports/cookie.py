@@ -9,4 +9,5 @@ cookie_transport = CookieTransport(
     cookie_max_age=auth_settings.COOKIE_MAX_AGE_SECONDS,
     cookie_secure=auth_settings.COOKIE_SECURE,
     cookie_httponly=auth_settings.COOKIE_HTTP_ONLY,
+    cookie_samesite=auth_settings.COOKIE_SAMESITE,
 )
