@@ -6,6 +6,10 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Security
 
+- Authentication endpoints (login, first-owner registration, credential change) are now rate-limited per client IP, backed by Redis so limits hold across all workers. This blunts password brute-forcing and credential stuffing.
+- New and changed passwords must be at least 12 characters and may not contain the account's email or username.
+- The web session lifetime (auth cookie / JWT) is reduced from 360 days to 7 days, bounding how long a stolen token stays valid.
+- The server now warns at startup if the JWT signing secret is shorter than the 32-byte minimum recommended for HS256.
 - The backend API is no longer published to a host port. nginx reaches it over the internal Docker network, so the plaintext HTTP API is no longer exposed on a host interface where it could bypass the frontend's TLS termination.
 - nginx now sends `Strict-Transport-Security` (HTTPS only), `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`, and no longer sends a wildcard `Access-Control-Allow-Origin` (the frontend and API share an origin).
 - The authentication cookie's `SameSite` policy is set explicitly (`lax`) rather than relying on the library default.
