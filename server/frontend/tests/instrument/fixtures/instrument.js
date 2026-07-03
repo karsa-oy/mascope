@@ -59,7 +59,7 @@ export default base.extend({
     const deactivate = () => page.locator('#stop-measuring').click()
     await use({ active, activate, deactivate })
   },
-  // eslint-disable-next-line no-empty-pattern
+
   orbi: async ({ page }, use) => {
     const converterDir = path.resolve('../runtime/data/streams')
     const testfileDir = path.resolve('../runtime/data/testfiles')
