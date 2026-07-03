@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Body, Depends, Request
 
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.lib.rate_limit import rate_limit
 from mascope_backend.api.new.users.exceptions import InvalidUsernameException
 from mascope_backend.api.new.users.first_owner.exceptions import (
     FirstOwnerRegistrationNotAvailableException,
@@ -44,7 +45,12 @@ async def check_first_owner_sign_up_status_route() -> dict:
     }
 
 
-@first_owner_router.post("")
+@first_owner_router.post(
+    "",
+    # Tightly rate-limit: this validates the server owner secret, so cap
+    # attempts per IP to prevent brute-forcing it.
+    dependencies=[Depends(rate_limit(times=5, seconds=3600, scope="first-owner"))],
+)
 @api_route(status_code=201, public=True)
 async def register_first_owner_route(
     request: Request,
