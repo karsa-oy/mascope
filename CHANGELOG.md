@@ -4,6 +4,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.1.1] - 2026.07.03
+
+### Fixed
+
+- Runtime now parses release semver tag correctly, enabling to checkout, pull and run a specific release (e.g. `git checkout v1.1.1`, `mascope prod docker pull`, `mascope prod up`)
+
 ## [v1.1.0] - 2026.07.03
 
 ### Security
