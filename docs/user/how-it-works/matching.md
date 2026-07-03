@@ -16,6 +16,15 @@ For low resolution (Time-of-Flight) instruments, lower resolving powers cause cl
 To mirror this hardware limitation, theoretical isotopes are passed through a binning routine with a resolution constant of 10,000.
 For each local window, the total intensity is calculated as the sum of the binned sub-isotopes, and the mass coordinate is mapped to the weighted center-of-mass of the cluster.
 
+### Instrument-Specific Intensity Quantification
+The matching process employs different intensity metrics depending on the instrument type to account for their distinct detector characteristics.
+
+**Orbitrap instruments** use **peak height** for signal intensity quantification.
+High-resolution profile spectra allow precise apex intensity determination from the Gaussian centroiding algorithm, making peak height a reliable measure of ion abundance.
+
+**Time-of-Flight (TOF) instruments** use **peak area** for signal intensity quantification.
+Since TOF peaks are resolved through multi-peak fitting rather than Gaussian centroiding, the integrated peak area provides a more robust measure of ion abundance that is less sensitive to peak shape variations and baseline uncertainties.
+
 ### Mass Window Slicing and Extraction
 Experimental peak timeseries data are loaded within a localized mass tolerance window of 0.5 Da around the target theoretical mass-to-charge ($m/z$) values.
 If a specific scan polarity is defined, the matching engine filters out opposite-polarity peaks.
