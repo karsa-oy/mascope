@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 
 import { useApp } from '@/stores'
+import { passwordPolicyError } from '@/lib/password'
 
 const app = useApp()
 
@@ -26,7 +27,16 @@ watch(visible, () => {
 })
 
 const invalidCurrentPassword = computed(() => password.current && password.current?.length == 0)
-const invalidNewPassword = computed(() => password.new && password.new?.length == 0)
+// Mirror the backend password policy so the user gets instant feedback.
+const newPasswordError = computed(() =>
+  password.new
+    ? passwordPolicyError(password.new, {
+        email: app.auth.user?.email,
+        username: app.auth.user?.username
+      })
+    : null
+)
+const invalidNewPassword = computed(() => !!newPasswordError.value)
 const invalidVerifyPassword = computed(() => password.verify && password.verify?.length == 0)
 const mismatchingPasswords = computed(
   () => password.new && password.verify && password.new !== password.verify
@@ -80,6 +90,9 @@ const execute = () => {
       </FloatLabel>
     </section>
     <menu style="margin-top: 2rem">
+      <Message v-if="newPasswordError" icon="pi pi-exclamation-triangle" severity="secondary">
+        {{ newPasswordError }}
+      </Message>
       <Message v-if="mismatchingPasswords" icon="pi pi-exclamation-triangle" severity="secondary">
         Your passwords do not match.
       </Message>

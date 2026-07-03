@@ -9,12 +9,14 @@ import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import FloatLabel from 'primevue/floatlabel'
+import Message from 'primevue/message'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { useApp } from '@/stores'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseCopyableField } from '@/lib/base'
 import { roles, prettyRoleName } from '@/lib/roles'
+import { passwordPolicyError } from '@/lib/password'
 
 const app = useApp()
 const confirm = useConfirm()
@@ -109,12 +111,20 @@ const invalidCreated = computed(() => {
     created.value?.email?.length < 5 ||
     !created.value?.email?.includes('@')
   const username = !created.value?.username || created.value?.username?.length < 5
-  const password = !created.value?.password || !(created.value?.password?.length > 0)
+  // Mirror the backend password policy for instant feedback.
+  const passwordError = created.value?.password
+    ? passwordPolicyError(created.value.password, {
+        email: created.value.email,
+        username: created.value.username
+      })
+    : null
+  const password = !created.value?.password || !!passwordError
   const form = email || username || password
   return {
     email,
     username,
     password,
+    passwordError,
     form
   }
 })
@@ -292,6 +302,14 @@ watch(visible, reset)
             />
           </menu>
         </menu>
+        <Message
+          v-if="created.password && invalidCreated.passwordError"
+          icon="pi pi-exclamation-triangle"
+          severity="secondary"
+          style="margin-top: 0.5rem"
+        >
+          {{ invalidCreated.passwordError }}
+        </Message>
       </template>
     </section>
     <menu style="justify-content: space-between; margin-top: 3rem">
