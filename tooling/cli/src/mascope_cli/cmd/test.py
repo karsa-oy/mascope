@@ -136,7 +136,41 @@ def run(
         elif component == TestComponent.LIBRARIES:
             run_library_tests(module, test_name, verbose)
         elif component == TestComponent.FRONTEND:
-            typer.echo("Frontend tests are not yet implemented")
+            run_frontend_tests(module, test_name)
+
+
+def run_frontend_tests(
+    module: TestModule | None,
+    test_name: str | None,
+):
+    """Run frontend tests with the specified options
+
+    Unit tests (Vitest) run by default; `-m system` runs the hermetic
+    end-to-end suite (Playwright), which needs a running stack - by default
+    the demo stack at http://localhost:8080 (docker-compose.demo.yaml).
+    """
+    frontend_dir = os.path.join("server", "frontend")
+    # Windows resolves npm as a .cmd shim, which subprocess only finds by
+    # its full name (lib.run executes without a shell).
+    npm = "npm.cmd" if os.name == "nt" else "npm"
+
+    if module == TestModule.SYSTEM:
+        command = f"{npm} run test:e2e"
+        if test_name:
+            command = f'{npm} run test:only -- "{test_name}"'
+    elif module in (TestModule.UNIT, None, TestModule.ALL):
+        command = f"{npm} run test:unit"
+        if test_name:
+            command = f'{npm} run test:unit -- -t "{test_name}"'
+    else:
+        typer.echo(
+            f"Frontend tests support modules 'unit' (Vitest) and 'system' "
+            f"(Playwright e2e); got '{module.value}'."
+        )
+        return
+
+    typer.echo(f"Running: {command} (in {frontend_dir})")
+    lib.run(command, cwd=frontend_dir)
 
 
 def run_backend_tests(
