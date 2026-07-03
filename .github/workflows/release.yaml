@@ -53,18 +53,39 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push Docker images
+      - name: Build Docker images
         run: |
           # install uv to run the CLI
           sudo snap install --classic astral-uv
 
-          export MASCOPE_PATH=/home/runner/work/mascope/mascope/          
-          VERSION=${{ needs.release-tag.outputs.version }}
-          
+          export MASCOPE_PATH=/home/runner/work/mascope/mascope/
+
           # Build using the CLI. parse_version() derives the same VERSION on
           # master, so the compose `image: ...:${MASCOPE_VERSION}` builds and
           # tags the images as :$VERSION directly.
           uv run mascope prod build
+
+      - name: Smoke test the built images
+        env:
+          MASCOPE_VERSION: ${{ needs.release-tag.outputs.version }}
+        run: |
+          # Release gate: boot the demo stack from the images built above and
+          # verify boot, login and seeded API reads before anything is pushed
+          # or tagged latest. Assert the tags exist locally first so compose
+          # can't silently fall back to pulling an older release from GHCR.
+          for service in backend frontend; do
+            docker image inspect ghcr.io/${{ github.repository }}/$service:$MASCOPE_VERSION > /dev/null
+          done
+          docker compose -f docker-compose.demo.yaml up -d
+          SMOKE_TIMEOUT=900 bash tooling/smoke-test.sh
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.demo.yaml logs --tail 200
+
+      - name: Push Docker images
+        run: |
+          VERSION=${{ needs.release-tag.outputs.version }}
 
           for service in backend frontend; do
             # alias image name
