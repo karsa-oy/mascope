@@ -248,11 +248,11 @@ watch(
 )
 
 watch(
-  () => scale.log,
+  () => scale.value.log,
   (prev, next) => {
     // Clear y-axis zoom when switching to log scale
     if (next) {
-      scale.max = null
+      scale.value.max = null
       plot.value.resetZoom()
     }
   }

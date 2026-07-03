@@ -36,7 +36,7 @@ const sampleLength = computed(() =>
 
 const traces = computed(() => {
   // Scale trace y-values based on "average / sum" toggle
-  if (sampleLength === null) {
+  if (sampleLength.value === null) {
     return []
   }
   return scale.value.mode == 'average'
@@ -78,7 +78,7 @@ const isotopeCharts = computed(() => {
     const end =
       nextStart !== -1 // if next isotope found
         ? nextStart // use it as the end of isotope trace data
-        : traces?.length // otherwise use all remaining data
+        : traces.value?.length // otherwise use all remaining data
     const isotopeTraces = traces.value?.slice(start, end)
     return {
       // all match isotope fields
