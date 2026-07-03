@@ -341,7 +341,12 @@ class Runtime:
                 return (
                     subprocess.check_output(shlex.split(cmd), stderr=subprocess.DEVNULL)
                     .decode("utf-8")
-                    .replace("\n", "")
+                    # strip(), not replace("\n", ""): callers such as
+                    # `git tag --points-at HEAD` return one item per line, so
+                    # collapsing every newline would glue them into a single
+                    # unmatchable token (e.g. "v1.1.0v2026.07.03-abc1234") and
+                    # break the semver-tag detection below. Only trim the ends.
+                    .strip()
                 )
             except Exception:
                 return None
