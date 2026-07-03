@@ -160,16 +160,11 @@ async def validation_exception_handler(
     :return: Structured JSON error response.
     :rtype: JSONResponse
     """
-    try:
-        body = await request.json()
-    except Exception:
-        body = None
-
+    # The request body is deliberately not included in the response or the
+    # logs: it can carry credentials (e.g. login forms) and other user data.
     context_message = (
-        f"Validation error on route {request.method}"
-        f" {request.url.path} with body={body!r}"
+        f"Validation error on route {request.method} {request.url.path}"
     )
-    runtime.logger.error(f"Validation error on {request.method} {request.url.path}")
     return handle_exception(exc, context_message, response_type="http")
 
 

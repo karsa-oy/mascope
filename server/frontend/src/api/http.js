@@ -65,7 +65,10 @@ function handleClientError(error) {
   const type = headers['X-Type']
   // log to console for developers
   const { detail, error: message } = error?.response?.data
-  console.error(`❌[api:http] ${method} ${url} client failure: ${detail?.error_message}`, error)
+  console.error(
+    `❌[api:http] ${method} ${url} client failure: ${message} (error_id: ${detail?.error_id})`,
+    error
+  )
   // emit notification to users
   const app = useApp()
   app.ui.notification.push({
@@ -122,7 +125,7 @@ function handleServerError(error) {
   // log to console for developers
   const { detail, error: message } = error?.response?.data || {}
   console.error(
-    `🚫 [api:http] ${type} ${method} ${url} server failure: ${detail?.error_message}`,
+    `🚫 [api:http] ${type} ${method} ${url} server failure: ${message} (error_id: ${detail?.error_id})`,
     error
   )
   // emit notification to users
