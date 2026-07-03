@@ -15,8 +15,10 @@ import { env } from './env'
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.goto('/')
-    // The app shell is up once the workspace has loaded past the spinner.
-    await page.locator('#app').waitFor({ timeout: 30_000 })
+    // #app is the always-present Vue mount div, so wait for a dashboard
+    // landmark instead: the instrument selector only renders once the
+    // authenticated app shell is up.
+    await page.locator('#instrument-selector').waitFor({ state: 'attached', timeout: 30_000 })
     await use(page)
   },
 

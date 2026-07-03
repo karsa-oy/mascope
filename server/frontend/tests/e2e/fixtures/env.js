@@ -6,10 +6,11 @@
  * Every value can be overridden to point at another running stack.
  */
 export const env = {
-  /** Frontend origin the tests drive. */
-  baseURL: process.env.MASCOPE_E2E_BASE_URL ?? 'http://localhost:8080',
+  /** Frontend origin the tests drive. 127.0.0.1 rather than localhost:
+   *  Docker publishes on IPv4, while localhost can resolve to ::1. */
+  baseURL: process.env.MASCOPE_E2E_BASE_URL ?? 'http://127.0.0.1:8080',
   /** API origin (same as baseURL on the demo/prod stacks; :8090 on the dev server). */
-  apiURL: process.env.MASCOPE_E2E_API_URL ?? process.env.MASCOPE_E2E_BASE_URL ?? 'http://localhost:8080',
+  apiURL: process.env.MASCOPE_E2E_API_URL ?? process.env.MASCOPE_E2E_BASE_URL ?? 'http://127.0.0.1:8080',
   /** Login credentials; defaults are the seeded demo user. */
   email: process.env.MASCOPE_E2E_EMAIL ?? 'demo@mascope.app',
   password: process.env.MASCOPE_E2E_PASSWORD ?? 'mascope-demo',
