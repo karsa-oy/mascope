@@ -48,6 +48,14 @@ jobs:
           persist-credentials: false
 
       - name: Build application images from this PR
+        env:
+          # The prod compose file interpolates these into volume mounts at
+          # parse time, so they must be non-empty even though `build` never
+          # mounts them.
+          MASCOPE_PATH: ${{ github.workspace }}
+          MASCOPE_FILESTORE: ${{ github.workspace }}/.runtime/filestore
+          MASCOPE_ENV: default
+          MASCOPE_LOGLEVEL: INFO
         run: |
           # The prod compose file declares build contexts alongside the GHCR
           # image tags, so building here produces locally tagged images that
@@ -81,7 +89,7 @@ jobs:
           # demo_init downloads and restores the demo bundle on first start,
           # so allow generous time before the frontend answers.
           for i in $(seq 1 120); do
-            if curl -fsS -o /dev/null http://localhost:8080; then
+            if curl -fsS -o /dev/null http://127.0.0.1:8080; then
               echo "Stack is up."
               exit 0
             fi
