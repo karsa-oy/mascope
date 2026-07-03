@@ -30,14 +30,14 @@ docker compose -f docker-compose.demo.yaml up -d   # frontend at http://localhos
 It comes preloaded with the published demo dataset and login `demo@mascope.app` /
 `mascope-demo` (first start downloads ~150 MB). Point the suite elsewhere with
 `MASCOPE_E2E_BASE_URL` / `MASCOPE_E2E_API_URL` / `MASCOPE_E2E_EMAIL` /
-`MASCOPE_E2E_PASSWORD`. Tests in `tests/instrument/` need real lab instruments —
-never run or "fix" those on a dev machine.
+`MASCOPE_E2E_PASSWORD`.
 
 ### Writing and debugging tests
 
 - Auth is handled once in `tests/e2e/setup/auth.setup.js` (API login → storage state).
-  Seed further state through the `api` fixture in `tests/e2e/fixtures/index.js`, not by
-  clicking through the UI.
+  Seed further state through the `api` and `scratch` fixtures in
+  `tests/e2e/fixtures/index.js`, not by clicking through the UI. The `scratch`
+  fixture provides a per-test workspace + dataset and cleans up after itself.
 - Prefer `getByLabel` / `getByRole` locators; add `data-testid` only where no
   accessible handle exists.
 - e2e runs keep a trace on failure: `npx playwright show-trace test-results/<...>/trace.zip`.

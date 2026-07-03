@@ -1679,8 +1679,6 @@ tests/        frontend tests
   e2e/          hermetic playwright tests (demo stack)
     fixtures/     auth, api seeding, env config
     setup/        one-time api login -> storage state
-  instrument/   playwright tests needing real lab instruments
-    fixtures/     reusable test patterns
 .vscode/      VS Code workspace settings
 index.html    static template w/ font imports
 package.json  npm package w/ dependencies
@@ -2329,7 +2327,7 @@ const layer = "my_dialog";
 
 ### Frontend Tests
 
-Frontend tests come in three layers under `server/frontend/tests/`:
+Frontend tests come in two layers under `server/frontend/tests/`:
 
 - **`tests/unit/`** — [Vitest](https://vitest.dev/guide/) unit tests for pure logic
   (formatters, chemistry helpers, validation composables, chart data transforms).
@@ -2339,10 +2337,8 @@ Frontend tests come in three layers under `server/frontend/tests/`:
   (`docker compose -f docker-compose.demo.yaml up`, frontend at `http://localhost:8080`,
   seeded demo dataset + `demo@mascope.app` login). Authentication happens once via the
   REST API (`tests/e2e/setup/auth.setup.js`) and is shared as storage state; the `api`
-  fixture seeds further state through the API so the UI is only used for the behavior
-  under test. Both unit and e2e suites run in CI on every PR.
-- **`tests/instrument/`** — Playwright tests that need real lab instruments (KLTOF1,
-  KORBI2) and a local dev stack at `:5173`. Manual / lab use only.
+  and `scratch` fixtures seed state through the API so the UI is only used for the
+  behavior under test. Both suites run in CI on every PR.
 
 #### Running the tests
 
@@ -2351,7 +2347,6 @@ COMMAND                  ARG           USECASE                DESCRIPTION
 npm run test:unit        optional      always                 run unit tests (fast, no stack)
 npm run test:e2e         optional      test feature branch    run e2e suite on chromium
 npm run test:e2e:full    optional      test prod release      run e2e on chrome, safari & firefox
-npm run test:instrument  optional      lab                    run instrument-bound tests
 npm run test:only        required      debug failed tests     run one e2e test
 npm run test:trace       required      debug failed tests     run e2e test with a trace
 npm run test:headed      recommended   debug failed tests     run e2e test(s) headed

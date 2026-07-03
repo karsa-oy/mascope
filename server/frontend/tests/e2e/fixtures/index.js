@@ -53,7 +53,48 @@ export const test = base.extend({
 
     await use(api)
     await context.dispose()
+  },
+
+  /**
+   * A scratch workspace + dataset seeded through the API for tests that
+   * mutate data. Deleted (with everything inside, the API cascades) after
+   * the test, so the demo stack stays reusable across runs.
+   */
+  scratch: async ({ api }, use) => {
+    const id = Math.random().toString(36).slice(2, 8)
+    const workspace = (await api.post('/workspaces', { workspace_name: `e2e-ws-${id}` })).data
+    const dataset = (
+      await api.post(`/workspaces/${workspace.workspace_id}/datasets`, {
+        dataset_name: `e2e-ds-${id}`
+      })
+    ).data
+
+    await use({
+      id,
+      workspace,
+      dataset,
+      createBatch: async (name, targetCollectionIds = []) =>
+        (
+          await api.post('/sample/batches', {
+            sample_batch_name: name,
+            dataset_id: dataset.dataset_id,
+            target_collection_ids: targetCollectionIds
+          })
+        ).data
+    })
+
+    await api.delete(`/workspaces/${workspace.workspace_id}`)
   }
 })
+
+/**
+ * Drill into a workspace from the workspace pane. Reloads first so state
+ * seeded through the API after page load is visible in the list.
+ */
+export async function openWorkspace(page, name) {
+  await page.reload()
+  await page.locator('#instrument-selector').waitFor({ state: 'attached', timeout: 30_000 })
+  await page.getByRole('option', { name }).click()
+}
 
 export { expect, env }

@@ -4,19 +4,12 @@ import { defineConfig, devices } from '@playwright/test'
 import { env } from './tests/e2e/fixtures/env.js'
 
 /**
- * Two suites live under tests/:
+ * End-to-end tests live under tests/e2e/: hermetic, run against any live
+ * stack, by default the demo stack (docker-compose.demo.yaml at
+ * http://localhost:8080), which is seeded with the published demo dataset
+ * and the demo login. Deterministic, CI-eligible. `npm run test:e2e`
  *
- * - tests/e2e/        Hermetic end-to-end tests. Run against any live stack,
- *                     by default the demo stack (docker-compose.demo.yaml at
- *                     http://localhost:8080), which is seeded with the published
- *                     demo dataset and the demo login. Deterministic, CI-eligible.
- *                     `npm run test:e2e`
- *
- * - tests/instrument/ End-to-end tests that need real lab instruments (KLTOF1,
- *                     KORBI2) and a local dev stack at :5173. Manual / lab only.
- *                     `npm run test:instrument`
- *
- * Environment overrides for the e2e suite (see tests/e2e/fixtures/env.js):
+ * Environment overrides (see tests/e2e/fixtures/env.js):
  *   MASCOPE_E2E_BASE_URL   frontend origin       (default http://localhost:8080)
  *   MASCOPE_E2E_API_URL    API origin            (default = base URL)
  *   MASCOPE_E2E_EMAIL      login email           (default demo@mascope.app)
@@ -76,13 +69,6 @@ export default defineConfig({
         baseURL: env.baseURL,
         storageState: env.storageStatePath
       }
-    },
-    // --- Instrument-bound suite (lab only, dev stack at :5173) ---
-    {
-      name: 'instrument',
-      testDir: './tests/instrument',
-      retries: 2,
-      use: { ...devices['Desktop Chrome'] }
     }
   ],
   // Opt-in: let Playwright bring the demo stack up itself. First run downloads
