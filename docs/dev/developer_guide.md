@@ -1674,9 +1674,13 @@ src/          source code
     data/         data stores w/ mutating APIs
     ui/           ui stores w/ read-only APIs
   ...           global vue app configs
-tests/        playwright tests
-  fixtures/     reusable test patterns
-  ...
+tests/        frontend tests
+  unit/         vitest unit tests (pure logic, no backend)
+  e2e/          hermetic playwright tests (demo stack)
+    fixtures/     auth, api seeding, env config
+    setup/        one-time api login -> storage state
+  instrument/   playwright tests needing real lab instruments
+    fixtures/     reusable test patterns
 .vscode/      VS Code workspace settings
 index.html    static template w/ font imports
 package.json  npm package w/ dependencies
@@ -1694,6 +1698,7 @@ The Mascope frontend is build with the following technologies:
 - [Pinia stores](https://pinia.vuejs.org/introduction.html) with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores)
 - [PrimeVue](https://primevue.org/introduction/) as the component library
 - [Vite](https://vitejs.dev/guide/) as the build tool + dev server
+- [Vitest](https://vitest.dev/guide/) for unit tests
 - [Playwright](https://playwright.dev/docs/intro) for end-to-end tests
 
 ### Frontend Development
@@ -2324,36 +2329,50 @@ const layer = "my_dialog";
 
 ### Frontend Tests
 
-> [!CAUTION]
-> These tests are super flakey and not really in use at the moment.
+Frontend tests come in three layers under `server/frontend/tests/`:
 
-Our frontend currently only has a handful of tests written in [Playwright](https://playwright.dev/docs/intro).
-These are end-to-end tests which work by running headless browsers and emulating real user behavior like clicks.
-The test then checks that certain elements are or are not visible in the page.
+- **`tests/unit/`** — [Vitest](https://vitest.dev/guide/) unit tests for pure logic
+  (formatters, chemistry helpers, validation composables, chart data transforms).
+  No backend needed, sub-second runs. This is where most new tests should go.
+- **`tests/e2e/`** — hermetic [Playwright](https://playwright.dev/docs/intro) end-to-end
+  tests. They run against any live stack, by default the demo stack
+  (`docker compose -f docker-compose.demo.yaml up`, frontend at `http://localhost:8080`,
+  seeded demo dataset + `demo@mascope.app` login). Authentication happens once via the
+  REST API (`tests/e2e/setup/auth.setup.js`) and is shared as storage state; the `api`
+  fixture seeds further state through the API so the UI is only used for the behavior
+  under test. Both unit and e2e suites run in CI on every PR.
+- **`tests/instrument/`** — Playwright tests that need real lab instruments (KLTOF1,
+  KORBI2) and a local dev stack at `:5173`. Manual / lab use only.
 
 #### Running the tests
 
-To run the tests, you can run one of the following commands:
-
 ```
-COMMAND               ARG           USECASE                DESCRIPTION
-npm run test          optional      test feature branch    run all tests on chrome only
-npm run test:full     optional      test prod release      run all tests on chrome, safari & firefox
-npm run test:only     required      debug failed tests     run one test
-npm run test:trace    required      debug failed tests     run test with a trace
-npm run test:headed   recommended   debug failed tests     run test(s) headed
-npm run test:gen      none          write new tests        run the visual test generator
+COMMAND                  ARG           USECASE                DESCRIPTION
+npm run test:unit        optional      always                 run unit tests (fast, no stack)
+npm run test:e2e         optional      test feature branch    run e2e suite on chromium
+npm run test:e2e:full    optional      test prod release      run e2e on chrome, safari & firefox
+npm run test:instrument  optional      lab                    run instrument-bound tests
+npm run test:only        required      debug failed tests     run one e2e test
+npm run test:trace       required      debug failed tests     run e2e test with a trace
+npm run test:headed      recommended   debug failed tests     run e2e test(s) headed
+npm run test:gen         none          write new tests        run the visual test generator
 ```
 
-Here, the argument is a string with the name of the test or a keyword (playwright will
-execute all tests matching the string). You can also run the tests directly with playwright,
-refer to the Playwright docs for more details.
+Or via the CLI: `mascope test run frontend` (unit) and
+`mascope test run frontend -m system` (e2e).
 
-#### Flakey tests
+The e2e environment is configured via `MASCOPE_E2E_BASE_URL`, `MASCOPE_E2E_API_URL`,
+`MASCOPE_E2E_EMAIL` and `MASCOPE_E2E_PASSWORD` (see `tests/e2e/fixtures/env.js`);
+`MASCOPE_E2E_STACK=demo` lets Playwright bring the demo stack up itself.
 
-Use the debugging methods listed above when facing flakey tests. Often tests will be less flakey when
-you run them in headed mode, and when you don't run them concurrently (this is why we configured Playwright
-to use only one worker).
+#### Test conventions
+
+- Prefer accessible locators (`getByLabel`, `getByRole`) over CSS selectors; add
+  `data-testid` only where no accessible handle exists.
+- Seed state through the `api` fixture, not by clicking through the UI.
+- Hermetic e2e tests run with zero retries locally — if a test needs a retry to pass,
+  fix the test. Failed runs keep a trace (`trace: retain-on-failure`); open it with
+  `npx playwright show-trace <path>` or `npm run test:trace -- "<test name>"`.
 
 ---
 
