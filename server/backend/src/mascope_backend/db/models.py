@@ -558,6 +558,18 @@ class SampleItem(Base):
         cascade="all, delete, delete-orphan",
         passive_deletes=True,
     )
+    peak_assignment_run = relationship(
+        "PeakAssignmentRun",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+        passive_deletes=True,
+    )
+    peak_assignment = relationship(
+        "PeakAssignment",
+        back_populates="sample_item",
+        cascade="all, delete, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 @event.listens_for(SampleItem, "after_update")
@@ -1048,6 +1060,135 @@ class MatchIsotope(Base):
     )
 
 
+class PeakAssignmentRun(Base):
+    """One peak-centric assignment run over a sample.
+
+    Stores the engine version and the full configuration (search ranges,
+    heuristics, ppm tolerances, stage toggles) so runs are reproducible and
+    comparable. PeakAssignment rows belong to exactly one run.
+
+    status values: 'pending', 'running', 'completed', 'failed'.
+    """
+
+    __tablename__ = "peak_assignment_run"
+
+    peak_assignment_run_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
+    )
+    engine_version: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"))
+    config: Mapped[Optional[dict]] = mapped_column(JSON)
+    error: Mapped[Optional[str]] = mapped_column(Text)
+    peak_assignment_run_utc_created: Mapped[Optional[dt]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+    peak_assignment_run_utc_completed: Mapped[Optional[dt]] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
+
+    # Relationships
+    sample_item = relationship("SampleItem", back_populates="peak_assignment_run")
+    peak_assignment = relationship(
+        "PeakAssignment",
+        back_populates="peak_assignment_run",
+        cascade="all, delete, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class PeakAssignment(Base):
+    """Per-peak assignment result for one observed sample peak in a run.
+
+    The unit of result is the observed peak (identified by sample_item_id +
+    sample_peak_id, with mz/intensity/tof denormalized as in MatchIsotope).
+    The assignment may reference a known target (target_compound_id /
+    target_ion_id set, source='database') or a discovered composition
+    (source='untargeted'). Every peak of the sample gets exactly one row per
+    run - the single-owner-per-peak invariant is enforced by the unique
+    constraint on (peak_assignment_run_id, sample_peak_id).
+
+    role values: 'M0', 'iso_child', 'reagent', 'artifact', 'unassigned'.
+    source values: 'database', 'untargeted' (NULL when unassigned).
+    tier values: 'identified', 'candidate', 'below_assignability', 'unassigned'.
+    """
+
+    __tablename__ = "peak_assignment"
+
+    peak_assignment_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    peak_assignment_run_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey(
+            "peak_assignment_run.peak_assignment_run_id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+    )
+    sample_item_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
+    )
+    sample_peak_id: Mapped[str] = mapped_column(String(20), index=True)
+    sample_peak_mz: Mapped[float] = mapped_column(Float)
+    sample_peak_intensity: Mapped[float] = mapped_column(Float)
+    sample_peak_tof: Mapped[Optional[float]] = mapped_column(Float)
+    role: Mapped[str] = mapped_column(String(16), server_default=text("'unassigned'"))
+    assigned_formula: Mapped[Optional[str]] = mapped_column(String(256))
+    ion_formula: Mapped[Optional[str]] = mapped_column(String(4096))
+    ionization_mechanism_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey(
+            "ionization_mechanism.ionization_mechanism_id",
+            ondelete="SET NULL",
+        ),
+    )
+    isotope_label: Mapped[Optional[str]] = mapped_column(String(64))
+    source: Mapped[Optional[str]] = mapped_column(String(16))
+    match_score: Mapped[Optional[float]] = mapped_column(Float)
+    mz_error_ppm: Mapped[Optional[float]] = mapped_column(Float)
+    abundance_error: Mapped[Optional[float]] = mapped_column(Float)
+    tier: Mapped[str] = mapped_column(
+        String(24), server_default=text("'unassigned'")
+    )
+    target_compound_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey("target_compound.target_compound_id", ondelete="SET NULL"),
+        index=True,
+    )
+    target_ion_id: Mapped[Optional[str]] = mapped_column(
+        String(16),
+        ForeignKey("target_ion.target_ion_id", ondelete="SET NULL"),
+        index=True,
+    )
+    owner_peak_assignment_id: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("peak_assignment.peak_assignment_id", ondelete="SET NULL"),
+    )
+    alternatives: Mapped[Optional[list]] = mapped_column(JSON)
+    provenance: Mapped[Optional[dict]] = mapped_column(JSON)
+
+    # Relationships
+    peak_assignment_run = relationship(
+        "PeakAssignmentRun", back_populates="peak_assignment"
+    )
+    sample_item = relationship("SampleItem", back_populates="peak_assignment")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "peak_assignment_run_id",
+            "sample_peak_id",
+            name="uq_peak_assignment_run_id_sample_peak_id",
+        ),
+        CheckConstraint(
+            "match_score IS NULL OR match_score BETWEEN 0 AND 1",
+            name="match_score_range",
+        ),
+    )
+
+
 class AttributeTemplate(Base):
     """Attribute template for additional sample metadata."""
 
@@ -1172,6 +1313,8 @@ __all__ = [
     "MatchIon",
     "MatchIsotope",
     "MatchRating",
+    "PeakAssignmentRun",
+    "PeakAssignment",
     "AttributeTemplate",
     "InstrumentFunction",
     "ReferenceSource",
