@@ -4,7 +4,9 @@ import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import { useAuth } from '@/stores/auth'
+import { passwordPolicyError } from '@/lib/password'
 
 const auth = useAuth()
 
@@ -16,11 +18,17 @@ const input = reactive({
   serverSecret: null
 })
 
+// Mirror the backend password policy for instant feedback.
+const passwordError = computed(() =>
+  input.password
+    ? passwordPolicyError(input.password, { email: input.email, username: input.username })
+    : null
+)
+
 const invalid = computed(() => ({
   email: !input.email || input.email?.length < 5 || !input.email?.includes('@'),
   username: !input.username || input.username?.length < 5,
-  password:
-    !input.password || input.password !== input.confirmPassword || !(input.password?.length > 0),
+  password: !input.password || input.password !== input.confirmPassword || !!passwordError.value,
   serverSecret: !input.serverSecret || input.serverSecret.length < 1
 }))
 
@@ -86,6 +94,13 @@ const signup = async () => {
         <label for="signup-confirm-password">Confirm password</label>
       </FloatLabel>
     </div>
+    <Message
+      v-if="input.password && passwordError"
+      icon="pi pi-exclamation-triangle"
+      severity="secondary"
+    >
+      {{ passwordError }}
+    </Message>
     <div class="field">
       <FloatLabel>
         <InputText
