@@ -23,6 +23,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - Frontend linting works again: migrated to the ESLint 9 flat config format (the legacy config had been silently ignored). The revived linter surfaced dormant chart bugs that are now fixed: the batch overview chart's log-scale zoom reset never fired, and two match spectra comparisons were always false.
 - The dashboard no longer renders a duplicate `id="app"` element inside the Vue mount point.
 
+### Security
+
+- API error responses no longer include Python tracebacks, internal filesystem paths, or raw messages of unexpected exceptions. Clients receive the user-facing message plus an opaque `error_id`; the full traceback is logged server-side under the same `error_id` for correlation. The same applies to error payloads emitted over Socket.IO notifications.
+- Request validation errors no longer echo the raw request body (which can contain credentials) back to the client.
+
 ## [v1.1.1] - 2026.07.03
 
 ### Fixed
