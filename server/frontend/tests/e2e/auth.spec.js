@@ -18,8 +18,9 @@ test.describe('authentication', () => {
     await field(page, 'login-password').fill(env.password)
     await page.getByRole('button', { name: 'Login' }).click()
 
-    // Authenticated app shell replaces the login panel.
-    await expect(page.locator('#app')).toBeVisible({ timeout: 30_000 })
+    // Authenticated app shell replaces the login panel. #app is the
+    // always-present Vue mount div, so use a dashboard landmark instead.
+    await expect(page.locator('#instrument-selector')).toBeAttached({ timeout: 30_000 })
     await expect(page.getByText('Sign-in to Mascope')).toBeHidden()
   })
 
@@ -33,6 +34,6 @@ test.describe('authentication', () => {
 
     // Still on the login screen, never into the app.
     await expect(page.getByText('Sign-in to Mascope')).toBeVisible()
-    await expect(page.locator('#app')).toHaveCount(0)
+    await expect(page.locator('#instrument-selector')).toHaveCount(0)
   })
 })

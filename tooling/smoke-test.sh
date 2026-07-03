@@ -59,10 +59,10 @@ echo "$me" | grep -q "$EMAIL" || {
 }
 
 echo "[smoke] seeded data is present..."
-batches=$(curl -fsS -b "$jar" "$BASE_URL/api/sample/batches")
-if [ -z "$batches" ] || [ "$batches" = "[]" ]; then
-  echo "[smoke] FAIL: /api/sample/batches returned no data" >&2
+workspaces=$(curl -fsS -b "$jar" "$BASE_URL/api/workspaces")
+echo "$workspaces" | grep -q '"workspace_id"' || {
+  echo "[smoke] FAIL: /api/workspaces returned no workspaces: $workspaces" >&2
   exit 1
-fi
+}
 
 echo "[smoke] PASS"
