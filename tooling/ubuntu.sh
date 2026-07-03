@@ -162,7 +162,12 @@ function install_mascope() {
     # native extensions (e.g. numcodecs blosc typedef bool).
     # Pin Python 3.12 so uv downloads a managed interpreter matching
     # the project's requires-python constraint (<3.13).
-    CFLAGS="-std=c17" uv tool install --force --python 3.12 .
+    # --reinstall (implies --refresh) forces a rebuild from source: every
+    # mascope package is pinned to version 0.0.0 (the real version is derived
+    # from git at runtime), so uv's cache cannot tell releases apart and would
+    # otherwise reuse a stale wheel - silently shipping old CLI code after an
+    # update to a new release.
+    CFLAGS="-std=c17" uv tool install --force --reinstall --python 3.12 .
     uv tool update-shell
 
     write_section "ENABLING SYSTEMD SERVICE"
