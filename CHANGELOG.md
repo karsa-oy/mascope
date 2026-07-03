@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026.07.03
+
 ### Security
 
 - Authentication endpoints (login, first-owner registration, credential change) are now rate-limited per client IP, backed by Redis so limits hold across all workers. This blunts password brute-forcing and credential stuffing.
@@ -48,3 +50,4 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 [Unreleased]: https://github.com/karsa-oy/mascope/compare/v1.0.0...master
 [v1.0.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.0.0
+[v1.1.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.1.0
