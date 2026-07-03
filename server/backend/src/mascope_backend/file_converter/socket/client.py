@@ -42,6 +42,14 @@ class FileConverterSocketClient:
                 self.url,
                 headers={"X-Service-Name": "file-converter"},
                 namespaces=["/file-converter"],
+                # Websocket only: a single persistent connection stays pinned to one
+                # backend worker. The default polling handshake issues several HTTP
+                # requests that a multi-worker backend (workers="auto") load-balances
+                # across processes, so the Engine.IO session is never found on the
+                # worker handling the next request and the namespace never connects.
+                # The file-converter reaches the backend directly (no nginx ip_hash
+                # stickiness), so it must avoid polling itself.
+                transports=["websocket"],
             )
         except Exception as e:
             runtime.logger.error(f"Failed to connect: {str(e)}")

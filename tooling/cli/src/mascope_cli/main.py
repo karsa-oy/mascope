@@ -70,7 +70,14 @@ def main(
     """
     # Default the version from git, but let an explicitly-set MASCOPE_VERSION win
     # (e.g. pinning a release image for a prod deploy: MASCOPE_VERSION=v1.0.0).
-    os.environ.setdefault("MASCOPE_VERSION", runtime.parse_version())
+    # Record whether it was pinned: a prod deploy honors a pin but otherwise
+    # pulls `latest`/a release tag rather than the branch-derived build id (see
+    # the prod _deploy_version helper).
+    if os.environ.get("MASCOPE_VERSION"):
+        os.environ["_MASCOPE_VERSION_PINNED"] = "1"
+    else:
+        os.environ["_MASCOPE_VERSION_PINNED"] = "0"
+        os.environ["MASCOPE_VERSION"] = runtime.parse_version()
 
     # override active env with CLI option (null if not provided)
     runtime.state.override("env", env)

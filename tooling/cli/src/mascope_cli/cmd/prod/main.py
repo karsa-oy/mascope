@@ -23,6 +23,7 @@ Database management:
 
 import os
 import platform
+import re
 import time
 from typing import Annotated, Optional
 
@@ -88,7 +89,28 @@ def main() -> None:
 #  --- Internal helpers ---
 
 
-def _compose_env() -> dict[str, str]:
+def _deploy_version() -> str:
+    """
+    Resolve the image tag for pulling/running published production images.
+
+    Published prod images exist only for master (``latest``) and release tags
+    (``vX.Y.Z``) - never for the branch-derived dev build id - so this ignores
+    the checked-out branch entirely: an explicit ``MASCOPE_VERSION`` pin wins;
+    otherwise a semver tag at HEAD selects that release; otherwise ``latest``
+    (the rolling master build).
+
+    :return: The image tag to deploy.
+    :rtype: str
+    """
+    if os.environ.get("_MASCOPE_VERSION_PINNED") == "1":
+        return os.environ["MASCOPE_VERSION"]
+    version = runtime.parse_version()
+    if re.fullmatch(r"v\d+\.\d+\.\d+", version):
+        return version
+    return "latest"
+
+
+def _compose_env(building: bool = False) -> dict[str, str]:
     """
     Build the environment variable dict injected into every docker compose call.
 
@@ -129,9 +151,13 @@ def _compose_env() -> dict[str, str]:
         MASCOPE_FILESTORE=runtime.meta.filestore,
         MASCOPE_TIMEZONE=timezone,
         # Selects which image tag to pull/build (the compose `image:` field).
-        # Set by the CLI callback from git (parse_version) unless pinned, e.g.
-        # MASCOPE_VERSION=v1.0.0 to deploy a release.
-        MASCOPE_VERSION=os.environ.get("MASCOPE_VERSION", "latest"),
+        # When building, use the current HEAD's version (branch-derived or
+        # pinned) so the local build is tagged and displayed accordingly; when
+        # pulling/running, use the deploy version (pin, release tag, or `latest`)
+        # so a stray branch checkout never asks for an unpublished image tag.
+        MASCOPE_VERSION=(
+            os.environ["MASCOPE_VERSION"] if building else _deploy_version()
+        ),
         # Forwarded explicitly so compose variable interpolation is always
         # satisfied — empty string when --log-level was not passed, which
         # compose treats as "no override" for the container environment.
@@ -172,7 +198,7 @@ def _compose_env() -> dict[str, str]:
     )
 
 
-def _run_compose(args: list[str]) -> None:
+def _run_compose(args: list[str], building: bool = False) -> None:
     """
     Invoke `docker compose` against the production compose file.
 
@@ -183,8 +209,12 @@ def _run_compose(args: list[str]) -> None:
     :param args: docker compose subcommand and arguments,
                  e.g. `["up", "--detach"]` or `["logs", "--follow", "backend"]`.
     :type args: list[str]
+    :param building: Whether this invocation builds images (vs. pulling/running).
+                     Selects the current HEAD's version instead of the deploy
+                     version for the compose `image:` tag.
+    :type building: bool
     """
-    env_vars = _compose_env()
+    env_vars = _compose_env(building)
     command = f"docker compose --file '{_COMPOSE_PATH}' {' '.join(args)}"
 
     runtime.logger.info(
@@ -230,7 +260,9 @@ def up(
         args.append("--build")
     if detach:
         args.append("--detach")
-    _run_compose(args)
+    # --build compiles the current HEAD (branch-derived version); a plain `up`
+    # runs the deploy version (pin, release tag, or latest).
+    _run_compose(args, building=rebuild)
 
 
 @prod_app.command()
@@ -273,7 +305,7 @@ def build() -> None:
     Examples:
         mascope prod build
     """
-    _run_compose(["build"])
+    _run_compose(["build"], building=True)
 
 
 @prod_app.command()

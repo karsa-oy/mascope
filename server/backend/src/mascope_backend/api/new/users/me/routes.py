@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 
 from mascope_backend.api.lib.api_features import api_route
+from mascope_backend.api.lib.rate_limit import rate_limit
 from mascope_backend.api.new.auth.dependencies import current_active_user, guest_user
 from mascope_backend.api.new.users.exceptions import InvalidUsernameException
 from mascope_backend.api.new.users.me.exceptions import InvalidCurrentPasswordException
@@ -70,7 +71,12 @@ async def update_me_route(
     )
 
 
-@me_router.patch("/creds")
+@me_router.patch(
+    "/creds",
+    # Verifies the current password, so rate-limit per IP to prevent using it
+    # as a password-guessing oracle.
+    dependencies=[Depends(rate_limit(times=10, seconds=3600, scope="creds-change"))],
+)
 @api_route()
 async def update_credentials_route(
     credentials_update: UserUpdateMeCredentials,
