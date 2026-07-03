@@ -30,6 +30,19 @@ def _resolve_cookie_secure() -> bool:
     return runtime.mode == "prod"
 
 
+# HS256 signs with the raw secret bytes; RFC 7518 requires a key at least as long
+# as the hash output (32 bytes for SHA-256). Warn rather than fail so an existing
+# deployment with a short key keeps running, but the operator is told to rotate.
+_MIN_JWT_SECRET_BYTES = 32
+if len(jwt_secret_key.encode("utf-8")) < _MIN_JWT_SECRET_BYTES:
+    runtime.logger.warning(
+        f"JWT secret key is shorter than {_MIN_JWT_SECRET_BYTES} bytes, which is "
+        "below the RFC 7518 minimum for HS256. Regenerate it with "
+        "`head -c 32 /dev/urandom | xxd -p -c 32 > .runtime/secrets/jwt_secret_key.txt` "
+        "and restart. Note: rotating the secret invalidates existing sessions."
+    )
+
+
 # TODO_configuration for auth
 class AuthConfig(BaseModel):
     """
@@ -41,8 +54,10 @@ class AuthConfig(BaseModel):
     JWT_SECRET_KEY: str = (
         jwt_secret_key  # PRIVATE_KEY used for signing and verifying JWT tokens
     )
-    # Token lifetime - 360 days in seconds (JWT expiration)
-    JWT_EXPIRATION_SECONDS: int = 360 * 24 * 60 * 60
+    # Token lifetime - 7 days in seconds (JWT expiration). The JWT is stateless
+    # and cannot be revoked server-side, so this bounds how long a stolen token
+    # or cookie stays valid. Users re-authenticate weekly.
+    JWT_EXPIRATION_SECONDS: int = 7 * 24 * 60 * 60
     JWT_AUDIENCE: list = ["mascope-users:auth"]  # Audience claim for token validation
     JWT_ALGORITHM: str = (
         "HS256"  # Algorithm used for signing the JWT (HMAC with SHA-256)
@@ -50,8 +65,8 @@ class AuthConfig(BaseModel):
 
     # Cookie settings for web-based JWT storage
     COOKIE_NAME: str = "mascope_auth"  # Name of the authentication cookie
-    # Lifetime of the cookie - 360 days in seconds (matches JWT expiration)
-    COOKIE_MAX_AGE_SECONDS: int = 360 * 24 * 60 * 60
+    # Lifetime of the cookie - 7 days in seconds (matches JWT expiration)
+    COOKIE_MAX_AGE_SECONDS: int = 7 * 24 * 60 * 60
     COOKIE_SECURE: bool = (
         _resolve_cookie_secure()
     )  # send cookies only over HTTPS; prod default, override via MASCOPE_COOKIE_SECURE

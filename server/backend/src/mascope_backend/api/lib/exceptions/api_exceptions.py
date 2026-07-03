@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy.exc import SQLAlchemyError
 
 from mascope_backend.api.new.roles.exceptions import InvalidRoleException
@@ -49,6 +50,11 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         case ApiException():
             user_message = e.user_message
             status_code = e.status_code
+
+        case InvalidPasswordException():
+            # Password policy violation from UserManager.validate_password.
+            user_message = str(e.reason)
+            status_code = 400  # Bad Request
 
         case HTTPException():
             status_code = e.status_code
