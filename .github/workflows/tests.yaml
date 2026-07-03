@@ -47,29 +47,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install uv
+        run: sudo snap install --classic astral-uv
+
       - name: Build application images from this PR
-        env:
-          # The prod compose file interpolates these into volume mounts at
-          # parse time, so they must be non-empty even though `build` never
-          # mounts them.
-          MASCOPE_PATH: ${{ github.workspace }}
-          MASCOPE_FILESTORE: ${{ github.workspace }}/.runtime/filestore
-          MASCOPE_ENV: default
-          MASCOPE_LOGLEVEL: INFO
         run: |
-          # The prod compose file declares build contexts alongside the GHCR
-          # image tags, so building here produces locally tagged images that
-          # docker-compose.demo.yaml will use instead of pulling from GHCR.
-          # Dummy secret files keep compose parsing happy; the demo stack
-          # brings its own throwaway secrets.
-          mkdir -p .runtime/secrets
-          for secret in jwt_secret_key postgres_password server_owner_secret_key ssl_certificate ssl_secret_key; do
-            echo placeholder > .runtime/secrets/$secret.txt
-          done
-          docker compose -f docker-compose.yaml build backend frontend
+          # Build via the CLI exactly like the release pipeline: it resolves
+          # the full compose env, including the MASCOPE_RUNTIME build arg the
+          # frontend bakes in at build time (the app cannot boot without it).
+          export MASCOPE_PATH=$GITHUB_WORKSPACE
+          uv run mascope prod build
 
       - name: Start the demo stack
-        run: docker compose -f docker-compose.demo.yaml up -d
+        run: |
+          # The CLI tagged the images with the branch-derived version; point
+          # the demo compose at that tag. If the build silently produced
+          # nothing, compose fails to pull this unpublished tag from GHCR,
+          # which is the failure we want.
+          VERSION=$(docker images "ghcr.io/${{ github.repository }}/backend" --format '{{.Tag}}' | head -1)
+          echo "Built image tag: $VERSION"
+          MASCOPE_VERSION=$VERSION docker compose -f docker-compose.demo.yaml up -d
 
       - name: Set up Node
         uses: actions/setup-node@v4
