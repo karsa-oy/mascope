@@ -5,7 +5,6 @@ import pytest
 
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
-    generate_target_ions_from_mass,
 )
 from mascope_backend.db import (
     IonizationMechanism,
@@ -104,30 +103,5 @@ async def test_generate_target_ions_from_composition(
                 expected["ra_M0"], rel=1e-6, abs=1e-6
             )
 
-        # Link integrity
-        assert_isotope_links(target_ions, target_isotopes)
-
-
-@pytest.mark.asyncio
-async def test_generate_target_ions_from_mass(
-    test_target_compounds_by_mass: list[tuple[float, TargetCompound]],
-    test_ionization_mechanisms: list[IonizationMechanism],
-) -> None:
-    """Test generating target ions from target compounds defined by mass.
-
-    :param test_target_compounds_by_mass: List of target compounds defined by mass.
-    :type test_target_compounds_by_mass: list[tuple[float, TargetCompound]]
-    :param test_ionization_mechanisms: List of ionization mechanisms to use for generating target ions.
-    :type test_ionization_mechanisms: list[IonizationMechanism]
-
-    :return: None
-    """
-    for target_compound_mass, target_compound in test_target_compounds_by_mass:
-        target_ions, target_isotopes = generate_target_ions_from_mass(
-            target_compound_mass, target_compound, test_ionization_mechanisms
-        )
-        # Generic checks: ensure some ions and isotopes were generated
-        assert len(target_ions) > 0, "No target ions generated"
-        assert len(target_isotopes) > 0, "No target isotopes generated"
         # Link integrity
         assert_isotope_links(target_ions, target_isotopes)

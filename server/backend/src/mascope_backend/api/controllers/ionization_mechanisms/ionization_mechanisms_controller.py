@@ -221,17 +221,10 @@ async def create_ionization_mechanism(
 
         # --- Create target ions with new mechanism for each compound --- #
         for target_compound in target_compounds:
-            try:
-                # Try if target compound is given by mass (try to parse composition into float)
-                target_compound_mass = float(target_compound.target_compound_formula)
-            except ValueError:
-                target_compound_mass = None
-
             # Create target ions for the compound
             await create_target_ions(
                 target_compound=target_compound,
                 ionization_mechanisms=[new_ionization_mechanism],
-                target_compound_mass=target_compound_mass,
                 independent_transaction=False,
                 session=session,
             )
