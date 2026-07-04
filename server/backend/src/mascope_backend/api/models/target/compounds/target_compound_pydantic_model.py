@@ -1,8 +1,29 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+
+
+def reject_mass_only_formula(value: Optional[str]) -> Optional[str]:
+    """Reject a target compound formula that is a bare numeric mass.
+
+    Mass-based target compounds (a plain number such as ``"136.1252"`` instead of
+    a chemical formula) are no longer supported: their ions/isotopes used to be
+    generated from the mass alone, which relied on the retired molmass fork.
+    Compounds must now be given by composition so an isotope pattern can be
+    computed. An empty formula (``"()"``, adduct-only) is still allowed.
+    """
+    if value is None:
+        return value
+    try:
+        float(value.strip())
+    except (TypeError, ValueError):
+        return value
+    raise ValueError(
+        "Mass-based target compounds are no longer supported; provide a chemical "
+        "formula (e.g. 'C6H12O6'), not a numeric mass."
+    )
 
 
 class TargetCompoundBase(BaseModel):
@@ -17,6 +38,10 @@ class TargetCompoundBase(BaseModel):
     )
     cas_number: Optional[str] = Field(
         None, description="CAS Number of the target compound"
+    )
+
+    _reject_mass_formula = field_validator("target_compound_formula")(
+        reject_mass_only_formula
     )
 
 
@@ -39,6 +64,10 @@ class TargetCompoundUpdate(BaseModel):
     )
     cas_number: Optional[str] = Field(
         None, description="CAS Number of the target compound"
+    )
+
+    _reject_mass_formula = field_validator("target_compound_formula")(
+        reject_mass_only_formula
     )
 
 
