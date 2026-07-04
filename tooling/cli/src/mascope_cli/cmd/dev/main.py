@@ -45,6 +45,30 @@ _MODE = "dev"
 DEV_COMPOSE_PATH = Path(os.environ["MASCOPE_PATH"]) / "docker-compose.dev.yaml"
 
 
+def _source_root() -> str:
+    """Repo root of the running CLI source.
+
+    ``mascope dev run`` launches the app (backend, frontend, ...) from here so
+    it runs the checkout you invoked ``mascope`` from - e.g. a git worktree -
+    rather than ``MASCOPE_PATH``. ``MASCOPE_PATH`` only locates runtime state
+    (the database, secrets, ``.runtime``), which is shared across checkouts, so
+    the two must not be conflated: without this, running from a worktree would
+    execute the main repo's source, because editable installs resolve imports
+    from the directory the subprocess starts in, not the one you cd'd into.
+
+    Derived from the installed ``mascope_cli`` package location, falling back to
+    the current directory when that does not resolve to a repo (e.g. a
+    non-editable install).
+    """
+    import mascope_cli
+
+    # .../tooling/cli/src/mascope_cli/__init__.py -> repo root is 5 levels up.
+    root = Path(mascope_cli.__file__).resolve().parents[4]
+    if (root / "pyproject.toml").exists():
+        return str(root)
+    return os.getcwd()
+
+
 @dev_app.callback()
 def main():
     """
@@ -166,6 +190,10 @@ def _run_application(
     if host:
         os.environ["MASCOPE_DEVHOST"] = "HOST"
 
+    # Launch the app from the CLI's source checkout, not MASCOPE_PATH, so
+    # running from a worktree runs that worktree's code (see _source_root).
+    source_root = _source_root()
+
     # Build module runner
     def run_module(mod):
         """Run a module with optional Windows reload mode."""
@@ -195,8 +223,12 @@ def _run_application(
             cmd = f"{pass_envvars} && {mod['run']}"
             # complex commands are best encoded to avoid needing escape chars
             base64_cmd = base64.b64encode(bytearray(cmd, "utf-16-le")).decode()
-            # open a new tab in the current windows terminal and run
-            return f'"wt --window 0 pwsh -noExit -EncodedCommand {base64_cmd}"'
+            # open a new tab in the current windows terminal, started in the
+            # source checkout, and run
+            return (
+                f'"wt --window 0 -d \\"{source_root}\\" '
+                f'pwsh -noExit -EncodedCommand {base64_cmd}"'
+            )
         else:
             # default behavior
             return f'"{mod["run"]}"'
@@ -206,7 +238,9 @@ def _run_application(
     cmds = f"{' '.join([run_module(mod) for mod in selected])}"
 
     runtime.logger.info(f"Starting: {', '.join(mod['name'] for mod in selected)}")
-    lib.run(f"{concurrently} --raw {names} {cmds}")
+    # cwd=source_root so the spawned `uv run mascope-backend` / frontend resolve
+    # against the invoked checkout rather than MASCOPE_PATH.
+    lib.run(f"{concurrently} --raw {names} {cmds}", cwd=source_root)
 
 
 @dev_app.command()
