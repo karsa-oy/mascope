@@ -15,6 +15,32 @@ from mascope_match.runtime import runtime
 MATCH_WINDOW_AMU = 0.5  # Da
 
 
+def _within_window_mask(
+    values: np.ndarray, targets: np.ndarray, window: float
+) -> np.ndarray:
+    """Boolean mask of `values` whose nearest `target` is within `window`.
+
+    Uses binary search on a sorted copy of `targets` (O((n+m) log m) time,
+    O(n) memory) instead of a dense pairwise difference matrix.
+    """
+    values = np.asarray(values)
+    targets = np.asarray(targets)
+    if values.size == 0 or targets.size == 0:
+        return np.zeros(values.shape, dtype=bool)
+
+    targets_sorted = np.sort(targets)
+    # Insertion positions of each value among the sorted targets; the nearest
+    # target is one of the two neighbours straddling that position.
+    pos = np.searchsorted(targets_sorted, values)
+    left = np.clip(pos - 1, 0, targets_sorted.size - 1)
+    right = np.clip(pos, 0, targets_sorted.size - 1)
+    nearest_dist = np.minimum(
+        np.abs(values - targets_sorted[left]),
+        np.abs(values - targets_sorted[right]),
+    )
+    return nearest_dist <= window
+
+
 async def compute_match_isotopes(
     filename: str,
     target_isotopes_df: pd.DataFrame,
@@ -168,12 +194,12 @@ async def load_peaks(
     peak_data = m_io.load_peak_data(filename)
 
     # Compute all peak timeseries within MATCH_WINDOW_AMU of target m/z values
-    # to not compute them later in Match tab visualization
+    # to not compute them later in Match tab visualization.
+    # A peak qualifies if its nearest target is within the window. Found via
+    # binary search on sorted targets - O((n+m) log m) time and O(n) memory,
+    # instead of materializing a dense (n_peaks x n_targets) difference matrix.
     all_mzs = peak_data.mz.values
-    mz_mask = np.any(
-        np.abs(all_mzs[:, None] - target_mzs[None, :]) <= MATCH_WINDOW_AMU, axis=1
-    )
-    mz_to_compute = all_mzs[mz_mask]
+    mz_to_compute = all_mzs[_within_window_mask(all_mzs, target_mzs, MATCH_WINDOW_AMU)]
 
     peak_timeseries = await m_compute.load_peak_timeseries(filename, mz_to_compute)
 
@@ -245,17 +271,22 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     n_targets = len(target_mzs)
 
     # --- Get sorted candidate peak indices per target isotope that are within MATCH_WINDOW_AMU ---
-    diff_matrix = np.abs(
-        target_mzs[:, None] - peak_mzs[None, :]
-    )  # shape (n_targets, n_peaks)
-    diff_in_range = diff_matrix <= MATCH_WINDOW_AMU
+    # Each target's candidates are the peaks whose m/z falls in
+    # [target - window, target + window]. Locating that range with binary search
+    # on the sorted peak m/z array avoids the dense (n_targets x n_peaks)
+    # difference matrix; only per-target candidate slices are materialized.
+    peak_order = np.argsort(peak_mzs, kind="stable")
+    peak_mzs_sorted = peak_mzs[peak_order]
     candidate_lists: list[list[int]] = []
     for i in range(n_targets):
-        candidates = np.where(diff_in_range[i])[0]
-        # Sort candidates by (diff, then m/z)
-        sort_idx = np.lexsort((peak_mzs[candidates], diff_matrix[i, candidates]))
-        candidates = candidates[sort_idx].tolist()
-        candidate_lists.append(candidates)
+        target_mz = target_mzs[i]
+        lo = np.searchsorted(peak_mzs_sorted, target_mz - MATCH_WINDOW_AMU, side="left")
+        hi = np.searchsorted(peak_mzs_sorted, target_mz + MATCH_WINDOW_AMU, side="right")
+        candidates = peak_order[lo:hi]
+        # Sort candidates by (diff, then m/z), matching the original tie-breaking.
+        cand_diffs = np.abs(peak_mzs[candidates] - target_mz)
+        sort_idx = np.lexsort((peak_mzs[candidates], cand_diffs))
+        candidate_lists.append(candidates[sort_idx].tolist())
 
     # --- Assign peaks to isotopes ---
     # Sort isotopes by decreasing relative abundance and m/z to prioritize matching

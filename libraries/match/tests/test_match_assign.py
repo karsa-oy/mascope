@@ -18,7 +18,11 @@ way ``compute_match_isotopes`` does, and a parsed-peaks dict as produced by
 import numpy as np
 import pandas as pd
 
-from mascope_match.compute.isotopes import MATCH_WINDOW_AMU, _match_assign
+from mascope_match.compute.isotopes import (
+    MATCH_WINDOW_AMU,
+    _match_assign,
+    _within_window_mask,
+)
 
 
 def make_targets(rows: list[dict]) -> pd.DataFrame:
@@ -165,3 +169,35 @@ class TestMatchAssign:
 
         assert pd.isna(result.loc[0, "sample_peak_mz"])
         assert pd.isna(result.loc[0, "matched_peak_idx"])
+
+
+def _within_window_mask_dense(values, targets, window):
+    """Reference implementation using a dense difference matrix."""
+    values = np.asarray(values)
+    targets = np.asarray(targets)
+    if values.size == 0 or targets.size == 0:
+        return np.zeros(values.shape, dtype=bool)
+    return np.any(np.abs(values[:, None] - targets[None, :]) <= window, axis=1)
+
+
+class TestWithinWindowMask:
+    def test_matches_dense_reference_on_random_data(self):
+        rng = np.random.default_rng(1234)
+        for _ in range(50):
+            values = rng.uniform(50, 500, size=rng.integers(0, 200))
+            targets = rng.uniform(50, 500, size=rng.integers(0, 50))
+            expected = _within_window_mask_dense(values, targets, MATCH_WINDOW_AMU)
+            actual = _within_window_mask(values, targets, MATCH_WINDOW_AMU)
+            np.testing.assert_array_equal(actual, expected)
+
+    def test_boundary_is_inclusive(self):
+        values = np.array([100.0 - MATCH_WINDOW_AMU, 100.0 + MATCH_WINDOW_AMU, 200.0])
+        targets = np.array([100.0])
+        np.testing.assert_array_equal(
+            _within_window_mask(values, targets, MATCH_WINDOW_AMU),
+            np.array([True, True, False]),
+        )
+
+    def test_empty_inputs(self):
+        assert _within_window_mask(np.array([]), np.array([1.0]), 0.5).size == 0
+        assert not _within_window_mask(np.array([1.0]), np.array([]), 0.5).any()
