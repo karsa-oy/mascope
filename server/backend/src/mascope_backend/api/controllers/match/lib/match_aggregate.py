@@ -12,27 +12,6 @@ from mascope_match.params import (
 )
 
 
-def aggregate_params(df: pd.DataFrame) -> pd.Series:
-    """Aggregation function to get the aggregated parameters.
-
-    Set match_score, match_category of the top row (the most alarming row).
-    Sums sample_peak_intensity_sum for the group.
-
-    :param df: The DataFrame containing the data to be aggregated.
-    :type df: pd.DataFrame
-    :return: A Pandas Series containing the aggregated values.
-    :rtype: pd.Series
-    """
-    top_row = df.iloc[0]
-    return pd.Series(
-        {
-            "match_score": top_row["match_score"],
-            "match_category": top_row["match_category"],
-            "sample_peak_intensity_sum": df["sample_peak_intensity_sum"].sum(),
-        }
-    )
-
-
 async def set_ions_match_category(
     match_ions_df: pd.DataFrame, match_params: Optional[BaseMatchParams] = None
 ) -> pd.DataFrame:
@@ -49,36 +28,44 @@ async def set_ions_match_category(
     :return: DataFrame with match_category field set for each ion.
     :rtype: pd.DataFrame
     """
-    for index, row in match_ions_df.iterrows():
-        # Default thresholds
-        probable_match_threshold = DEFAULT_PROBABLE_MATCH_THRESHOLD
-        possible_match_threshold = DEFAULT_POSSIBLE_MATCH_THRESHOLD
+    if match_ions_df.empty:
+        match_ions_df["match_category"] = pd.Series(dtype=int)
+        return match_ions_df
 
-        # Override with provided filter parameters if available
-        if match_params:
-            probable_match_threshold = match_params.probable_match_threshold
-            possible_match_threshold = match_params.possible_match_threshold
-
-        # Use ion-specific filters if available and no match_params provided
-        instrument = row["instrument"]
-        match_params_ion = row.get("filter_params")
-        if not match_params and match_params_ion and instrument in match_params_ion:
-            ion_filters = match_params_ion[row["instrument"]]
-            probable_match_threshold = ion_filters["probable_match_threshold"]
-            possible_match_threshold = ion_filters["possible_match_threshold"]
-        # Determine match_category
-        match_score = row["match_score"]
-        match_ions_df.at[index, "match_category"] = (
-            2
-            if match_score >= probable_match_threshold
-            else (
-                1
-                if possible_match_threshold <= match_score < probable_match_threshold
-                else 0
-            )
+    # --- Resolve per-ion thresholds (vectorized) ---
+    if match_params:
+        # Provided parameters take priority for every ion.
+        probable = pd.Series(
+            match_params.probable_match_threshold, index=match_ions_df.index
         )
+        possible = pd.Series(
+            match_params.possible_match_threshold, index=match_ions_df.index
+        )
+    else:
+        # Ion-specific overrides (filter_params keyed by instrument), falling
+        # back to the module defaults.
+        probable = pd.Series(
+            DEFAULT_PROBABLE_MATCH_THRESHOLD, index=match_ions_df.index, dtype=float
+        )
+        possible = pd.Series(
+            DEFAULT_POSSIBLE_MATCH_THRESHOLD, index=match_ions_df.index, dtype=float
+        )
+        if "filter_params" in match_ions_df.columns:
+            for i, (instrument, filter_params) in enumerate(
+                zip(match_ions_df["instrument"], match_ions_df["filter_params"])
+            ):
+                if isinstance(filter_params, dict) and instrument in filter_params:
+                    ion_filters = filter_params[instrument]
+                    idx = match_ions_df.index[i]
+                    probable.at[idx] = ion_filters["probable_match_threshold"]
+                    possible.at[idx] = ion_filters["possible_match_threshold"]
 
-    match_ions_df["match_category"] = match_ions_df["match_category"].astype(int)
+    # Determine match_category from match_score against the resolved thresholds.
+    match_score = match_ions_df["match_score"]
+    category = pd.Series(0, index=match_ions_df.index, dtype=int)
+    category[match_score >= possible] = 1
+    category[match_score >= probable] = 2
+    match_ions_df["match_category"] = category
 
     return match_ions_df
 
@@ -203,8 +190,14 @@ async def aggregate_match_ions(
     :return: Tuple of DataFrames with aggregated match ions data.
     :rtype: (pd.DataFrame, pd.DataFrame)
     """
+    # Precompute the abundance-weighted score once so the groupby can sum it
+    # directly instead of re-indexing relative_abundance per group.
+    weighted = filtered_match_isotope_df.assign(
+        _weighted_score=filtered_match_isotope_df["match_score"]
+        * filtered_match_isotope_df["relative_abundance"]
+    )
     match_ions_data_df = (
-        filtered_match_isotope_df.groupby(
+        weighted.groupby(
             [
                 "sample_item_id",
                 "sample_item_name",
@@ -224,20 +217,11 @@ async def aggregate_match_ions(
             ]
         )
         .agg(
-            {
-                "match_score": lambda x: (
-                    x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
-                ).sum(),
-                "sample_peak_intensity": "sum",
-                "filter_params": "first",
-            }
+            match_score=("_weighted_score", "sum"),
+            sample_peak_intensity_sum=("sample_peak_intensity", "sum"),
+            filter_params=("filter_params", "first"),
         )
         .reset_index()
-        .rename(
-            columns={
-                "sample_peak_intensity": "sample_peak_intensity_sum",
-            }
-        )
     )
     # Prepare a simplified DataFrame for storing in database (keep instrument and
     # match_params for correct set_ions_match_category)
@@ -280,15 +264,14 @@ def aggregate_match_ions_light(
     :return: DataFrame with aggregated match ions data.
     :rtype: pd.DataFrame
     """
+    weighted = filtered_match_isotope_df.assign(
+        _weighted_score=filtered_match_isotope_df["match_score"]
+        * filtered_match_isotope_df["relative_abundance"]
+    )
     match_ions_df = (
-        filtered_match_isotope_df.groupby("target_ion_id")
+        weighted.groupby("target_ion_id")
         .agg(
-            match_score=(
-                "match_score",
-                lambda x: (
-                    x * filtered_match_isotope_df.loc[x.index, "relative_abundance"]
-                ).sum(),
-            ),
+            match_score=("_weighted_score", "sum"),
             sample_peak_intensity_sum=("sample_peak_intensity", "sum"),
         )
         .reset_index()
@@ -338,9 +321,16 @@ async def aggregate_match_compounds(
                 "target_collection_name",
                 "target_collection_description",
                 "target_collection_type",
-            ]
-        )[match_ions_df.columns]
-        .apply(aggregate_params)
+            ],
+            sort=False,
+        )
+        .agg(
+            # The frame is pre-sorted by (match_category, match_score) desc, so
+            # "first" preserves the most alarming row's score and category.
+            match_score=("match_score", "first"),
+            match_category=("match_category", "first"),
+            sample_peak_intensity_sum=("sample_peak_intensity_sum", "sum"),
+        )
         .reset_index()
     )
     # Explicitly cast match_category to int
@@ -419,9 +409,15 @@ async def aggregate_match_collections(compounds_df: pd.DataFrame) -> pd.DataFram
                 "target_collection_name",
                 "target_collection_description",
                 "target_collection_type",
-            ]
-        )[compounds_df.columns]
-        .apply(aggregate_params)
+            ],
+            sort=False,
+        )
+        .agg(
+            # Pre-sorted desc, so "first" is the most alarming compound.
+            match_score=("match_score", "first"),
+            match_category=("match_category", "first"),
+            sample_peak_intensity_sum=("sample_peak_intensity_sum", "sum"),
+        )
         .reset_index()
     )
     # Explicitly cast match_category to int
@@ -460,9 +456,16 @@ async def aggregate_match_samples(compounds_df: pd.DataFrame) -> pd.DataFrame:
                 "filename",
                 "sample_item_id",
                 "sample_item_name",
-            ]
-        )[compounds_df.columns]
-        .apply(aggregate_params)
+            ],
+            sort=False,
+        )
+        .agg(
+            # Pre-sorted by (alarm_mode, match_category, match_score) desc, so
+            # "first" is the most alarming compound of the sample.
+            match_score=("match_score", "first"),
+            match_category=("match_category", "first"),
+            sample_peak_intensity_sum=("sample_peak_intensity_sum", "sum"),
+        )
         .reset_index()
     )
     # Cast match_category to int

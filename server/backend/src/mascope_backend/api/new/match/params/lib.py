@@ -60,91 +60,74 @@ def apply_match_params(
     :return: DataFrame with applied filters.
     :rtype: pd.DataFrame
     """
-    # Convert match_params Pydantic model to dictionary if provided
+    if match_isotope_df.empty:
+        return match_isotope_df
+
+    df = match_isotope_df.copy()
+
+    # --- Resolve the effective parameters per row ---
+    # Priority: provided match parameters > ion-specific parameters for the
+    # sample instrument (filter_params) > instrument defaults.
+    param_keys = [
+        "mz_tolerance",
+        "isotope_ratio_tolerance",
+        "peak_min_intensity",
+        "probable_match_threshold",
+        "possible_match_threshold",
+    ]
     provided_params = match_params.model_dump() if match_params else None
-
-    def get_params(row):
-        """
-        Determine the match parameters to use based on the priority:
-        1. Provided match parameters
-        2. Ion-specific match parameters for the sample instrument
-        3. Default match parameters
-        """
-        # If provided_params are available, use them for all rows
-        if provided_params:
-            return provided_params
-
-        # If row-specific match_params are available for the instrument, use them
-        if "filter_params" in row and row["instrument"] in row["filter_params"]:
-            return row["filter_params"][row["instrument"]]
-
-        # Fallback to default parameters
-        return instrument_default_match_params(row["instrument"]).model_dump()
-
-    def filter_row(row):
-        """
-        Apply filtering logic to the given row based on the determined parameters.
-        """
-        # Determine which filter parameters to use for the current row
-        params = get_params(row)
-
-        # Check for None/NaN in necessary for filtering fields to ensure they can be processed
-        valid_data = True
-        for field in [
-            "match_mz_error",
-            "match_abundance_error",
-            "sample_peak_intensity",
-            "relative_abundance",
-        ]:
-            if pd.isna(row[field]) or row.get(field) is None:
-                # Assign match_category to NaN value by assigning None
-                row["match_category"] = None
-                valid_data = False
-                break
-        if not valid_data:
-            return row
-
-        # Apply filtering logic
-        row["match_score"] = (
-            row["match_score"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
-                    abs(row["match_abundance_error"])
-                    <= params["isotope_ratio_tolerance"],
-                    row["sample_peak_intensity"] >= params["peak_min_intensity"],
-                ]
-            )
-            else 0
+    if provided_params:
+        params_df = pd.DataFrame(
+            {key: provided_params[key] for key in param_keys}, index=df.index
+        )
+    else:
+        instruments = df["instrument"].to_numpy()
+        defaults = {
+            instrument: instrument_default_match_params(instrument).model_dump()
+            for instrument in df["instrument"].unique()
+        }
+        if "filter_params" in df.columns:
+            filter_params = df["filter_params"].to_numpy()
+            row_params = [
+                fp[instrument]
+                if isinstance(fp, dict) and instrument in fp
+                else defaults[instrument]
+                for instrument, fp in zip(instruments, filter_params)
+            ]
+        else:
+            row_params = [defaults[instrument] for instrument in instruments]
+        params_df = pd.DataFrame(
+            [[params[key] for key in param_keys] for params in row_params],
+            index=df.index,
+            columns=param_keys,
+            dtype=float,
         )
 
-        row["sample_peak_intensity"] = (
-            row["sample_peak_intensity"]
-            if all(
-                [
-                    abs(row["match_mz_error"]) <= params["mz_tolerance"],
-                    abs(row["match_abundance_error"])
-                    <= params["isotope_ratio_tolerance"],
-                ]
-            )
-            else 0
-        )
+    # --- Apply filtering logic (vectorized) ---
+    # Rows with NaN in any field required for filtering are marked with a
+    # None match_category and left otherwise untouched.
+    valid = ~(
+        df["match_mz_error"].isna()
+        | df["match_abundance_error"].isna()
+        | df["sample_peak_intensity"].isna()
+        | df["relative_abundance"].isna()
+    )
 
-        # Determine match category based on match_score
-        match_score = row["match_score"]
-        row["match_category"] = (
-            2  # Probable match
-            if match_score >= params["probable_match_threshold"]
-            else (
-                1  # Possible match
-                if match_score >= params["possible_match_threshold"]
-                else 0
-            )  # No match
-        )
+    within_tolerance = (
+        df["match_mz_error"].abs() <= params_df["mz_tolerance"]
+    ) & (df["match_abundance_error"].abs() <= params_df["isotope_ratio_tolerance"])
+    score_accepted = within_tolerance & (
+        df["sample_peak_intensity"] >= params_df["peak_min_intensity"]
+    )
 
-        return row
+    df.loc[valid & ~score_accepted, "match_score"] = 0
+    df.loc[valid & ~within_tolerance, "sample_peak_intensity"] = 0
 
-    # Apply the filtering logic to each row
-    filtered_df = match_isotope_df.apply(filter_row, axis=1)
+    # Determine match category based on the (filtered) match_score
+    match_category = pd.Series(0, index=df.index, dtype=object)
+    match_category[df["match_score"] >= params_df["possible_match_threshold"]] = 1
+    match_category[df["match_score"] >= params_df["probable_match_threshold"]] = 2
+    match_category[~valid] = None
+    df["match_category"] = match_category
 
-    return filtered_df
+    return df
