@@ -3,6 +3,7 @@ import re
 from pyteomics.mass import Composition, calculate_mass
 
 from mascope_tools.composition.config import ELECTRON_MASS
+from mascope_tools.composition.custom_elements import CUSTOM_ELEMENTS
 from mascope_tools.composition.exceptions import CompositionFinderException
 from mascope_tools.composition.models import (
     Atom,
@@ -20,7 +21,8 @@ def to_pyteomics(formula: str) -> str:
 # Caret-prefixed heavy isotopes used for labelled reagents, e.g. '^N' = 15N (the
 # 15N-labelled nitrate reagent '+^NO3-'). pyteomics masses isotopes via 'N[15]'
 # notation and cannot mass the bare '^N' symbol, so map them for mass computation.
-CARET_ISOTOPES = {"^N": "N[15]"}
+# Derived from the single custom-element registry (custom_elements.py).
+CARET_ISOTOPES = {sym: ce.pyteomics_isotope for sym, ce in CUSTOM_ELEMENTS.items()}
 
 
 def composition_mass(composition: Composition) -> float:
@@ -145,6 +147,58 @@ def parse_composition(formula_string: str, multiplier: int = 1) -> Composition:
     return elements
 
 
+_VALID_FORMULA_CHARS = re.compile(r"[A-Za-z0-9()\[\]^]*")
+
+
+def assert_valid_formula(formula: str) -> None:
+    """Validate a chemical formula string, raising ``ValueError`` on anything invalid.
+
+    Accepts element symbols, parenthesis groups, bracket isotopes (``[15N]``) and
+    labelled ``^X`` custom elements. An empty string and ``"()"`` (adduct-only) are
+    valid. Unlike :func:`parse_composition` -- which silently skips characters it
+    does not recognise -- this raises on invalid characters, unbalanced brackets,
+    and unknown element symbols.
+
+    Examples
+    --------
+    >>> assert_valid_formula("C6H12O6")
+    >>> assert_valid_formula("^NO3")
+    >>> assert_valid_formula("(CH4N2O)H")
+    >>> assert_valid_formula("()")
+    >>> assert_valid_formula("H2O!")
+    Traceback (most recent call last):
+        ...
+    ValueError: Formula 'H2O!' contains invalid characters.
+    >>> assert_valid_formula("Zz")
+    Traceback (most recent call last):
+        ...
+    ValueError: Formula 'Zz' contains an unknown element or is not a valid chemical formula.
+    """
+    stripped = formula.strip()
+    if stripped in ("", "()"):
+        return
+    if not _VALID_FORMULA_CHARS.fullmatch(stripped):
+        raise ValueError(f"Formula '{formula}' contains invalid characters.")
+    if stripped.count("(") != stripped.count(")") or stripped.count(
+        "["
+    ) != stripped.count("]"):
+        raise ValueError(f"Formula '{formula}' has unbalanced brackets.")
+    composition = parse_composition(stripped)
+    if not composition:
+        raise ValueError(f"Formula '{formula}' contains no recognisable elements.")
+    try:
+        # composition_mass masses every symbol (mapping labelled '^X'), so an
+        # unknown element symbol raises here.
+        composition_mass(composition)
+    except ValueError:
+        raise
+    except Exception as exc:  # pyteomics raises its own error type
+        raise ValueError(
+            f"Formula '{formula}' contains an unknown element or is not a "
+            f"valid chemical formula."
+        ) from exc
+
+
 def to_hill_order(elements: dict) -> str:
     """Convert a dictionary of elements to Hill notation string."""
     # For empty formula, return '()'
@@ -200,6 +254,83 @@ def to_hill_order(elements: dict) -> str:
 def remove_ones_from_formula(formula: str) -> str:
     formula = re.sub(r"([A-Za-z]+)1(?![0-9])", r"\1", formula)
     return formula
+
+
+# Token: a bracket isotope ('[15N]'), a caret custom element ('^N'), or a plain
+# element ('C', 'Br'), each with an optional trailing count.
+_FORMULA_TOKEN = re.compile(r"(\[\d+[A-Z][a-z]?\]|\^?[A-Z][a-z]?)(\d*)")
+
+
+def parse_formula_tokens(formula: str) -> dict[str, int]:
+    """Parse a flat (no-parenthesis) formula into ``{symbol: count}``, preserving
+    bracket isotopes (``[15N]``) and caret custom elements (``^N``) as distinct
+    symbols. Unlike :func:`parse_composition` this keeps isotope/custom tokens
+    verbatim (it does not fold them into pyteomics element notation), which is
+    what :func:`to_hill_notation` needs to emit exact formula strings.
+
+    Examples
+    --------
+    >>> parse_formula_tokens("C6H12O6")
+    {'C': 6, 'H': 12, 'O': 6}
+    >>> parse_formula_tokens("[15N]BrHO3")
+    {'[15N]': 1, 'Br': 1, 'H': 1, 'O': 3}
+    >>> parse_formula_tokens("HN^NO6")
+    {'H': 1, 'N': 1, '^N': 1, 'O': 6}
+    """
+    counts: dict[str, int] = {}
+    for symbol, count in _FORMULA_TOKEN.findall(formula):
+        counts[symbol] = counts.get(symbol, 0) + (int(count) if count else 1)
+    return counts
+
+
+def _hill_base_and_isotope(symbol: str) -> tuple[str, int, int]:
+    """Return ``(base_element, is_isotope, mass_number)`` for a formula symbol.
+
+    A bracket isotope ``[15N]`` -> ``("N", 1, 15)``; a plain or caret element
+    ``C`` / ``^N`` -> ``(symbol, 0, 0)``.
+    """
+    m = re.fullmatch(r"\[(\d+)([A-Z][a-z]?)\]", symbol)
+    if m:
+        return m.group(2), 1, int(m.group(1))
+    return symbol, 0, 0
+
+
+def to_hill_notation(counts: dict[str, int]) -> str:
+    """Format ``{symbol: count}`` in classic Hill order.
+
+    Classic Hill (as used by molmass, and by Mascope for the ``target_ion_formula``
+    / ``target_isotope_formula`` strings persisted for target ions): if carbon is
+    present, list C then H then the remaining elements alphabetically; if no carbon
+    is present, list *all* elements (including H) alphabetically. A bracket isotope
+    ``[mX]`` sorts as element ``X`` (plain ``X`` before its isotopes, isotopes by
+    ascending mass number); a caret custom element ``^X`` sorts by its raw symbol
+    (so ``^N`` follows the regular elements).
+
+    NOTE: this differs from :func:`to_hill_order`, which always places H second
+    even when no carbon is present. ``to_hill_order`` is kept for the composition
+    finder / scoring paths that rely on that convention; ``to_hill_notation`` is
+    the molmass-compatible ordering used where exact stored formula strings matter.
+    """
+    counts = {k: v for k, v in counts.items() if v > 0}
+    if not counts:
+        return ""
+    has_carbon = any(_hill_base_and_isotope(s)[0] == "C" for s in counts)
+
+    def sort_key(symbol: str) -> tuple:
+        base, is_isotope, mass_number = _hill_base_and_isotope(symbol)
+        if has_carbon and base == "C":
+            group: tuple = (0, "")
+        elif has_carbon and base == "H":
+            group = (1, "")
+        else:
+            group = (2, base)
+        return (group, is_isotope, mass_number, symbol)
+
+    parts = []
+    for symbol in sorted(counts, key=sort_key):
+        n = counts[symbol]
+        parts.append(symbol if n == 1 else f"{symbol}{n}")
+    return "".join(parts)
 
 
 def parse_ionization(ionization_string: str) -> IonizationMechanism:

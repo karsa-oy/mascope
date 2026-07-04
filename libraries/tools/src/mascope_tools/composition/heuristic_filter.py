@@ -16,6 +16,7 @@ from mascope_tools.composition.config import (
     ISOTOPE_MATCHING_INTENSITY_TOLERANCE,
     ISOTOPE_MATCHING_MZ_TOLERANCE_PPM,
 )
+from mascope_tools.composition.custom_elements import CUSTOM_ELEMENTS
 from mascope_tools.composition.models import HeuristicFilterConfig
 from mascope_tools.composition.utils import (
     normalize_formula_with_isotopes,
@@ -31,12 +32,13 @@ ISOTOPE_CANDIDATE_LIMIT = 64
 # We model it as a custom element '^X' whose isotope abundances are the labelled
 # distribution, so predict_isotopes yields the heavy base AND the small light
 # satellite. `purity` is the heaviest-isotope fraction (e.g. 0.98 for 15N).
-# (Mirrors the backend's custom-element handling in target_ions_compute, but
-# self-contained -- no molmass dependency.)
-LABELLED_REAGENT_PURITY = 0.98
+# The element definitions come from the shared registry (custom_elements.py) --
+# the single source of truth also used by the Mascope backend, so no molmass
+# dependency and no duplicated isotope data.
+LABELLED_REAGENT_PURITY = CUSTOM_ELEMENTS["^N"].default_purity
 # symbol -> (regular_symbol, [(mass, mass_number), ... lightest first])
 _CUSTOM_ELEMENT_DATA = {
-    "^N": ("N", [(14.0030740, 14), (15.0001089, 15)]),
+    sym: (ce.base_element, list(ce.isotopes)) for sym, ce in CUSTOM_ELEMENTS.items()
 }
 
 
