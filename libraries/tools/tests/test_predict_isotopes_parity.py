@@ -1,39 +1,81 @@
-"""Parity: ``mascope_tools`` ``predict_isotopes`` vs the molmass ``Formula.spectrum()``
-ground-truth, for non-labelled ions AND labelled custom-element ('^N') ions.
+"""Parity: ``mascope_tools`` ``predict_isotopes`` vs frozen molmass reference
+envelopes, for non-labelled ions AND labelled custom-element ('^N') ions.
 
-molmass (an independent isotope-pattern implementation) is the reference the backend
-already trusts. This guards the self-contained custom-element convolution in
-``predict_isotopes`` against drift, and the non-labelled cases guard against
-regressions in the standard IsoSpec path.
+The reference envelopes in ``REFERENCE_ENVELOPES`` were computed with molmass
+(``Formula.spectrum()``) -- an independent isotope-pattern implementation -- and
+frozen here so the check survives the retirement of the mascope_molmass fork. This
+guards the self-contained custom-element convolution in ``predict_isotopes`` against
+drift, and the non-labelled cases guard the standard IsoSpec path against regressions.
 
 We assert parity on the chemically significant peaks (>= 1.5% relative, which
 includes the ~2% 14N satellite of a labelled reagent). Trace peaks below that are
 threshold/grouping-convention dependent between IsoSpec and molmass and are not
 asserted -- they are negligible for scoring (mass-dominated 0.6/0.2/0.2).
+
+To regenerate the reference (e.g. if a custom element's mass/purity changes), run
+``predict_isotopes``'s molmass equivalent ``Formula(mm).spectrum()`` and paste the
+neutral-mass -> m/z converted, base-normalised peaks below.
 """
 
 import numpy as np
 import pytest
 
-pytest.importorskip("mascope_molmass")
-from mascope_molmass import Formula  # noqa: E402
-
-from mascope_tools.composition.config import ELECTRON_MASS  # noqa: E402
-from mascope_tools.composition.heuristic_filter import predict_isotopes  # noqa: E402
+from mascope_tools.composition.heuristic_filter import predict_isotopes
 
 SIGNIFICANT = 0.015  # relative-abundance floor for asserted peaks
 MZ_TOL = 0.003
 INT_TOL = 0.04
 
-# (tools ion formula without charge sign, charge, equivalent molmass formula)
-CASES = [
-    ("C6H12O6", -1, "C6H12O6"),  # non-labelled (regression)
-    ("C6H12BrO6", -1, "C6H12BrO6"),  # bromine envelope (M+2 ~ base)
-    ("C5H8O6^N", -1, "C5H8^NO6"),  # 15N-nitrate adduct ion
-    ("C10H15O3^N", -1, "C10H15^NO3"),  # another 15N case
-    ("C3H4O3^N2", -1, "C3H4^N2O3"),  # two labelled atoms (multinomial)
-    ("C8H10O3^N", 1, "C8H10^NO3"),  # positive charge
-]
+# (ion, charge) -> full molmass reference envelope as base-normalised (m/z, rel)
+# peaks. Frozen from molmass Formula.spectrum(); see module docstring.
+REFERENCE_ENVELOPES = {
+    ("C6H12O6", -1): [
+        (180.063937, 1.000000),
+        (181.067379, 0.068560),
+        (182.068554, 0.014329),
+        (183.071721, 0.000873),
+        (184.073182, 0.000088),
+        (185.076089, 0.000005),
+    ],
+    ("C6H12BrO6", -1): [
+        (258.982274, 1.000000),
+        (259.985717, 0.068560),
+        (260.980323, 0.987104),
+        (261.983751, 0.067566),
+        (262.984886, 0.014027),
+        (263.988046, 0.000854),
+        (264.989495, 0.000086),
+    ],
+    ("C5H8O6^N", -1): [
+        (178.035711, 0.020384),
+        (179.032753, 1.000000),
+        (180.036201, 0.057496),
+        (181.037259, 0.013676),
+        (182.040495, 0.000719),
+    ],
+    ("C10H15O3^N", -1): [
+        (197.105742, 0.020362),
+        (198.102791, 1.000000),
+        (199.106197, 0.111013),
+        (200.108258, 0.011734),
+        (201.110949, 0.000849),
+    ],
+    ("C3H4O3^N2", -1): [
+        (116.022741, 0.000416),
+        (117.019778, 0.040774),
+        (118.016819, 1.000000),
+        (119.020265, 0.034271),
+        (120.021227, 0.006568),
+        (121.024508, 0.000210),
+    ],
+    ("C8H10O3^N", 1): [
+        (168.065520, 0.020371),
+        (169.062566, 1.000000),
+        (170.065969, 0.088854),
+        (171.067736, 0.009636),
+        (172.070535, 0.000623),
+    ],
+}
 
 
 def _tools_envelope(ion: str, charge: int):
@@ -43,29 +85,22 @@ def _tools_envelope(ion: str, charge: int):
     return mz, pr / pr.max()
 
 
-def _molmass_envelope(mm_formula: str, charge: int):
-    gt = [(e.mass, e.fraction) for e in Formula(mm_formula).spectrum().values()]
-    gmax = max(f for _, f in gt)
-    # neutral mass -> m/z to compare on the same axis as tools
-    return [((m - ELECTRON_MASS * charge) / abs(charge), f / gmax) for m, f in gt]
-
-
-@pytest.mark.parametrize("ion,charge,mm", CASES)
-def test_predict_isotopes_matches_molmass(ion, charge, mm):
+@pytest.mark.parametrize("ion,charge", list(REFERENCE_ENVELOPES))
+def test_predict_isotopes_matches_molmass(ion, charge):
     mz, rel = _tools_envelope(ion, charge)
-    gt = _molmass_envelope(mm, charge)
+    gt = REFERENCE_ENVELOPES[(ion, charge)]
 
-    # every significant molmass peak has a matching tools peak (mass + intensity)
+    # every significant reference peak has a matching tools peak (mass + intensity)
     for gmz, gf in gt:
         if gf < SIGNIFICANT:
             continue
         j = int(np.argmin(np.abs(mz - gmz)))
         assert abs(mz[j] - gmz) < MZ_TOL, f"{ion}: no tools peak near {gmz:.4f}"
         assert abs(rel[j] - gf) < INT_TOL, (
-            f"{ion}: intensity at {gmz:.4f}: tools {rel[j]:.3f} vs molmass {gf:.3f}"
+            f"{ion}: intensity at {gmz:.4f}: tools {rel[j]:.3f} vs reference {gf:.3f}"
         )
 
-    # and tools predicts no spurious significant peak that molmass lacks
+    # and tools predicts no spurious significant peak that the reference lacks
     gt_mz = np.array([m for m, _ in gt])
     for k in np.where(rel >= SIGNIFICANT)[0]:
         assert np.min(np.abs(gt_mz - mz[k])) < MZ_TOL, (
