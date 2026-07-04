@@ -1175,21 +1175,26 @@ async def match_compute_batch(
             failed_samples.append(sample.sample_item_id)
             continue
 
-        # Step 4: Aggregate higher-level matches and update timestamps
-        match_aggregate_result = await aggregate_and_create_matches(
-            sample_item_id=sample.sample_item_id
-        )
-        match_aggregate_status = match_aggregate_result.get("status")
-        if match_aggregate_status in ("success", "partial"):
-            runtime.logger.debug(
-                f"Aggregated new higher-level matches for sample item '{sample.sample_item_name}'."
-            )
-            await update_sample_modified_timestamps(
-                sample_item_ids=match_aggregate_result.get(
-                    "affected_sample_item_ids", []
-                )
-            )
         await send_progress_user_notification(progress_notification, 1.0)
+
+    # Step 4: Aggregate higher-level matches once for the whole batch and update
+    # timestamps. Aggregating per batch instead of per sample avoids re-running
+    # the batch-level target queries for every sample.
+    match_aggregate_result = await aggregate_and_create_matches(
+        sample_batch_id=sample_batch_id
+    )
+    match_aggregate_status = match_aggregate_result.get("status")
+    if match_aggregate_status in ("success", "partial"):
+        runtime.logger.debug(
+            f"Aggregated new higher-level matches for sample batch '{sample_batch_name}'."
+        )
+        affected_sample_item_ids = match_aggregate_result.get("data", {}).get(
+            "affected_sample_item_ids", []
+        )
+        if affected_sample_item_ids:
+            await update_sample_modified_timestamps(
+                sample_item_ids=affected_sample_item_ids
+            )
 
     # Step 5: Determine status based on outcomes
     computed_samples_count = len(computed_samples)

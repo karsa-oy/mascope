@@ -1,6 +1,5 @@
 import pandas as pd
 from sqlalchemy import (
-    and_,
     select,
 )
 
@@ -223,10 +222,9 @@ async def aggregate_match_isotope_filtered_data(
             )
             return targets_df
 
-        target_isotope_ids = targets_df["target_isotope_id"].tolist()
-
-        # c. Combine sample and targets query to fetch relevant match isotopes data.
-        # Fetch match isotopes
+        # c. Fetch match isotopes for the samples in scope. Restricting to the
+        # batch's target isotopes happens via the inner merge with targets_df
+        # below, so no (potentially huge) target-isotope IN list is needed here.
         match_isotopes_query = (
             select(
                 MatchIsotope.sample_item_id,
@@ -240,12 +238,7 @@ async def aggregate_match_isotope_filtered_data(
                 MatchIsotope.match_score,
             )
             .select_from(MatchIsotope)
-            .where(
-                and_(
-                    MatchIsotope.sample_item_id.in_(sample_item_ids),
-                    MatchIsotope.target_isotope_id.in_(target_isotope_ids),
-                )
-            )
+            .where(MatchIsotope.sample_item_id.in_(sample_item_ids))
         )
 
         match_isotopes_result = await session.execute(match_isotopes_query)
