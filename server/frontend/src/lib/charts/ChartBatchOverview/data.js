@@ -300,7 +300,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
             groups[ionId].push(record)
             return groups
           }, {})
-        ).map(([ionId, ionRecords], index) => {
+        ).map(([, ionRecords]) => {
           // Create sample_item_id → intensity mapping for this ion
           const intensityMap = ionRecords.reduce((map, record) => {
             map[record.sample_item_id] = record.sample_peak_intensity_sum
