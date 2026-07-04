@@ -17,7 +17,6 @@ dependencies = [
     "mascope_tofwerk",
     "mascope_thermo",
     "mascope_tools",
-    "mascope_molmass",
 ]
 
 [project.scripts]
@@ -62,7 +61,6 @@ mascope_tofwerk = { workspace = true }
 mascope_thermo = { workspace = true }
 mascope_tools = { workspace = true }
 mascope_runtime = { workspace = true }
-mascope_molmass = { workspace = true}
 
 [build-system]
 requires = ["uv_build>=0.6,<0.7"]

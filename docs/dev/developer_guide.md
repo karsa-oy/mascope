@@ -51,13 +51,12 @@ mascope/           # Monorepo root directory
     chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
     match/             # Matching (targeted analysis) module
-    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
-    tools/             # Standalone package with peak alignment etc.
+    tools/             # Formula parsing, isotope prediction, peak alignment etc.
   server/            # Mascope app server
     backend/           # API server (Python, FastAPI, PostgreSQL)
       alembic/           # Alembic migration environment
@@ -2381,13 +2380,12 @@ Javascript). In addition to the three libraries listed here, the [Runtime Librar
     chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
     match/             # Matching (targeted analysis) module
-    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
-    tools/             # Standalone package with peak alignment etc.
+    tools/             # Formula parsing, isotope prediction, peak alignment etc.
 ```
 
 The libraries dependency structure is as follows:
@@ -2395,7 +2393,7 @@ The libraries dependency structure is as follows:
 ```mermaid
 flowchart LR
     backend([mascope_backend])
-    molmass([mascope_molmass])
+    tools([mascope_tools])
     signal([mascope_signal])
     file([mascope_file])
     tofwerk([mascope_tofwerk])
@@ -2405,7 +2403,7 @@ flowchart LR
     cli([mascope_cli])
 
     classDef library fill:#ba642e,stroke-width: 0;
-    class molmass,signal,file,tofwerk,thermo library;
+    class tools,signal,file,tofwerk,thermo library;
 
     classDef service fill:#02607a,stroke-width: 0;
     class backend service;
@@ -2424,7 +2422,7 @@ flowchart LR
     backend --> signal
     backend --> tofwerk
     backend --> thermo
-    backend --> molmass
+    backend --> tools
 
     %% libraries
     thermo --> file
@@ -2437,7 +2435,7 @@ flowchart LR
     backend -.-> runtime
     thermo -.-> runtime
     tofwerk -.-> runtime
-    molmass -.-> runtime
+    tools -.-> runtime
     file -.-> runtime
     signal -.-> runtime
     file_agent -.-> runtime
@@ -2474,11 +2472,11 @@ To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.
    uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
    ```
 
-### Molmass
+### Chemical formulas and custom elements
 
-`mascope_molmass` is a fork of the [molmass](https://github.com/cgohlke/molmass/tree/master) package, used for chemical formula parsing and arithmetics, i.e. applying addition and abstraction ionization mechanisms to neutral molecule formulae. The reason for the fork is to have the ability to define "custom elements" in the `mascope_molmass/elements.py` module.
+Chemical formula parsing, ion arithmetic (applying addition/abstraction ionization mechanisms to a neutral formula) and isotope-pattern prediction all live in `mascope_tools.composition`. This previously relied on a fork of the [molmass](https://github.com/cgohlke/molmass/tree/master) package (`mascope_molmass`); that fork has been retired and its logic consolidated into `mascope_tools` (parsing via `pyteomics`, isotope envelopes via `IsoSpecPy`).
 
-The formula parsing has been adapted to allow the caret `^` to be used in a formula, denoting custom elements. The motivation is to enable defining custom isotopic distribution for an element, required to properly support analysing data measured with isotopically labeled ionization reagent. For example, `^N` is used to denote `[15N]` substituted nitrogen, with 98% substitution rate.
+Formulas may use the caret `^` to denote a labelled **custom element** with a non-natural isotopic distribution — required to analyse data measured with an isotopically labelled ionization reagent. For example `^N` denotes `[15N]`-substituted nitrogen at 98% substitution. Custom elements are defined in one place, `mascope_tools.composition.custom_elements.CUSTOM_ELEMENTS`, which the backend (target-ion generation, cheminfo formula conversion) and `mascope_tools` (mass computation, isotope prediction) both consume. Classic Hill-notation formatting (used for the stored `target_ion_formula` / `target_isotope_formula` strings) is `mascope_tools.composition.utils.to_hill_notation`.
 
 ---
 
