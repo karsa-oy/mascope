@@ -122,6 +122,40 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   }
 
   /**
+   * Handle batch match (re)creation.
+   *
+   * A batch rematch creates every sample's matches in one burst and emits a
+   * single `batch_match_created` event (rather than one `sample_match_created`
+   * per sample). Reload all records for the focused batch with the currently
+   * selected ions.
+   */
+  const handleBatchMatchReload = async (event) => {
+    console.debug('🔄 [chart.batch.overview] handling batch_match_created event', event)
+    // Ignore events for a batch the user is not currently looking at.
+    if (event?.record?.sample_batch_id && event.record.sample_batch_id !== app.data.batch.focusedId) {
+      return
+    }
+    const targetIonIds = app.data.match.ion.selectedIds
+    if (targetIonIds.length === 0) {
+      records.value = []
+      return
+    }
+
+    pending.value = true
+    const sampleItemIds = app.data.sample.list.map((s) => s.sample_item_id)
+    const chunkSize = 30 // How many ions to load per request
+    let reloaded = []
+    for (let i = 0; i < targetIonIds.length; i += chunkSize) {
+      const chunk = targetIonIds.slice(i, i + chunkSize)
+      const newRecords = await fetchMatchRecords(sampleItemIds, chunk)
+      reloaded = [...reloaded, ...newRecords]
+    }
+    console.debug(`🔄 [chart.batch.overview] reloaded ${reloaded.length} datapoints for batch`)
+    records.value = reloaded
+    pending.value = false
+  }
+
+  /**
    * Handle sample match removal
    */
   const handleSampleMatchRemoval = (event) => {
@@ -166,6 +200,10 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     console.debug('📬 [api:sio] sample_match_created received:', event)
     handleNewSample(event)
   })
+  api.socket.on('batch_match_created', (event) => {
+    console.debug('📬 [api:sio] batch_match_created received:', event)
+    handleBatchMatchReload(event)
+  })
   api.socket.on('sample_match_deleted', (event) => {
     console.debug('📬 [api:sio] sample_match_deleted received:', event)
     handleSampleMatchRemoval(event)
@@ -181,6 +219,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
 
   onUnmounted(() => {
     api.socket.off('sample_match_created', handleNewSample)
+    api.socket.off('batch_match_created', handleBatchMatchReload)
     api.socket.off('sample_match_deleted', handleSampleMatchRemoval)
     api.socket.off('batch_match_deleted', handleBatchMatchRemoval)
     api.socket.off('match_ion_reload', handleIonReload)

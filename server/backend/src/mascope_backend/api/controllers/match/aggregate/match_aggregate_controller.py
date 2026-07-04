@@ -417,6 +417,11 @@ async def aggregate_and_create_matches(
     :param match_params: Additional match parameters.
     :return: A dictionary with a message and log of actions taken.
     """
+    # Whether this call aggregates a whole batch (rather than a single sample).
+    # Batch aggregation creates all matches in one burst at the end, so it
+    # notifies the frontend once for the batch instead of once per sample.
+    batch_scope = sample_item_id is None and sample_batch_id is not None
+
     try:
         _, sample_ref = await fetch_sample_item_ids(sample_item_id, sample_batch_id)
     except NotFoundException as e:
@@ -501,29 +506,43 @@ async def aggregate_and_create_matches(
         for record in result.get("data", []):
             sample_item_ids.add(record.get("sample_item_id"))
 
-    # After all creations, emit notification events for each affected sample item
+    # After all creations, emit notification events so the frontend refreshes.
     if not sample_batch_id and sample_item_ids:
         # fetch any sample to get the batch ID
         first_sample_item_id = next(iter(sample_item_ids))
         sample = await fetch_sample(first_sample_item_id)
         sample_batch_id = sample.sample_batch_id
 
-    for sample_item_id in sample_item_ids:
-        # Emit "sample_match_created" notification event
-        await emit_record_created(
-            record_type="sample_match",
-            record_id=sample_item_id,
-            record={
-                "sample_item_id": sample_item_id,
-                "sample_batch_id": sample_batch_id,
-            },
-            room=sample_batch_id,
-        )
-        # Emit "peak_reload" notification event since "target_isotope_formula" may have changed
-        await emit_record_reload(
-            record_type="peak",
-            room=sample_item_id,
-        )
+    if batch_scope:
+        # Batch aggregation writes every sample's matches in one final burst, so
+        # a per-sample event storm would just tell the frontend to reload N
+        # times. Emit a single "batch_match_created" event for the whole batch.
+        if sample_batch_id and sample_item_ids:
+            await emit_record_created(
+                record_type="batch_match",
+                record_id=sample_batch_id,
+                record={"sample_batch_id": sample_batch_id},
+                room=sample_batch_id,
+            )
+    else:
+        # Single-sample aggregation: notify per sample so an open sample view can
+        # update incrementally.
+        for sample_item_id in sample_item_ids:
+            # Emit "sample_match_created" notification event
+            await emit_record_created(
+                record_type="sample_match",
+                record_id=sample_item_id,
+                record={
+                    "sample_item_id": sample_item_id,
+                    "sample_batch_id": sample_batch_id,
+                },
+                room=sample_batch_id,
+            )
+            # Emit "peak_reload" event since "target_isotope_formula" may have changed
+            await emit_record_reload(
+                record_type="peak",
+                room=sample_item_id,
+            )
 
     # Determine overall status
     statuses_set = set(statuses)
