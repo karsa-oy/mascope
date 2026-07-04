@@ -20,7 +20,6 @@ from mascope_backend.api.controllers.target.ions.target_ions_controller import (
 )
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
-    generate_target_ions_from_mass,
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -283,12 +282,6 @@ async def aggregate_sample_match_compound(
         # Normalize the compound formula for consistency
         normalized_formula = norm(target_compound_formula)
 
-        # Attempt to parse the target compound formula as a mass if applicable
-        try:
-            target_compound_mass = float(normalized_formula)
-        except ValueError:
-            target_compound_mass = None  # If parsing fails, proceed without a mass
-
         # Initialize the target compound with the normalized formula
         target_compound = TargetCompound(
             target_compound_id=gen_id(),
@@ -301,7 +294,6 @@ async def aggregate_sample_match_compound(
         ion_creation_result = await create_target_ions(
             target_compound=target_compound,
             ionization_mechanisms=ionization_mechanisms,
-            target_compound_mass=target_compound_mass,
             independent_transaction=False,
             session=session,
         )
@@ -433,12 +425,6 @@ async def aggregate_sample_match_compounds(
             # Normalize the compound formula for consistency
             normalized_formula = norm(target_compound_formula)
 
-            # Attempt to parse the target compound formula as a mass if applicable
-            try:
-                target_compound_mass = float(normalized_formula)
-            except ValueError:
-                target_compound_mass = None  # If parsing fails, proceed without a mass
-
             # Initialize the target compound with the normalized formula
             target_compound = TargetCompound(
                 target_compound_id=gen_id(),
@@ -446,24 +432,13 @@ async def aggregate_sample_match_compounds(
             )
             target_compounds.append(target_compound.to_dict())
 
-            # Step 3: Generate and create target ions and isotopes.
-            if target_compound_mass is None:
-                # Parsing into float failed, target compound is given by composition
-                (
-                    target_ions,
-                    target_isotopes,
-                ) = generate_target_ions_from_composition(
-                    target_compound, ionization_mechanisms
-                )
-            else:
-                # Try if target compound is given by mass (try to parse composition into float)
-                target_compound_mass = float(target_compound.target_compound_formula)
-                (
-                    target_ions,
-                    target_isotopes,
-                ) = generate_target_ions_from_mass(
-                    target_compound_mass, target_compound, ionization_mechanisms
-                )
+            # Step 3: Generate and create target ions and isotopes from the composition.
+            (
+                target_ions,
+                target_isotopes,
+            ) = generate_target_ions_from_composition(
+                target_compound, ionization_mechanisms
+            )
             for target_isotope in target_isotopes:
                 # Add the isotopes to be committed to the db
                 session.add(target_isotope)
