@@ -201,3 +201,13 @@ class TestWithinWindowMask:
     def test_empty_inputs(self):
         assert _within_window_mask(np.array([]), np.array([1.0]), 0.5).size == 0
         assert not _within_window_mask(np.array([1.0]), np.array([]), 0.5).any()
+
+    def test_nan_target_is_ignored(self):
+        # A NaN target sorts to the end; a value just above the largest finite
+        # target must still match it rather than being poisoned by the NaN.
+        values = np.array([100.3])
+        targets = np.array([100.0, np.nan])
+        np.testing.assert_array_equal(
+            _within_window_mask(values, targets, MATCH_WINDOW_AMU),
+            np.array([True]),
+        )

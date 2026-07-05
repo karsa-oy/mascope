@@ -21,7 +21,7 @@ def _within_window_mask(
     """Boolean mask of `values` whose nearest `target` is within `window`.
 
     Uses binary search on a sorted copy of `targets` (O((n+m) log m) time,
-    O(n) memory) instead of a dense pairwise difference matrix.
+    O(n) memory).
     """
     values = np.asarray(values)
     targets = np.asarray(targets)
@@ -34,7 +34,10 @@ def _within_window_mask(
     pos = np.searchsorted(targets_sorted, values)
     left = np.clip(pos - 1, 0, targets_sorted.size - 1)
     right = np.clip(pos, 0, targets_sorted.size - 1)
-    nearest_dist = np.minimum(
+    # fmin (not minimum) so a NaN target - which np.sort pushes to the end, and
+    # which would otherwise poison the distance of every value that lands next
+    # to it - is ignored rather than propagated.
+    nearest_dist = np.fmin(
         np.abs(values - targets_sorted[left]),
         np.abs(values - targets_sorted[right]),
     )
@@ -196,8 +199,7 @@ async def load_peaks(
     # Compute all peak timeseries within MATCH_WINDOW_AMU of target m/z values
     # to not compute them later in Match tab visualization.
     # A peak qualifies if its nearest target is within the window. Found via
-    # binary search on sorted targets - O((n+m) log m) time and O(n) memory,
-    # instead of materializing a dense (n_peaks x n_targets) difference matrix.
+    # binary search on sorted targets - O((n+m) log m) time and O(n) memory.
     all_mzs = peak_data.mz.values
     mz_to_compute = all_mzs[_within_window_mask(all_mzs, target_mzs, MATCH_WINDOW_AMU)]
 
@@ -283,7 +285,7 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
         lo = np.searchsorted(peak_mzs_sorted, target_mz - MATCH_WINDOW_AMU, side="left")
         hi = np.searchsorted(peak_mzs_sorted, target_mz + MATCH_WINDOW_AMU, side="right")
         candidates = peak_order[lo:hi]
-        # Sort candidates by (diff, then m/z), matching the original tie-breaking.
+        # Order candidates by absolute m/z difference, breaking ties by m/z.
         cand_diffs = np.abs(peak_mzs[candidates] - target_mz)
         sort_idx = np.lexsort((peak_mzs[candidates], cand_diffs))
         candidate_lists.append(candidates[sort_idx].tolist())

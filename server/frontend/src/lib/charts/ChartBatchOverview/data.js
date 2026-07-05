@@ -195,34 +195,43 @@ export const useChartData = defineStore('chart.batch.overview', () => {
       await handleIonsSelected(nextSelected, prevSelected)
     }
   )
-  // Socket listeners for match data changes
-  api.socket.on('sample_match_created', (event) => {
+  // Socket listeners for match data changes. Keep a reference to each listener
+  // so onUnmounted can actually remove it: socket.off only detaches a handler
+  // whose identity matches the one passed to socket.on, so an inline arrow
+  // registered here could never be removed (leaking a listener per mount).
+  const onSampleMatchCreated = (event) => {
     console.debug('📬 [api:sio] sample_match_created received:', event)
     handleNewSample(event)
-  })
-  api.socket.on('batch_match_created', (event) => {
+  }
+  const onBatchMatchCreated = (event) => {
     console.debug('📬 [api:sio] batch_match_created received:', event)
     handleBatchMatchReload(event)
-  })
-  api.socket.on('sample_match_deleted', (event) => {
+  }
+  const onSampleMatchDeleted = (event) => {
     console.debug('📬 [api:sio] sample_match_deleted received:', event)
     handleSampleMatchRemoval(event)
-  })
-  api.socket.on('batch_match_deleted', (event) => {
+  }
+  const onBatchMatchDeleted = (event) => {
     console.debug('📬 [api:sio] batch_match_deleted received:', event)
     handleBatchMatchRemoval(event)
-  })
-  api.socket.on('match_ion_reload', (event) => {
+  }
+  const onMatchIonReload = (event) => {
     console.debug('📬 [api:sio] match_ion_reload received:', event)
     handleIonReload(event)
-  })
+  }
+
+  api.socket.on('sample_match_created', onSampleMatchCreated)
+  api.socket.on('batch_match_created', onBatchMatchCreated)
+  api.socket.on('sample_match_deleted', onSampleMatchDeleted)
+  api.socket.on('batch_match_deleted', onBatchMatchDeleted)
+  api.socket.on('match_ion_reload', onMatchIonReload)
 
   onUnmounted(() => {
-    api.socket.off('sample_match_created', handleNewSample)
-    api.socket.off('batch_match_created', handleBatchMatchReload)
-    api.socket.off('sample_match_deleted', handleSampleMatchRemoval)
-    api.socket.off('batch_match_deleted', handleBatchMatchRemoval)
-    api.socket.off('match_ion_reload', handleIonReload)
+    api.socket.off('sample_match_created', onSampleMatchCreated)
+    api.socket.off('batch_match_created', onBatchMatchCreated)
+    api.socket.off('sample_match_deleted', onSampleMatchDeleted)
+    api.socket.off('batch_match_deleted', onBatchMatchDeleted)
+    api.socket.off('match_ion_reload', onMatchIonReload)
   })
   /**
    * X-axis field selection

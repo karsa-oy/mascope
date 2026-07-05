@@ -515,7 +515,7 @@ async def aggregate_and_create_matches(
 
     if batch_scope:
         # Batch aggregation writes every sample's matches in one final burst, so
-        # a per-sample event storm would just tell the frontend to reload N
+        # a per-sample match event storm would just tell the frontend to reload N
         # times. Emit a single "batch_match_created" event for the whole batch.
         if sample_batch_id and sample_item_ids:
             await emit_record_created(
@@ -538,11 +538,18 @@ async def aggregate_and_create_matches(
                 },
                 room=sample_batch_id,
             )
-            # Emit "peak_reload" event since "target_isotope_formula" may have changed
-            await emit_record_reload(
-                record_type="peak",
-                room=sample_item_id,
-            )
+
+    # Peak views are per-sample regardless of scope: an open peak list must
+    # refresh its match/formula annotations after a rematch. Each event is
+    # scoped to its sample room, so this is not the batch-chart "storm" the
+    # single "batch_match_created" event above avoids - only a client actually
+    # viewing that sample's peaks is in the room.
+    for sample_item_id in sample_item_ids:
+        # "target_isotope_formula" (and match category) may have changed.
+        await emit_record_reload(
+            record_type="peak",
+            room=sample_item_id,
+        )
 
     # Determine overall status
     statuses_set = set(statuses)
