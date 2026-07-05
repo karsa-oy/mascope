@@ -15,6 +15,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   concurrency guard, the upload-context registry whose filename normalization
   decides whether an uploaded file is "registered", and the filestream watcher
   that must queue a file only once it has stopped growing.
+- Frontend unit tests for the notification hub (process tracking, badges,
+  watcher dispatch, log retention) and the spreadsheet-paste table parser.
+- Unit tests for the core matching pipeline: the isotope-to-peak assignment
+  rules (closest-in-window, per-ion peak uniqueness, abundance priority, m/z
+  ordering) and the match statistics (abundance/mz error and score formulas)
+  in `mascope_match`, plus the ion -> compound -> collection/sample aggregation
+  rules in the backend match controllers.
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed
