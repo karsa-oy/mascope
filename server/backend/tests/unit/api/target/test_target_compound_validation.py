@@ -36,6 +36,17 @@ def test_mass_only_formulas_are_rejected(mass_formula):
         TargetCompoundMatches(target_compound_formula=mass_formula)
 
 
+@pytest.mark.parametrize(
+    "formula",
+    ["NaN", "InN", "CoInS"],
+)
+def test_formulas_that_float_would_misparse_are_accepted(formula):
+    # float("NaN"/"InN"...) parses "NaN" as not-a-number but the old float()
+    # guard rejected "NaN" (a valid Na+N formula); the numeric-pattern guard
+    # only rejects actual numeric masses.
+    assert TargetCompoundBase(target_compound_formula=formula)
+
+
 def test_update_model_rejects_mass_but_allows_none():
     # Formula is optional on update; None is allowed (formula left unchanged)
     assert TargetCompoundUpdate(target_compound_id="x").target_compound_formula is None

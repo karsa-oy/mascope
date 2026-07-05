@@ -25,6 +25,7 @@ from mascope_tools.composition.custom_elements import CUSTOM_ELEMENTS
 from mascope_tools.composition.finder import replace_atom_with_isotope
 from mascope_tools.composition.heuristic_filter import extract_isotope_labels
 from mascope_tools.composition.utils import (
+    assert_valid_formula,
     parse_composition,
     parse_formula_tokens,
     to_hill_notation,
@@ -102,6 +103,23 @@ def generate_target_ions_from_composition(
 
     # generate and create ion records
     target_compound_formula = target_compound.target_compound_formula.rstrip()
+
+    # parse_composition silently drops characters it does not recognise, so an
+    # invalid formula (garbage like 'xyz', a leftover numeric mass, or an unknown
+    # custom element) would otherwise yield an empty/partial composition and
+    # produce bogus adduct-only ions - or make IsoSpecPy raise further down. The
+    # retired molmass fork raised FormulaError here, which the caller treated as
+    # "skip". Preserve that: reject the whole compound (no ions) up front. This
+    # also guards existing (pre-validation) rows reached via create_target_ions.
+    try:
+        assert_valid_formula(target_compound_formula)
+    except ValueError as e:
+        runtime.logger.warning(
+            f"Skipping target compound with invalid formula "
+            f"'{target_compound_formula}': {e}"
+        )
+        return [], []
+
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
 
