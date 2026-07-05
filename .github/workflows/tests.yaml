@@ -58,6 +58,10 @@ jobs:
       - name: Run library tests
         # Thermo tests that need the proprietary RawFileReader DLLs skip
         # themselves when MASCOPE_THERMO_DLL_DIR is unset.
+        env:
+          # The library runtimes resolve their config relative to this path
+          # at import time; collection fails without it.
+          MASCOPE_PATH: ${{ github.workspace }}
         run: uv run pytest libraries/ -v
 
   e2e:
