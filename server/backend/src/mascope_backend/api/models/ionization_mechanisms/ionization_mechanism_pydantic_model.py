@@ -44,6 +44,16 @@ class IonizationMechanismBaseValidator:
                 "Invalid ionization mechanism: it cannot contain a combination of '+' and '-' in the middle."
             )
 
+        # A multi-character mechanism must have a modification formula between
+        # the operation and charge signs: "++" / "--" denote an empty
+        # modification, which produces atomless ions downstream. Electron
+        # transfer is written as plain "+" or "-".
+        if len(value) > 1 and not value[1:-1]:
+            raise ValueError(
+                f"Invalid ionization mechanism '{value}': missing modification "
+                "formula; use '+' or '-' alone for electron transfer."
+            )
+
         # Validate the modification formula (the mechanism body, without the
         # leading operation and trailing charge sign). Raises on invalid
         # characters or unknown elements. Electron transfer ("+"/"-") has no body.

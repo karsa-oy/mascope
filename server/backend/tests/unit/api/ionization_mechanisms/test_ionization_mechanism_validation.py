@@ -39,6 +39,8 @@ def test_valid_mechanisms_accepted(mechanism):
         "H+",  # missing leading operation
         "+H",  # missing trailing polarity
         "+-",  # invalid sign combination
+        "++",  # empty modification formula (used to hang ion generation)
+        "--",  # empty modification formula
     ],
 )
 def test_invalid_mechanisms_rejected(mechanism):

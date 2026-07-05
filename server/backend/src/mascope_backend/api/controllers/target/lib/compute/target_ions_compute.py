@@ -308,6 +308,7 @@ def _get_raw_ion(
     :param compound_composition: Neutral compound composition (None for empty "()")
     :type compound_composition: dict[str, int] | None
     :raises UnknownIonizationMechanism: If the ionization mechanism is unknown.
+    :raises SkipIonizationMechanism: If the resulting ion has no atoms.
     :return: 2-tuple of (ion composition as ``{symbol: count}``, ion charge)
     :rtype: tuple[dict[str, int], int]
     """
@@ -333,6 +334,14 @@ def _get_raw_ion(
         ion_charge = -mechanism_charge
     else:
         raise UnknownIonizationMechanism(ionization_mechanism)
+
+    if not ion_composition:
+        # E.g. an empty-modification mechanism on the empty compound "()", or a
+        # subtraction that removes every atom. An atomless ion has no meaningful
+        # formula or isotope pattern (its mass would be the electron mass alone).
+        raise SkipIonizationMechanism(
+            f"Mechanism {ionization_mechanism} yields an ion with no atoms"
+        )
 
     return ion_composition, ion_charge
 
@@ -731,6 +740,13 @@ def group_target_isotopes(
 
         # Determine bin size
         bin_mask = (mz >= mz[i]) & (mz < mz[i] + dmz)
+
+        # A non-positive bin width (m/z <= 0, e.g. a degenerate atomless ion)
+        # leaves the mask empty, which would never advance the loop; fall back
+        # to a single-point bin so every isotope is emitted and i always moves.
+        if not bin_mask.any():
+            bin_mask = np.zeros(mz.size, dtype=bool)
+            bin_mask[i] = True
 
         # Extract values within the current bin
         mz_bin = mz[bin_mask]
