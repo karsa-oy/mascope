@@ -1168,9 +1168,14 @@ async def match_compute_batch(
                 if not match_data["match_isotopes"].empty:
                     computed_samples.append(sample.sample_item_id)
 
-        except ApiException as e:
-            runtime.logger.info(
-                f"Computing match isotopes for sample '{sample.sample_item_name}' failed: {e}"
+        except Exception as e:
+            # Catch any per-sample failure (not just ApiException): a single bad
+            # sample - corrupt file, unreadable metadata, a transient DB error -
+            # must fail only that sample, never abort matching for the rest of
+            # the batch. CancelledError is a BaseException and is not caught.
+            runtime.logger.warning(
+                f"Computing match isotopes for sample '{sample.sample_item_name}' "
+                f"failed: {e}"
             )
             failed_samples.append(sample.sample_item_id)
             continue
@@ -1179,10 +1184,21 @@ async def match_compute_batch(
 
     # Step 4: Aggregate higher-level matches once for the whole batch and update
     # timestamps. Aggregating per batch instead of per sample avoids re-running
-    # the batch-level target queries for every sample.
-    match_aggregate_result = await aggregate_and_create_matches(
-        sample_batch_id=sample_batch_id
-    )
+    # the batch-level target queries for every sample. A failure here must not
+    # discard the per-sample isotopes already computed and saved above, so it is
+    # caught and reflected in the batch status rather than propagated.
+    aggregation_failed = False
+    try:
+        match_aggregate_result = await aggregate_and_create_matches(
+            sample_batch_id=sample_batch_id
+        )
+    except Exception as e:
+        aggregation_failed = True
+        match_aggregate_result = {}
+        runtime.logger.error(
+            f"Higher-level match aggregation failed for sample batch "
+            f"'{sample_batch_name}': {e}"
+        )
     match_aggregate_status = match_aggregate_result.get("status")
     if match_aggregate_status in ("success", "partial"):
         runtime.logger.debug(
@@ -1209,6 +1225,11 @@ async def match_compute_batch(
         status = "skipped"
     else:
         status = "success"
+
+    # Isotopes were computed but not fully aggregated into higher-level matches:
+    # never report clean success.
+    if aggregation_failed and status in ("success", "skipped"):
+        status = "partial" if computed_samples_count > 0 else "failed"
 
     message = (
         f"Finished computing matches ({status}) for sample batch '{sample_batch.sample_batch_name}'. "
