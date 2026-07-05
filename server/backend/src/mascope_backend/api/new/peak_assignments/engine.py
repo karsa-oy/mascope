@@ -34,6 +34,10 @@ SOURCE_UNTARGETED = "untargeted"
 
 # Placeholder used by the untargeted finder for unassigned peaks
 UNTARGETED_NO_MATCH = "---"
+# The finder emits "()" for ionization/reagent peaks (an adduct with no
+# molecular core). That is not a molecular formula, so it must not be persisted
+# as one; a dedicated reagent role is a later phase.
+UNTARGETED_IONIZATION = "()"
 
 
 def tier_for_score(
@@ -261,7 +265,10 @@ def untargeted_matches_to_peak_assignments(
 
     for _, row in matches_df.iterrows():
         formula = row.get("formula")
-        if not isinstance(formula, str) or formula == UNTARGETED_NO_MATCH:
+        if not isinstance(formula, str) or formula in (
+            UNTARGETED_NO_MATCH,
+            UNTARGETED_IONIZATION,
+        ):
             continue
 
         peak = peak_lookup.get(float(row["mz"]))
@@ -275,9 +282,13 @@ def untargeted_matches_to_peak_assignments(
             continue
         seen_peak_ids.add(sample_peak_id)
 
-        mz_error_ppm = _float_or_none(
-            row.get("mz_error_ppm", row.get("composition_error_ppm"))
-        )
+        # Fall back to composition_error_ppm when mz_error_ppm is absent OR
+        # present-but-NaN. dict.get's default only covers the absent case, so a
+        # NaN in a mixed batch (some rows carry an isotope-envelope mz error,
+        # some do not) would otherwise collapse the score to 0.
+        mz_error_ppm = _float_or_none(row.get("mz_error_ppm"))
+        if mz_error_ppm is None:
+            mz_error_ppm = _float_or_none(row.get("composition_error_ppm"))
         abundance_error = _float_or_none(row.get("intensity_error"))
 
         mz_term = (
