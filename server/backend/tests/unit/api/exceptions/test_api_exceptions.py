@@ -9,6 +9,7 @@ logs, correlated to the response through an opaque ``error_id``.
 import json
 
 import pytest
+from fastapi.exceptions import RequestValidationError
 
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
@@ -16,6 +17,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     handle_exception,
     process_exception,
 )
+from mascope_backend.runtime import runtime
 
 
 def _raise_and_process(exc: Exception, context: str = "Test context") -> ApiException:
@@ -74,6 +76,64 @@ class TestProcessExceptionDoesNotLeakInternals:
         assert api_exc.status_code == 400
         assert "mz must be positive" in api_exc.user_message
         assert set(api_exc.tech_message) == {"error_id"}
+
+    def test_attribute_error_message_is_generic(self):
+        api_exc = _raise_and_process(
+            AttributeError("'NoneType' object has no attribute '_engine'")
+        )
+
+        assert api_exc.status_code == 400
+        assert "_engine" not in api_exc.user_message
+        assert api_exc.user_message == "Test context. Unexpected error."
+
+    def test_runtime_error_message_is_generic(self):
+        secret_path = "/app/.runtime/secrets/jwt_secret_key.txt"
+        api_exc = _raise_and_process(RuntimeError(f"cannot open {secret_path}"))
+
+        assert api_exc.status_code == 500
+        assert secret_path not in api_exc.user_message
+        assert api_exc.user_message == "Test context. Unexpected error."
+
+    def test_validation_error_input_never_reaches_client_or_log(self):
+        # A RequestValidationError renders the offending "input" (which can be a
+        # password) in both its str() and the logged traceback's final line.
+        secret = "hunter2-must-not-leak"
+        exc = RequestValidationError(
+            [
+                {
+                    "type": "missing",
+                    "loc": ("body", "password"),
+                    "msg": "Field required",
+                    "input": {"username": "demo", "password": secret},
+                }
+            ]
+        )
+
+        logged: list[str] = []
+        sink_id = runtime.logger.add(
+            lambda message: logged.append(str(message)), level="TRACE"
+        )
+        try:
+            api_exc = _raise_and_process(exc)
+        finally:
+            runtime.logger.remove(sink_id)
+
+        assert api_exc.status_code == 422
+        # Client sees the validator message (field location) but never the value.
+        assert secret not in json.dumps(api_exc.tech_message)
+        assert secret not in api_exc.user_message
+        assert "Field required" in api_exc.user_message
+        # And the value never reaches the server log either.
+        assert secret not in "".join(logged)
+
+    def test_api_exception_string_payload_keeps_error_id(self):
+        api_exc = _raise_and_process(
+            ApiException("Cannot change scope", "collection is locked", 409)
+        )
+
+        assert api_exc.status_code == 409
+        assert "error_id" in api_exc.tech_message
+        assert api_exc.tech_message["detail"] == "collection is locked"
 
 
 class TestApiEResponseJson:
