@@ -8,6 +8,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
+- Unit tests for the core matching pipeline: the isotope-to-peak assignment
+  rules (closest-in-window, per-ion peak uniqueness, abundance priority, m/z
+  ordering) and the match statistics (abundance/mz error and score formulas)
+  in `mascope_match`, plus the ion -> compound -> collection/sample aggregation
+  rules in the backend match controllers.
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed
