@@ -15,6 +15,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
   starts from scratch; CI runs the test nightly and on manual dispatch
   (`.github/workflows/reproducibility.yaml`).
+- Frontend unit tests for the notification hub (process tracking, badges,
+  watcher dispatch, log retention) and the spreadsheet-paste table parser.
+- Unit tests for the core matching pipeline: the isotope-to-peak assignment
+  rules (closest-in-window, per-ion peak uniqueness, abundance priority, m/z
+  ordering) and the match statistics (abundance/mz error and score formulas)
+  in `mascope_match`, plus the ion -> compound -> collection/sample aggregation
+  rules in the backend match controllers.
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed
