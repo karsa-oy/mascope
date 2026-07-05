@@ -1,0 +1,72 @@
+name: Reproducibility (golden dataset)
+run-name: Golden-dataset reproducibility on ${{ github.ref_name }}
+
+# Heavy job (rebuilds the demo dataset from raw through the real pipeline),
+# so it does not run per-PR: nightly against the default branch, plus manual
+# dispatch for any branch (e.g. before merging a pipeline-touching PR).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  reproducibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        run: sudo snap install --classic astral-uv
+
+      - name: Build application images from this ref
+        run: |
+          # Build via the CLI exactly like the release pipeline (resolves the
+          # full compose env, including the frontend's MASCOPE_RUNTIME arg).
+          export MASCOPE_PATH=$GITHUB_WORKSPACE
+          uv run mascope prod build
+
+      - name: Start the demo stack in rebuild mode
+        run: |
+          VERSION=$(docker images "ghcr.io/${{ github.repository }}/backend" --format '{{.Tag}}' | head -1)
+          echo "Built image tag: $VERSION"
+          MASCOPE_VERSION=$VERSION MASCOPE_DEMO_REBUILD=1 \
+            docker compose -f docker-compose.demo.yaml up -d
+
+      - name: Install test dependencies
+        run: |
+          uv venv
+          uv pip install -e .
+          uv sync --group dev
+
+      - name: Wait for the stack to come up
+        run: |
+          # demo_init downloads the bundle and restores the seed on first
+          # start, so allow generous time before the frontend answers.
+          for i in $(seq 1 120); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8080; then
+              echo "Stack is up."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Stack did not come up in time." >&2
+          docker compose -f docker-compose.demo.yaml logs --tail 100
+          exit 1
+
+      - name: Run the reproducibility test
+        env:
+          MASCOPE_REPRO_TEST: "1"
+          MASCOPE_PATH: ${{ github.workspace }}
+        run: |
+          uv run pytest server/backend/tests/system/reproducibility/ -v
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.demo.yaml logs --tail 300

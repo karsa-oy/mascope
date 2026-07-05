@@ -8,6 +8,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
+- Golden-dataset reproducibility test: the demo bundle's raw files are ingested
+  through the real upload -> convert -> match pipeline and the produced peaks
+  must reproduce the bundle's golden outputs within the manifest tolerances
+  (sub-0.1 ppm m/z). The demo stack gained a rebuild mode
+  (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
+  starts from scratch; CI runs the test nightly and on manual dispatch
+  (`.github/workflows/reproducibility.yaml`).
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed

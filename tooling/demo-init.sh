@@ -15,9 +15,18 @@
 # Idempotent: a second `up` with the data already present skips the fetch +
 # restore and only re-seeds (which is itself idempotent).
 #
+# Rebuild mode (MASCOPE_DEMO_REBUILD=1): restores the bundle's reference *seed*
+# dump (ionization modes, instrument config, calibration/diagnostic collections)
+# instead of the full snapshot, and skips the filestore restore. The stack comes
+# up with reference data but no samples, so the bundle's raw files can be
+# ingested through the real upload -> convert -> match pipeline. This is the
+# substrate the reproducibility test drives (see docs/demo_dataset.md).
+#
 # Required environment (set by docker-compose.demo.yaml):
 #   MASCOPE_ENV, MASCOPE_DB_NAME, MASCOPE_DB_USER, MASCOPE_DEMO_DB_PASSWORD,
 #   MASCOPE_DEMO_JWT_SECRET, MASCOPE_DEMO_OWNER_SECRET
+# Optional:
+#   MASCOPE_DEMO_REBUILD (default 0)
 
 set -euo pipefail
 
@@ -66,14 +75,31 @@ until pg_isready -h "$PGHOST" -U "$PGUSER" -d postgres >/dev/null 2>&1; do
 done
 log_info "PostgreSQL is ready"
 
+# --- Resolve mode: full snapshot (default) or reference seed (rebuild) -------
+# Each mode has its own dump and its own "already loaded" sentinel table:
+# the snapshot populates sample_item, while the seed only carries reference
+# data (target collections) and deliberately no samples.
+REBUILD="${MASCOPE_DEMO_REBUILD:-0}"
+if [[ "$REBUILD" == "1" ]]; then
+    DUMP_REL="seed/mascope_demo.dump"
+    SENTINEL_TABLE="target_collection"
+    SENTINEL_DESC="target collections"
+else
+    DUMP_REL="snapshot/mascope_demo.dump"
+    SENTINEL_TABLE="sample_item"
+    SENTINEL_DESC="sample items"
+fi
+
 # --- Skip if the demo data is already loaded (fast re-up) --------------------
-# sample_item is a core table populated by the snapshot; a positive count means
-# a previous run already restored the bundle into this database volume.
+# A positive sentinel count means a previous run already restored the bundle
+# into this database volume. In rebuild mode this also protects ingested
+# samples from being wiped by a container restart (the seed's reference data
+# stays present throughout).
 LOADED=$(psql -h "$PGHOST" -U "$PGUSER" -d "$DB" -tAc \
-    "SELECT count(*) FROM sample_item" 2>/dev/null || echo "0")
+    "SELECT count(*) FROM $SENTINEL_TABLE" 2>/dev/null || echo "0")
 
 if [[ "${LOADED//[[:space:]]/}" =~ ^[0-9]+$ ]] && [[ "${LOADED//[[:space:]]/}" -gt 0 ]]; then
-    log_info "Demo data already present ($LOADED sample items); skipping restore"
+    log_info "Demo data already present ($LOADED $SENTINEL_DESC); skipping restore"
 else
     # --- Fetch + locate the published bundle (via the in-image CLI) ----------
     log_info "Fetching the demo bundle (downloads + checksum-verifies)..."
@@ -82,14 +108,14 @@ from mascope_cli.cmd.demo import _fetch; _fetch.fetch()"
     BUNDLE=$("$PYTHON" -c "from mascope_cli.cmd.demo import bundles; print(bundles.bundle_dir())")
     log_info "Bundle ready at $BUNDLE"
 
-    DUMP="$BUNDLE/snapshot/mascope_demo.dump"
+    DUMP="$BUNDLE/$DUMP_REL"
     if [[ ! -f "$DUMP" ]]; then
-        log_error "Snapshot dump not found in bundle: $DUMP"
+        log_error "Dump not found in bundle: $DUMP"
         exit 1
     fi
 
-    # --- Restore the snapshot into a clean database -------------------------
-    log_info "Recreating '$DB' and restoring the snapshot..."
+    # --- Restore the dump into a clean database -----------------------------
+    log_info "Recreating '$DB' and restoring $DUMP_REL..."
     psql -h "$PGHOST" -U "$PGUSER" -d postgres -c "DROP DATABASE IF EXISTS \"$DB\"" >/dev/null
     psql -h "$PGHOST" -U "$PGUSER" -d postgres -c "CREATE DATABASE \"$DB\"" >/dev/null
     # pg_restore continues past individual errors and then exits non-zero - e.g.
@@ -99,24 +125,38 @@ from mascope_cli.cmd.demo import _fetch; _fetch.fetch()"
     pg_restore -h "$PGHOST" -U "$PGUSER" --no-owner --no-acl -d "$DB" "$DUMP" \
         || log_warn "pg_restore reported ignored errors (verifying the result)..."
     RESTORED=$(psql -h "$PGHOST" -U "$PGUSER" -d "$DB" -tAc \
-        "SELECT count(*) FROM sample_item" 2>/dev/null || echo "0")
+        "SELECT count(*) FROM $SENTINEL_TABLE" 2>/dev/null || echo "0")
     if ! { [[ "${RESTORED//[[:space:]]/}" =~ ^[0-9]+$ ]] && [[ "${RESTORED//[[:space:]]/}" -gt 0 ]]; }; then
-        log_error "Restore failed: '$DB' has no sample data"
+        log_error "Restore failed: '$DB' has no $SENTINEL_DESC"
         exit 1
     fi
-    log_info "Snapshot restored into '$DB' ($RESTORED sample items)"
+    log_info "Restored $DUMP_REL into '$DB' ($RESTORED $SENTINEL_DESC)"
 
-    # --- Restore the filestore ---------------------------------------------
-    FILESTORE_SRC="$BUNDLE/snapshot/filestore"
+    # --- Restore the filestore (snapshot mode only) -------------------------
+    # In rebuild mode the filestore starts empty; the real pipeline fills it
+    # as raw files are uploaded and ingested.
     FILESTORE_DST="/app/.runtime/env/${MASCOPE_ENV}/filestore"
     mkdir -p "$FILESTORE_DST"
-    if [[ -d "$FILESTORE_SRC" ]]; then
-        cp -a "$FILESTORE_SRC"/. "$FILESTORE_DST"/
-        log_info "Filestore restored to $FILESTORE_DST"
+    if [[ "$REBUILD" == "1" ]]; then
+        log_info "Rebuild mode: filestore starts empty (filled by ingestion)"
     else
-        log_warn "Bundle has no filestore tree at $FILESTORE_SRC; skipping"
+        FILESTORE_SRC="$BUNDLE/snapshot/filestore"
+        if [[ -d "$FILESTORE_SRC" ]]; then
+            cp -a "$FILESTORE_SRC"/. "$FILESTORE_DST"/
+            log_info "Filestore restored to $FILESTORE_DST"
+        else
+            log_warn "Bundle has no filestore tree at $FILESTORE_SRC; skipping"
+        fi
     fi
 fi
+
+# --- Standard env subdirectories the app expects on startup ------------------
+# The dev-mode CLI creates these when it builds the demo env; in the container
+# the env volume starts empty, so make sure they exist in both modes (the
+# upload pipeline writes to filestreams, the backend logs to logs, etc.).
+for SUB in filestore filestreams temp logs agents; do
+    mkdir -p "/app/.runtime/env/${MASCOPE_ENV}/$SUB"
+done
 
 # --- Upgrade the schema to head (image may be newer than the snapshot) -------
 cd /app/server/backend
