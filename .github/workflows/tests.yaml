@@ -102,6 +102,17 @@ jobs:
           CI: "true"
         run: npm run test:e2e
 
+      - name: Run SDK contract tests
+        env:
+          MASCOPE_SDK_CONTRACT: "1"
+        run: |
+          # Reuses the demo stack this job already booted. These exercise
+          # MascopeClient over HTTP, so they catch API-surface breaking
+          # changes that unit tests cannot.
+          uv venv
+          uv sync --group dev
+          uv run pytest libraries/sdk/tests/ -v
+
       - name: Dump stack logs on failure
         if: failure()
         run: docker compose -f docker-compose.demo.yaml logs --tail 200

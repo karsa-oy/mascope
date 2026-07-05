@@ -8,6 +8,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
+- SDK contract tests: `MascopeClient` is exercised end-to-end against the demo
+  stack (workspace resolution, dataset/batch/sample listings, matched peak
+  retrieval), doubling as a breaking-change detector for the public REST API.
+  They run in CI inside the demo-stack e2e job and locally with
+  `MASCOPE_SDK_CONTRACT=1 uv run pytest libraries/sdk/tests/`.
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed
