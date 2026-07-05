@@ -13,6 +13,7 @@ read model ("every peak in sample X with its formula and confidence"):
   queryable ledger with a single owner per peak.
 """
 
+import asyncio
 from datetime import datetime as dt
 from datetime import timezone
 
@@ -37,7 +38,10 @@ from mascope_backend.api.new.ionization.modes.util import (
     fetch_sample_ionization_mechanism_ids,
 )
 from mascope_backend.api.new.match.params import default_match_params
-from mascope_backend.api.new.match.params.lib import isotope_abundance_threshold_expr
+from mascope_backend.api.new.match.params.lib import (
+    apply_match_params,
+    isotope_abundance_threshold_expr,
+)
 from mascope_backend.api.new.peak_assignments.config import (
     PEAK_ASSIGNMENT_ENGINE_VERSION,
     PeakAssignmentConfig,
@@ -480,6 +484,13 @@ async def assign_sample_peaks(
                 target_isotopes_df=target_isotopes_df,
                 polarity=sample.polarity,
             )
+            # Gate raw matches by the sample's match parameters, exactly as the
+            # targeted Match pipeline does: this zeroes the score of peaks whose
+            # m/z error, isotope-ratio error, or intensity falls outside
+            # tolerance. Without it a peak tens of ppm off a target would be
+            # tiered "identified" here while the Match tab reports no match.
+            if not match_isotope_df.empty:
+                match_isotope_df = apply_match_params(match_isotope_df, match_params)
             stage_a_assignments = invert_matches_to_peak_assignments(
                 match_isotope_df,
                 sample_item_id=sample_item_id,
@@ -533,7 +544,13 @@ async def assign_sample_peaks(
                     min_unsaturation=-1000.0,
                     max_unsaturation=10000.0,
                 )
-                matches_df, _ = assign_compositions(
+                # assign_compositions is synchronous and CPU-bound (recursive
+                # composition enumeration over up to max_untargeted_peaks). This
+                # runs as a background task on the API event loop, so offload it
+                # to a worker thread to avoid blocking every other request and
+                # the progress notifications for the duration of the search.
+                matches_df, _ = await asyncio.to_thread(
+                    assign_compositions,
                     remainder_df[["mz", "intensity"]].reset_index(drop=True),
                     search_config,
                 )

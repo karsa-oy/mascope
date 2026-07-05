@@ -185,9 +185,29 @@ def upgrade() -> None:
         ["target_ion_id"],
         unique=False,
     )
+    op.create_index(
+        op.f("ix_peak_assignment_ionization_mechanism_id"),
+        "peak_assignment",
+        ["ionization_mechanism_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_peak_assignment_owner_peak_assignment_id"),
+        "peak_assignment",
+        ["owner_peak_assignment_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        op.f("ix_peak_assignment_owner_peak_assignment_id"),
+        table_name="peak_assignment",
+    )
+    op.drop_index(
+        op.f("ix_peak_assignment_ionization_mechanism_id"),
+        table_name="peak_assignment",
+    )
     op.drop_index(
         op.f("ix_peak_assignment_target_ion_id"), table_name="peak_assignment"
     )

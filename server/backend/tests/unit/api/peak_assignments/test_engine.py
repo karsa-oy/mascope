@@ -415,6 +415,65 @@ class TestUntargetedMatches:
             "fmt(C4H8N2O)"
         )
 
+    def test_nan_mz_error_falls_back_to_composition_error(self):
+        # A NaN mz_error_ppm (present column, no isotope-envelope error for this
+        # row) must fall back to composition_error_ppm, not collapse the score.
+        matches_df = pd.DataFrame(
+            [
+                {
+                    "mz": 100.1,
+                    "formula": "C5H10O2",
+                    "ion": "C5H11O2+",
+                    "isotope_label": "M0",
+                    "ionization_mechanism": "+H+",
+                    "mz_error_ppm": float("nan"),
+                    "composition_error_ppm": 2.0,
+                    "intensity_error": 0.1,
+                    "other_candidates": "",
+                }
+            ]
+        )
+        assignments = untargeted_matches_to_peak_assignments(
+            matches_df,
+            {100.1: ("pA", 5000.0)},
+            "sample1",
+            "run1",
+            POSSIBLE,
+            PROBABLE,
+            mechanism_id_by_notation={"+H+": "mech1"},
+        )
+        assert len(assignments) == 1
+        # score = (1 - 0.1) * (1 - 2.0/100), not 0 from a collapsed mz term.
+        assert assignments[0]["match_score"] == pytest.approx(0.9 * 0.98)
+        assert assignments[0]["tier"] == TIER_IDENTIFIED
+
+    def test_ionization_placeholder_formula_is_skipped(self):
+        # The finder emits "()" for reagent/ionization peaks; it is not a
+        # molecular formula and must not be persisted as one.
+        matches_df = pd.DataFrame(
+            [
+                {
+                    "mz": 19.018,
+                    "formula": "()",
+                    "ion": "H3O+",
+                    "isotope_label": "M0",
+                    "ionization_mechanism": "+H+",
+                    "mz_error_ppm": 1.0,
+                    "intensity_error": 0.0,
+                    "other_candidates": "",
+                }
+            ]
+        )
+        assignments = untargeted_matches_to_peak_assignments(
+            matches_df,
+            {19.018: ("pR", 1000.0)},
+            "sample1",
+            "run1",
+            POSSIBLE,
+            PROBABLE,
+        )
+        assert assignments == []
+
 
 class TestBuildUnassigned:
     def test_every_leftover_peak_gets_a_placeholder_row(self):
