@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 
-from mascope_match.compute.isotopes import calculate_match_stats
+from mascope_match.compute.isotopes import (
+    assign_defaults_to_unmatched,
+    calculate_match_stats,
+)
+from mascope_match.params import unmatched_isotope_params
 
 
 class TestCalculateMatchStats:
@@ -66,3 +70,111 @@ class TestCalculateMatchStats:
             result["sample_peak_intensity_relative"].to_numpy(),
             np.array([0.0, 0.0, 1.0, 0.5]),
         )
+
+    def test_perfect_match_scores_one(self):
+        # Intensities exactly proportional to relative abundances and exact
+        # m/z agreement: zero errors, match score 1 for every isotope.
+        match_isotope_df = pd.DataFrame(
+            {
+                "target_ion_id": ["ion_1", "ion_1"],
+                "relative_abundance": [1.0, 0.25],
+                "sample_peak_intensity": [200.0, 50.0],
+                "mz": [100.0, 101.0],
+                "sample_peak_mz": [100.0, 101.0],
+            }
+        )
+
+        result = calculate_match_stats(match_isotope_df)
+
+        np.testing.assert_allclose(result["match_abundance_error"], [0.0, 0.0])
+        np.testing.assert_allclose(result["match_mz_error"], [0.0, 0.0])
+        np.testing.assert_allclose(result["match_score"], [1.0, 1.0])
+
+    def test_abundance_error_known_answer(self):
+        # Main isotope: intensity 100 at rel_ab 1.0. Second isotope measured
+        # at 30 but expected at 0.5 relative -> relative intensity 0.3,
+        # abundance error 0.3/0.5 - 1 = -0.4, score 1 - |-0.4| = 0.6.
+        match_isotope_df = pd.DataFrame(
+            {
+                "target_ion_id": ["ion_1", "ion_1"],
+                "relative_abundance": [1.0, 0.5],
+                "sample_peak_intensity": [100.0, 30.0],
+                "mz": [100.0, 101.0],
+                "sample_peak_mz": [100.0, 101.0],
+            }
+        )
+
+        result = calculate_match_stats(match_isotope_df)
+
+        np.testing.assert_allclose(result["match_abundance_error"], [0.0, -0.4])
+        np.testing.assert_allclose(result["match_score"], [1.0, 0.6])
+
+    def test_mz_error_ppm_and_score_term(self):
+        # 50 ppm m/z error: mz_term = 1 - 0.01 * 50 = 0.5. Abundance is
+        # perfect (single-isotope ion), so the score equals the mz term.
+        match_isotope_df = pd.DataFrame(
+            {
+                "target_ion_id": ["ion_1"],
+                "relative_abundance": [1.0],
+                "sample_peak_intensity": [50.0],
+                "mz": [200.0],
+                "sample_peak_mz": [200.0 * (1 + 50e-6)],
+            }
+        )
+
+        result = calculate_match_stats(match_isotope_df)
+
+        np.testing.assert_allclose(result["match_mz_error"], [50.0])
+        np.testing.assert_allclose(result["match_score"], [0.5])
+
+    def test_mz_error_beyond_100_ppm_scores_zero(self):
+        match_isotope_df = pd.DataFrame(
+            {
+                "target_ion_id": ["ion_1"],
+                "relative_abundance": [1.0],
+                "sample_peak_intensity": [50.0],
+                "mz": [100.0],
+                "sample_peak_mz": [100.0 * (1 + 200e-6)],
+            }
+        )
+
+        result = calculate_match_stats(match_isotope_df)
+
+        np.testing.assert_allclose(result["match_mz_error"], [200.0])
+        np.testing.assert_allclose(result["match_score"], [0.0])
+
+
+class TestAssignDefaultsToUnmatched:
+    def test_unmatched_rows_get_defaults_matched_rows_untouched(self):
+        match_isotope_df = pd.DataFrame(
+            {
+                "target_ion_id": ["ion_1", "ion_1"],
+                "relative_abundance": [1.0, 0.5],
+                "mz": [100.0, 101.0],
+                "sample_peak_id": ["peak_7", np.nan],
+                "sample_peak_mz": [100.0, np.nan],
+                "sample_peak_intensity": [42.0, np.nan],
+                "sample_peak_intensity_relative": [1.0, np.nan],
+                "match_abundance_error": [0.0, np.nan],
+                "match_mz_error": [0.0, np.nan],
+                "match_score": [1.0, np.nan],
+                "sample_peak_tof": [3.0, np.nan],
+            }
+        )
+        unmatched_mask = match_isotope_df["sample_peak_mz"].isna()
+
+        result = assign_defaults_to_unmatched(match_isotope_df, unmatched_mask)
+
+        # The unmatched isotope reports its own target m/z as the peak m/z
+        # and the documented defaults everywhere else.
+        assert result.loc[1, "sample_peak_mz"] == 101.0
+        assert result.loc[1, "sample_peak_id"] == unmatched_isotope_params.sample_peak_id
+        assert result.loc[1, "match_score"] == unmatched_isotope_params.match_score
+        assert (
+            result.loc[1, "match_abundance_error"]
+            == unmatched_isotope_params.match_abundance_error
+        )
+        # The matched isotope is untouched.
+        assert result.loc[0, "sample_peak_id"] == "peak_7"
+        assert result.loc[0, "sample_peak_mz"] == 100.0
+        assert result.loc[0, "match_score"] == 1.0
