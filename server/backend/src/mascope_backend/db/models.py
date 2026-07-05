@@ -1190,6 +1190,7 @@ class PeakAssignment(Base):
             "ionization_mechanism.ionization_mechanism_id",
             ondelete="SET NULL",
         ),
+        index=True,
     )
     isotope_label: Mapped[Optional[str]] = mapped_column(String(64))
     source: Mapped[Optional[str]] = mapped_column(String(16))
@@ -1212,6 +1213,7 @@ class PeakAssignment(Base):
     owner_peak_assignment_id: Mapped[Optional[str]] = mapped_column(
         String(32),
         ForeignKey("peak_assignment.peak_assignment_id", ondelete="SET NULL"),
+        index=True,
     )
     alternatives: Mapped[Optional[list]] = mapped_column(JSON)
     provenance: Mapped[Optional[dict]] = mapped_column(JSON)
