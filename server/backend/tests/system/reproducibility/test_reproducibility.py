@@ -146,9 +146,19 @@ def test_pipeline_reproduces_goldens():
 
 
 def _docker(*args: str, timeout: int = 300) -> subprocess.CompletedProcess:
-    """Run a docker CLI command, captured; the caller owns returncode checks."""
+    """
+    Run a docker CLI command, captured; the caller owns returncode checks.
+
+    Container output is UTF-8 (loguru emoji included) regardless of the host
+    locale, so decode explicitly - Windows' default charmap codec chokes on it.
+    """
     return subprocess.run(
-        ["docker", *args], capture_output=True, text=True, timeout=timeout
+        ["docker", *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
     )
 
 
@@ -170,29 +180,54 @@ def _psql(sql: str) -> str:
 
 def _upload_raws(raws: list) -> None:
     """
-    Upload raw files to the real upload endpoint, as the File Agent does.
+    Upload raw files to the real upload endpoint, as the File Agent does
+    (same fixed file-agent token + service headers as ``mascope demo
+    --rebuild``), robustly against a server saturated by ingestion.
 
-    Reuses the rebuild uploader's fixed file-agent token + service name so the
-    request shape matches ``mascope demo --rebuild`` exactly.
+    Uploads run while the converter is already crunching earlier files, so
+    individual requests can be slow or even time out client-side after the
+    server has stored the file. Failed files are retried in later passes, and
+    a 400 "already exists" answer counts as success (the earlier attempt won).
     """
-    import mascope_sdk
-    from mascope_sdk import api_post_file
+    import requests
 
-    mascope_sdk.SERVICE_NAME = _rebuild._UPLOAD_SERVICE
+    url = f"{APP_URL}/api/{_rebuild._UPLOAD_PATH}"
+    headers = {
+        "Authorization": f"Bearer {_rebuild._UPLOAD_TOKEN}",
+        "X-Service-Name": _rebuild._UPLOAD_SERVICE,
+    }
 
-    failed = []
-    for raw in raws:
-        resp = api_post_file(
-            url=APP_URL,
-            path=_rebuild._UPLOAD_PATH,
-            access_token=_rebuild._UPLOAD_TOKEN,
-            filepath=str(raw),
-        )
-        if resp is None:
-            failed.append(raw.name)
+    def _post_once(raw) -> tuple[bool, str]:
+        try:
+            with open(raw, "rb") as fh:
+                resp = requests.post(
+                    url, files=[("files", fh)], headers=headers, timeout=(10, 300)
+                )
+        except requests.RequestException as e:
+            return False, f"{type(e).__name__}: {e}"
+        if resp.ok:
+            return True, ""
+        if resp.status_code == 400 and "exist" in resp.text.lower():
+            return True, ""  # an earlier (timed-out) attempt landed server-side
+        return False, f"HTTP {resp.status_code}: {resp.text[:200]}"
+
+    failed: dict = {raw: "" for raw in raws}
+    for attempt in range(3):
+        if not failed:
+            break
+        if attempt:
+            time.sleep(30)  # let the converter catch up before retrying
+        for raw in list(failed):
+            ok, why = _post_once(raw)
+            if ok:
+                failed.pop(raw)
+            else:
+                failed[raw] = why
+
     assert not failed, (
-        f"failed to upload {len(failed)}/{len(raws)} raw file(s) to "
-        f"{APP_URL}/api/{_rebuild._UPLOAD_PATH}: {failed}"
+        f"failed to upload {len(failed)}/{len(raws)} raw file(s) to {url} "
+        f"after 3 attempts: "
+        + "; ".join(f"{raw.name}: {why}" for raw, why in failed.items())
     )
 
 
@@ -292,6 +327,9 @@ def _assert_raw_reader_pin(manifest: dict) -> None:
     want = (manifest.get("produced_with") or {}).get("opentfraw_version")
     if not want:
         return
+    # The manifest records a requirement-style pin ("opentfraw==1.2.0");
+    # compare on the version part only.
+    want = want.split("==")[-1].strip()
 
     probe = (
         "import importlib.metadata as m\n"
