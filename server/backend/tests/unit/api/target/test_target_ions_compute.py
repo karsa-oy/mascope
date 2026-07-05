@@ -105,3 +105,29 @@ async def test_generate_target_ions_from_composition(
 
         # Link integrity
         assert_isotope_links(target_ions, target_isotopes)
+
+
+@pytest.mark.parametrize("bad_formula", ["xyz", "136.1252", "Zz", "^C"])
+def test_invalid_compound_formula_yields_no_ions(bad_formula):
+    """An invalid compound formula must produce no ions (and never raise).
+
+    parse_composition silently drops unrecognised characters, so without the
+    up-front validity check these would either create bogus adduct-only ions or
+    make IsoSpecPy raise. Both are guarded: the compound is skipped.
+    """
+    compound = TargetCompound(
+        target_compound_id="unit-invalid",
+        target_compound_formula=bad_formula,
+    )
+    mechanism = IonizationMechanism(
+        ionization_mechanism_id="unit-mech",
+        ionization_mechanism_polarity="+",
+        ionization_mechanism="+H+",
+    )
+
+    target_ions, target_isotopes = generate_target_ions_from_composition(
+        compound, [mechanism]
+    )
+
+    assert target_ions == []
+    assert target_isotopes == []

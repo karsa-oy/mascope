@@ -1,8 +1,14 @@
+import re
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+
+# A bare numeric mass such as "136.1252", "60", "1e3". Matched explicitly rather
+# than via float(), which also parses "NaN"/"inf"/"Infinity" and would
+# misclassify the chemically valid formula "NaN" (sodium nitride) as a mass.
+_NUMERIC_MASS = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
 
 
 def reject_mass_only_formula(value: Optional[str]) -> Optional[str]:
@@ -16,14 +22,12 @@ def reject_mass_only_formula(value: Optional[str]) -> Optional[str]:
     """
     if value is None:
         return value
-    try:
-        float(value.strip())
-    except (TypeError, ValueError):
-        return value
-    raise ValueError(
-        "Mass-based target compounds are no longer supported; provide a chemical "
-        "formula (e.g. 'C6H12O6'), not a numeric mass."
-    )
+    if _NUMERIC_MASS.fullmatch(value.strip()):
+        raise ValueError(
+            "Mass-based target compounds are no longer supported; provide a "
+            "chemical formula (e.g. 'C6H12O6'), not a numeric mass."
+        )
+    return value
 
 
 class TargetCompoundBase(BaseModel):
