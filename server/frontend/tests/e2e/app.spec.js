@@ -14,15 +14,29 @@ test.describe('app shell (demo data)', () => {
   })
 
   test('serves the seeded demo data through the API', async ({ api }) => {
-    // Walk the data hierarchy: workspaces -> datasets -> batches.
+    // Walk the data hierarchy: workspaces -> datasets -> batches. The demo has
+    // more than one workspace (e.g. an empty "System Workspace") and more than
+    // one dataset, and their order is not guaranteed, so aggregate across all of
+    // them rather than assuming the first entry holds the data.
     // List endpoints respond with a { message, results, data } wrapper.
     const workspaces = (await api.get('/workspaces')).data
     expect(workspaces.length, 'demo dataset should contain a workspace').toBeGreaterThan(0)
 
-    const datasets = (await api.get(`/workspaces/${workspaces[0].workspace_id}/datasets`)).data
-    expect(datasets.length, 'demo workspace should contain a dataset').toBeGreaterThan(0)
+    const datasets = (
+      await Promise.all(
+        workspaces.map((w) =>
+          api.get(`/workspaces/${w.workspace_id}/datasets`).then((r) => r.data)
+        )
+      )
+    ).flat()
+    expect(datasets.length, 'demo should contain a dataset').toBeGreaterThan(0)
 
-    const batches = (await api.get(`/sample/batches?dataset_id=${datasets[0].dataset_id}`)).data
-    expect(batches.length, 'demo dataset should contain a sample batch').toBeGreaterThan(0)
+    const batchCounts = await Promise.all(
+      datasets.map((d) =>
+        api.get(`/sample/batches?dataset_id=${d.dataset_id}`).then((r) => r.data.length)
+      )
+    )
+    const totalBatches = batchCounts.reduce((sum, n) => sum + n, 0)
+    expect(totalBatches, 'demo dataset should contain a sample batch').toBeGreaterThan(0)
   })
 })
