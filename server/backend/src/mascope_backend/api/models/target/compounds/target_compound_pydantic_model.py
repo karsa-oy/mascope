@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_tools.composition.utils import assert_valid_formula
 
 # A bare numeric mass such as "136.1252", "60", "1e3". Matched explicitly rather
 # than via float(), which also parses "NaN"/"inf"/"Infinity" and would
@@ -11,14 +12,19 @@ from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 _NUMERIC_MASS = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
 
 
-def reject_mass_only_formula(value: Optional[str]) -> Optional[str]:
-    """Reject a target compound formula that is a bare numeric mass.
+def validate_compound_formula(value: Optional[str]) -> Optional[str]:
+    """Validate a target compound formula, rejecting masses and invalid formulas.
 
     Mass-based target compounds (a plain number such as ``"136.1252"`` instead of
     a chemical formula) are no longer supported: their ions/isotopes used to be
     generated from the mass alone, which relied on the retired molmass fork.
     Compounds must now be given by composition so an isotope pattern can be
     computed. An empty formula (``"()"``, adduct-only) is still allowed.
+
+    Anything that is not a parseable chemical formula (unknown elements such as
+    ``"Zz"``, unknown custom elements such as ``"^C"``, stray characters) is also
+    rejected here: ion generation would silently skip such a compound, leaving a
+    compound record that can never produce ions or matches.
     """
     if value is None:
         return value
@@ -27,6 +33,7 @@ def reject_mass_only_formula(value: Optional[str]) -> Optional[str]:
             "Mass-based target compounds are no longer supported; provide a "
             "chemical formula (e.g. 'C6H12O6'), not a numeric mass."
         )
+    assert_valid_formula(value)
     return value
 
 
@@ -44,8 +51,8 @@ class TargetCompoundBase(BaseModel):
         None, description="CAS Number of the target compound"
     )
 
-    _reject_mass_formula = field_validator("target_compound_formula")(
-        reject_mass_only_formula
+    _validate_formula = field_validator("target_compound_formula")(
+        validate_compound_formula
     )
 
 
@@ -70,8 +77,8 @@ class TargetCompoundUpdate(BaseModel):
         None, description="CAS Number of the target compound"
     )
 
-    _reject_mass_formula = field_validator("target_compound_formula")(
-        reject_mass_only_formula
+    _validate_formula = field_validator("target_compound_formula")(
+        validate_compound_formula
     )
 
 
