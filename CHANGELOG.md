@@ -8,6 +8,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
+- Upload-to-browse e2e test: a real demo raw file is uploaded through the web
+  UI (Uppy/tus), the file-converter runs the real conversion -> peak detection
+  -> matching pipeline, and the result must appear in the Raw files browser.
+  Unit tests for the converter's building blocks: the peak-detection
+  concurrency guard, the upload-context registry whose filename normalization
+  decides whether an uploaded file is "registered", and the filestream watcher
+  that must queue a file only once it has stopped growing.
 - Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
 
 ### Changed
@@ -20,6 +27,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Web UI file uploads work again on deployments served from a non-standard
+  port (e.g. the demo stack on `:8080`). nginx forwarded `X-Forwarded-Host`
+  without the port, the tus upload endpoint built its upload URL from it, and
+  every upload chunk was then sent to port 80 and refused. Found by the new
+  upload e2e test.
 - Frontend linting works again: migrated to the ESLint 9 flat config format (the legacy config had been silently ignored). The revived linter surfaced dormant chart bugs that are now fixed: the batch overview chart's log-scale zoom reset never fired, and two match spectra comparisons were always false.
 - The dashboard no longer renders a duplicate `id="app"` element inside the Vue mount point.
 - The axios error handlers no longer throw a `TypeError` (masking the real error) when a request fails before a response exists, e.g. a request-setup or network failure; the request/response `config` and body are now guarded before destructuring.

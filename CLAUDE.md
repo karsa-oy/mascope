@@ -30,7 +30,9 @@ docker compose -f docker-compose.demo.yaml up -d   # frontend at http://localhos
 It comes preloaded with the published demo dataset and login `demo@mascope.app` /
 `mascope-demo` (first start downloads ~150 MB). Point the suite elsewhere with
 `MASCOPE_E2E_BASE_URL` / `MASCOPE_E2E_API_URL` / `MASCOPE_E2E_EMAIL` /
-`MASCOPE_E2E_PASSWORD`.
+`MASCOPE_E2E_PASSWORD`. The upload spec needs a demo raw file
+(`MASCOPE_E2E_RAW_FILE`; defaults to the local bundle cache under
+`.runtime/demo/`, skips if none found).
 
 ### Writing and debugging tests
 
