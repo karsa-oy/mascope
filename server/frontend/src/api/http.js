@@ -49,7 +49,7 @@ function handleRequestData(config) {
 }
 
 function handleResponseData(response) {
-  const { method, url } = response?.config
+  const { method, url } = response?.config || {}
   console.debug(`✅ [api:http] response ${method} ${url}`, response)
   // pick the handler
   const handlerName = response?.config?.headers['X-Handler']
@@ -61,10 +61,13 @@ function handleResponseData(response) {
 // ERROR HANDLING
 
 function handleClientError(error) {
-  const { method, url, headers } = error.config
-  const type = headers['X-Type']
+  // Request-interceptor failures may have no config/response at all, so guard
+  // both before destructuring (otherwise the real error is masked by a
+  // TypeError thrown here).
+  const { method, url, headers } = error?.config || {}
+  const type = headers?.['X-Type']
   // log to console for developers
-  const { detail, error: message } = error?.response?.data
+  const { detail, error: message } = error?.response?.data || {}
   console.error(
     `❌[api:http] ${method} ${url} client failure: ${message} (error_id: ${detail?.error_id})`,
     error
@@ -102,8 +105,8 @@ function handleUnauthorizedError(error) {
  * One of purposes is catching unhandled 401s to trigger auth check.
  */
 function handleServerError(error) {
-  const { method, url, headers } = error?.config
-  const type = headers['X-Type'] ?? 'unknown'
+  const { method, url, headers } = error?.config || {}
+  const type = headers?.['X-Type'] ?? 'unknown'
 
   // Any unhandled 401 triggers auth check
   if (error?.response?.status === 401) {
