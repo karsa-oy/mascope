@@ -37,6 +37,29 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+  libraries:
+    name: Library tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv via snap
+        run: sudo snap install --classic astral-uv
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv sync --group dev
+
+      - name: Run library tests
+        # Thermo tests that need the proprietary RawFileReader DLLs skip
+        # themselves when MASCOPE_THERMO_DLL_DIR is unset.
+        run: uv run pytest libraries/ -v
+
   e2e:
     name: End-to-end tests (demo stack)
     runs-on: ubuntu-latest
