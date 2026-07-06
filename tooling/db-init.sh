@@ -198,12 +198,24 @@ else
     # PGPASSWORD is already exported above. Custom format (-Fc) matches the
     # format produced by the CLI's pg_dump wrapper in admin.py, so dumps are
     # interchangeable with mascope prod db backup list / restore.
+    #
+    # MASCOPE_DUMP_COMPRESSION (backend.database.dump_compression in config)
+    # controls pg_dump --compress. On large databases "0" cuts the dump time —
+    # and thus the migration downtime window — substantially, because the
+    # single-core gzip stage is the usual bottleneck.
+    DUMP_COMPRESS_ARGS=()
+    if [ -n "${MASCOPE_DUMP_COMPRESSION:-}" ]; then
+        DUMP_COMPRESS_ARGS+=(--compress="$MASCOPE_DUMP_COMPRESSION")
+        log_info "Using pg_dump compression: ${MASCOPE_DUMP_COMPRESSION}"
+    fi
+
     if pg_dump \
         -h "$PGHOST" \
         -U "$PGUSER" \
         --format=custom \
         --no-owner \
         --no-acl \
+        "${DUMP_COMPRESS_ARGS[@]}" \
         --file="$BACKUP_FILE" \
         "$MASCOPE_DB_NAME" 2>&1; then
  

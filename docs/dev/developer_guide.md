@@ -1645,6 +1645,20 @@ grep mascope-prod-db-backup /var/log/syslog | tail -20
 - Use https://crontab.guru to generate and verify cron expressions.
 - `pg_dump` for large databases (tens of GB) can take several minutes - this is normal.
   The backup file will grow incrementally in `.runtime/database/backups/prod/` while in progress.
+- **Large databases: dump uncompressed.** `pg_dump -Fc` compresses with
+  single-core gzip, which is both the dump-time bottleneck and the reason
+  off-site deduplication (restic) cannot see unchanged data between
+  consecutive dumps. Set in the env's `prod.mascope.toml`:
+
+  ```toml
+  [backend.database]
+  dump_compression = "0"
+  ```
+
+  This speeds up nightly dumps *and* the pre-migration dump during upgrades
+  (shorter downtime window). Uncompressed dumps take 2–4× more local disk —
+  shorten the local retention window to compensate. One-off override:
+  `mascope prod db backup create --compress 0`.
 - Backup filenames embed a timestamp and optional `cron` label, e.g.
   `mascope_test_env_20260313_040001_cron.dump`
 - Deletion only affects dumps matching the **active environment** - other environments'

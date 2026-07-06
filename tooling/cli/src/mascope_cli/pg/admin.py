@@ -129,6 +129,7 @@ def pg_dump(
     mount: str,
     label: str = "",
     timeout: int = 7200,
+    compression: str = "",
 ) -> Path:
     """
     Create a compressed custom-format dump of a PostgreSQL database.
@@ -164,6 +165,12 @@ def pg_dump(
                     (2 hours) — dumps of large databases on slow disks can
                     take far longer than the generic 10 min ceiling.
     :type timeout: int
+    :param compression: Value passed to `pg_dump --compress`: a level
+                        (`"0"`..`"9"`) or method:level (`"zstd:1"`, PG16+).
+                        Empty string uses pg_dump's default. `"0"` skips the
+                        single-core gzip stage (much faster on large
+                        databases) at the cost of a larger dump file.
+    :type compression: str
     :raises RuntimeError: If pg_dump exits non-zero, exceeds `timeout`, or the
                           output file is not found on the host after the dump
                           completes.
@@ -182,20 +189,26 @@ def pg_dump(
     filename = "_".join(name_parts) + ".dump"
     container_path = f"{mount}/{filename}"
 
+    dump_args = [
+        "pg_dump",
+        "--username",
+        user,
+        "--format",
+        "custom",  # -Fc equivalent, explicit for readability
+        "--no-password",
+    ]
+    if compression:
+        dump_args += ["--compress", compression]
+    dump_args += [
+        "--file",
+        container_path,
+        database,  # positional: database name last
+    ]
+
     try:
         result = _docker_exec(
             container,
-            [
-                "pg_dump",
-                "--username",
-                user,
-                "--format",
-                "custom",  # -Fc equivalent, explicit for readability
-                "--no-password",
-                "--file",
-                container_path,
-                database,  # positional: database name last
-            ],
+            dump_args,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as e:

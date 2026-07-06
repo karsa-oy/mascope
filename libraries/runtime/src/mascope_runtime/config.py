@@ -118,6 +118,15 @@ class DatabaseConfig(BaseModel):
     # --- PostgreSQL: autovacuum ---
     autovacuum_max_workers: int = 3  # parallel autovacuum workers
 
+    # --- Dumps (pg_dump) ---
+    # Value for pg_dump --compress: a level ("0".."9") or method:level
+    # ("zstd:1", "lz4"; PG16+ client). Empty = pg_dump's default (moderate
+    # gzip). "0" (uncompressed) dumps considerably faster — the gzip stage is
+    # the usual single-core bottleneck — and lets restic deduplicate
+    # consecutive dumps in the off-site backup repository; dumps take more
+    # local disk, so pair with a short local retention on large databases.
+    dump_compression: str = ""
+
     @field_validator("shm_size")
     @classmethod
     def validate_shm_size_format(cls, v: str) -> str:
