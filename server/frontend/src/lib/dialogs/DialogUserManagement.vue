@@ -13,7 +13,6 @@ import Message from 'primevue/message'
 import { useConfirm } from 'primevue/useconfirm'
 
 import { useApp } from '@/stores'
-import { beautifySnakeCase } from '@/lib/utils'
 import { BaseCopyableField } from '@/lib/base'
 import { roles, prettyRoleName } from '@/lib/roles'
 import { passwordPolicyError } from '@/lib/password'
@@ -58,7 +57,7 @@ const user = {
     }
   },
   cancel: reset,
-  save: async (data) => {
+  save: async () => {
     if (edited.value) {
       await app.data.user.update(edited.value)
     }

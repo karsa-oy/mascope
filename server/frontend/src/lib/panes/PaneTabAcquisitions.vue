@@ -38,7 +38,7 @@ const confirm = useConfirm()
 onMounted(() => {
   uppy
     .use(DropTarget, { target: '#uppy-drop-target' })
-    .on('file-added', (file) => {
+    .on('file-added', () => {
       const dashboard = uppy.getPlugin('Dashboard')
       if (dashboard) {
         dashboard.openModal()
@@ -52,7 +52,6 @@ onMounted(() => {
       theme: app.ui.darkmode.active ? 'dark' : 'light',
       closeModalOnClickOutside: true,
       closeAfterFinish: true,
-      showProgressDetails: true,
       proudlyDisplayPoweredByUppy: false,
       note: 'Supported file types: .h5 (TOF), .raw (Orbi)'
     })
@@ -63,7 +62,7 @@ onUnmounted(() => {
   uppy.removePlugin(uppy.getPlugin('DropTarget'))
 })
 
-const props = defineProps({
+defineProps({
   active: {
     type: Boolean
   }
@@ -423,7 +422,6 @@ const currentPageReportTemplate =
                 id="uppy-upload-trigger"
                 label="Upload"
                 icon="pi pi-file-arrow-up"
-                @click=""
               />
               <Button
                 v-tooltip.top="processBlockedReason"

@@ -18,7 +18,7 @@ const app = useApp()
 const props = defineProps({
   files: {
     type: Array,
-    default: []
+    default: () => []
   }
 })
 const active = defineModel('active')

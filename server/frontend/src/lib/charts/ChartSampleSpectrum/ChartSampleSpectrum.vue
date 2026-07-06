@@ -73,7 +73,7 @@ watch(
 
 watch(
   () => app.ui.tab.active,
-  async (newValue, oldValue) => {
+  async (newValue) => {
     if (newValue === 'sample') {
       // Wait for DOM to update after tab switch, then resize plot
       await nextTick()

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watchEffect, computed, provide } from 'vue'
+import { computed } from 'vue'
 
 import OverlayBadge from 'primevue/overlaybadge'
 

@@ -34,7 +34,7 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
         (key) => ui.value[key] === typeDefaults.value[key]
       )
     } else {
-      return
+      return false
     }
   })
 
@@ -42,13 +42,10 @@ export const useMatchParams = defineStore('app.data.match.params', () => {
   const ui = ref()
 
   // Backend param state (what's stored in DB for this ion)
-  const db = computed(
-    () =>
-      ({
-        ...(typeDefaults.value ?? {}),
-        ...(matchVisualized.ion?.filter_params[matchVisualized.instrument] ?? {})
-      }) ?? null
-  )
+  const db = computed(() => ({
+    ...(typeDefaults.value ?? {}),
+    ...(matchVisualized.ion?.filter_params[matchVisualized.instrument] ?? {})
+  }))
 
   // Check if UI params differ from DB params
   const changed = computed(() =>

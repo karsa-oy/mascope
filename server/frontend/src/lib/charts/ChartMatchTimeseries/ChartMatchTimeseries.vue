@@ -1,10 +1,7 @@
 <script setup>
 import { ref, computed, toRaw, watch, onMounted } from 'vue'
 
-import Tag from 'primevue/tag'
-
 import { useApp } from '@/stores'
-import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -64,8 +61,7 @@ const layout = computed(() => ({
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
-    gridwidth: 1,
-    autorange: true
+    gridwidth: 1
   },
   yaxis: {
     title: { text: `Peak intensity [counts/s]` },
@@ -74,8 +70,7 @@ const layout = computed(() => ({
     rangemode: 'tozero',
     type: scale.value.log ? 'log' : 'lin',
     gridcolor: '#33333399',
-    gridwidth: 1,
-    autorange: true
+    gridwidth: 1
   },
   margin: { l: 50, r: 30, t: 30, b: 40 },
   dragmode: 'zoom',
