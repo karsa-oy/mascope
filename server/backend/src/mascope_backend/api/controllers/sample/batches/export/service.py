@@ -7,13 +7,13 @@ from datetime import datetime
 
 import pandas as pd
 
+from mascope_backend.api.controllers.dataset.dataset_controller import get_dataset
 from mascope_backend.api.controllers.match.targets.batch.match_targets_batch_controller import (
     get_batch_data,
 )
 from mascope_backend.api.controllers.sample.batches.export.util import (
     auto_adjust_column_width,
 )
-from mascope_backend.api.controllers.dataset.dataset_controller import get_dataset
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
@@ -60,9 +60,7 @@ async def sample_batch_export_spreadsheet(
 
     # --- Fetch dataset and target collections ---
     dataset_id = sample_batch.get("dataset_id")
-    dataset = (
-        (await get_dataset(dataset_id)).get("data") if dataset_id else None
-    )
+    dataset = (await get_dataset(dataset_id)).get("data") if dataset_id else None
 
     collections = (
         await get_match_collection_records(sample_batch_id=sample_batch_id)

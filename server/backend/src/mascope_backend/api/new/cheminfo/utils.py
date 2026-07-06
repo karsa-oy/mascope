@@ -81,9 +81,7 @@ def to_custom_element_format(formula: str) -> str:
         labelled = CUSTOM_ELEMENTS.get(custom_element)
         # Replace with the custom element only if it exists and its labelled
         # (main) isotope mass number matches the explicit isotope in the formula.
-        if labelled is not None and labelled.labelled_massnumber == int(
-            match.group(1)
-        ):
+        if labelled is not None and labelled.labelled_massnumber == int(match.group(1)):
             return custom_element
         # If no custom element found or mass number doesn't match, return original
         return match.group(0)

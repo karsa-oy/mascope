@@ -283,7 +283,9 @@ def _match_assign(match_isotope_df: pd.DataFrame, parsed_peaks: dict) -> pd.Data
     for i in range(n_targets):
         target_mz = target_mzs[i]
         lo = np.searchsorted(peak_mzs_sorted, target_mz - MATCH_WINDOW_AMU, side="left")
-        hi = np.searchsorted(peak_mzs_sorted, target_mz + MATCH_WINDOW_AMU, side="right")
+        hi = np.searchsorted(
+            peak_mzs_sorted, target_mz + MATCH_WINDOW_AMU, side="right"
+        )
         candidates = peak_order[lo:hi]
         # Order candidates by absolute m/z difference, breaking ties by m/z.
         cand_diffs = np.abs(peak_mzs[candidates] - target_mz)

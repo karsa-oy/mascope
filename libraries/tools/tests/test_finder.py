@@ -2,7 +2,10 @@ import pandas as pd
 import pytest
 
 from mascope_tools.composition.exceptions import CompositionFinderException
-from mascope_tools.composition.finder import assign_compositions, replace_atom_with_isotope
+from mascope_tools.composition.finder import (
+    assign_compositions,
+    replace_atom_with_isotope,
+)
 from mascope_tools.composition.models import CompositionSearchConfig
 from mascope_tools.composition.utils import (
     combine_formula_and_ionization,

@@ -162,9 +162,7 @@ async def validation_exception_handler(
     """
     # The request body is deliberately not included in the response or the
     # logs: it can carry credentials (e.g. login forms) and other user data.
-    context_message = (
-        f"Validation error on route {request.method} {request.url.path}"
-    )
+    context_message = f"Validation error on route {request.method} {request.url.path}"
     return handle_exception(exc, context_message, response_type="http")
 
 

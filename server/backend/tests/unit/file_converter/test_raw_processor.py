@@ -22,11 +22,11 @@ import pytest
 
 from mascope_thermo.processor import RawProcessor
 
+
 # Committed sample (ships in the repo; only the small KORBI MS1 files are tracked).
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 KORBI_POS = (
-    _REPO_ROOT
-    / "libraries/thermo/tests/test_files/KORBI2_AMB_POS_20260109174345.raw"
+    _REPO_ROOT / "libraries/thermo/tests/test_files/KORBI2_AMB_POS_20260109174345.raw"
 )
 
 # Golden metadata for that file (decoded by OpenTFRaw; instrument-independent of

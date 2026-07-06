@@ -861,9 +861,7 @@ def get_ms2_summary_metadata(
     :rtype: dict
     """
     with open_backend(datafile_path) as backend:
-        all_count = len(
-            backend.scan_indices(polarity, t_min, t_max, ms_type=None)
-        )
+        all_count = len(backend.scan_indices(polarity, t_min, t_max, ms_type=None))
         # scan_indices raises NoScansFoundError when nothing matches, so an
         # MS1-only file would otherwise blow up here instead of reaching the
         # graceful empty-MS2 return below.
