@@ -37,6 +37,33 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+  libraries:
+    name: Library tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv via snap
+        run: sudo snap install --classic astral-uv
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv sync --group dev
+
+      - name: Run library tests
+        # Thermo tests that need the proprietary RawFileReader DLLs skip
+        # themselves when MASCOPE_THERMO_DLL_DIR is unset.
+        env:
+          # The library runtimes resolve their config relative to this path
+          # at import time; collection fails without it.
+          MASCOPE_PATH: ${{ github.workspace }}
+        run: uv run pytest libraries/ -v
+
   e2e:
     name: End-to-end tests (demo stack)
     runs-on: ubuntu-latest
@@ -95,6 +122,20 @@ jobs:
           echo "Stack did not come up in time." >&2
           docker compose -f docker-compose.demo.yaml logs --tail 100
           exit 1
+
+      - name: Stage a raw file for the upload spec
+        run: |
+          # The upload e2e re-ingests a real demo raw file. The bundle was
+          # already fetched by demo_init into its cache volume; copy one raw
+          # file out instead of downloading the bundle a second time.
+          docker cp mascope_demo_init:/app/.runtime/demo /tmp/demo-bundle
+          RAW=$(find /tmp/demo-bundle -path "*/raw/*.raw" | head -1)
+          if [ -z "$RAW" ]; then
+            echo "No raw file found in the demo bundle cache." >&2
+            exit 1
+          fi
+          echo "Staged raw file: $RAW"
+          echo "MASCOPE_E2E_RAW_FILE=$RAW" >> $GITHUB_ENV
 
       - name: Run e2e tests
         working-directory: server/frontend

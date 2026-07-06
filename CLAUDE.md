@@ -30,7 +30,9 @@ docker compose -f docker-compose.demo.yaml up -d   # frontend at http://localhos
 It comes preloaded with the published demo dataset and login `demo@mascope.app` /
 `mascope-demo` (first start downloads ~150 MB). Point the suite elsewhere with
 `MASCOPE_E2E_BASE_URL` / `MASCOPE_E2E_API_URL` / `MASCOPE_E2E_EMAIL` /
-`MASCOPE_E2E_PASSWORD`.
+`MASCOPE_E2E_PASSWORD`. The upload spec needs a demo raw file
+(`MASCOPE_E2E_RAW_FILE`; defaults to the local bundle cache under
+`.runtime/demo/`, skips if none found).
 
 ### Writing and debugging tests
 
@@ -49,5 +51,6 @@ It comes preloaded with the published demo dataset and login `demo@mascope.app` 
 
 - Conventional Commits (`type(scope): description`); ASCII-only commit messages,
   no Co-Authored-By trailers.
-- CI (`.github/workflows/tests.yaml`) runs backend pytest, frontend unit, and the
-  demo-stack e2e suite on every PR; releases are gated on `tooling/smoke-test.sh`.
+- CI (`.github/workflows/tests.yaml`) runs backend pytest, library pytest, frontend
+  unit, and the demo-stack e2e suite on every PR; releases are gated on
+  `tooling/smoke-test.sh`.
