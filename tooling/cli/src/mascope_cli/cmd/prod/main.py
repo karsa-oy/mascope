@@ -33,6 +33,7 @@ from mascope_cli.cmd import lib
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs
 from mascope_cli.runtime import runtime
+from mascope_cli.version import resolve_version
 from mascope_runtime import Runtime
 
 
@@ -108,7 +109,9 @@ def _deploy_version() -> str:
     """
     if os.environ.get("_MASCOPE_VERSION_PINNED") == "1":
         return os.environ["MASCOPE_VERSION"]
-    version = runtime.parse_version()
+    # resolve_version falls back to the installed package version outside a
+    # checkout, so a pip-installed release CLI deploys its own version.
+    version = resolve_version(runtime)
     if re.fullmatch(r"v\d+\.\d+\.\d+", version):
         return version
     return "latest"

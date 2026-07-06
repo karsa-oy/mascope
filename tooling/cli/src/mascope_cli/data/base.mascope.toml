@@ -1,0 +1,169 @@
+
+# MASCOPE BASE CONFIGURATION
+# Shared defaults for all modes 
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[meta]
+description = "The default runtime env"
+api_port = 8090
+filestore = './filestore'
+
+[cli]
+color = "blue"
+log_path = './logs'
+
+# SERVERS
+
+[backend]
+tags = ['server', 'tof', 'orbi', 'file', 'lab', 'all']
+log_path = './logs'
+color = "green"
+# paths
+filestreams = './filestreams'
+# scripts
+run = "uv run mascope-backend run api-server"
+
+[backend.database]
+# --- PostgreSQL connection ---
+user = "mascope_user"
+port = 5432
+
+# --- Docker ---
+shm_size = "1g"
+
+# --- SQLAlchemy pool (per worker) ---
+pool_size = 3
+max_overflow = 2
+pool_timeout = 30
+pool_pre_ping = true
+expire_on_commit = false
+
+
+# --- PostgreSQL tuning ---
+# Tuning baseline — assumes SSD, 16 GB RAM.
+# See postgres README.md for full explanation.
+# Override in prod.mascope.toml for production hardware.
+
+# --- PostgreSQL: memory ---
+shared_buffers = "512MB"          # 25% of ~8GB floor; primary data cache
+effective_cache_size = "4GB"      # planner hint; ~50-75% of available RAM
+work_mem = "32MB"                 # per sort/hash op; raise if EXPLAIN shows disk spills
+maintenance_work_mem = "512MB"    # index builds, VACUUM; safe bump over 64MB default
+autovacuum_work_mem = "-1"        # inherits maintenance_work_mem
+wal_buffers = "16MB"              # practical ceiling; good for any concurrent write load
+
+# --- PostgreSQL: checkpoints and WAL ---
+min_wal_size = "512MB"            # minimum WAL retained
+max_wal_size = "2GB"              # ceiling before forced checkpoint
+checkpoint_completion_target = 0.9  # spread checkpoint I/O over 90% of interval
+
+# Note: wal_compression = "on" uses zlib. "lz4" requires postgres built with --with-lz4
+# (not available in standard postgres:16-alpine image).
+wal_compression = "on"
+
+# --- PostgreSQL: planner ---
+effective_io_concurrency = 200    # SSD/NVMe on dev machines; set 1 for HDD
+random_page_cost = 1.1            # SSD random read cost; 4.0 for HDD
+default_statistics_target = 100   # histogram depth per column; raise for skewed data
+jit = "off"                       # JIT adds overhead on short queries; off for mixed workload
+
+# --- PostgreSQL: autovacuum ---
+autovacuum_max_workers = 3        # parallel vacuum workers
+
+# --- Dumps (pg_dump) ---
+# pg_dump --compress value: a level ("0".."9") or method:level ("zstd:1", PG16+).
+# "0" (uncompressed) dumps several times faster — single-core gzip is the usual
+# bottleneck — and lets restic deduplicate consecutive dumps in the off-site
+# repository. Costs 2-4x more local disk per dump; shorten local retention
+# (LOCAL_RETENTION_DAYS in backup.env) on large databases to compensate.
+dump_compression = "0"
+
+
+[backend.redis]
+port = 6379
+image = "redis:7-alpine"
+
+[file-converter]
+tags = ['server', 'tof', 'orbi', 'file', 'all']
+log_path = './logs'
+color = "orange"
+# settings
+source = './filestreams'
+raw_threads = 1
+h5_threads = 1
+# scripts
+run = "uv run mascope-backend run file-converter"
+
+
+[frontend]
+tags = ['lab', 'orbi', 'tof', 'file', 'all']
+log_path = './logs'
+color = "magenta"
+# settings
+# acquisition_filter = { min = '2020-01-01T00:00' }
+sample_table_defaults = { columns = ["sample_item_name", "index"], sort_field = "index", sort_order = -1 }
+# scripts
+run = "cd ./server/frontend && npm install && npm run dev"
+
+# AGENTS
+
+[file-agent]
+tags = ['agents', 'orbi', 'tof', 'all']
+log_path = './logs'
+color = "purple"
+# settings
+mask = '*.raw'
+timeout = 10
+source = './agents/file'
+host = 'localhost'
+access_token = ''
+# filename_prefix = ''
+# filename_suffix = ''
+
+# scripts
+run = "uv run mascope agent file"
+
+# LIBRARIES
+
+# general
+
+[file-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[chemistry-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[signal-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[match-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+# hardware
+
+[thermo-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+[tofwerk-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"
+
+# public
+
+[sdk-lib]
+tags = ['lib']
+log_path = './logs'
+color = "white"

@@ -12,7 +12,9 @@ import subprocess
 
 import pytest
 
+from mascope_cli import version as version_mod
 from mascope_cli.runtime import runtime
+from mascope_cli.version import resolve_version
 
 
 BUILD_ID = r"\d{4}\.\d{2}\.\d{2}-[0-9a-f]{7}"
@@ -88,3 +90,32 @@ def test_outside_a_repo_falls_back_to_unknown(tmp_path, monkeypatch):
     empty.mkdir()
     monkeypatch.chdir(empty)
     assert runtime.parse_version() == "unknown-version"
+
+
+# --- resolve_version: the CLI-level wrapper with a package-version fallback ---
+
+
+@pytest.fixture
+def no_repo(tmp_path, monkeypatch):
+    """A cwd where git yields nothing, forcing the package fallback."""
+    empty = tmp_path / "not-a-repo"
+    empty.mkdir()
+    monkeypatch.chdir(empty)
+
+
+def test_resolve_version_prefers_git(git_repo):
+    _git(git_repo, "tag", "v1.2.3")
+    assert resolve_version(runtime) == "v1.2.3"
+
+
+def test_resolve_version_falls_back_to_package_version(no_repo, monkeypatch):
+    # A pip-installed CLI has no checkout; the wheel version becomes the
+    # deploy tag (formatted like a release tag).
+    monkeypatch.setattr(version_mod.metadata, "version", lambda name: "9.9.9")
+    assert resolve_version(runtime) == "v9.9.9"
+
+
+def test_resolve_version_ignores_workspace_placeholder(no_repo, monkeypatch):
+    # The monorepo workspace pins 0.0.0 — not a meaningful deploy tag.
+    monkeypatch.setattr(version_mod.metadata, "version", lambda name: "0.0.0")
+    assert resolve_version(runtime) == "unknown-version"
