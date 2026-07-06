@@ -72,8 +72,16 @@ jit = "off"                       # JIT adds overhead on short queries; off for 
 # --- PostgreSQL: autovacuum ---
 autovacuum_max_workers = 3        # parallel vacuum workers
 
+# --- Dumps (pg_dump) ---
+# pg_dump --compress value: a level ("0".."9") or method:level ("zstd:1", PG16+).
+# "0" (uncompressed) dumps several times faster — single-core gzip is the usual
+# bottleneck — and lets restic deduplicate consecutive dumps in the off-site
+# repository. Costs 2-4x more local disk per dump; shorten local retention
+# (LOCAL_RETENTION_DAYS in backup.env) on large databases to compensate.
+dump_compression = "0"
 
-[backend.redis] 
+
+[backend.redis]
 port = 6379
 image = "redis:7-alpine"
 
