@@ -57,6 +57,9 @@ jit = "off"                       # JIT adds overhead on short queries; off for 
 # --- PostgreSQL: autovacuum ---
 autovacuum_max_workers = 4        # parallel vacuum workers
 
+# --- Dumps (pg_dump) ---
+dump_compression = "0"            # uncompressed: fast dumps, restic dedups off-site
+
 
 [backend.redis]
 host = "redis"  # Docker Compose service name
