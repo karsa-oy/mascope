@@ -1609,13 +1609,18 @@ echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
    no inbound router ports needed):
 
    ```bash
-   # on the backup server: dedicated user, key-only SSH
-   sudo adduser --disabled-password backup
-   sudo -u backup mkdir -p /home/backup/.ssh /home/backup/mascope-backups
-   # append each VPS's public key to /home/backup/.ssh/authorized_keys
+   # on the backup server: dedicated user, key-only SSH.
+   # NB: do not name the user `backup` — that is a built-in Ubuntu system
+   # account (uid 34, nologin shell) and adduser will silently no-op.
+   sudo adduser --disabled-password --gecos "" mascope-backup
+   sudo -u mascope-backup mkdir -p /home/mascope-backup/.ssh
+   sudo mkdir -p /path/to/big-disk/mascope-backups
+   sudo chown mascope-backup:mascope-backup /path/to/big-disk/mascope-backups
+   # append each VPS's public key to /home/mascope-backup/.ssh/authorized_keys
+   # (mode 600, owner mascope-backup; ~/.ssh mode 700)
 
-   # on each VPS (backup.env):
-   RESTIC_REPOSITORY=sftp:backup@<tailscale-ip>:mascope-backups/<hostname>
+   # on each VPS (backup.env) — note the absolute repository path:
+   RESTIC_REPOSITORY=sftp:mascope-backup@<tailscale-ip>:/path/to/big-disk/mascope-backups/<hostname>
    ```
 
    Caveats: the backup server needs disk redundancy (RAID/ZFS) and monitoring
