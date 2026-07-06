@@ -2,13 +2,10 @@
 Ion-level match records service for target ions with match data.
 """
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, select, true
 
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
-)
-from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
-    fetch_sample_item_ids,
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import (
     fetch_samples,
@@ -26,6 +23,7 @@ from mascope_backend.db import (
     MatchIon,
     Sample,
     SampleBatch,
+    SampleItem,
     TargetCollection,
     TargetCollectionInSampleBatch,
     TargetCompound,
@@ -62,7 +60,12 @@ async def get_match_ion_records(
     """
     if sample_item_ids:
         samples = await fetch_samples(sample_item_ids)
-        entity_name = ", ".join(sample.sample_item_name for sample in samples)
+        # Name only small requests explicitly; batch-sized requests would bloat
+        # every response message with thousands of sample names.
+        if len(samples) <= 5:
+            entity_name = ", ".join(sample.sample_item_name for sample in samples)
+        else:
+            entity_name = f"{len(samples)} samples"
         entity_type = "samples"
 
         data = await _get_sample_match_ion_records(
@@ -241,11 +244,16 @@ async def _get_batch_match_ion_records(
     Retrieves target ions with batch-level aggregate match data.
 
     The aggregate match data represents the best match for the ion in the samples
-    within the batch. The aggregation is performed via subquery and window function.
+    within the batch. The aggregation uses a LATERAL top-1 probe per requested
+    target ion: each probe walks the (target_ion_id, match_score) index in
+    descending score order and stops at the first row belonging to the batch,
+    so the cost scales with the number of requested ions instead of every
+    match row in the batch.
 
     Steps:
-    - Get all ionization mechanism IDs and sample item IDs used in the batch.
-    - Construct a subquery to get the best MatchIon per TargetIon across all samples in the batch.
+    - Get all ionization mechanism IDs used in the batch.
+    - Build a subquery of the requested target ion IDs (collection/ion filters applied).
+    - LATERAL-join a best-scoring-MatchIon-in-batch probe against those ions.
     - Build the main query joining TargetIon, TargetCompound, IonizationMechanism, and the subquery.
     - Apply filters for target collection and target ions if provided.
     - Process the results to format the ion and match data.
@@ -261,36 +269,88 @@ async def _get_batch_match_ion_records(
     """
 
     async with async_session() as session:
-        # --- Get all ionization mechanism IDs and sample item IDs used in the batch ---
+        # --- Get all ionization mechanism IDs used in the batch ---
         batch_ionization_mechanism_ids = await fetch_batch_ionization_mechanism_ids(
             sample_batch.sample_batch_id
         )
-        batch_sample_item_ids, _ = await fetch_sample_item_ids(
-            sample_batch_id=sample_batch.sample_batch_id
-        )
 
-        # --- Construct a subquery to get the best MatchIon per TargetIon across
-        # all samples in the batch ---
-        # Fetch all MatchIon entries for samples in the batch
-        matchion_subq = select(
-            MatchIon.target_ion_id.label("sub_target_ion_id"),
-            MatchIon.match_ion_id.label("sub_match_ion_id"),
-            MatchIon.sample_item_id.label("sub_sample_item_id"),
-            MatchIon.match_score.label("sub_match_score"),
-            MatchIon.match_category.label("sub_match_category"),
-            MatchIon.sample_peak_intensity_sum.label("sub_sample_peak_intensity_sum"),
-            MatchIon.match_ion_utc_created.label("sub_match_ion_utc_created"),
-            MatchIon.match_ion_utc_modified.label("sub_match_ion_utc_modified"),
-        ).where(MatchIon.sample_item_id.in_(batch_sample_item_ids))
-        # Use window function to assign ranks based on match_score per TargetIon
-        matchion_ranked = matchion_subq.add_columns(
-            func.row_number()
-            .over(
-                partition_by=MatchIon.target_ion_id,
-                order_by=MatchIon.match_score.desc(),
+        # --- Subquery of the target ion IDs this request is actually about ---
+        # Restricting the best-match aggregation to these ions keeps its cost
+        # proportional to the requested collection instead of every match row
+        # produced by any collection attached to the batch.
+        relevant_ion_ids = (
+            select(TargetIon.target_ion_id)
+            .join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetIon.target_compound_id,
             )
-            .label("rn")
-        ).subquery()
+            .join(
+                TargetCollectionInSampleBatch,
+                TargetCollectionInSampleBatch.target_collection_id
+                == TargetCompoundInTargetCollection.target_collection_id,
+            )
+            .where(
+                TargetCollectionInSampleBatch.sample_batch_id
+                == sample_batch.sample_batch_id,
+                TargetIon.ionization_mechanism_id.in_(batch_ionization_mechanism_ids),
+            )
+        )
+        if target_collection_id:
+            relevant_ion_ids = relevant_ion_ids.where(
+                TargetCompoundInTargetCollection.target_collection_id
+                == target_collection_id
+            )
+        if target_ion_ids:
+            relevant_ion_ids = relevant_ion_ids.where(
+                TargetIon.target_ion_id.in_(target_ion_ids)
+            )
+
+        # --- Best MatchIon per TargetIon across the batch's samples ---
+        # LATERAL top-1 probe per ion: walks the (target_ion_id, match_score)
+        # index backward (descending score) and returns the first row whose
+        # sample belongs to the batch. Ions without a match simply produce no
+        # row and surface as NULL match data through the main query's outer join.
+        relevant_ions = relevant_ion_ids.distinct().subquery("relevant_ion")
+        best_match = (
+            select(
+                MatchIon.match_ion_id.label("sub_match_ion_id"),
+                MatchIon.sample_item_id.label("sub_sample_item_id"),
+                MatchIon.match_score.label("sub_match_score"),
+                MatchIon.match_category.label("sub_match_category"),
+                MatchIon.sample_peak_intensity_sum.label(
+                    "sub_sample_peak_intensity_sum"
+                ),
+                MatchIon.match_ion_utc_created.label("sub_match_ion_utc_created"),
+                MatchIon.match_ion_utc_modified.label("sub_match_ion_utc_modified"),
+            )
+            .join(
+                SampleItem,
+                SampleItem.sample_item_id == MatchIon.sample_item_id,
+            )
+            .where(
+                MatchIon.target_ion_id == relevant_ions.c.target_ion_id,
+                SampleItem.sample_batch_id == sample_batch.sample_batch_id,
+            )
+            .order_by(MatchIon.match_score.desc())
+            .limit(1)
+            .lateral("best_match")
+        )
+        matchion_best = (
+            select(
+                relevant_ions.c.target_ion_id.label("sub_target_ion_id"),
+                best_match.c.sub_match_ion_id,
+                best_match.c.sub_sample_item_id,
+                best_match.c.sub_match_score,
+                best_match.c.sub_match_category,
+                best_match.c.sub_sample_peak_intensity_sum,
+                best_match.c.sub_match_ion_utc_created,
+                best_match.c.sub_match_ion_utc_modified,
+            )
+            .select_from(relevant_ions)
+            .join(best_match, true())
+            .subquery()
+        )
 
         # --- Main query ---
         query = (
@@ -298,13 +358,13 @@ async def _get_batch_match_ion_records(
                 TargetIon,
                 TargetCompound,
                 IonizationMechanism,
-                matchion_ranked.c.sub_match_ion_id,
-                matchion_ranked.c.sub_sample_item_id,
-                matchion_ranked.c.sub_match_score,
-                matchion_ranked.c.sub_match_category,
-                matchion_ranked.c.sub_sample_peak_intensity_sum,
-                matchion_ranked.c.sub_match_ion_utc_created,
-                matchion_ranked.c.sub_match_ion_utc_modified,
+                matchion_best.c.sub_match_ion_id,
+                matchion_best.c.sub_sample_item_id,
+                matchion_best.c.sub_match_score,
+                matchion_best.c.sub_match_category,
+                matchion_best.c.sub_sample_peak_intensity_sum,
+                matchion_best.c.sub_match_ion_utc_created,
+                matchion_best.c.sub_match_ion_utc_modified,
                 TargetCollection.target_collection_type.in_(
                     target_collection_config.APP_ALARMING_COLLECTION_TYPES
                 ).label("alarming"),
@@ -335,11 +395,8 @@ async def _get_batch_match_ion_records(
                 == TargetCollection.target_collection_id,
             )
             .outerjoin(
-                matchion_ranked,
-                and_(
-                    matchion_ranked.c.sub_target_ion_id == TargetIon.target_ion_id,
-                    matchion_ranked.c.rn == 1,  # Pick top match score per target ion
-                ),
+                matchion_best,
+                matchion_best.c.sub_target_ion_id == TargetIon.target_ion_id,
             )
             .where(
                 and_(
