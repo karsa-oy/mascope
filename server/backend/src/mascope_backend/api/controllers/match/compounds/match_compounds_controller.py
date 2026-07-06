@@ -328,11 +328,11 @@ async def create_match_compounds(
                     session.add(new_match_compound)
                     processed_compounds.append(new_match_compound)
 
-        # Step 5: Commit transaction and refresh
+        # Step 5: Commit transaction. All values are set client-side and the
+        # session keeps objects loaded after commit (expire_on_commit=False),
+        # so no per-row refresh is needed.
         if processed_compounds:
             await session.commit()
-            for compound in processed_compounds:
-                await session.refresh(compound)
 
     # Step 6: Generate result message
     total_requested = len(match_compounds)

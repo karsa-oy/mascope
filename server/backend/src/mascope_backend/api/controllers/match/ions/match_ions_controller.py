@@ -388,11 +388,11 @@ async def create_match_ions(
                     session.add(new_match_ion)
                     processed_ions.append(new_match_ion)
 
-        # Step 5: Commit transaction and refresh
+        # Step 5: Commit transaction. All values are set client-side and the
+        # session keeps objects loaded after commit (expire_on_commit=False),
+        # so no per-row refresh is needed.
         if processed_ions:
             await session.commit()
-            for ion in processed_ions:
-                await session.refresh(ion)
 
     # Step 6: Generate result message
     total_requested = len(match_ions)

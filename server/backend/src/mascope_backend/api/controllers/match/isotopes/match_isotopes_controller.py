@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, asc, delete, desc, func, select
+from sqlalchemy import and_, asc, delete, desc, func, insert, select
 
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
@@ -217,9 +217,8 @@ async def create_match_isotopes(
     Creates match isotopes for a given sample item based on the provided list of match isotope data.
 
     Steps:
-    1. Check for existing match isotopeses to avoid duplication.
-    2. Insert the new matches into the database and commit the transaction.
-    3. Refresh and return the created match isotopes.
+    1. Check for existing match isotopes to avoid duplication.
+    2. Bulk-insert the new matches into the database and commit the transaction.
 
     :param match_isotopes: List of match isotope data for creating matches.
     :type match_isotopes: list[MatchIsotopeBase]
@@ -233,39 +232,44 @@ async def create_match_isotopes(
     sample_item_id = match_isotopes[0].sample_item_id
     target_isotope_ids = [mi.target_isotope_id for mi in match_isotopes]
 
+    # All column values are generated client-side, so the rows can be built up
+    # front and inserted in bulk without reading anything back from the database.
+    utc_created = datetime.now(timezone.utc)
+    rows = [
+        {
+            **mi.model_dump(),
+            "match_isotope_utc_created": utc_created,
+            "match_isotope_utc_modified": None,
+        }
+        for mi in match_isotopes
+    ]
+
     async with async_session() as session:
         # Step 1: Check for existing matches to avoid duplication.
-        stmt = select(MatchIsotope).where(
-            and_(
-                MatchIsotope.sample_item_id == sample_item_id,
-                MatchIsotope.target_isotope_id.in_(target_isotope_ids),
+        stmt = (
+            select(MatchIsotope.match_isotope_id)
+            .where(
+                and_(
+                    MatchIsotope.sample_item_id == sample_item_id,
+                    MatchIsotope.target_isotope_id.in_(target_isotope_ids),
+                )
             )
+            .limit(1)
         )
-        existing_match_isotopes = (await session.execute(stmt)).scalars().all()
         # If existing match isotopes are found, raise a DuplicateException to prevent overwriting.
-        if existing_match_isotopes:
+        if await session.scalar(stmt) is not None:
             raise DuplicateException(
                 "Match isotopes already exist for the given sample item and target isotopes"
             )
 
-        # Step 2: Insert the new match isotope into the database and commit the transaction.
-        new_match_isotopes = [
-            MatchIsotope(
-                **mi.model_dump(), match_isotope_utc_created=datetime.now(timezone.utc)
-            )
-            for mi in match_isotopes
-        ]
-        session.add_all(new_match_isotopes)
+        # Step 2: Bulk-insert the new match isotopes and commit the transaction.
+        await session.execute(insert(MatchIsotope), rows)
         await session.commit()
 
-        # Step 3: Refresh the match isotopes to get updated data from the database.
-        for match_isotope in new_match_isotopes:
-            await session.refresh(match_isotope)
-
-    # Step 4: Return created match isotopes
-    message = f"{len(new_match_isotopes)} match isotope(s) created successfully."
+    # Step 3: Return created match isotopes
+    message = f"{len(rows)} match isotope(s) created successfully."
     runtime.logger.info(message)
     return {
         "message": message,
-        "data": [match_isotope.to_dict() for match_isotope in new_match_isotopes],
+        "data": rows,
     }

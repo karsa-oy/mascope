@@ -221,11 +221,11 @@ async def create_match_samples(
                 session.add(new_match_sample)
                 new_match_samples.append(new_match_sample)
 
-        # Step 5: Commit the transaction and refresh the newly created match samples.
+        # Step 5: Commit the transaction. All values are set client-side and the
+        # session keeps objects loaded after commit (expire_on_commit=False),
+        # so no per-row refresh is needed.
         if new_match_samples:
             await session.commit()
-            for sample in new_match_samples:
-                await session.refresh(sample)
 
     # Step 6: Generate result message
     total_requested = len(match_samples)

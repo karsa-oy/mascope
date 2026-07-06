@@ -239,11 +239,11 @@ async def create_match_collections(
                     session.add(new_match_collection)
                     processed_collections.append(new_match_collection)
 
-        # Step 5: Commit transaction and refresh
+        # Step 5: Commit transaction. All values are set client-side and the
+        # session keeps objects loaded after commit (expire_on_commit=False),
+        # so no per-row refresh is needed.
         if processed_collections:
             await session.commit()
-            for collection in processed_collections:
-                await session.refresh(collection)
 
     # Step 6: Generate result message
     total_requested = len(match_collections)

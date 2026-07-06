@@ -1,6 +1,5 @@
 import pandas as pd
 from sqlalchemy import (
-    and_,
     select,
 )
 
@@ -223,10 +222,9 @@ async def aggregate_match_isotope_filtered_data(
             )
             return targets_df
 
-        target_isotope_ids = targets_df["target_isotope_id"].tolist()
-
-        # c. Combine sample and targets query to fetch relevant match isotopes data.
-        # Fetch match isotopes
+        # c. Fetch match isotopes for the samples in scope. Restricting to the
+        # batch's target isotopes happens via the inner merge with targets_df
+        # below, so no (potentially huge) target-isotope IN list is needed here.
         match_isotopes_query = (
             select(
                 MatchIsotope.sample_item_id,
@@ -240,12 +238,7 @@ async def aggregate_match_isotope_filtered_data(
                 MatchIsotope.match_score,
             )
             .select_from(MatchIsotope)
-            .where(
-                and_(
-                    MatchIsotope.sample_item_id.in_(sample_item_ids),
-                    MatchIsotope.target_isotope_id.in_(target_isotope_ids),
-                )
-            )
+            .where(MatchIsotope.sample_item_id.in_(sample_item_ids))
         )
 
         match_isotopes_result = await session.execute(match_isotopes_query)
@@ -424,6 +417,11 @@ async def aggregate_and_create_matches(
     :param match_params: Additional match parameters.
     :return: A dictionary with a message and log of actions taken.
     """
+    # Whether this call aggregates a whole batch (rather than a single sample).
+    # Batch aggregation creates all matches in one burst at the end, so it
+    # notifies the frontend once for the batch instead of once per sample.
+    batch_scope = sample_item_id is None and sample_batch_id is not None
+
     try:
         _, sample_ref = await fetch_sample_item_ids(sample_item_id, sample_batch_id)
     except NotFoundException as e:
@@ -508,25 +506,46 @@ async def aggregate_and_create_matches(
         for record in result.get("data", []):
             sample_item_ids.add(record.get("sample_item_id"))
 
-    # After all creations, emit notification events for each affected sample item
+    # After all creations, emit notification events so the frontend refreshes.
     if not sample_batch_id and sample_item_ids:
         # fetch any sample to get the batch ID
         first_sample_item_id = next(iter(sample_item_ids))
         sample = await fetch_sample(first_sample_item_id)
         sample_batch_id = sample.sample_batch_id
 
+    if batch_scope:
+        # Batch aggregation writes every sample's matches in one final burst, so
+        # a per-sample match event storm would just tell the frontend to reload N
+        # times. Emit a single "batch_match_created" event for the whole batch.
+        if sample_batch_id and sample_item_ids:
+            await emit_record_created(
+                record_type="batch_match",
+                record_id=sample_batch_id,
+                record={"sample_batch_id": sample_batch_id},
+                room=sample_batch_id,
+            )
+    else:
+        # Single-sample aggregation: notify per sample so an open sample view can
+        # update incrementally.
+        for sample_item_id in sample_item_ids:
+            # Emit "sample_match_created" notification event
+            await emit_record_created(
+                record_type="sample_match",
+                record_id=sample_item_id,
+                record={
+                    "sample_item_id": sample_item_id,
+                    "sample_batch_id": sample_batch_id,
+                },
+                room=sample_batch_id,
+            )
+
+    # Peak views are per-sample regardless of scope: an open peak list must
+    # refresh its match/formula annotations after a rematch. Each event is
+    # scoped to its sample room, so this is not the batch-chart "storm" the
+    # single "batch_match_created" event above avoids - only a client actually
+    # viewing that sample's peaks is in the room.
     for sample_item_id in sample_item_ids:
-        # Emit "sample_match_created" notification event
-        await emit_record_created(
-            record_type="sample_match",
-            record_id=sample_item_id,
-            record={
-                "sample_item_id": sample_item_id,
-                "sample_batch_id": sample_batch_id,
-            },
-            room=sample_batch_id,
-        )
-        # Emit "peak_reload" notification event since "target_isotope_formula" may have changed
+        # "target_isotope_formula" (and match category) may have changed.
         await emit_record_reload(
             record_type="peak",
             room=sample_item_id,
