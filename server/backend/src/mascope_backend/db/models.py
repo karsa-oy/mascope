@@ -1151,9 +1151,7 @@ class PeakAssignment(Base):
     match_score: Mapped[Optional[float]] = mapped_column(Float)
     mz_error_ppm: Mapped[Optional[float]] = mapped_column(Float)
     abundance_error: Mapped[Optional[float]] = mapped_column(Float)
-    tier: Mapped[str] = mapped_column(
-        String(24), server_default=text("'unassigned'")
-    )
+    tier: Mapped[str] = mapped_column(String(24), server_default=text("'unassigned'"))
     target_compound_id: Mapped[Optional[str]] = mapped_column(
         String(16),
         ForeignKey("target_compound.target_compound_id", ondelete="SET NULL"),

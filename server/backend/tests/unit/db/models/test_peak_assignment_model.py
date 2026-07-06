@@ -97,27 +97,21 @@ async def test_create_run_and_assignments(session, db_test_run, db_test_sample_i
     session.add_all([m0, child])
     await session.flush()
 
-    run = await session.get(
-        PeakAssignmentRun, db_test_run.peak_assignment_run_id
-    )
+    run = await session.get(PeakAssignmentRun, db_test_run.peak_assignment_run_id)
     assert run is not None
     assert run.engine_version == "0.1.0-test"
     assert run.config["mz_precision_ppm"] == 10.0
 
     result = await session.execute(
         select(PeakAssignment)
-        .where(
-            PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id
-        )
+        .where(PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id)
         .order_by(PeakAssignment.sample_peak_id)
     )
     assignments = result.scalars().all()
     assert len(assignments) == 2
     assert assignments[0].role == "M0"
     assert assignments[1].role == "iso_child"
-    assert (
-        assignments[1].owner_peak_assignment_id == assignments[0].peak_assignment_id
-    )
+    assert assignments[1].owner_peak_assignment_id == assignments[0].peak_assignment_id
 
 
 @pytest.mark.asyncio
@@ -125,9 +119,7 @@ async def test_single_owner_per_peak_is_enforced(
     session, db_test_run, db_test_sample_item
 ):
     """The unique constraint rejects a second row for the same peak in a run."""
-    session.add(
-        _assignment(db_test_run, db_test_sample_item.sample_item_id, "peak-1")
-    )
+    session.add(_assignment(db_test_run, db_test_sample_item.sample_item_id, "peak-1"))
     await session.flush()
 
     session.add(
@@ -143,9 +135,7 @@ async def test_single_owner_per_peak_is_enforced(
 
 
 @pytest.mark.asyncio
-async def test_match_score_range_is_enforced(
-    session, db_test_run, db_test_sample_item
-):
+async def test_match_score_range_is_enforced(session, db_test_run, db_test_sample_item):
     """The check constraint rejects scores outside [0, 1] but allows NULL."""
     session.add(
         _assignment(
@@ -178,9 +168,7 @@ async def test_deleting_run_cascades_to_assignments(
     session, db_test_run, db_test_sample_item
 ):
     """Deleting a run removes its assignment rows via ON DELETE CASCADE."""
-    assignment = _assignment(
-        db_test_run, db_test_sample_item.sample_item_id, "peak-1"
-    )
+    assignment = _assignment(db_test_run, db_test_sample_item.sample_item_id, "peak-1")
     session.add(assignment)
     await session.flush()
 

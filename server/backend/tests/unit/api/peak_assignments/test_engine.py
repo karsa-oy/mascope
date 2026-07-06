@@ -383,10 +383,7 @@ class TestUntargetedMatches:
         child = by_peak["pB"]
         assert child["role"] == ROLE_ISO_CHILD
         assert child["isotope_label"] == "13C"
-        assert (
-            child["owner_peak_assignment_id"]
-            == by_peak["pA"]["peak_assignment_id"]
-        )
+        assert child["owner_peak_assignment_id"] == by_peak["pA"]["peak_assignment_id"]
 
     def test_rows_without_observed_peak_are_skipped(self):
         assignments = untargeted_matches_to_peak_assignments(
@@ -411,9 +408,7 @@ class TestUntargetedMatches:
         )
         by_peak = {a["sample_peak_id"]: a for a in assignments}
         assert by_peak["pA"]["assigned_formula"] == "fmt(C5H10O2)"
-        assert by_peak["pA"]["alternatives"][0]["assigned_formula"] == (
-            "fmt(C4H8N2O)"
-        )
+        assert by_peak["pA"]["alternatives"][0]["assigned_formula"] == ("fmt(C4H8N2O)")
 
     def test_nan_mz_error_falls_back_to_composition_error(self):
         # A NaN mz_error_ppm (present column, no isotope-envelope error for this
