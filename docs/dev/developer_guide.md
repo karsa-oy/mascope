@@ -2513,28 +2513,32 @@ This library exposes a public Python SDK for end-users to leverage especially in
 
 #### Publish
 
-To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.org/), you need to register an account and generate an API token. Then follow the steps:
+Publishing to [PyPI](https://pypi.org/) is automated for both `mascope-sdk` and
+`mascope-tools` by the `publish-pypi` workflow
+(`.github/workflows/publish-pypi.yaml`). To release a new version:
 
-1. Set the package version manually in `libraries/sdk/pyproject.toml` to the last commit date in ISO format on the branch you are releasing from:
-
-   ```sh
-   git log -1 --date=format:"%Y.%m.%d" --format="%ad"   # Get the commit date
-   2025.6.19                                            # Example date output to copy
-   ```
-
-2. Build the distributable from the SDK directory:
+1. In a PR, set `version` in the package's `pyproject.toml`
+   (`libraries/sdk/` or `libraries/tools/`) to the commit date in unpadded
+   CalVer (e.g. `2026.7.6` — no leading zeros; PEP 440 strips them anyway):
 
    ```sh
-   cd libraries/sdk
-   uv build                                             # Build distributable
+   git log -1 --date=format:"%Y.%-m.%-d" --format="%ad"   # Version to copy
    ```
 
-3. Publish from the mascope repo root (important: `uv build` creates `dist/` in the root directory, not in `libraries/sdk/`):
+2. Merge to `master`. The workflow compares each package's version against
+   PyPI, and builds, import-checks and uploads the ones that are new. Versions
+   already on PyPI are skipped, so re-runs and unrelated pushes are no-ops.
 
-   ```sh
-   cd ../..                                             # Navigate back to mascope root
-   uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
-   ```
+Authentication uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+(OIDC) — there are no tokens to manage. Each PyPI project is configured
+(pypi.org → project → Publishing) to trust this repository's
+`publish-pypi.yaml` workflow and the `pypi` GitHub environment; approval
+requirements can be set on that environment in the repository settings.
+
+To publish manually (e.g. from a fork or in an emergency), the underlying
+steps are in `.github/scripts/publish-package.sh`: `uv build --package
+mascope_sdk` from the repo root (note: `dist/` is created in the root, not in
+the package directory), then `uv publish --token <MY_TOKEN>`.
 
 ### Chemical formulas and custom elements
 
