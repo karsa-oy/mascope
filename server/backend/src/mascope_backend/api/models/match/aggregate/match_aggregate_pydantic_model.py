@@ -1,9 +1,10 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.models.target.compounds.target_compound_pydantic_model import (
     TargetCompoundMatches,
+    validate_compound_formula,
 )
 from mascope_match.params import (
     OrbiMatchParams,
@@ -54,6 +55,17 @@ class AggregateSampleMatchCompoundsBody(BaseModel):
         None,
         description="List of ion mechanism ids to use; if none are provided, sample batch defaults are used.",
     )
+
+    @field_validator("target_compound_formulas")
+    @classmethod
+    def _validate_formulas(cls, formulas: list[str]) -> list[str]:
+        # This endpoint builds TargetCompound rows directly (bypassing the
+        # TargetCompound model), so apply the same formula validation here;
+        # otherwise a numeric mass or invalid formula silently yields
+        # adduct-only ions or a compound that can never match.
+        for formula in formulas:
+            validate_compound_formula(formula)
+        return formulas
 
 
 class AggregateAndCreateMatchesBody(AggregateMatchIsotopeFilteredDataBody):

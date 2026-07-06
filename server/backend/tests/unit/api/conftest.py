@@ -169,49 +169,6 @@ async def test_target_compounds_by_composition(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def test_target_compounds_by_mass(
-    async_session_factory: Callable,
-) -> list[tuple[float, TargetCompound]]:
-    """Create test target compound records by mass instead of composition.
-
-    Session-scoped: created once and reused across all unit tests that need
-    mass-based target compounds.
-
-    :param async_session_factory: Factory for creating database sessions
-    :type async_session_factory: Callable
-
-    :return: List of tuples containing target compound masses and their corresponding
-             objects
-    :rtype: list[tuple[float, TargetCompound]]
-    """
-
-    # Define the target compound masses to be used in tests
-    # These are example masses, you can adjust them as needed for your tests
-    masses = [0.0, 18.01056, 60.03236, 136.12520]
-
-    async with async_session_factory() as session:
-        target_compounds = [
-            TargetCompound(
-                target_compound_id=gen_test_id(),
-                target_compound_name=None,
-                target_compound_formula=str(mass),
-                cas_number=None,
-            )
-            for i, mass in enumerate(masses)
-        ]
-        for target_compound in target_compounds:
-            session.add(target_compound)
-
-        await session.commit()
-
-        # Refresh to get all attributes
-        for target_compound in target_compounds:
-            await session.refresh(target_compound)
-
-    return list(zip(masses, target_compounds))
-
-
-@pytest_asyncio.fixture(scope="session")
 async def unit_test_workspace(async_session_factory):
     """Create a workspace for unit tests that need datasets."""
     async with async_session_factory() as session:

@@ -359,12 +359,6 @@ async def create_target_compound(
             continue  # as ions & isotopes are already there in this case
 
         # STEP2: Proceed to creating new target compound record and generating target ions and isotopes for the compound
-        try:
-            # Try if target compound is given by mass (try to parse composition into float)
-            target_compound_mass = float(target_compound.target_compound_formula)
-        except ValueError:
-            target_compound_mass = None
-
         # Add the compound to session (before creating ions that reference it)
         session.add(target_compound)
 
@@ -378,7 +372,6 @@ async def create_target_compound(
         await create_target_ions(
             target_compound=target_compound,
             ionization_mechanisms=ionization_mechanisms,
-            target_compound_mass=target_compound_mass,
             independent_transaction=False,
             session=session,
         )

@@ -20,11 +20,16 @@ from mascope_backend.db import (
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
-from mascope_molmass import Formula
-from mascope_molmass.elements import ELECTRON, ELEMENTS
+from mascope_tools.composition.config import ELECTRON_MASS
+from mascope_tools.composition.custom_elements import CUSTOM_ELEMENTS
 from mascope_tools.composition.finder import replace_atom_with_isotope
 from mascope_tools.composition.heuristic_filter import extract_isotope_labels
-from mascope_tools.composition.utils import normalize_formula_with_isotopes
+from mascope_tools.composition.utils import (
+    assert_valid_formula,
+    parse_composition,
+    parse_formula_tokens,
+    to_hill_notation,
+)
 
 
 # Threshold for high resolution isotope peaks prediction
@@ -52,32 +57,28 @@ class UnknownCustomElement(Exception):
     pass
 
 
-def charge_string(raw_ion: Formula) -> str:
-    """Get charge string (+/-) based on ion formula
+def charge_string(charge: int) -> str:
+    """Get charge string (+/-) for an ion charge.
 
-    :param raw_ion: Formula instance of the ion
-    :type raw_ion: Formula
-    :return: Charge string, either + or -
+    :param charge: Ion charge (e.g. +1, -1, 0)
+    :type charge: int
+    :return: Charge string, either "+", "-", or "" for a neutral
     :rtype: str
 
     Examples
     --------
-    >>> from mascope_molmass import Formula
-    >>> charge_string(Formula("H+"))
+    >>> charge_string(1)
     '+'
-    >>> charge_string(Formula("Cl-"))
+    >>> charge_string(-1)
     '-'
-    >>> charge_string(Formula("H2O"))
+    >>> charge_string(0)
     ''
     """
-    charge_str = ""
-    if raw_ion.charge == -1:
-        charge_str = "-"
-    elif raw_ion.charge == +1:
-        charge_str = "+"
-    else:
-        charge_str = ""
-    return charge_str
+    if charge > 0:
+        return "+"
+    if charge < 0:
+        return "-"
+    return ""
 
 
 def generate_target_ions_from_composition(
@@ -86,8 +87,9 @@ def generate_target_ions_from_composition(
 ) -> tuple[list[TargetIon], list[TargetIsotope]]:
     """Generate target ions and isotopes based on target compound composition and given ionization mechanisms
 
-    Leverages mascope_molmass.Formula to compute ion formulas (compound formula + ionization mechanism),
-    potentially including custom elements (e.g. ^N). Predicts isotopic patterns using IsoSpecPy.
+    Combines the neutral formula with each ionization mechanism (formula addition/
+    subtraction), potentially including custom elements (e.g. ^N). Predicts isotopic
+    patterns using IsoSpecPy.
 
     :param target_compound: Target compound to use as a base for the ions
     :type target_compound: TargetCompoundBase
@@ -101,12 +103,31 @@ def generate_target_ions_from_composition(
 
     # generate and create ion records
     target_compound_formula = target_compound.target_compound_formula.rstrip()
+
+    # parse_composition silently drops characters it does not recognise, so an
+    # invalid formula (garbage like 'xyz', a leftover numeric mass, or an unknown
+    # custom element) would otherwise yield an empty/partial composition and
+    # produce bogus adduct-only ions - or make IsoSpecPy raise further down. The
+    # retired molmass fork raised FormulaError here, which the caller treated as
+    # "skip". Preserve that: reject the whole compound (no ions) up front. This
+    # also guards existing (pre-validation) rows reached via create_target_ions.
+    try:
+        assert_valid_formula(target_compound_formula)
+    except ValueError as e:
+        runtime.logger.warning(
+            f"Skipping target compound with invalid formula "
+            f"'{target_compound_formula}': {e}"
+        )
+        return [], []
+
     for ionization_mechanism in ionization_mechanisms:
         mechanism = ionization_mechanism.ionization_mechanism
 
         try:
-            compound_formula = _get_compound_formula(target_compound_formula, mechanism)
-            raw_ion = _get_raw_ion(mechanism, compound_formula)
+            compound_composition = _get_compound_composition(
+                target_compound_formula, mechanism
+            )
+            ion_composition, ion_charge = _get_raw_ion(mechanism, compound_composition)
         except (SkipIonizationMechanism, ValueError) as e:
             runtime.logger.debug(
                 f"Skipping ionization mechanism {mechanism} for compound {target_compound_formula}: {e}"
@@ -120,27 +141,28 @@ def generate_target_ions_from_composition(
             # Try to create ions with other mechanisms
             continue
 
-        # Strip brackets [] and charge from formula
-        ion_formula = raw_ion._formula_nocharge
-        # Remove potential explicit isotopes in the formula
-        ion_formula = Formula(normalize_formula_with_isotopes(ion_formula)).formula
+        # Ion formula (no charge) in classic Hill notation. Explicit isotopes are
+        # folded into their base element (labelled '^X' elements are preserved).
+        ion_formula = to_hill_notation(ion_composition)
+        charge_str = charge_string(ion_charge)
 
         # construct and save ion row
         runtime.logger.debug(
-            f"Generated ion formula {raw_ion.formula} for compound {compound_formula} with mechanism {mechanism}"
+            f"Generated ion formula {ion_formula}{charge_str} for compound "
+            f"{target_compound_formula} with mechanism {mechanism}"
         )
         ion = TargetIon(
             target_ion_id=gen_id(16),
             target_compound_id=target_compound.target_compound_id,
             ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
-            target_ion_formula=ion_formula + charge_string(raw_ion),
+            target_ion_formula=ion_formula + charge_str,
             filter_params={},
         )
         target_ions.append(ion)
 
         predicted_isotopes = dict()
         # Predict high resolution isotopes
-        predicted_isotopes["HIGH"] = predict_isotopes(raw_ion, ion_formula)
+        predicted_isotopes["HIGH"] = predict_isotopes(ion_composition, ion_charge)
         # Group for low resolution
         predicted_isotopes["LOW"] = group_target_isotopes(
             *predicted_isotopes["HIGH"], RESOLUTION_LOW
@@ -164,10 +186,66 @@ def generate_target_ions_from_composition(
     return target_ions, target_isotopes
 
 
-def _get_compound_formula(
+def _mechanism_parts(ionization_mechanism: str) -> tuple[str, str, int]:
+    """Split an ionization mechanism into (body, operation, mechanism_charge).
+
+    The mechanism format is ``<operation><formula><modification polarity>``, e.g.
+    ``+H+``, ``+Br-``, ``-H+`` (deprotonation), or the single-character electron
+    transfer mechanisms ``+`` / ``-``.
+
+    - ``body`` is the modification formula with the leading operation and trailing
+      polarity stripped (empty for electron transfer).
+    - ``operation`` is ``"+"`` (addition) or ``"-"`` (subtraction). Electron
+      transfer is treated as an addition of the electron mechanism.
+    - ``mechanism_charge`` is the charge of the modification (+1 / -1), taken from
+      the trailing polarity; for electron transfer it is +1 (``+``) or -1 (``-``).
+
+    Examples
+    --------
+    >>> _mechanism_parts("+H+")
+    ('H', '+', 1)
+    >>> _mechanism_parts("+Br-")
+    ('Br', '+', -1)
+    >>> _mechanism_parts("-H+")
+    ('H', '-', 1)
+    >>> _mechanism_parts("+")
+    ('', '+', 1)
+    >>> _mechanism_parts("-")
+    ('', '+', -1)
+    """
+    if len(ionization_mechanism) == 1:
+        # Electron transfer: "+" abstracts an electron, "-" adds one.
+        return "", "+", (1 if ionization_mechanism == "+" else -1)
+    operation = ionization_mechanism[0]
+    trailing_polarity = ionization_mechanism[-1]
+    body = ionization_mechanism[1:-1]
+    mechanism_charge = 1 if trailing_polarity == "+" else -1
+    return body, operation, mechanism_charge
+
+
+def _composition_counts(formula: str) -> dict[str, int]:
+    """Parse ``formula`` into a plain ``{symbol: count}`` dict, preserving labelled
+    '^X' custom elements. Uses ``parse_composition`` (which handles parentheses and
+    folds explicit isotopes into their base element) but returns a plain dict so
+    that count arithmetic does not go through pyteomics' element re-parsing, which
+    rejects the bare '^N' symbol."""
+    return dict(parse_composition(formula))
+
+
+def _combine_counts(
+    compound_counts: dict[str, int], mechanism_counts: dict[str, int], *, add: bool
+) -> dict[str, int]:
+    """Add or subtract element counts, dropping symbols that reach zero."""
+    combined = dict(compound_counts)
+    for symbol, count in mechanism_counts.items():
+        combined[symbol] = combined.get(symbol, 0) + (count if add else -count)
+    return {symbol: count for symbol, count in combined.items() if count > 0}
+
+
+def _get_compound_composition(
     target_compound_formula: str, ionization_mechanism: str
-) -> Formula | None:
-    """Get compound formula as Formula instance, handling special cases.
+) -> dict[str, int] | None:
+    """Get the neutral compound composition, handling special cases.
 
     :param target_compound_formula: Target compound formula string
     :type target_compound_formula: str
@@ -176,15 +254,15 @@ def _get_compound_formula(
     :raises SkipIonizationMechanism: If the ionization mechanism cannot be applied:
         - Electron transfer on empty formula
         - Abstraction from empty formula
-    :return: Compound formula as Formula instance, or None for empty formula "()"
-    :rtype: Formula | None
+        - Not enough atoms of a subtracted element
+    :return: Compound composition as ``{symbol: count}``, or None for empty "()"
+    :rtype: dict[str, int] | None
     """
     runtime.logger.debug(
         f"Processing compound formula '{target_compound_formula}' with ionization mechanism '{ionization_mechanism}'"
     )
     # Handle the special case when generating ions for empty formula "()"
     if target_compound_formula == "()":
-        compound_formula = None
         if ionization_mechanism == "-" or ionization_mechanism == "+":
             # Electron transfer does not apply
             raise SkipIonizationMechanism(
@@ -195,91 +273,104 @@ def _get_compound_formula(
             raise SkipIonizationMechanism(
                 "Subtraction mechanisms do not apply to empty formula"
             )
-    elif ionization_mechanism.startswith("-"):
-        # For subtraction mechanisms, ensure the compound formula can support it
-        compound_formula = Formula(target_compound_formula)
-        mechanism_formula = Formula(ionization_mechanism[1:])
-        for (
-            element,
-            iso_counts,
-        ) in mechanism_formula._elements.items():
-            # Check if element to be subtracted exists in compound formula
-            if element not in compound_formula._elements:
+        return None
+
+    compound_composition = _composition_counts(target_compound_formula)
+
+    if ionization_mechanism.startswith("-") and len(ionization_mechanism) > 1:
+        # For subtraction mechanisms, ensure the compound composition can support it
+        body, _, _ = _mechanism_parts(ionization_mechanism)
+        mechanism_composition = _composition_counts(body)
+        for element, mech_count in mechanism_composition.items():
+            # Check if element to be subtracted exists in compound composition
+            if element not in compound_composition:
                 raise SkipIonizationMechanism(
-                    f"Element {element} from mechanism formula {mechanism_formula.formula} "
-                    f"not in compound formula {compound_formula.formula}"
+                    f"Element {element} from mechanism formula {to_hill_notation(mechanism_composition)} "
+                    f"not in compound formula {to_hill_notation(compound_composition)}"
                 )
             # Check if there are enough atoms of the element to be subtracted
-            mech_count = sum(iso_counts.values())
-            compound_count = sum(compound_formula._elements[element].values())
-            if mech_count > compound_count:
+            if mech_count > compound_composition[element]:
                 raise SkipIonizationMechanism(
                     f"Cannot subtract {mech_count} of element {element} from compound formula "
-                    f"{compound_formula.formula}"
+                    f"{to_hill_notation(compound_composition)}"
                 )
-    else:
-        compound_formula = Formula(target_compound_formula)
 
-    return compound_formula
+    return compound_composition
 
 
-def _get_raw_ion(ionization_mechanism: str, compound_formula: Formula) -> Formula:
-    """Get raw ion Formula based on ionization mechanism and compound formula.
-    Leverage molmass.Formula addition and subtraction operators
+def _get_raw_ion(
+    ionization_mechanism: str, compound_composition: dict[str, int] | None
+) -> tuple[dict[str, int], int]:
+    """Get the ion composition and charge for a mechanism and compound composition.
 
     :param ionization_mechanism: Ionization mechanism string
     :type ionization_mechanism: str
-    :param compound_formula: Compound formula as Formula instance
-    :type compound_formula: Formula
+    :param compound_composition: Neutral compound composition (None for empty "()")
+    :type compound_composition: dict[str, int] | None
     :raises UnknownIonizationMechanism: If the ionization mechanism is unknown.
-    :return: Raw ion as Formula instance
-    :rtype: Formula
+    :raises SkipIonizationMechanism: If the resulting ion has no atoms.
+    :return: 2-tuple of (ion composition as ``{symbol: count}``, ion charge)
+    :rtype: tuple[dict[str, int], int]
     """
-    if len(ionization_mechanism) > 1:
-        # Parse mechanism into Formula, excluding the operation sign (+/-)
-        mechanism_formula = Formula(ionization_mechanism[1:])
-        operation = ionization_mechanism[0]
-    else:
-        # For electron transfer, the entire mechanism (+/-) is used
-        mechanism_formula = Formula(ionization_mechanism)
-        # Electron is added for "-" and subtracted for "+"
-        operation = "+"
+    body, operation, mechanism_charge = _mechanism_parts(ionization_mechanism)
+    mechanism_composition = _composition_counts(body)
 
     if operation == "+":
-        # Addition mechanism
-        if compound_formula is None:
+        # Addition mechanism (also electron transfer, body empty)
+        if compound_composition is None:
             # Special case: empty formula "()"
-            raw_ion = mechanism_formula
+            ion_composition = mechanism_composition
         else:
-            raw_ion = compound_formula + mechanism_formula
+            ion_composition = _combine_counts(
+                compound_composition, mechanism_composition, add=True
+            )
+        ion_charge = mechanism_charge
     elif operation == "-":
-        # Subtraction mechanism
-        raw_ion = compound_formula - mechanism_formula
+        # Subtraction mechanism; the resulting ion charge is the opposite of the
+        # subtracted modification's charge (e.g. removing H+ yields an anion).
+        ion_composition = _combine_counts(
+            compound_composition, mechanism_composition, add=False
+        )
+        ion_charge = -mechanism_charge
     else:
         raise UnknownIonizationMechanism(ionization_mechanism)
 
-    return raw_ion
+    if not ion_composition:
+        # E.g. an empty-modification mechanism on the empty compound "()", or a
+        # subtraction that removes every atom. An atomless ion has no meaningful
+        # formula or isotope pattern (its mass would be the electron mass alone).
+        raise SkipIonizationMechanism(
+            f"Mechanism {ionization_mechanism} yields an ion with no atoms"
+        )
+
+    return ion_composition, ion_charge
 
 
 def predict_isotopes(
-    raw_ion: Formula, ion_formula: str
+    ion_composition: dict[str, int], ion_charge: int
 ) -> tuple[list[float], list[float], list[str]]:
-    """Predicts isotope masses and abundances for a given ion formula using IsoSpecPy.
+    """Predicts isotope masses and abundances for a given ion using IsoSpecPy.
 
     Handles custom elements (e.g., ^N for isotopically labelled nitrogen) by:
     1. Computing isotope pattern for the non-custom part using IsoSpecPy
     2. Multiplying with custom element isotope distributions
 
-    :param raw_ion: Formula instance of the ion
-    :type raw_ion: Formula
-    :param ion_formula: Ion formula string
-    :type ion_formula: str
+    :param ion_composition: Composition of the ion as ``{symbol: count}`` (may
+        contain '^X' custom elements)
+    :type ion_composition: dict[str, int]
+    :param ion_charge: Ion charge (e.g. +1, -1)
+    :type ion_charge: int
     :raises UnknownCustomElement: If a custom element is unknown.
     :return: 3-tuple lists of (m/z values, relative abundances, isotope formulae)
     :rtype: tuple[list[float], list[float], list[str]]
     """
-    custom_elements = _extract_custom_elements(raw_ion, ion_formula)
-    base_formula = _remove_custom_elements_from_formula(ion_formula, custom_elements)
+    custom_elements = _extract_custom_elements(ion_composition)
+    base_composition = {
+        symbol: count
+        for symbol, count in ion_composition.items()
+        if not symbol.startswith("^") and count > 0
+    }
+    base_formula = to_hill_notation(base_composition)
 
     # Compute isotope pattern for the base (non-custom) part
     base_masses, base_probs, base_labels = _compute_base_isotope_pattern(base_formula)
@@ -297,84 +388,57 @@ def predict_isotopes(
         ]
 
     # Correct masses for electron charge and add charge string to formulae
-    charge = raw_ion.charge
-    masses = [(m - ELECTRON.mass * charge) / abs(charge) for m in masses]
-    charge_str = charge_string(raw_ion)
+    masses = [(m - ELECTRON_MASS * ion_charge) / abs(ion_charge) for m in masses]
+    charge_str = charge_string(ion_charge)
     formulae = [f + charge_str for f in formulae]
 
     return masses, probs, formulae
 
 
-def _extract_custom_elements(raw_ion: Formula, ion_formula: str) -> dict[str, dict]:
-    """Extract custom element data from a formula.
+def _extract_custom_elements(ion_composition: dict[str, int]) -> dict[str, dict]:
+    """Extract custom element data from an ion composition.
 
-    :param raw_ion: Formula instance containing element data
-    :param ion_formula: Ion formula string to check for custom elements
+    Isotope masses and abundances come from the shared custom-element registry
+    (mascope_tools.composition.custom_elements); the labelled-reagent purity sets
+    the heavy/light isotope split.
+
+    :param ion_composition: Ion composition to check for custom elements
     :return: Dict mapping custom element symbols to their properties
-    :raises UnknownCustomElement: If a custom element is not in ELEMENTS
+    :raises UnknownCustomElement: If a custom element is not in the registry
     """
     custom_elements = {}
 
-    if "^" not in ion_formula:
-        return custom_elements
-
-    elements = raw_ion._elements
-    for symbol in elements:
-        if not symbol.startswith("^"):
+    for symbol, count in ion_composition.items():
+        if not symbol.startswith("^") or count <= 0:
             continue
 
-        try:
-            element = ELEMENTS[symbol]
-        except KeyError as e:
-            raise UnknownCustomElement(symbol) from e
+        element = CUSTOM_ELEMENTS.get(symbol)
+        if element is None:
+            raise UnknownCustomElement(symbol)
 
-        isotope_keys = list(element.isotopes.keys())
+        # Labelled distribution: heaviest isotope at `purity`, remainder split to
+        # the lighter isotope(s). For the two-isotope elements defined today this
+        # is simply (1 - purity) on the light isotope, `purity` on the heavy one.
+        purity = element.default_purity
+        abundances = [1.0 - purity] + [purity] * (len(element.isotopes) - 1)
+
         custom_elements[symbol] = {
-            "count": elements[symbol][0],
-            "regular_symbol": symbol[1:],  # Remove ^ prefix
-            "lightest_mass_number": isotope_keys[0],
+            "count": count,
+            "regular_symbol": element.base_element,
+            "lightest_mass_number": element.isotopes[0][1],
             "isotopes": [
                 {
-                    "mass": iso.mz,
-                    "abundance": iso.abundance,
-                    "mass_number": iso.massnumber,
+                    "mass": mass,
+                    "abundance": abundance,
+                    "mass_number": mass_number,
                 }
-                for iso in element.isotopes.values()
+                for (mass, mass_number), abundance in zip(
+                    element.isotopes, abundances
+                )
             ],
         }
 
     return custom_elements
-
-
-def _remove_custom_elements_from_formula(
-    ion_formula: str, custom_elements: dict[str, dict]
-) -> str:
-    """Remove custom elements from formula string for IsoSpecPy calculation.
-
-    Examples
-    --------
-    >>> _remove_custom_elements_from_formula("HN^NO6", {"^N": {}})
-    'HNO6'
-    >>> _remove_custom_elements_from_formula("[18O]C2H4^N", {"^N": {}})
-    'C2H4[18O]'
-    >>> _remove_custom_elements_from_formula("C6H12O6", {})
-    'C6H12O6'
-    >>> _remove_custom_elements_from_formula("", {})
-    ''
-
-    :param ion_formula: Original ion formula string
-    :param custom_elements: Dict of custom element data
-    :return: Formula string with custom elements removed, normalized
-    """
-    result = ion_formula
-    for symbol in custom_elements:
-        pattern = rf"{re.escape(symbol)}\d*"
-        result = re.sub(pattern, "", result)
-
-    if result:
-        result = Formula(result).formula
-
-    return result
 
 
 def _compute_base_isotope_pattern(
@@ -457,11 +521,13 @@ def _combine_with_custom_elements(
             # Concatenate custom element formulae
             custom_formula = "".join(c[2] for c in custom_combo)
 
-            # Combine and normalize using Formula to merge elements (e.g. NN -> N2)
-            # Then reorder to put isotope labels at the front
+            # Combine and normalize to merge elements (e.g. NN -> N2), then reorder
+            # to put isotope labels at the front.
             raw_combined = custom_formula + base_isotope_formula
             normalized = _reorder_isotopes_first(
-                Formula(raw_combined).formula if raw_combined else ""
+                to_hill_notation(parse_formula_tokens(raw_combined))
+                if raw_combined
+                else ""
             )
 
             # Merge duplicates by summing probabilities
@@ -629,99 +695,6 @@ def _multinomial_coeff(n: int, counts: list[int]) -> int:
     return result
 
 
-def generate_target_ions_from_mass(
-    target_compound_mass: float,
-    target_compound: TargetCompoundBase,
-    ionization_mechanisms: list[IonizationMechanism],
-) -> tuple[list[TargetIon], list[TargetIsotope]]:
-    """TODO: deprecate this function in favor of composition-based generation
-
-    Generate target ions and isotopes based on target compound mass and given
-    ionization mechanisms
-
-    :param target_compound_mass: Mass of the target compound (composition not known)
-    :type target_compound_mass: float
-    :param target_compound: Target compound to use as a base for the ions
-    :type target_compound: TargetCompoundBase
-    :param ionization_mechanisms: List of ionization mechanisms to apply to the target compound
-    :type ionization_mechanisms: list[IonizationMechanism]
-    :return: 2-tuple of (
-        list of ions (instances of TargetIon),
-        list of isotopes (instances of TargetIsotope)
-        )
-    :rtype: tuple
-    """
-    target_ions = []
-    target_isotopes = []
-
-    # generate ion and isotope records
-    for ionization_mechanism in ionization_mechanisms:
-        mechanism = ionization_mechanism.ionization_mechanism
-        polarity = ionization_mechanism.ionization_mechanism_polarity
-        # construct ion
-        ion = TargetIon(
-            target_ion_id=gen_id(16),
-            target_compound_id=target_compound.target_compound_id,
-            ionization_mechanism_id=ionization_mechanism.ionization_mechanism_id,
-            target_ion_formula=(f"{target_compound_mass:.4f}" + mechanism),
-            filter_params={},
-        )
-        target_ions.append(ion)
-
-        # construct isotopes
-        if len(mechanism) > 1:
-            # Addition or abstraction mechanism
-            # Calculate isotopic pattern of the ionization mechanism
-            raw_ion = Formula("(" + mechanism[1:-1] + ")" + polarity)
-            is_adduct = mechanism[0] == "+"
-            if is_adduct:
-                # Addition mechanism
-                raw_isotopes = [
-                    (isotope.mz, isotope.fraction)
-                    for isotope in raw_ion.spectrum().values()
-                ]
-            else:
-                # Abstraction mechanism, no knowledge of the isotopic pattern
-                raw_isotopes = [(-raw_ion.mz, 1.0)]
-        else:
-            # Special case: electron transfer
-            is_addition = mechanism[0] == "-"
-            me = 0.00054858  # mass of an electron [Da]
-            raw_isotopes = [(me if is_addition else -me, 1.0)]
-        # Store high resolution isotopes
-        target_isotopes.extend(
-            [
-                TargetIsotope(
-                    target_isotope_id=gen_id(16),
-                    target_ion_id=ion.target_ion_id,
-                    mz=(target_compound_mass + mz),
-                    relative_abundance=fraction,
-                    resolution="HIGH",
-                    # Use the ion formula as placeholder
-                    target_isotope_formula=ion.target_ion_formula,
-                )
-                for mz, fraction in raw_isotopes
-            ]
-        )
-        # Store low resolution isotopes
-        target_isotopes.extend(
-            [
-                TargetIsotope(
-                    target_isotope_id=gen_id(16),
-                    target_ion_id=ion.target_ion_id,
-                    mz=(target_compound_mass + reagent_mz),
-                    relative_abundance=reagent_rel_abu,
-                    resolution="LOW",
-                    # Use the ion formula as placeholder
-                    target_isotope_formula=ion.target_ion_formula,
-                )
-                for reagent_mz, reagent_rel_abu in raw_isotopes
-            ]
-        )
-
-    return target_ions, target_isotopes
-
-
 def group_target_isotopes(
     masses: list, probs: list, formulae: list, resolution: float
 ) -> tuple[list, list, list]:
@@ -767,6 +740,13 @@ def group_target_isotopes(
 
         # Determine bin size
         bin_mask = (mz >= mz[i]) & (mz < mz[i] + dmz)
+
+        # A non-positive bin width (m/z <= 0, e.g. a degenerate atomless ion)
+        # leaves the mask empty, which would never advance the loop; fall back
+        # to a single-point bin so every isotope is emitted and i always moves.
+        if not bin_mask.any():
+            bin_mask = np.zeros(mz.size, dtype=bool)
+            bin_mask[i] = True
 
         # Extract values within the current bin
         mz_bin = mz[bin_mask]

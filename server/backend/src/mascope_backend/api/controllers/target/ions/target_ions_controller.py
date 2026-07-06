@@ -19,7 +19,6 @@ from mascope_backend.api.controllers.sample.batches.status.service import (
 )
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
-    generate_target_ions_from_mass,
 )
 from mascope_backend.api.lib.api_features import api_controller
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
@@ -271,17 +270,15 @@ async def get_target_ion(target_ion_id: str) -> dict:
 async def create_target_ions(
     target_compound: TargetCompoundBase,
     ionization_mechanisms: List[IonizationMechanism],
-    target_compound_mass: float = None,
     independent_transaction=False,
     session=None,
 ) -> dict:
     """Function to create target ion and target isotope records
     derived from a given target compound and list of ionization mechanisms to apply.
-    If target compound mass is given, it will be used instead of compound formula.
 
     Steps:
     1. Verify input parameters and initialize session if operation is an independent transaction.
-    2. Generate target ions and isotopes based on compound formula or mass.
+    2. Generate target ions and isotopes from the compound composition.
     3. Persist the generated ions and isotopes in the database.
     4. Return created ions, isotopes, and any message logs.
 
@@ -289,9 +286,6 @@ async def create_target_ions(
     :type target_compound: TargetCompoundBase
     :param ionization_mechanisms: List of ionization mechanisms to apply to the compound
     :type ionization_mechanisms: List[IonizationMechanism]
-    :param target_compound_mass: Mass of the target compound (if formula is not known),
-    defaults to None. If None, formula will be used.
-    :type target_compound_mass: float, optional
     :param independent_transaction: Flag indicating whether the create target ions is an independent transaction, defaults to False
     :type independent_transaction: bool, optional
     :param session: Database session, smust be gicen if not an independent transaction, defaults to None
@@ -303,24 +297,11 @@ async def create_target_ions(
     if independent_transaction:
         session = async_session()
 
-    # Step 2: Generate target ions and isotopes
-    if target_compound_mass is None:
-        # Parsing into float failed, target compound is given by composition
-        (
-            target_ions,
-            target_isotopes,
-        ) = generate_target_ions_from_composition(
-            target_compound, ionization_mechanisms
-        )
-    else:
-        # Try if target compound is given by mass (try to parse composition into float)
-        target_compound_mass = float(target_compound.target_compound_formula)
-        (
-            target_ions,
-            target_isotopes,
-        ) = generate_target_ions_from_mass(
-            target_compound_mass, target_compound, ionization_mechanisms
-        )
+    # Step 2: Generate target ions and isotopes from the compound composition.
+    (
+        target_ions,
+        target_isotopes,
+    ) = generate_target_ions_from_composition(target_compound, ionization_mechanisms)
 
     # Step 3: Persist generated ions and isotopes
     for target_isotope in target_isotopes:

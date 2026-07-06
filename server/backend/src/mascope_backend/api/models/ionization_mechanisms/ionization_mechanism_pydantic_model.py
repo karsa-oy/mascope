@@ -13,7 +13,7 @@ from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_backend.api.models.ionization_mechanisms.config import (
     ionization_mechanism_config,
 )
-from mascope_molmass import Formula
+from mascope_tools.composition.utils import assert_valid_formula
 
 
 class IonizationMechanismBaseValidator:
@@ -44,12 +44,23 @@ class IonizationMechanismBaseValidator:
                 "Invalid ionization mechanism: it cannot contain a combination of '+' and '-' in the middle."
             )
 
-        # Validate the ionization mechanism formula using mascope_molmass
+        # A multi-character mechanism must have a modification formula between
+        # the operation and charge signs: "++" / "--" denote an empty
+        # modification, which produces atomless ions downstream. Electron
+        # transfer is written as plain "+" or "-".
+        if len(value) > 1 and not value[1:-1]:
+            raise ValueError(
+                f"Invalid ionization mechanism '{value}': missing modification "
+                "formula; use '+' or '-' alone for electron transfer."
+            )
+
+        # Validate the modification formula (the mechanism body, without the
+        # leading operation and trailing charge sign). Raises on invalid
+        # characters or unknown elements. Electron transfer ("+"/"-") has no body.
+        formula_body = value[1:-1] if len(value) > 1 else ""
         try:
-            mechanism_formula = Formula(value[1:]) if len(value) > 1 else Formula(value)
-            # Access _elements to trigger parsing and potentially raise an error
-            mechanism_formula._elements
-        except Exception as e:
+            assert_valid_formula(formula_body)
+        except ValueError as e:
             raise ValueError(
                 f"Invalid ionization mechanism formula '{value}': {str(e)}"
             ) from e
