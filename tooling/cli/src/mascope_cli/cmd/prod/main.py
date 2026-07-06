@@ -184,6 +184,8 @@ def _compose_env(building: bool = False) -> dict[str, str]:
         MASCOPE_DB_DEFAULT_STATISTICS_TARGET=str(db_cfg.default_statistics_target),
         MASCOPE_DB_JIT=db_cfg.jit,
         MASCOPE_DB_AUTOVACUUM_MAX_WORKERS=str(db_cfg.autovacuum_max_workers),
+        # pg_dump --compress for the db_init pre-migration dump
+        MASCOPE_DUMP_COMPRESSION=db_cfg.dump_compression,
         # --- Container names ---
         MASCOPE_REDIS_CONTAINER_NAME=redis_cfg.get_redis_container_name(mode=_MODE),
         MASCOPE_BACKEND_CONTAINER_NAME=backend_cfg.get_backend_container_name(

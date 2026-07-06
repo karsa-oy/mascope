@@ -1705,6 +1705,21 @@ untested backup is not a backup.
 - `pg_dump` for large databases (tens of GB) can take several minutes — the
   dump file grows incrementally while in progress. restic uploads are
   incremental/deduplicated, so nightly pushes are much smaller than the first.
+- **Large databases: dump uncompressed.** `pg_dump -Fc` compresses with
+  single-core gzip, which is both the dump-time bottleneck and the reason
+  restic cannot deduplicate consecutive dumps (each night re-uploads the full
+  dump). Set in the env's `prod.mascope.toml`:
+
+  ```toml
+  [backend.database]
+  dump_compression = "0"
+  ```
+
+  This speeds up nightly dumps *and* the pre-migration dump during upgrades
+  (shorter downtime window), and lets restic deduplicate and zstd-compress
+  dump generations off-site. Uncompressed dumps take 2–4× more local disk —
+  lower `LOCAL_RETENTION_DAYS` in `backup.env` to compensate. One-off
+  override: `mascope prod db backup create --compress 0`.
 - Backup filenames embed a timestamp and the `cron` label, e.g.
   `mascope_test_env_20260313_040001_cron.dump`.
 - The script chains dump create and prune sequentially to avoid simultaneous
