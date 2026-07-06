@@ -15,6 +15,15 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   concurrency guard, the upload-context registry whose filename normalization
   decides whether an uploaded file is "registered", and the filestream watcher
   that must queue a file only once it has stopped growing.
+- Golden-dataset reproducibility test: the demo bundle's raw files are ingested
+  through the real upload -> convert -> match pipeline and the produced peaks
+  must reproduce the bundle's golden outputs within the manifest tolerances
+  (sub-0.1 ppm m/z). The demo stack gained a rebuild mode
+  (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
+  starts from scratch; CI runs the test nightly and on manual dispatch
+  (`.github/workflows/reproducibility.yaml`).
+- The `libraries/` test suites (chem, file, match, molmass, signal, thermo, tools)
+  now run in CI on every PR; previously they only ran when invoked locally.
 - Frontend unit tests for the notification hub (process tracking, badges,
   watcher dispatch, log retention) and the spreadsheet-paste table parser.
 - Unit tests for the core matching pipeline: the isotope-to-peak assignment
