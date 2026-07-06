@@ -157,9 +157,7 @@ async def get_peak_assignments(
                         PeakAssignmentRun.sample_item_id == sample_item_id,
                         PeakAssignmentRun.status == "completed",
                     )
-                    .order_by(
-                        PeakAssignmentRun.peak_assignment_run_utc_created.desc()
-                    )
+                    .order_by(PeakAssignmentRun.peak_assignment_run_utc_created.desc())
                     .limit(1)
                 )
             ).scalar_one_or_none()
@@ -178,9 +176,7 @@ async def get_peak_assignments(
 
         query = (
             select(PeakAssignment)
-            .where(
-                PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id
-            )
+            .where(PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id)
             .order_by(PeakAssignment.sample_peak_mz)
         )
         if tier:
@@ -278,8 +274,7 @@ async def _fetch_known_target_isotopes(
                 == TargetCompoundInTargetCollection.target_collection_id,
             )
             .where(
-                TargetCollectionInSampleBatch.sample_batch_id
-                == sample.sample_batch_id,
+                TargetCollectionInSampleBatch.sample_batch_id == sample.sample_batch_id,
                 TargetIon.ionization_mechanism_id.in_(ionization_mechanism_ids),
                 IonizationMechanism.ionization_mechanism_polarity == sample.polarity,
                 TargetIsotope.resolution == resolution_type,
@@ -307,17 +302,13 @@ async def _fetch_untargeted_ionizations(
     :param sample: Sample model object
     :return: (explicit notation strings, notation -> mechanism id mapping)
     """
-    mechanism_ids = await fetch_sample_ionization_mechanism_ids(
-        sample.sample_item_id
-    )
+    mechanism_ids = await fetch_sample_ionization_mechanism_ids(sample.sample_item_id)
     async with async_session() as session:
         mechanisms = (
             (
                 await session.execute(
                     select(IonizationMechanism).where(
-                        IonizationMechanism.ionization_mechanism_id.in_(
-                            mechanism_ids
-                        ),
+                        IonizationMechanism.ionization_mechanism_id.in_(mechanism_ids),
                         IonizationMechanism.ionization_mechanism_polarity
                         == sample.polarity,
                     )
@@ -346,13 +337,9 @@ def _load_sample_peaks(sample: Sample) -> pd.DataFrame:
     :param sample: Sample model object
     :return: DataFrame with sample_peak_id, mz, and intensity columns
     """
-    peak_data = extract_peaks(
-        sample.filename, sample.polarity, sample.t0, sample.t1
-    )
+    peak_data = extract_peaks(sample.filename, sample.polarity, sample.t0, sample.t1)
     instrument_type = get_instrument_type(sample.filename)
-    intensities = (
-        peak_data.heights if instrument_type == "orbi" else peak_data.areas
-    )
+    intensities = peak_data.heights if instrument_type == "orbi" else peak_data.areas
     peaks_df = pd.DataFrame(
         {
             "sample_peak_id": [str(peak_id) for peak_id in peak_data.peak_ids],
@@ -389,9 +376,7 @@ async def _finalize_run(
     async with async_session() as session:
         await session.execute(
             update(PeakAssignmentRun)
-            .where(
-                PeakAssignmentRun.peak_assignment_run_id == peak_assignment_run_id
-            )
+            .where(PeakAssignmentRun.peak_assignment_run_id == peak_assignment_run_id)
             .values(
                 status=status,
                 error=error,
@@ -522,8 +507,8 @@ async def assign_sample_peaks(
                 config.max_untargeted_peaks, "intensity"
             ).sort_values("mz")
 
-            notations, mechanism_id_by_notation = (
-                await _fetch_untargeted_ionizations(sample)
+            notations, mechanism_id_by_notation = await _fetch_untargeted_ionizations(
+                sample
             )
             if remainder_df.empty or not notations:
                 skip_reason = (
@@ -533,9 +518,7 @@ async def assign_sample_peaks(
                 )
                 runtime.logger.info(f"Skipping untargeted stage: {skip_reason}")
             else:
-                formula_ranges, _ = to_explicit_isotope_format(
-                    config.formula_ranges
-                )
+                formula_ranges, _ = to_explicit_isotope_format(config.formula_ranges)
                 search_config = CompositionSearchConfig(
                     ionizations=",".join(notations),
                     mass_range_ppm=config.mz_precision_ppm,
@@ -578,9 +561,7 @@ async def assign_sample_peaks(
         assigned_peak_ids.update(
             assignment["sample_peak_id"] for assignment in stage_b_assignments
         )
-        unassigned_df = peaks_df[
-            ~peaks_df["sample_peak_id"].isin(assigned_peak_ids)
-        ]
+        unassigned_df = peaks_df[~peaks_df["sample_peak_id"].isin(assigned_peak_ids)]
         unassigned_assignments = build_unassigned_assignments(
             unassigned_df,
             sample_item_id=sample_item_id,
