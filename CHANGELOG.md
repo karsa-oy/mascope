@@ -13,6 +13,22 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   retrieval), doubling as a breaking-change detector for the public REST API.
   They run in CI inside the demo-stack e2e job and locally with
   `MASCOPE_SDK_CONTRACT=1 uv run pytest libraries/sdk/tests/`.
+- Upload-to-browse e2e test: a real demo raw file is uploaded through the web
+  UI (Uppy/tus), the file-converter runs the real conversion -> peak detection
+  -> matching pipeline, and the result must appear in the Raw files browser.
+  Unit tests for the converter's building blocks: the peak-detection
+  concurrency guard, the upload-context registry whose filename normalization
+  decides whether an uploaded file is "registered", and the filestream watcher
+  that must queue a file only once it has stopped growing.
+- Golden-dataset reproducibility test: the demo bundle's raw files are ingested
+  through the real upload -> convert -> match pipeline and the produced peaks
+  must reproduce the bundle's golden outputs within the manifest tolerances
+  (sub-0.1 ppm m/z). The demo stack gained a rebuild mode
+  (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
+  starts from scratch; CI runs the test nightly and on manual dispatch
+  (`.github/workflows/reproducibility.yaml`).
+- The `libraries/` test suites (chem, file, match, molmass, signal, thermo, tools)
+  now run in CI on every PR; previously they only ran when invoked locally.
 - Frontend unit tests for the notification hub (process tracking, badges,
   watcher dispatch, log retention) and the spreadsheet-paste table parser.
 - Unit tests for the core matching pipeline: the isotope-to-peak assignment
@@ -32,6 +48,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Web UI file uploads work again on deployments served from a non-standard
+  port (e.g. the demo stack on `:8080`). nginx forwarded `X-Forwarded-Host`
+  without the port, the tus upload endpoint built its upload URL from it, and
+  every upload chunk was then sent to port 80 and refused. Found by the new
+  upload e2e test.
 - Frontend linting works again: migrated to the ESLint 9 flat config format (the legacy config had been silently ignored). The revived linter surfaced dormant chart bugs that are now fixed: the batch overview chart's log-scale zoom reset never fired, and two match spectra comparisons were always false.
 - The dashboard no longer renders a duplicate `id="app"` element inside the Vue mount point.
 - The axios error handlers no longer throw a `TypeError` (masking the real error) when a request fails before a response exists, e.g. a request-setup or network failure; the request/response `config` and body are now guarded before destructuring.
