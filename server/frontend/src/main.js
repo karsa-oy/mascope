@@ -10,6 +10,9 @@ import Ripple from 'primevue/ripple'
 
 import 'primeicons/primeicons.css'
 import '@phosphor-icons/web/regular'
+// Self-hosted Inter (weight 400, matching the former Google Fonts stylesheet);
+// fonts must not be fetched from third-party CDNs (GDPR: IP disclosure to Google)
+import '@fontsource/inter'
 
 import App from './App.vue'
 import router from './routes'
