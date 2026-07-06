@@ -1,0 +1,24 @@
+
+# MASCOPE DEVELOPMENT MODE CONFIGURATION
+# Overrides base.mascope.toml for dev mode
+
+# Each section may also have
+# log_level =  "trace", "debug", "info", "warning", "success", "error" or "critical"
+
+[backend]
+workers = 1  # uvicorn workers ("auto" || int)
+log_level = "debug"
+
+[backend.database]
+# --- PostgreSQL connection ---
+host = "localhost"
+
+# --- SQLAlchemy pool for single worker dev setup (higher pool size) ---
+pool_size = 5
+max_overflow = 10
+
+[backend.redis]
+host = "localhost"  # Dev Redis runs on localhost
+
+[file-converter]
+server = "localhost"  # Connect to dev backend
