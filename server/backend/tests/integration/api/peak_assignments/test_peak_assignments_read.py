@@ -96,9 +96,7 @@ async def test_get_assignments_with_explicit_run_id(guest_client, pa_test_data):
 
 
 @pytest.mark.asyncio
-async def test_get_assignments_unknown_run_id_returns_404(
-    guest_client, pa_test_data
-):
+async def test_get_assignments_unknown_run_id_returns_404(guest_client, pa_test_data):
     response = await guest_client.get(
         f"/api/peak-assignments/sample/{pa_test_data['sample_item_id']}",
         params={"peak_assignment_run_id": "does-not-exist-42"},
