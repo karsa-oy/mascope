@@ -75,9 +75,22 @@ def backup_create(
             ),
         ),
     ] = False,
+    compress: Annotated[
+        Optional[str],
+        typer.Option(
+            "--compress",
+            "-Z",
+            help=(
+                "pg_dump --compress value: a level ('0'..'9') or method:level "
+                "('zstd:1', PG16+). Defaults to backend.database.dump_compression "
+                "from config. '0' dumps much faster and deduplicates well in a "
+                "restic off-site repository."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """
-    Dump the environment's database to a compressed .dump file.
+    Dump the environment's database to a custom-format .dump file.
 
     Dumps are written to .runtime/database/backups/prod/ by default.
     Use --transfer to write to .runtime/database/transfer/ for cross-server
@@ -88,6 +101,7 @@ def backup_create(
         mascope prod db backup create
         mascope prod db backup create --env tof1 --label pre-migration
         mascope prod db backup create --transfer
+        mascope prod db backup create --compress 0
     """
     if not check_prerequisites(_MODE):
         return
@@ -113,9 +127,19 @@ def backup_create(
     database = db_cfg.get_postgres_database_name(source_env)
     dump_dir, mount = dirs(transfer, _MODE)
 
+    compression = compress if compress is not None else db_cfg.dump_compression
+
     runtime.logger.info(f"Backing up '{database}' → {dump_dir.name}/...")
     try:
-        path = pg_dump(container, db_cfg.user, database, dump_dir, mount, label)
+        path = pg_dump(
+            container,
+            db_cfg.user,
+            database,
+            dump_dir,
+            mount,
+            label,
+            compression=compression,
+        )
     except RuntimeError as e:
         runtime.logger.error(str(e))
         raise typer.Exit(1)

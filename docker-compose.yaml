@@ -98,6 +98,8 @@ services:
       MASCOPE_ENV: ${MASCOPE_ENV}
       MASCOPE_DB_NAME: ${MASCOPE_DB_NAME:-mascope}
       MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
+      # pg_dump --compress for the pre-migration dump; empty = pg_dump default
+      MASCOPE_DUMP_COMPRESSION: ${MASCOPE_DUMP_COMPRESSION:-}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}
