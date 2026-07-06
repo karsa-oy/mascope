@@ -168,7 +168,9 @@ class TestAssignDefaultsToUnmatched:
         # The unmatched isotope reports its own target m/z as the peak m/z
         # and the documented defaults everywhere else.
         assert result.loc[1, "sample_peak_mz"] == 101.0
-        assert result.loc[1, "sample_peak_id"] == unmatched_isotope_params.sample_peak_id
+        assert (
+            result.loc[1, "sample_peak_id"] == unmatched_isotope_params.sample_peak_id
+        )
         assert result.loc[1, "match_score"] == unmatched_isotope_params.match_score
         assert (
             result.loc[1, "match_abundance_error"]

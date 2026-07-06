@@ -15,6 +15,7 @@ from mascope_backend.file_converter.base_processor import (
 from mascope_thermo.backend import open_backend
 from mascope_thermo.thermo import get_polarity_options
 
+
 _log = logging.getLogger(__name__)
 
 
@@ -163,8 +164,7 @@ class RawProcessor(BaseFileProcessor):
         if created is None:
             created = datetime.fromtimestamp(os.path.getmtime(self.file_to_process))
             _log.warning(
-                "Reader did not provide an acquisition date; using file mtime "
-                "for %s",
+                "Reader did not provide an acquisition date; using file mtime for %s",
                 self.file_to_process,
             )
         return created.isoformat()

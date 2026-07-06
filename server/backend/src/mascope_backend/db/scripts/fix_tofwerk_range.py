@@ -23,6 +23,7 @@ from sqlalchemy import text
 from mascope_backend.db import async_session, configure_database_engine
 from mascope_backend.runtime import runtime
 
+
 # Maximum number of affected rows to log individually
 _PREVIEW_LIMIT = 20
 
@@ -62,9 +63,7 @@ async def _fix_database() -> dict:
             {"lim": _PREVIEW_LIMIT},
         )
         for row in preview_result:
-            runtime.logger.info(
-                f"  {row.filename}: range has {row.range_len} elements"
-            )
+            runtime.logger.info(f"  {row.filename}: range has {row.range_len} elements")
         if affected > _PREVIEW_LIMIT:
             runtime.logger.info(f"  ... and {affected - _PREVIEW_LIMIT} more")
 
@@ -134,9 +133,7 @@ def _fix_filestore(filenames: list[str]) -> dict:
         try:
             update_props(filename, {"range": [mz_range[0], mz_range[-1]]})
             updated += 1
-            runtime.logger.info(
-                f"  Fixed {filename}: {len(mz_range)} -> 2 elements"
-            )
+            runtime.logger.info(f"  Fixed {filename}: {len(mz_range)} -> 2 elements")
         except Exception as exc:
             runtime.logger.warning(f"  Cannot write .props for {filename}: {exc}")
             errors.append(filename)
@@ -162,8 +159,7 @@ async def run() -> None:
     runtime.logger.info("=" * 80)
     runtime.logger.info("FIX TOFWERK RANGE COMPLETE")
     runtime.logger.info(
-        f"Database — affected: {db_result['affected']}, "
-        f"updated: {db_result['updated']}"
+        f"Database — affected: {db_result['affected']}, updated: {db_result['updated']}"
     )
     runtime.logger.info(
         f"Filestore — checked: {fs_result['checked']}, "

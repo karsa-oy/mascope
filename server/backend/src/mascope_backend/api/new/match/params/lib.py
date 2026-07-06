@@ -113,9 +113,9 @@ def apply_match_params(
         | df["relative_abundance"].isna()
     )
 
-    within_tolerance = (
-        df["match_mz_error"].abs() <= params_df["mz_tolerance"]
-    ) & (df["match_abundance_error"].abs() <= params_df["isotope_ratio_tolerance"])
+    within_tolerance = (df["match_mz_error"].abs() <= params_df["mz_tolerance"]) & (
+        df["match_abundance_error"].abs() <= params_df["isotope_ratio_tolerance"]
+    )
     score_accepted = within_tolerance & (
         df["sample_peak_intensity"] >= params_df["peak_min_intensity"]
     )

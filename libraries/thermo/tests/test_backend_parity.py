@@ -308,7 +308,9 @@ _MIN_SCANS_FOR_PROFILE_PARITY = 3  # fewer scans -> freq average not representat
 
 def _bounded_window(monkeypatch, path):
     """(t_min, t_max) [s] covering at most MAX_AVG_SCANS scans."""
-    times = np.sort(_run_under(monkeypatch, "thermo", m_thermo.get_scan_timestamps, path))
+    times = np.sort(
+        _run_under(monkeypatch, "thermo", m_thermo.get_scan_timestamps, path)
+    )
     if times.size == 0:
         return None, None
     return float(times[0]), float(times[min(times.size, MAX_AVG_SCANS) - 1])
@@ -463,10 +465,20 @@ def test_sum_signal_matches_thermo(monkeypatch, path):
     t_min, t_max = _bounded_window(monkeypatch, path)
 
     th_sig, th_n = _run_under(
-        monkeypatch, "thermo", m_thermo.compute_sum_signal, path, t_min=t_min, t_max=t_max
+        monkeypatch,
+        "thermo",
+        m_thermo.compute_sum_signal,
+        path,
+        t_min=t_min,
+        t_max=t_max,
     )
     ot_sig, ot_n = _run_under(
-        monkeypatch, "opentfraw", m_thermo.compute_sum_signal, path, t_min=t_min, t_max=t_max
+        monkeypatch,
+        "opentfraw",
+        m_thermo.compute_sum_signal,
+        path,
+        t_min=t_min,
+        t_max=t_max,
     )
     assert ot_n == th_n, "number of combined scans differs"
     if th_n < _MIN_SCANS_FOR_PROFILE_PARITY:
@@ -530,8 +542,12 @@ def test_reconstructed_profile_matches_thermo(monkeypatch, path):
     t_min, t_max = _bounded_window(monkeypatch, path)
 
     th_sig, th_n = _run_under(
-        monkeypatch, "thermo", m_thermo.compute_sum_signal,
-        path, t_min=t_min, t_max=t_max,
+        monkeypatch,
+        "thermo",
+        m_thermo.compute_sum_signal,
+        path,
+        t_min=t_min,
+        t_max=t_max,
     )
     if th_n < _MIN_SCANS_FOR_PROFILE_PARITY:
         pytest.skip(f"too few scans ({th_n})")

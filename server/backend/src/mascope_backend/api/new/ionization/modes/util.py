@@ -110,7 +110,7 @@ async def resolve_ionization_modes_by_peaks(
         calibration_isotopes_response = await get_target_isotopes(
             target_collection_id=calibration_collection_id
         )
-        calibration_isotopes_df = pd.DataFrame(
+        _calibration_isotopes_df = pd.DataFrame(
             calibration_isotopes_response.get("data", [])
         )
         # TODO: Match the calibration isotopes to the peaks in the sample file

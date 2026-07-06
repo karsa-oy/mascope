@@ -52,6 +52,7 @@ async def get_samples_route(
         raise ValueError("Either sample_batch_id or sample_item_id must be provided.")
     return await get_samples(**query_params.model_dump())
 
+
 @samples_router.get("/centroids")
 @api_route(token_access=True)
 async def get_samples_centroids_route(

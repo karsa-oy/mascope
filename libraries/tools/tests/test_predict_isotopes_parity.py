@@ -22,6 +22,7 @@ import pytest
 
 from mascope_tools.composition.heuristic_filter import predict_isotopes
 
+
 SIGNIFICANT = 0.015  # relative-abundance floor for asserted peaks
 MZ_TOL = 0.003
 INT_TOL = 0.04

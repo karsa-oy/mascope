@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
 from mascope_tools.composition.utils import assert_valid_formula
 
+
 # A bare numeric mass such as "136.1252", "60", "1e3". Matched explicitly rather
 # than via float(), which also parses "NaN"/"inf"/"Infinity" and would
 # misclassify the chemically valid formula "NaN" (sodium nitride) as a mass.

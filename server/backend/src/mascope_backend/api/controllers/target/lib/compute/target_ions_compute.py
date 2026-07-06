@@ -432,9 +432,7 @@ def _extract_custom_elements(ion_composition: dict[str, int]) -> dict[str, dict]
                     "abundance": abundance,
                     "mass_number": mass_number,
                 }
-                for (mass, mass_number), abundance in zip(
-                    element.isotopes, abundances
-                )
+                for (mass, mass_number), abundance in zip(element.isotopes, abundances)
             ],
         }
 

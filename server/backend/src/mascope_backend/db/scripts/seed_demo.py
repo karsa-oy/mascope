@@ -40,6 +40,7 @@ from mascope_backend.db import (
 )
 from mascope_backend.runtime import runtime
 
+
 # --- Fixed, well-known demo credentials (LOCAL DEMO ONLY) ------------------
 # Keep in sync with `_print_access()` in the mascope CLI demo command and
 # docs/demo_dataset.md.

@@ -609,11 +609,9 @@ async def delete_sample_files(
 
         # Check if any affected instruments are now missing from the database
         # This happens when we deleted the last sample file for an instrument
-        if missing_instruments := [
-            instrument
-            for instrument in instruments_affected
-            if instrument not in final_instruments
-        ]:
+        if any(
+            instrument not in final_instruments for instrument in instruments_affected
+        ):
             # Clean up orphaned datasets and emit instrument deletion events
             await delete_acquisition_datasets()
 

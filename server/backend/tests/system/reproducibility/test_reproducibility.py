@@ -263,16 +263,9 @@ def _wait_for_pipeline(n_files: int) -> None:
         processing = int(
             _psql("SELECT count(*) FROM sample_batch WHERE status = 'processing'")
         )
-        matched = int(
-            _psql("SELECT count(*) FROM match_isotope WHERE match_score > 0")
-        )
+        matched = int(_psql("SELECT count(*) FROM match_isotope WHERE match_score > 0"))
 
-        if (
-            files_done >= n_files
-            and batches > 0
-            and processing == 0
-            and matched > 0
-        ):
+        if files_done >= n_files and batches > 0 and processing == 0 and matched > 0:
             stable = stable + 1 if matched == last_matched else 1
             if stable >= STABLE_POLLS:
                 return
