@@ -15,6 +15,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
   starts from scratch; CI runs the test nightly and on manual dispatch
   (`.github/workflows/reproducibility.yaml`).
+- The `libraries/` test suites (chem, file, match, molmass, signal, thermo, tools)
+  now run in CI on every PR; previously they only ran when invoked locally.
 - Frontend unit tests for the notification hub (process tracking, badges,
   watcher dispatch, log retention) and the spreadsheet-paste table parser.
 - Unit tests for the core matching pipeline: the isotope-to-peak assignment
