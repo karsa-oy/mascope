@@ -7,10 +7,11 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
     if (raw.value) {
       try {
         return JSON.parse(raw.value)
-      } catch (err) {
+      } catch {
         return null
       }
     }
+    return null
   })
   const data = computed(() => parsed.value?.data)
   const op = computed(() => parsed.value?.op)
@@ -33,7 +34,7 @@ export const useClipboard = defineStore('browser.sample.clipboard', () => {
   async function read() {
     try {
       raw.value = await navigator.clipboard.readText()
-    } catch (err) {
+    } catch {
       return
     }
   }

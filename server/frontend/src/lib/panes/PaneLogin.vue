@@ -1,5 +1,4 @@
 <script setup>
-import Panel from 'primevue/panel'
 import FloatLabel from 'primevue/floatlabel'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'

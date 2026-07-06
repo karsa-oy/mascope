@@ -260,7 +260,7 @@ watch(
 
 watch(
   () => app.ui.tab.active,
-  async (newValue, oldValue) => {
+  async (newValue) => {
     if (newValue === 'batch') {
       // Wait for DOM to update after tab switch, then resize plot
       await nextTick()

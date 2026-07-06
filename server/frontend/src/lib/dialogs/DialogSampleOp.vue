@@ -178,7 +178,7 @@ watchEffect(async () => {
         value: mode.ionization_mode_id
       }))
       input.ionization_mode_id = ionizationModeOptions.value[0]?.value ?? null
-    } catch (error) {
+    } catch {
       ionizationModeOptions.value = []
     }
   } else if (action.value === 'update' && original.value?.ionization_mode_id) {

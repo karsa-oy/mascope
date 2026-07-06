@@ -1,4 +1,4 @@
-import { ref, shallowRef, watch, watchEffect, computed } from 'vue'
+import { ref, shallowRef, watch, computed } from 'vue'
 import { defineStore } from 'pinia'
 
 import { useApp } from '@/stores'

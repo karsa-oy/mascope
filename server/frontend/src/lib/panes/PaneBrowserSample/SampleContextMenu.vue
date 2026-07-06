@@ -3,11 +3,7 @@ import { ref, onMounted } from 'vue'
 
 import ContextMenu from 'primevue/contextmenu'
 
-import { useApp } from '@/stores'
-
 import { useSampleContextMenu } from './stores'
-
-const app = useApp()
 
 const contextMenu = useSampleContextMenu()
 

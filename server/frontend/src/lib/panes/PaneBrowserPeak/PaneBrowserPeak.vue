@@ -15,7 +15,7 @@ const app = useApp()
 const peakTable = ref(null)
 const scroller = usePeakScroller()
 
-const props = defineProps({
+defineProps({
   height: {
     type: Number,
     required: true
@@ -146,6 +146,7 @@ onBeforeUnmount(() => {
                 }
               "
               v-for="(match, index) in data.match"
+              :key="match.target_isotope_id"
             >
               {{ match.target_isotope_formula }}
             </Button>

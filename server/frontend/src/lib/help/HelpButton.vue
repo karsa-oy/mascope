@@ -1,6 +1,5 @@
 <script setup>
 import Button from 'primevue/button'
-import OverlayBadge from 'primevue/overlaybadge'
 
 import { useApp } from '@/stores'
 

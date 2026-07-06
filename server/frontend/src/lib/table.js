@@ -41,7 +41,8 @@ export function fromSpreadsheet(text, fields) {
  *  check that the selected sample has the same id as the active one.
  */
 export function equals(first, second, field) {
-  const nullish = (input) => input == (undefined || null)
+  // Loose equality with null matches both null and undefined.
+  const nullish = (input) => input == null
   if (nullish(first) || nullish(second)) {
     return first == second
   }

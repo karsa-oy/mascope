@@ -1,6 +1,4 @@
 <script setup>
-import { ref, watch } from 'vue'
-
 import Select from 'primevue/select'
 
 import { useApp } from '@/stores'

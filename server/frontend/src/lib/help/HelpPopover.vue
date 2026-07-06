@@ -1,7 +1,5 @@
 <script setup>
-import { ref, watch, watchEffect } from 'vue'
-
-import Popover from 'primevue/popover'
+import { ref, watchEffect } from 'vue'
 
 import { useMagicKeys, watchDebounced } from '@vueuse/core'
 import { useFloating, arrow, offset } from '@floating-ui/vue'
@@ -38,7 +36,7 @@ watchEffect(() => {
 const border = '1px solid var(--p-panel-border-color)'
 
 // position box
-watchEffect((data) => {
+watchEffect(() => {
   if (popoverEl.value) {
     Object.assign(popoverEl.value.style, {
       top: `${y.value}px`,

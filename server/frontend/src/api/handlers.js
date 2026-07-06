@@ -86,7 +86,7 @@ export default {
    * Authentication
    */
   auth: (response) => {
-    const { type, status, message, data } = unpack(response)
+    const { type, status, data } = unpack(response)
     const app = useApp()
 
     // Handle owner registration check

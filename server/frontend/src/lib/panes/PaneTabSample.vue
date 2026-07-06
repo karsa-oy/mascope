@@ -11,10 +11,6 @@ import { ChartSampleSpectrum } from '@/lib/charts'
 
 const { height } = useWindowSize()
 
-import { useApp } from '@/stores'
-
-const app = useApp()
-
 const padding = 180
 
 const storedState = localStorage.getItem('sample-tab-split')

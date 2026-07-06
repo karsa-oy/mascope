@@ -1,4 +1,4 @@
-import { ref, reactive, watch, computed, onBeforeUnmount } from 'vue'
+import { reactive, watch, computed, onBeforeUnmount } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api'
 import { genId } from '@/lib/utils'
