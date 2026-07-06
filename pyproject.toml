@@ -24,7 +24,10 @@ mascope = "mascope_cli.main:app"
 mascope-backend = "mascope_backend.main:exec"
 
 [dependency-groups]
+# Small standalone group so CI can install the linter without the heavy dev deps.
+lint = ["ruff>=0.15.8,<0.16"]
 dev = [
+    { include-group = "lint" },
     "deptry>=0.23,<0.24",
     "austin-dist~=3.6",
     # jupyter
@@ -38,7 +41,6 @@ dev = [
     "pytest-alembic>=0.12,<0.13",
     "pytest~=9.0",
     "pytest-asyncio>=1.3.0,<2",
-    "ruff>=0.15.8,<0.16",
 ]
 
 [tool.uv.workspace]
@@ -69,6 +71,10 @@ build-backend = "uv_build"
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+extend-exclude = [
+    "tooling/notebooks",        # exploratory notebooks, not production code
+    "server/backend/tests/old", # legacy suite kept for reference only
+]
 
 [tool.ruff.lint]
 select = [
@@ -77,6 +83,17 @@ select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
 ]
+ignore = [
+    "E501", # line length is owned by `ruff format`
+    "E731", # assigning lambdas is fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Star re-exports are the intended pattern in package __init__ modules.
+"**/__init__.py" = ["F403", "F405"]
+# Annotations name .NET types (RawFileReaderAdapter, System List) that only
+# exist after the proprietary RawFileReader DLLs are loaded at runtime.
+"libraries/thermo/src/mascope_thermo/thermo.py" = ["F821"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mascope_*"]

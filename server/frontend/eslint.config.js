@@ -25,6 +25,22 @@ export default [
         ...globals.browser,
         ...globals.node
       }
+    },
+    rules: {
+      // `catch {}` around best-effort calls (localStorage, clipboard) is fine.
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unused-vars': [
+        'error',
+        {
+          // Underscore prefix marks intentionally unused bindings, and rest
+          // destructuring is allowed to strip fields (`{ omitted, ...rest }`).
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          ignoreRestSiblings: true
+        }
+      ],
+      // Route-level views are addressed by path, not tag name.
+      'vue/multi-word-component-names': ['error', { ignores: ['Dashboard'] }]
     }
   }
 ]
