@@ -63,11 +63,10 @@ def _source_root() -> str:
     the current directory when that does not resolve to a repo (e.g. a
     non-editable install).
     """
-    import mascope_cli
+    from mascope_cli.checkout import source_checkout
 
-    # .../tooling/cli/src/mascope_cli/__init__.py -> repo root is 5 levels up.
-    root = Path(mascope_cli.__file__).resolve().parents[4]
-    if (root / "pyproject.toml").exists():
+    root = source_checkout()
+    if root:
         return str(root)
     return os.getcwd()
 

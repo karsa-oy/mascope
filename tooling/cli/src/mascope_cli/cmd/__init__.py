@@ -1,10 +1,10 @@
 # flake8: noqa
-from .agent import agent_app
-from .backend import backend_app
+# Operator command groups — always available, wheel and checkout alike.
+# Developer groups (dev, test, agent, backend) are imported by main.py only
+# when running from a source checkout: they drive the monorepo itself and
+# pull in the `dev` extra's dependencies (alembic, sqlalchemy, psycopg2).
 from .cert import cert_app
 from .demo import demo_app
-from .dev import dev_app
 from .env import env_app
 from .logs import logs_app
 from .prod import prod_app
-from .test import test_app
