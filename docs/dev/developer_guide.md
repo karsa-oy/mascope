@@ -35,7 +35,7 @@ This document is structured as follows:
   - [Schema migrations](#schema-migrations)
   - [Database management commands](#database-management-commands)
   - [PostgreSQL tuning reference](#postgresql-tuning-reference)
-  - [Scheduled database backups (cron)](#scheduled-database-backups-cron)
+  - [Automated backups (cron + restic)](#automated-backups-cron--restic)
 - 🖥️ **[Frontend](#️-frontend)** - VueJS user interface
 - 📚 **[Libraries](#-libraries)** - shared Python libraries
 - 🚚 **[Deploying](#-deploying)** - prod operations guide
@@ -1561,93 +1561,121 @@ docker exec mascope_prod_postgres psql -U mascope_user \
 
 ---
 
-### Scheduled Database Backups (Cron)
+### Automated Backups (Cron + Restic)
 
-Mascope uses `cron` to automate PostgreSQL backups via the `mascope prod db backup` CLI commands.
-Cron jobs are **per-user, per-machine** - they are not tied to a project directory or environment.
-All backup commands operate on the **active environment's database only**.
+Production hosts run `tooling/backup-cron.sh` nightly from cron. The script has
+two layers:
 
-Backups are written to `.runtime/database/backups/prod/` as compressed `.dump` files
-(PostgreSQL custom format via `pg_dump -Fc`).
+1. **Local dumps** — `mascope prod db backup create` writes a compressed `.dump`
+   file (PostgreSQL custom format, `pg_dump -Fc`) of the **active environment's
+   database** to `.runtime/database/backups/prod/`, then prunes dumps older than
+   `LOCAL_RETENTION_DAYS` (default 7). These give fast same-host restores.
+2. **Encrypted off-site copy** — [restic](https://restic.net/) pushes the dump
+   directory **and the filestore** (uploaded raw files) to an encrypted remote
+   repository, then applies the `KEEP_DAILY`/`KEEP_WEEKLY`/`KEEP_MONTHLY`
+   retention policy (defaults 7/4/6). These survive host loss.
+
+Off-site backups are encrypted client-side by restic, so the storage provider
+never sees plaintext — this is what lets the privacy notice claim encrypted
+backups (GDPR Art. 32).
 
 ### Prerequisites
 
-Before setting up cron, confirm the required values on the server:
+```bash
+which mascope   # /home/<user>/.local/bin/mascope
+which docker    # /usr/bin/docker
+which restic    # /usr/bin/restic (installed by tooling/ubuntu.sh)
+echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
+```
+
+### Setup
+
+1. **Create the off-site repository.** Any restic-supported backend works; the
+   two we use:
+   - *Hetzner Storage Box* — enable SSH support in the Storage Box settings and
+     install the host's SSH key (`ssh-copy-id -p 23 u123456@u123456.your-storagebox.de`).
+   - *S3-compatible object storage* (e.g. Contabo Object Storage) — create a
+     bucket and an access key pair.
+
+   Prefer the **other** hosting provider than the one the server runs on, so a
+   provider-level incident cannot take out both the service and its backups.
+
+2. **Configure the host:**
+
+   ```bash
+   cp tooling/backup.env.example "$MASCOPE_PATH/.runtime/secrets/backup.env"
+   chmod 600 "$MASCOPE_PATH/.runtime/secrets/backup.env"
+   # then edit: repository, encryption password, FILESTORE_PATH, retention
+   ```
+
+   ⚠️ Store the `RESTIC_PASSWORD` in the company password manager **before the
+   first run** — without it the backups are unrecoverable, by design.
+
+3. **Test manually** before relying on cron:
+
+   ```bash
+   MASCOPE_PATH=$MASCOPE_PATH bash tooling/backup-cron.sh
+   restic snapshots   # with backup.env sourced — should list the new snapshot
+   ```
+
+4. **Install the cron job** (`crontab -e`). Cron does **not** load
+   `/etc/environment` or shell profiles, so the header must set the environment
+   explicitly:
+
+   ```
+   SHELL=/usr/bin/bash
+   PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
+   MASCOPE_PATH=/home/karsa/Mascope
+
+   # Nightly backup at 4 AM: local dump + prune + encrypted off-site push
+   0 4 * * * $MASCOPE_PATH/tooling/backup-cron.sh 2>&1 | logger -t mascope-backup
+   ```
+
+   Output goes to syslog: `grep mascope-backup /var/log/syslog | tail -20`.
+
+   If filestore files are root-owned (containers currently run as root), a
+   user-level cron cannot read them — install the job in root's crontab
+   (`sudo crontab -e`) or grant read access with ACLs
+   (`setfacl -R -m u:karsa:rX <filestore>`).
+
+5. **Monitoring (recommended):** set `HEALTHCHECK_URL` in `backup.env` to a
+   [healthchecks.io](https://healthchecks.io) ping URL. The script pings it on
+   success and `<url>/fail` on failure, so a silently broken cron job (the
+   classic backup failure mode) still raises an email alert.
+
+### Restoring
 
 ```bash
-# Confirm mascope is installed and its location
-which mascope                  # should return /home/<user>/.local/bin/mascope
+# Same-host restore from a local dump (list, then restore):
+mascope prod db backup list
+mascope prod db restore
 
-# Confirm MASCOPE_PATH (set in /etc/environment by ubuntu.sh, NOT exported into SSH/cron sessions)
-echo $MASCOPE_PATH             # e.g. /home/karsa/Mascope
-
-# Confirm docker is available
-which docker                   # should return /usr/bin/docker
+# Disaster recovery from off-site (new host):
+set -a; source "$MASCOPE_PATH/.runtime/secrets/backup.env"; set +a
+restic snapshots                                  # pick a snapshot
+restic restore latest --target /tmp/mascope-restore
+# then: mascope prod db restore from the recovered .dump file, and copy the
+# recovered filestore back to the MASCOPE_FILESTORE path.
 ```
 
-### Crontab setup
-
-Edit the crontab with:
-
-```bash
-crontab -e    # opens in $EDITOR (nano by default)
-crontab -l    # view current crontab
-```
-
-The crontab requires explicit environment variables -cron does **not** load `/etc/environment`
-or the user's shell profile:
-
-```
-SHELL=/usr/bin/bash
-PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
-MASCOPE_PATH=/home/karsa/Mascope
-```
-
-- `PATH` -must include `~/.local/bin` (where `uv tool` installs `mascope`) and `/usr/bin` (where `docker` lives)
-- `MASCOPE_PATH` -required by the `mascope` runtime to locate the project; set by `tooling/ubuntu.sh` in `/etc/environment` but **not** automatically exported into cron
-
-### Recommended crontab
-
-Backup create and delete are **chained in a single job** with `&&` to avoid simultaneous
-writes to `state.json`:
-
-```
-SHELL=/usr/bin/bash
-PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
-MASCOPE_PATH=/home/karsa/Mascope
-
-# Daily backup at 4 AM -create then prune, 7-day retention, active env only
-0 4 * * * { mascope prod db backup create -l cron && mascope prod db backup delete --retention-days 7; } 2>&1 | logger -t mascope-prod-db-backup
-```
-
-Both stdout and stderr are captured and forwarded to syslog under the tag `mascope-prod-db-backup`.
-
-### Useful commands
-
-```bash
-# View recent backup files and sizes
-mascope prod db backup list -a
-
-# Manual backup (active env)
-mascope prod db backup create
-
-# Preview what deletion would remove (dry run)
-mascope prod db backup delete --retention-days 7 --dry-run
-
-# Check recent cron execution logs
-grep mascope-prod-db-backup /var/log/syslog | tail -20
-
-```
+Do a **restore drill** (restore latest snapshot to a scratch directory and
+`pg_restore --list` the dump) after first setup and then periodically — an
+untested backup is not a backup.
 
 ### Notes
 
-- Use https://crontab.guru to generate and verify cron expressions.
-- `pg_dump` for large databases (tens of GB) can take several minutes - this is normal.
-  The backup file will grow incrementally in `.runtime/database/backups/prod/` while in progress.
-- Backup filenames embed a timestamp and optional `cron` label, e.g.
-  `mascope_test_env_20260313_040001_cron.dump`
-- Deletion only affects dumps matching the **active environment** - other environments'
-  dumps in the same directory are untouched.
+- All `mascope prod db backup` commands operate on the **active environment's
+  database only**; deletion never touches other environments' dumps.
+- `pg_dump` for large databases (tens of GB) can take several minutes — the
+  dump file grows incrementally while in progress. restic uploads are
+  incremental/deduplicated, so nightly pushes are much smaller than the first.
+- Backup filenames embed a timestamp and the `cron` label, e.g.
+  `mascope_test_env_20260313_040001_cron.dump`.
+- The script chains dump create and prune sequentially to avoid simultaneous
+  writes to `state.json`.
+- Pre-migration dumps created by `tooling/db-init.sh` land in the same
+  `.runtime/database/backups/prod/` directory, so they are pushed off-site and
+  pruned locally by the same run. Use https://crontab.guru to adjust schedules.
 
 ## 🖥️ Frontend
 
