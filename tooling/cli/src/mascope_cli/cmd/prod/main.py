@@ -229,8 +229,7 @@ def _run_compose(args: list[str], building: bool = False) -> None:
     result = lib.run(command=command, env_vars=env_vars)
     if result.returncode != 0:
         runtime.logger.error(
-            f"docker compose exited with code {result.returncode} "
-            f"(command: {command})"
+            f"docker compose exited with code {result.returncode} (command: {command})"
         )
         raise typer.Exit(result.returncode)
 

@@ -12,6 +12,7 @@ import subprocess
 import pytest
 import typer
 
+
 # The prod package re-exports a `main` function that shadows the module of
 # the same name, so import the module explicitly.
 prod_main = importlib.import_module("mascope_cli.cmd.prod.main")
