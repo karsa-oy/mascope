@@ -99,17 +99,13 @@ class TestClientContract:
         assert {"dataset_id", "dataset_name"} <= set(df.columns)
 
     def test_batches_listing_shape(self, mascope):
-        dataset_id = mascope.datasets.list().iloc[0]["dataset_id"]
+        df = _first_batches(mascope)
 
-        df = mascope.batches.list(dataset_id)
-
-        assert df is not None and not df.empty, "demo dataset should have batches"
         assert "sample_batch_id" in df.columns
         assert "sample_batch_name" in df.columns
 
     def test_samples_listing_shape(self, mascope):
-        dataset_id = mascope.datasets.list().iloc[0]["dataset_id"]
-        batch = mascope.batches.list(dataset_id).iloc[0]
+        batch = _first_batches(mascope).iloc[0]
 
         df = mascope.samples.list(batch["sample_batch_id"])
 
@@ -119,11 +115,7 @@ class TestClientContract:
     def test_sample_peaks_include_match_data(self, mascope):
         # The demo data ships fully matched, so peaks must carry flattened
         # match columns and at least one isotope attribution.
-        dataset_id = mascope.datasets.list().iloc[0]["dataset_id"]
-        batch = mascope.batches.list(dataset_id).iloc[0]
-        sample_id = mascope.samples.list(batch["sample_batch_id"]).iloc[0][
-            "sample_item_id"
-        ]
+        sample_id = _first_sample_id(mascope)
 
         peaks = mascope.samples.get_peaks(sample_id)
 
@@ -134,13 +126,32 @@ class TestClientContract:
         assert peaks["target_isotope_id"].notna().any(), "expected matched peaks"
 
     def test_get_single_sample(self, mascope):
-        dataset_id = mascope.datasets.list().iloc[0]["dataset_id"]
-        batch = mascope.batches.list(dataset_id).iloc[0]
-        sample_id = mascope.samples.list(batch["sample_batch_id"]).iloc[0][
-            "sample_item_id"
-        ]
+        sample_id = _first_sample_id(mascope)
 
         sample = mascope.samples.get(sample_id)
 
         assert sample is not None
         assert sample.get("sample_item_id") == sample_id
+
+
+def _first_batches(mascope):
+    """
+    Batches of the first demo dataset that has any.
+
+    Dataset ordering is not part of the contract, and the workspace can carry
+    empty datasets (e.g. auto-created acquisition pools), so scan rather than
+    trust ``iloc[0]``.
+    """
+    for _, dataset in mascope.datasets.list().iterrows():
+        batches = mascope.batches.list(dataset["dataset_id"])
+        if batches is not None and not batches.empty:
+            return batches
+    pytest.fail("demo stack has no dataset with batches")
+
+
+def _first_sample_id(mascope) -> str:
+    """A sample from the first batch of the first data-bearing dataset."""
+    batch = _first_batches(mascope).iloc[0]
+    samples = mascope.samples.list(batch["sample_batch_id"])
+    assert samples is not None and not samples.empty, "demo batch should have samples"
+    return samples.iloc[0]["sample_item_id"]
