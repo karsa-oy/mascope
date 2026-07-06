@@ -11,6 +11,7 @@ compose. See `docs/dev/developer_guide.md` for the full picture.
 |---|---|---|---|
 | Backend (pytest) | `mascope test run` or `uv run pytest server/backend/tests/` | Postgres (`mascope dev up`) | minutes |
 | Libraries (pytest) | `mascope test run libraries` | nothing | fast |
+| CLI (pytest) | `uv run pytest tooling/cli/tests/` | nothing (hermetic conftest) | seconds |
 | Frontend unit (Vitest) | `npm run test:unit` in `server/frontend` | nothing | ~1 s |
 | Frontend e2e (Playwright) | `npm run test:e2e` in `server/frontend` | a running stack, see below | minutes |
 | Deployment smoke | `bash tooling/smoke-test.sh` | a running stack | seconds |
@@ -51,6 +52,6 @@ It comes preloaded with the published demo dataset and login `demo@mascope.app` 
 
 - Conventional Commits (`type(scope): description`); ASCII-only commit messages,
   no Co-Authored-By trailers.
-- CI (`.github/workflows/tests.yaml`) runs backend pytest, library pytest, frontend
-  unit, and the demo-stack e2e suite on every PR; releases are gated on
-  `tooling/smoke-test.sh`.
+- CI (`.github/workflows/tests.yaml`) runs backend pytest, library pytest, CLI
+  pytest, frontend unit, and the demo-stack e2e suite on every PR; releases are
+  gated on `tooling/smoke-test.sh`.

@@ -111,6 +111,29 @@ jobs:
           MASCOPE_PATH: ${{ github.workspace }}
         run: uv run pytest libraries/ -v
 
+  cli:
+    name: CLI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.2"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run CLI tests
+        # Hermetic: the suite's conftest builds its own MASCOPE_PATH home,
+        # so no environment setup is needed here.
+        run: uv run pytest tooling/cli/tests/ -v
+
   e2e:
     name: End-to-end tests (demo stack)
     runs-on: ubuntu-latest
