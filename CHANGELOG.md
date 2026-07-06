@@ -51,6 +51,10 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- `mascope prod` compose commands (`build`, `up`, ...) now exit with docker
+  compose's exit code instead of always reporting success. CI builds release
+  images via `mascope prod build` and trusts its exit status, so a swallowed
+  build failure previously let jobs continue against stale images.
 - Web UI file uploads work again on deployments served from a non-standard
   port (e.g. the demo stack on `:8080`). nginx forwarded `X-Forwarded-Host`
   without the port, the tus upload endpoint built its upload URL from it, and

@@ -213,6 +213,9 @@ def _run_compose(args: list[str], building: bool = False) -> None:
                      Selects the current HEAD's version instead of the deploy
                      version for the compose `image:` tag.
     :type building: bool
+    :raises typer.Exit: With docker compose's exit code when it fails, so
+                        callers (CI in particular) can rely on the CLI's exit
+                        status instead of scraping logs.
     """
     env_vars = _compose_env(building)
     command = f"docker compose --file '{_COMPOSE_PATH}' {' '.join(args)}"
@@ -223,7 +226,13 @@ def _run_compose(args: list[str], building: bool = False) -> None:
         f" Command: {command}"
     )
 
-    lib.run(command=command, env_vars=env_vars)
+    result = lib.run(command=command, env_vars=env_vars)
+    if result.returncode != 0:
+        runtime.logger.error(
+            f"docker compose exited with code {result.returncode} "
+            f"(command: {command})"
+        )
+        raise typer.Exit(result.returncode)
 
 
 # --- Commands ---
