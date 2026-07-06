@@ -1590,15 +1590,41 @@ echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
 
 ### Setup
 
-1. **Create the off-site repository.** Any restic-supported backend works; the
-   two we use:
+1. **Create the off-site repository.** Any restic-supported backend works:
    - *Hetzner Storage Box* — enable SSH support in the Storage Box settings and
      install the host's SSH key (`ssh-copy-id -p 23 u123456@u123456.your-storagebox.de`).
    - *S3-compatible object storage* (e.g. Contabo Object Storage) — create a
      bucket and an access key pair.
+   - *Own backup server* — see below.
 
    Prefer the **other** hosting provider than the one the server runs on, so a
    provider-level incident cannot take out both the service and its backups.
+
+   #### Using your own backup server
+
+   A machine with large disks (e.g. an office server) can serve as the backup
+   target over plain SFTP. Do not expose its SSH port to the internet — connect
+   the VPSes and the backup server through a VPN overlay instead
+   ([Tailscale](https://tailscale.com/) is the quickest: install on both ends,
+   no inbound router ports needed):
+
+   ```bash
+   # on the backup server: dedicated user, key-only SSH
+   sudo adduser --disabled-password backup
+   sudo -u backup mkdir -p /home/backup/.ssh /home/backup/mascope-backups
+   # append each VPS's public key to /home/backup/.ssh/authorized_keys
+
+   # on each VPS (backup.env):
+   RESTIC_REPOSITORY=sftp:backup@<tailscale-ip>:mascope-backups/<hostname>
+   ```
+
+   Caveats: the backup server needs disk redundancy (RAID/ZFS) and monitoring
+   like any other piece of infrastructure, and its location is a
+   data-processing location (Art. 30 record / DPA). With SFTP push, a
+   compromised VPS could delete its own off-site backups; for a hardened setup,
+   run restic's `rest-server --append-only` on the backup server instead.
+   Migrating to a hosted target later is just a `RESTIC_REPOSITORY` change
+   (`restic init` on the new target, or `restic copy` to carry snapshots over).
 
 2. **Configure the host:**
 
