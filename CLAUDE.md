@@ -49,5 +49,6 @@ It comes preloaded with the published demo dataset and login `demo@mascope.app` 
 
 - Conventional Commits (`type(scope): description`); ASCII-only commit messages,
   no Co-Authored-By trailers.
-- CI (`.github/workflows/tests.yaml`) runs backend pytest, frontend unit, and the
-  demo-stack e2e suite on every PR; releases are gated on `tooling/smoke-test.sh`.
+- CI (`.github/workflows/tests.yaml`) runs backend pytest, library pytest, frontend
+  unit, and the demo-stack e2e suite on every PR; releases are gated on
+  `tooling/smoke-test.sh`.
