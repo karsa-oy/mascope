@@ -41,8 +41,11 @@ concurrently = "concurrently.cmd" if platform.system() == "Windows" else "concur
 
 
 _MODE = "dev"
-# Path to dev docker-compose file
-DEV_COMPOSE_PATH = Path(os.environ["MASCOPE_PATH"]) / "docker-compose.dev.yaml"
+
+
+def _dev_compose_path() -> Path:
+    """Path of the dev compose file under MASCOPE_PATH."""
+    return Path(os.environ["MASCOPE_PATH"]) / "docker-compose.dev.yaml"
 
 
 def _source_root() -> str:
@@ -117,7 +120,7 @@ def _run_dev_compose(args: list[str]):
     redis_cfg = runtime.full_config.backend.redis
 
     lib.run(
-        command=f"docker compose --file '{DEV_COMPOSE_PATH}' {' '.join(args)}",
+        command=f"docker compose --file '{_dev_compose_path()}' {' '.join(args)}",
         env_vars={
             "MASCOPE_ENV": runtime.env.name,
             "MASCOPE_PATH": os.environ["MASCOPE_PATH"],

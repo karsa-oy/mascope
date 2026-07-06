@@ -38,12 +38,6 @@ from mascope_runtime import Runtime
 
 _MODE = "prod"
 
-# Resolved once at import time — MASCOPE_PATH is guaranteed to be set
-# by the time any CLI command runs.
-_COMPOSE_PATH = os.path.join(
-    *os.path.split(os.environ["MASCOPE_PATH"]), "docker-compose.yaml"
-)
-
 prod_app = typer.Typer()
 prod_app.add_typer(prod_db_app, name="db")
 
@@ -87,6 +81,16 @@ def main() -> None:
 
 
 #  --- Internal helpers ---
+
+
+def _compose_path() -> str:
+    """
+    Path of the production compose file under MASCOPE_PATH.
+
+    :return: Absolute path to docker-compose.yaml.
+    :rtype: str
+    """
+    return os.path.join(os.environ["MASCOPE_PATH"], "docker-compose.yaml")
 
 
 def _deploy_version() -> str:
@@ -220,7 +224,7 @@ def _run_compose(args: list[str], building: bool = False) -> None:
                         status instead of scraping logs.
     """
     env_vars = _compose_env(building)
-    command = f"docker compose --file '{_COMPOSE_PATH}' {' '.join(args)}"
+    command = f"docker compose --file '{_compose_path()}' {' '.join(args)}"
 
     runtime.logger.info(
         f"Database: {env_vars['MASCOPE_DB_NAME']}."

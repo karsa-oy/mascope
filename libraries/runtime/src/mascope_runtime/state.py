@@ -33,6 +33,14 @@ Production
 In the production containers, a special `state.json`
 is used. You can find this file committed in
 `runtime/lib/state.prod.json`
+
+Implementation note: both classes intercept every public attribute
+access via `__setattr__`/`__getattr__`, so their own internals are
+kept in underscore-prefixed attributes written with
+`object.__setattr__` to avoid recursion. State is stored per
+instance — two Runtime instances in one process (e.g. the CLI's own
+plus a temporary one built for a compose invocation) must not share
+or clobber each other's state.
 """
 
 import json
@@ -48,8 +56,6 @@ default_state = {
     },
 }
 
-state_path = None  # *
-
 
 class RuntimeJsonState(object):
     """
@@ -64,20 +70,19 @@ class RuntimeJsonState(object):
     """
 
     def __init__(self, root_path):
-        global state_path  # *
-        state_path = os.path.join(root_path, ".runtime", "state.json")
+        object.__setattr__(
+            self, "_state_path", os.path.join(root_path, ".runtime", "state.json")
+        )
 
     def __setattr__(self, attr: str, value: any):
-        global state_path
         self.ensure_state_json()
-        with open(state_path, "r") as f:
+        with open(self._state_path, "r") as f:
             state = json.load(f)
-        with open(state_path, "w") as f:
+        with open(self._state_path, "w") as f:
             state[attr]["active"] = value
             json.dump(state, f, indent=2)
 
     def __getattr__(self, attr: str) -> any:
-        global state_path
         self.ensure_state_json()
 
         # Check environment variable override for 'env'
@@ -86,31 +91,26 @@ class RuntimeJsonState(object):
             if env_override:
                 return env_override
 
-        with open(state_path, "r") as f:
+        with open(self._state_path, "r") as f:
             state = json.load(f)
             return state[attr]["override"] or state[attr]["active"]
 
     def override(self, attr: str, value: any):
-        global state_path
         self.ensure_state_json()
-        with open(state_path, "r") as f:
+        with open(self._state_path, "r") as f:
             state = json.load(f)
-        with open(state_path, "w") as f:
+        with open(self._state_path, "w") as f:
             state[attr]["override"] = value
             json.dump(state, f, indent=2)
 
     def ensure_state_json(self):
-        global state_path
-        if not os.path.exists(state_path):
-            with open(state_path, "x") as f:
+        if not os.path.exists(self._state_path):
+            with open(self._state_path, "x") as f:
                 json.dump(
                     default_state,
                     f,
                     indent=2,
                 )
-
-
-temp_state = None  # *
 
 
 class RuntimeTempState(object):
@@ -126,24 +126,20 @@ class RuntimeTempState(object):
         State is persisted only in memory, in a regular
         Python dict object.
         """
-        global temp_state  # *
-        temp_state = {
-            "env": {"active": env or "default", "override": None},
-            "mode": {"active": mode or "dev", "override": None},
-        }
+        object.__setattr__(
+            self,
+            "_state",
+            {
+                "env": {"active": env or "default", "override": None},
+                "mode": {"active": mode or "dev", "override": None},
+            },
+        )
 
     def __setattr__(self, attr: str, value: any):
-        temp_state[attr]["active"] = value
+        self._state[attr]["active"] = value
 
     def __getattr__(self, attr: str):
-        return temp_state[attr]["override"] or temp_state[attr]["active"]
+        return self._state[attr]["override"] or self._state[attr]["active"]
 
     def override(self, attr: str, value: any):
-        temp_state[attr]["override"] = value
-
-
-# * Global variables are used here in order
-# to prevent conflicts with the __setattr__
-# and __getattr__ methods. If instead we
-# tried to put these inside the classes, we
-# would run into infinite recursion.
+        self._state[attr]["override"] = value
