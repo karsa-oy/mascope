@@ -1637,6 +1637,11 @@ echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
    cp tooling/backup.env.example "$MASCOPE_PATH/.runtime/secrets/backup.env"
    chmod 600 "$MASCOPE_PATH/.runtime/secrets/backup.env"
    # then edit: repository, encryption password, FILESTORE_PATH, retention
+
+   # the dump directory and pre-existing dumps are usually root-owned
+   # (created by the docker daemon / init container) — hand them to the
+   # user that runs the cron job, or pruning fails:
+   sudo chown -R "$(whoami)" "$MASCOPE_PATH/.runtime/database/backups"
    ```
 
    ⚠️ Store the `RESTIC_PASSWORD` in the company password manager **before the

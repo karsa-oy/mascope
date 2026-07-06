@@ -58,6 +58,16 @@ on_error() {
 }
 trap 'on_error $LINENO' ERR
 
+# The dump directory and pre-existing dumps are often root-owned (created by
+# the docker daemon / init container), while this script typically runs as a
+# regular user. Pruning needs write permission on the directory itself, so
+# fail fast (and alert) instead of tracebacking halfway through.
+if [[ -d "$DUMP_DIR" && ! -w "$DUMP_DIR" ]]; then
+    log "ERROR: $DUMP_DIR is not writable by $(whoami) — pruning would fail."
+    log "Fix once with: sudo chown -R $(whoami) $DUMP_DIR"
+    false
+fi
+
 # --- Layer 1: local database dump -------------------------------------------
 
 log "creating database dump..."
