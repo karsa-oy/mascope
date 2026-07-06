@@ -10,7 +10,7 @@ from typing import Annotated
 
 import typer
 
-from mascope_cli.cmd.dev.docker import is_docker_running
+from mascope_cli.docker import is_docker_running
 from mascope_cli.runtime import runtime
 
 

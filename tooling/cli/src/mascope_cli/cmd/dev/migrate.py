@@ -22,9 +22,12 @@ from mascope_cli.runtime import runtime
 
 dev_migrate_app = typer.Typer()
 
-# Alembic working directory
-BACKEND_PATH = Path(os.environ["MASCOPE_PATH"]) / "server" / "backend"
 _PATH = "dev"
+
+
+def _backend_path() -> Path:
+    """Alembic working directory (the backend package under MASCOPE_PATH)."""
+    return Path(os.environ["MASCOPE_PATH"]) / "server" / "backend"
 
 
 def _check_prerequisites() -> bool:
@@ -53,7 +56,7 @@ def _run_alembic(
     """
     result = subprocess.run(
         ["uv", "run", "alembic"] + args,
-        cwd=BACKEND_PATH,
+        cwd=_backend_path(),
         capture_output=capture,
         text=True,
         check=False,
@@ -80,7 +83,7 @@ def check_pending_migrations() -> bool:
     """
     try:
         # Get head revision from migration files
-        alembic_cfg = Config(BACKEND_PATH / "alembic.ini")
+        alembic_cfg = Config(_backend_path() / "alembic.ini")
         script = ScriptDirectory.from_config(alembic_cfg)
         head_rev = script.get_current_head()
 
