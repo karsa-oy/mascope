@@ -106,6 +106,10 @@ function install_tooling() {
         write_line "Node 22 detected, skipping install."
     fi
 
+    # restic for encrypted off-site backups (tooling/backup-cron.sh)
+    write_line "installing restic"
+    sudo apt install --yes restic
+
     # use jemalloc to ensure no free() pointer errors
     write_line "installing jemalloc"
     sudo apt install --yes --no-install-recommends libjemalloc2
