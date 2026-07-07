@@ -10,7 +10,6 @@ members = [
     "mascope-cli",
     "mascope-file",
     "mascope-match",
-    "mascope-molmass",
     "mascope-runtime",
     "mascope-sdk",
     "mascope-signal",
@@ -1400,9 +1399,8 @@ source = { editable = "." }
 dependencies = [
     { name = "mascope-backend" },
     { name = "mascope-chem" },
-    { name = "mascope-cli" },
+    { name = "mascope-cli", extra = ["demo", "dev"] },
     { name = "mascope-match" },
-    { name = "mascope-molmass" },
     { name = "mascope-runtime" },
     { name = "mascope-sdk" },
     { name = "mascope-signal" },
@@ -1426,14 +1424,16 @@ dev = [
     { name = "scikit-learn" },
     { name = "voila" },
 ]
+lint = [
+    { name = "ruff" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "mascope-backend", editable = "server/backend" },
     { name = "mascope-chem", editable = "libraries/chem" },
-    { name = "mascope-cli", editable = "tooling/cli" },
+    { name = "mascope-cli", extras = ["dev", "demo"], editable = "tooling/cli" },
     { name = "mascope-match", editable = "libraries/match" },
-    { name = "mascope-molmass", editable = "libraries/molmass" },
     { name = "mascope-runtime", editable = "libraries/runtime" },
     { name = "mascope-sdk", editable = "libraries/sdk" },
     { name = "mascope-signal", editable = "libraries/signal" },
@@ -1457,6 +1457,7 @@ dev = [
     { name = "scikit-learn", specifier = ">=1.5.1,<2" },
     { name = "voila", specifier = ">=0.5.12,<0.6" },
 ]
+lint = [{ name = "ruff", specifier = ">=0.15.8,<0.16" }]
 
 [[package]]
 name = "mascope-backend"
@@ -1568,26 +1569,37 @@ requires-dist = [
 
 [[package]]
 name = "mascope-cli"
-version = "0.0.0"
+version = "2026.7.7"
 source = { editable = "tooling/cli" }
 dependencies = [
-    { name = "alembic" },
-    { name = "mascope-runtime" },
-    { name = "psycopg2-binary" },
+    { name = "mascope-runtime", extra = ["logs"] },
     { name = "rich" },
-    { name = "sqlalchemy" },
     { name = "typer" },
+]
+
+[package.optional-dependencies]
+demo = [
+    { name = "pandas" },
+    { name = "requests" },
+]
+dev = [
+    { name = "alembic" },
+    { name = "psycopg2-binary" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.18.1" },
-    { name = "mascope-runtime", editable = "libraries/runtime" },
-    { name = "psycopg2-binary", specifier = ">=2.9.11" },
+    { name = "alembic", marker = "extra == 'dev'", specifier = ">=1.18.1" },
+    { name = "mascope-runtime", extras = ["logs"], editable = "libraries/runtime" },
+    { name = "pandas", marker = "extra == 'demo'", specifier = ">=2.0.0" },
+    { name = "psycopg2-binary", marker = "extra == 'dev'", specifier = ">=2.9.11" },
+    { name = "requests", marker = "extra == 'demo'", specifier = ">=2.32.0,<3" },
     { name = "rich", specifier = ">=13.7.1,<14" },
-    { name = "sqlalchemy", specifier = "~=2.0" },
+    { name = "sqlalchemy", marker = "extra == 'dev'", specifier = "~=2.0" },
     { name = "typer", specifier = ">=0.15.2,<0.16" },
 ]
+provides-extras = ["dev", "demo"]
 
 [[package]]
 name = "mascope-file"
@@ -1644,30 +1656,28 @@ requires-dist = [
 ]
 
 [[package]]
-name = "mascope-molmass"
-version = "0.0.0"
-source = { editable = "libraries/molmass" }
-
-[[package]]
 name = "mascope-runtime"
-version = "0.0.0"
+version = "2026.7.7"
 source = { editable = "libraries/runtime" }
 dependencies = [
-    { name = "duckdb" },
     { name = "loguru" },
     { name = "pydantic" },
-    { name = "pytz" },
     { name = "rich" },
+]
+
+[package.optional-dependencies]
+logs = [
+    { name = "duckdb" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "duckdb", specifier = ">=1.2.1,<2" },
+    { name = "duckdb", marker = "extra == 'logs'", specifier = ">=1.2.1,<2" },
     { name = "loguru", specifier = ">=0.7.2,<0.8" },
     { name = "pydantic", specifier = ">=2.8.2,<3" },
-    { name = "pytz", specifier = "~=2025.1" },
     { name = "rich", specifier = ">=13.7.1,<14" },
 ]
+provides-extras = ["logs"]
 
 [[package]]
 name = "mascope-sdk"
@@ -1788,7 +1798,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "mascope-molmass" },
     { name = "pytest" },
 ]
 
@@ -1807,10 +1816,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "mascope-molmass", editable = "libraries/molmass" },
-    { name = "pytest", specifier = ">=8.4.1" },
-]
+dev = [{ name = "pytest", specifier = ">=8.4.1" }]
 
 [[package]]
 name = "matplotlib"

@@ -74,10 +74,10 @@ from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
 )
 from mascope_backend.db import (
+    Dataset,
     SampleBatch,
     SampleFile,
     TargetCollectionInSampleBatch,
-    Dataset,
     async_session,
 )
 from mascope_backend.db.id import gen_id
@@ -325,9 +325,7 @@ async def create_sample_batch(
     async with async_session() as session:
         # --- Validate dataset type for ACQUISITION batches ---
         if sample_batch.sample_batch_type == "ACQUISITION":
-            if not (
-                dataset := await session.get(Dataset, sample_batch.dataset_id)
-            ):
+            if not (dataset := await session.get(Dataset, sample_batch.dataset_id)):
                 raise NotFoundException(
                     f"Dataset with ID '{sample_batch.dataset_id}' not found"
                 )

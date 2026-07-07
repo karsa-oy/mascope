@@ -49,7 +49,7 @@ export async function initSocket() {
     console.warn('⚠️ [api:sio] Socket disconnected:', reason)
     socketConnected.value = false
   })
-  socket.io.on('reconnect_attempt', (attempt) => {
+  socket.io.on('reconnect_attempt', () => {
     console.debug('🔄 [api:sio] Socket reconnect attempt')
     const app = useApp()
     app.ui.notification.push({

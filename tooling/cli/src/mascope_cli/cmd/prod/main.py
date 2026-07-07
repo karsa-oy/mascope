@@ -38,12 +38,6 @@ from mascope_runtime import Runtime
 
 _MODE = "prod"
 
-# Resolved once at import time — MASCOPE_PATH is guaranteed to be set
-# by the time any CLI command runs.
-_COMPOSE_PATH = os.path.join(
-    *os.path.split(os.environ["MASCOPE_PATH"]), "docker-compose.yaml"
-)
-
 prod_app = typer.Typer()
 prod_app.add_typer(prod_db_app, name="db")
 
@@ -89,6 +83,16 @@ def main() -> None:
 #  --- Internal helpers ---
 
 
+def _compose_path() -> str:
+    """
+    Path of the production compose file under MASCOPE_PATH.
+
+    :return: Absolute path to docker-compose.yaml.
+    :rtype: str
+    """
+    return os.path.join(os.environ["MASCOPE_PATH"], "docker-compose.yaml")
+
+
 def _deploy_version() -> str:
     """
     Resolve the image tag for pulling/running published production images.
@@ -104,6 +108,10 @@ def _deploy_version() -> str:
     """
     if os.environ.get("_MASCOPE_VERSION_PINNED") == "1":
         return os.environ["MASCOPE_VERSION"]
+    # Git only, not resolve_version: the CLI's own package version is a
+    # calver (e.g. v2026.7.7) in a different series from the app's release
+    # image tags (vX.Y.Z), so it must never be used as a deploy tag. A
+    # pip-installed CLI without a pin deploys `latest`.
     version = runtime.parse_version()
     if re.fullmatch(r"v\d+\.\d+\.\d+", version):
         return version
@@ -215,9 +223,12 @@ def _run_compose(args: list[str], building: bool = False) -> None:
                      Selects the current HEAD's version instead of the deploy
                      version for the compose `image:` tag.
     :type building: bool
+    :raises typer.Exit: With docker compose's exit code when it fails, so
+                        callers (CI in particular) can rely on the CLI's exit
+                        status instead of scraping logs.
     """
     env_vars = _compose_env(building)
-    command = f"docker compose --file '{_COMPOSE_PATH}' {' '.join(args)}"
+    command = f"docker compose --file '{_compose_path()}' {' '.join(args)}"
 
     runtime.logger.info(
         f"Database: {env_vars['MASCOPE_DB_NAME']}."
@@ -225,7 +236,12 @@ def _run_compose(args: list[str], building: bool = False) -> None:
         f" Command: {command}"
     )
 
-    lib.run(command=command, env_vars=env_vars)
+    result = lib.run(command=command, env_vars=env_vars)
+    if result.returncode != 0:
+        runtime.logger.error(
+            f"docker compose exited with code {result.returncode} (command: {command})"
+        )
+        raise typer.Exit(result.returncode)
 
 
 # --- Commands ---
@@ -308,6 +324,54 @@ def build() -> None:
         mascope prod build
     """
     _run_compose(["build"], building=True)
+
+
+@prod_app.command()
+def update(
+    version: Annotated[
+        Optional[str],
+        typer.Option(
+            "--version",
+            help="Release to update to: vX.Y.Z or 'latest'. Defaults to the "
+            "MASCOPE_VERSION pin, or 'latest'.",
+        ),
+    ] = None,
+) -> None:
+    """
+    Update the production stack to a newer release.
+
+    Pulls the target release images and restarts the stack with them
+    (`docker compose pull` followed by `up --detach`), then shows container
+    status. Database migrations run automatically on startup — the db_init
+    service takes a pre-migration dump into the backups directory first.
+    Containers whose image did not change are left running, and a failed
+    pull aborts before the running stack is touched.
+
+    \b
+    Examples:
+        mascope prod update                        # follow the latest release
+        mascope prod update --version v1.2.0       # move to a specific release
+        MASCOPE_VERSION=v1.2.0 mascope prod update # same, via env pin
+    """
+    if version is not None:
+        if version != "latest" and not re.fullmatch(r"v\d+\.\d+\.\d+", version):
+            runtime.logger.error(
+                f"Invalid release '{version}' - expected vX.Y.Z or 'latest'. "
+                "For other image tags, pin via the MASCOPE_VERSION env var."
+            )
+            raise typer.Exit(1)
+        # Same effect as an env pin: _deploy_version honors it for both the
+        # pull and the restart.
+        os.environ["MASCOPE_VERSION"] = version
+        os.environ["_MASCOPE_VERSION_PINNED"] = "1"
+
+    check_data_dirs(_MODE)
+    target = _deploy_version()
+    runtime.logger.info(f"Updating the production stack to '{target}'")
+    _run_compose(["pull"])
+    _run_compose(["up", "--detach"])
+    _run_compose(["ps"])
+    runtime.logger.success(f"Production stack updated to '{target}'")
 
 
 @prod_app.command()

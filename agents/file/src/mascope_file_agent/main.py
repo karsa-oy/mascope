@@ -17,7 +17,7 @@ from mascope_runtime import Runtime
 
 
 mascope_sdk.SERVICE_NAME = "file-agent"
-from mascope_sdk import api_post_file
+from mascope_sdk import api_post_file  # noqa: E402  (needs SERVICE_NAME set first)
 
 
 # default configuration

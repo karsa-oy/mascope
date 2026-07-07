@@ -51,11 +51,11 @@ def binary_search_for_left_range(mz_values, left_range):
     :param left_range:
     :return:
     """
-    l = len(mz_values)
-    if mz_values[l - 1] < left_range:
+    n = len(mz_values)
+    if mz_values[n - 1] < left_range:
         raise ValueError(f"No value bigger than {left_range}")
     low = 0
-    high = l - 1
+    high = n - 1
     while low <= high:
         mid = low + int(((high - low) / 2))
         if mz_values[mid] >= left_range:
@@ -72,11 +72,11 @@ def binary_search_for_right_range(mz_values, right_range):
     :param right_range:
     :return:
     """
-    l = len(mz_values)
+    n = len(mz_values)
     if mz_values[0] > right_range:
         raise ValueError(f"No value smaller than {right_range}")
     low = 0
-    high = l - 1
+    high = n - 1
     while low <= high:
         mid = low + int(((high - low) / 2))
         if mz_values[mid] > right_range:

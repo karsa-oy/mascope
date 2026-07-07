@@ -1,17 +1,32 @@
 [project]
 name = "mascope_runtime"
-version = "0.0.0"
+version = "2026.7.7"
 description = "Karsa Mascope's shared runtime util library for config, state and logging"
+classifiers = [
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 authors = [{ name = "Karsa Oy", email = "support@karsa.fi" }]
-requires-python = ">=3.12,<3.13"
+maintainers = [
+    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" },
+]
 license.text = "Apache-2.0"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "rich>=13.7.1,<14",
     "pydantic>=2.8.2,<3",
     "loguru>=0.7.2,<0.8",
-    "duckdb>=1.2.1,<2",
-    "pytz~=2025.1",
 ]
+
+[project.optional-dependencies]
+# Log querying/garbage collection (RuntimeLogging.query/gc) reads the JSON
+# log files through duckdb; only the CLI's `mascope logs` needs it.
+logs = ["duckdb>=1.2.1,<2"]
+
+[project.urls]
+homepage = "https://karsa.fi/"
+repository = "https://github.com/karsa-oy/mascope"
+"Bug Tracker" = "https://github.com/karsa-oy/mascope/issues"
 
 [build-system]
 requires = ["uv_build>=0.6,<0.7"]

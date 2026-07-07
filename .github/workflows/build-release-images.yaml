@@ -20,27 +20,32 @@ on:
 jobs:
   build-images:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
     steps:
       - name: Check out the release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.release.tag_name }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push the release images
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.2"
+
+      - name: Build the release images
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          sudo snap install --classic astral-uv
           export MASCOPE_PATH="$GITHUB_WORKSPACE"
 
           # Pin the build to the release tag. The CLI uses setdefault, so this
@@ -51,6 +56,28 @@ jobs:
 
           uv run mascope prod build
 
+      - name: Smoke test the built images
+        env:
+          MASCOPE_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          # Same gate as the master release pipeline: the rebuild from the tag
+          # is not guaranteed byte-identical to the master build that was
+          # smoke-tested (base images are not digest-pinned), so verify boot,
+          # login and seeded API reads before anything is pushed.
+          for service in backend frontend; do
+            docker image inspect ghcr.io/${{ github.repository }}/$service:$MASCOPE_VERSION > /dev/null
+          done
+          docker compose -f docker-compose.demo.yaml up -d
+          SMOKE_TIMEOUT=900 bash tooling/smoke-test.sh
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.demo.yaml logs --tail 200
+
+      - name: Push the release images
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
           for service in backend frontend; do
             docker push "ghcr.io/${{ github.repository }}/$service:$TAG"
             echo "Pushed ghcr.io/${{ github.repository }}/$service:$TAG"

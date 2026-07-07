@@ -1,18 +1,19 @@
 [project]
 name = "mascope_tools"
-version = "2026.06.25"
+# CalVer without zero-padding (PEP 440 normalizes 06 -> 6 anyway).
+version = "2026.6.25"
 description = "Mascope's public library, containing tools for spectra postprocessing."
 classifiers = [
     "Topic :: Scientific/Engineering :: Atmospheric Science",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 authors = [
-    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi>" },
-    { name = "Konstantin Tumashevich", email = "konstantin.tumashevich@karsa.fi>" },
+    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" },
+    { name = "Konstantin Tumashevich", email = "konstantin.tumashevich@karsa.fi" },
     ]
 maintainers = [
-    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi>" },
-    { name = "Konstantin Tumashevich", email = "konstantin.tumashevich@karsa.fi>" },
+    { name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" },
+    { name = "Konstantin Tumashevich", email = "konstantin.tumashevich@karsa.fi" },
     ]
 license.text = "Apache-2.0"
 requires-python = ">=3.12"
@@ -33,11 +34,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
-    "mascope_molmass",   # test-only: isotope-pattern ground-truth for predict_isotopes parity
 ]
-
-[tool.uv.sources]
-mascope_molmass = { workspace = true }
 
 [project.urls]
 homepage = "https://karsa.fi/"

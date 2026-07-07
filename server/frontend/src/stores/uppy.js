@@ -55,7 +55,7 @@ export const useUppy = defineStore('app.uppy', () => {
       maxFileSize: FILE_UPLOAD_SIZE_LIMIT,
       maxNumberOfFiles: 1000
     },
-    onBeforeFileAdded: (currentFile, files) => {
+    onBeforeFileAdded: (currentFile) => {
       let isValid = validateFile(currentFile)
       if (!isValid) {
         invalidFiles.value = [...invalidFiles.value, currentFile]

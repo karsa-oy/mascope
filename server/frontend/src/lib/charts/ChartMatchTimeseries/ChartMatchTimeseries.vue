@@ -1,10 +1,7 @@
 <script setup>
 import { ref, computed, toRaw, watch, onMounted } from 'vue'
 
-import Tag from 'primevue/tag'
-
 import { useApp } from '@/stores'
-import { num } from '@/lib/formatters'
 
 import BaseChartPlotly from '../BaseChartPlotly.vue'
 import { useChartData } from './data.js'
@@ -36,11 +33,9 @@ const traces = computed(() => {
     return []
   }
   return scale.value.mode == 'average'
-    ? data.traces.map((trace) => {
-        let newTrace = structuredClone(toRaw(trace))
-        newTrace.fill = 'none'
-        return newTrace
-      })
+    ? // Shallow copy: only the fill mode changes, the (potentially long,
+      // one point per scan) data arrays can be shared with the store
+      data.traces.map((trace) => ({ ...toRaw(trace), fill: 'none' }))
     : data.traces.toReversed()
 })
 
@@ -64,8 +59,7 @@ const layout = computed(() => ({
     autorange: true,
     showgrid: true,
     gridcolor: '#33333399',
-    gridwidth: 1,
-    autorange: true
+    gridwidth: 1
   },
   yaxis: {
     title: { text: `Peak intensity [counts/s]` },
@@ -74,8 +68,7 @@ const layout = computed(() => ({
     rangemode: 'tozero',
     type: scale.value.log ? 'log' : 'lin',
     gridcolor: '#33333399',
-    gridwidth: 1,
-    autorange: true
+    gridwidth: 1
   },
   margin: { l: 50, r: 30, t: 30, b: 40 },
   dragmode: 'zoom',

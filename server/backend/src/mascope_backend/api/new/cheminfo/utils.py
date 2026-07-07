@@ -4,7 +4,7 @@ Utility functions for cheminfo composition search.
 
 import re
 
-import mascope_molmass
+from mascope_tools.composition.custom_elements import CUSTOM_ELEMENTS
 
 
 def to_cheminfo_ionization_format(ionization: str) -> str:
@@ -78,16 +78,11 @@ def to_custom_element_format(formula: str) -> str:
     def replace_isotope(match):
         element = match.group(2)
         custom_element = f"^{element}"
-        if custom_element in mascope_molmass.ELEMENTS:
-            # Find the main isotope for this custom element
-            main_isotope = None
-            for iso in mascope_molmass.ELEMENTS[custom_element].isotopes.values():
-                if main_isotope is None or iso.abundance > main_isotope.abundance:
-                    main_isotope = iso
-            # Check if the mass number of the custom element main isotope matches
-            # with the specified isotope in the original formula
-            if main_isotope.massnumber == int(match.group(1)):
-                return custom_element
+        labelled = CUSTOM_ELEMENTS.get(custom_element)
+        # Replace with the custom element only if it exists and its labelled
+        # (main) isotope mass number matches the explicit isotope in the formula.
+        if labelled is not None and labelled.labelled_massnumber == int(match.group(1)):
+            return custom_element
         # If no custom element found or mass number doesn't match, return original
         return match.group(0)
 
@@ -116,11 +111,9 @@ def to_explicit_isotope_format(formula_ranges: str) -> str:
     def replace_custom_element(match):
         element = match.group(1)
         key = f"^{element}"
-        main_isotope = None
-        for iso in mascope_molmass.ELEMENTS[key].isotopes.values():
-            if main_isotope is None or iso.abundance > main_isotope.abundance:
-                main_isotope = iso
-        replaced_with = f"[{main_isotope.massnumber}{element}]"
+        # KeyError for an unknown custom element, matching the previous behaviour.
+        labelled = CUSTOM_ELEMENTS[key]
+        replaced_with = f"[{labelled.labelled_massnumber}{element}]"
         replacements[key] = replaced_with
         return replaced_with
 

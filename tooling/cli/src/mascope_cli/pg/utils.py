@@ -17,7 +17,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from mascope_cli.cmd.dev.docker import is_docker_running
+from mascope_cli.docker import is_docker_running
 from mascope_cli.runtime import runtime
 
 

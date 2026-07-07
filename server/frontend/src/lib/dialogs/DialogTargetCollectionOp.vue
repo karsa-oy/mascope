@@ -841,7 +841,7 @@ watch(
  */
 watch(
   [() => selected.dataset, () => info.type],
-  async ([newDataset, newType], [oldDataset, oldType]) => {
+  async ([newDataset, newType]) => {
     // Skip during initialization - init handles the first load
     if (initializing.value) return
 

@@ -57,7 +57,7 @@ class ActiveSequence:
                 "ActiveSequence::advanceLowerBound(): get<0>(t] >= nbOfSpectra"
             )
 
-        if self._spectra_present[spec_ind] == False:
+        if not self._spectra_present[spec_ind]:
             raise Exception(
                 "ActiveSequence::advanceLowerBound(): that spectrum should be present"
             )

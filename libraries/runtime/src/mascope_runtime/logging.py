@@ -21,10 +21,26 @@ import sys
 from types import TracebackType
 from typing import Callable, List
 
-import duckdb
 from loguru import logger
 from rich.console import Console
 from rich.traceback import Traceback
+
+
+def _duckdb():
+    """
+    Import duckdb on first use.
+
+    Only the log-query commands need it; keeping the import out of module
+    scope lets the base install skip the dependency (the `logs` extra
+    provides it).
+    """
+    try:
+        import duckdb
+    except ImportError as error:
+        raise ImportError(
+            "Log querying requires duckdb - install mascope_runtime[logs]"
+        ) from error
+    return duckdb
 
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
@@ -494,7 +510,7 @@ class RuntimeLogging:
             """
 
         # EXECUTE - run the query and print the logs using loguru
-        with duckdb.connect() as conn:
+        with _duckdb().connect() as conn:
             records = conn.sql(query).fetchall()
             for (
                 timestamp,
@@ -541,7 +557,7 @@ class RuntimeLogging:
             return
 
         if retain:
-            with duckdb.connect() as conn:
+            with _duckdb().connect() as conn:
                 max_date = conn.sql(
                     f"SELECT current_date - INTERVAL {retain}"
                 ).fetchall()[0][0]

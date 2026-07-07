@@ -40,7 +40,7 @@ function saveParams(mzPrecision, formulaRange) {
   } catch {}
 }
 
-const props = defineProps({
+defineProps({
   height: {
     type: Number,
     required: true
@@ -466,10 +466,9 @@ const expanded = ref({})
         </template>
       </DataTable>
       <div
-        v-else
+        v-else-if="!app.data.peak.focused"
         class="center"
         style="width: 100%; max-width: 900px; height: 200px"
-        v-if="!app.data.peak.focused"
       >
         <div class="col" style="gap: 1rem; max-width: 45ch; text-align: center">
           <strong>

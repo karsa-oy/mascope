@@ -7,9 +7,9 @@ import pytest
 from pydantic import ValidationError
 
 from mascope_backend.api.models.dataset.dataset_pydantic_model import (
-    GetDatasetsQueryParams,
     DatasetCreate,
     DatasetUpdate,
+    GetDatasetsQueryParams,
 )
 
 
@@ -18,8 +18,7 @@ def test_dataset_create_valid(dataset_data, dataset_create_model):
     # Test with fixture data
     assert dataset_create_model.dataset_name == dataset_data["dataset_name"]
     assert (
-        dataset_create_model.dataset_description
-        == dataset_data["dataset_description"]
+        dataset_create_model.dataset_description == dataset_data["dataset_description"]
     )
 
     # Test with minimal required data
@@ -76,9 +75,7 @@ def test_query_params_defaults():
 
 def test_query_params_custom():
     """Test setting custom values for query parameters."""
-    params = GetDatasetsQueryParams(
-        sort="dataset_name", order="desc", page=2, limit=50
-    )
+    params = GetDatasetsQueryParams(sort="dataset_name", order="desc", page=2, limit=50)
     assert params.sort == "dataset_name"
     assert params.order == "desc"
     assert params.page == 2

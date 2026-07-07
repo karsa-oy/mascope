@@ -1,5 +1,5 @@
 <script setup>
-import { inject, computed, watch } from 'vue'
+import { inject, computed } from 'vue'
 
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'

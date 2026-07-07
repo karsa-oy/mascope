@@ -4,6 +4,112 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026.07.07
+
+### Changed
+
+- The batch overview chart loads its per-sample datapoints through a new columnar endpoint (`POST /api/match/records/ion/series`) that sends each ion's metadata once with parallel per-sample value arrays, scoped by batch ID instead of an explicit list of every sample ID. On a 5,000-sample batch this cuts a full large-collection chart load from minutes of ~25 MB chunk responses to seconds, and the chart no longer rebuilds every Plotly trace from deep clones when toggling the average/sum scale.
+- The spectrum, match-spectra and match-timeseries charts no longer deep-clone every Plotly trace when the intensity scale is toggled; they build shallow copies that share the unchanged data arrays. Noticeable on long acquisitions (thousands of scans per trace).
+- API responses now carry a `Server-Timing` header and request logs include `duration_ms`, so slow endpoints are visible in browser devtools and server logs without extra tooling.
+
+### Added
+
+- The Mascope CLI is now a standalone PyPI package: `pip install mascope-cli`
+  on a machine with Docker, then `mascope init` (creates a runtime home with
+  editable config, compose files and generated secrets), `mascope cert gen`
+  and `mascope prod up` bring up a deployment — no source checkout needed.
+  Importing the CLI is side-effect free, `mascope --help` works before any
+  environment exists, and commands without a configured home fail with a
+  pointer to `mascope init` instead of a traceback. The standalone install
+  ships the operator surface (`init`, `prod`, `env`, `demo`, `logs`, `cert`);
+  developer commands (`dev`, `test`, `agent`, `backend`) remain available in
+  the monorepo checkout, which is unchanged. The shared runtime library is
+  published alongside as `mascope-runtime`. A hermetic CLI test suite and a
+  packaging smoke test (wheel installed into an isolated environment) run in
+  CI on every PR. Without a `MASCOPE_VERSION` pin, a pip-installed CLI
+  deploys the `latest` release images.
+- `mascope prod update`: update a deployment in one step — pulls the target
+  release images (`--version vX.Y.Z`, or `latest` without a pin), restarts
+  the stack with them, and shows container status. Database migrations run
+  automatically on startup, preceded by a pre-migration dump; a failed pull
+  aborts before the running stack is touched.
+
+- Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
+- Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
+- SDK contract tests: `MascopeClient` is exercised end-to-end against the demo
+  stack (workspace resolution, dataset/batch/sample listings, matched peak
+  retrieval), doubling as a breaking-change detector for the public REST API.
+  They run in CI inside the demo-stack e2e job and locally with
+  `MASCOPE_SDK_CONTRACT=1 uv run pytest libraries/sdk/tests/`.
+- Upload-to-browse e2e test: a real demo raw file is uploaded through the web
+  UI (Uppy/tus), the file-converter runs the real conversion -> peak detection
+  -> matching pipeline, and the result must appear in the Raw files browser.
+  Unit tests for the converter's building blocks: the peak-detection
+  concurrency guard, the upload-context registry whose filename normalization
+  decides whether an uploaded file is "registered", and the filestream watcher
+  that must queue a file only once it has stopped growing.
+- Golden-dataset reproducibility test: the demo bundle's raw files are ingested
+  through the real upload -> convert -> match pipeline and the produced peaks
+  must reproduce the bundle's golden outputs within the manifest tolerances
+  (sub-0.1 ppm m/z). The demo stack gained a rebuild mode
+  (`MASCOPE_DEMO_REBUILD=1`) that restores only the reference seed so ingestion
+  starts from scratch; CI runs the test nightly and on manual dispatch
+  (`.github/workflows/reproducibility.yaml`).
+- The `libraries/` test suites (chem, file, match, molmass, signal, thermo, tools)
+  now run in CI on every PR; previously they only ran when invoked locally.
+- Frontend unit tests for the notification hub (process tracking, badges,
+  watcher dispatch, log retention) and the spreadsheet-paste table parser.
+- Unit tests for the core matching pipeline: the isotope-to-peak assignment
+  rules (closest-in-window, per-ion peak uniqueness, abundance priority, m/z
+  ordering) and the match statistics (abundance/mz error and score formulas)
+  in `mascope_match`, plus the ion -> compound -> collection/sample aggregation
+  rules in the backend match controllers.
+- Releases are gated on a smoke test (`tooling/smoke-test.sh`): the demo stack is booted from the freshly built images and must serve the frontend, authenticate the demo login and answer seeded API reads before any image is pushed or tagged `latest`. The script also works against any running deployment.
+
+### Changed
+
+- Documented the test layers in the developer guide and added a repository `CLAUDE.md` runbook for coding agents.
+- The matching pipeline is substantially faster: match isotopes are bulk-inserted, aggregation runs once per batch instead of per sample, the row-wise pandas hot paths are vectorized, and candidate peaks are found with binary-search windows instead of dense difference matrices. Behaviour is preserved; the profiled bottleneck (database round-trips and row-wise pandas, ~90% of match time) is what was cut.
+- Chemical-formula handling (formula parsing, ion arithmetic, isotope prediction, and the labelled `^N` custom element) is consolidated into `mascope_tools.composition`, and the vendored `mascope_molmass` fork is retired (net -7.2k lines).
+
+### Removed
+
+- The unmaintained instrument-bound Playwright suite. Its batch, dataset and target collection scenarios now live in the hermetic e2e suite; the truly instrument-dependent specs (sample processing, Orbitrap acquisition) were dropped and remain available in git history.
+- The vendored `mascope_molmass` fork; its only unique capability (the labelled `^N` custom element) now lives in `mascope_tools.composition`.
+
+### Fixed
+
+- `mascope prod` compose commands (`build`, `up`, ...) now exit with docker
+  compose's exit code instead of always reporting success. CI builds release
+  images via `mascope prod build` and trusts its exit status, so a swallowed
+  build failure previously let jobs continue against stale images.
+- Web UI file uploads work again on deployments served from a non-standard
+  port (e.g. the demo stack on `:8080`). nginx forwarded `X-Forwarded-Host`
+  without the port, the tus upload endpoint built its upload URL from it, and
+  every upload chunk was then sent to port 80 and refused. Found by the new
+  upload e2e test.
+- Frontend linting works again: migrated to the ESLint 9 flat config format (the legacy config had been silently ignored). The revived linter surfaced dormant chart bugs that are now fixed: the batch overview chart's log-scale zoom reset never fired, and two match spectra comparisons were always false.
+- The dashboard no longer renders a duplicate `id="app"` element inside the Vue mount point.
+- The axios error handlers no longer throw a `TypeError` (masking the real error) when a request fails before a response exists, e.g. a request-setup or network failure; the request/response `config` and body are now guarded before destructuring.
+
+### Security
+
+- API error responses no longer include Python tracebacks, internal filesystem paths, or raw messages of unexpected exceptions (including `AttributeError` and `RuntimeError`, which previously echoed their raw message). Clients receive the user-facing message plus an opaque `error_id`; the full traceback is logged server-side under the same `error_id` for correlation. The same applies to error payloads emitted over Socket.IO notifications.
+- Request validation errors no longer echo the raw request body (which can contain credentials) back to the client, and the offending input values are now kept out of the server logs as well (the validation error is logged without its traceback, whose final line rendered the raw input).
+- After a batch rematch, an open sample's peak list now refreshes its match/formula annotations. The batch aggregation path emitted only a batch-level event and skipped the per-sample `peak_reload`, so peak annotations went stale until a manual reload.
+- The batch overview chart no longer leaks a socket listener on every mount: the match-event handlers are now removed on unmount (they were registered as inline callbacks that `socket.off` could not match by identity).
+- Invalid target-compound formulas are now handled safely. Since the replacement parser silently skips characters it does not recognise, a formula that is garbage, a leftover numeric mass, or an unknown custom element previously produced bogus adduct-only ions or an unhandled 500 during isotope prediction; such compounds are now skipped with a warning. The batch match endpoint rejects bare numeric masses like single-compound creation does, and the valid formula `NaN` (sodium nitride) is no longer misclassified as a numeric mass.
+
+## 2026.07.07
+
+### Fixed
+
+- The batch overview no longer times out when loading a large target collection on a large batch (#1584). The batch-level match ion aggregation ranked every match row of every sample in the batch before keeping the best row per ion; it now probes the best in-batch match per requested ion via a new `match_ion (target_ion_id, match_score)` index, so its cost scales with the collection instead of the batch's match volume. Measured on a 5,103-sample batch with a 3,000-ion collection: 13-21 s -> 0.3-1.3 s. Requires a database migration (`alembic upgrade head`).
+
+### Changed
+
+- nginx now serves JSON, JavaScript and CSS responses gzip-compressed (#1585). The batch overview's chart data chunks shrink from ~25 MB to ~1.6 MB on the wire for a 5,000-sample batch; uploads and raw-file downloads are unaffected.
+
 ## [v1.1.1] - 2026.07.03
 
 ### Fixed

@@ -16,24 +16,42 @@ from rich.table import Table
 from typing_extensions import Annotated
 
 from mascope_cli import cmd
+from mascope_cli.checkout import source_checkout
+from mascope_cli.cmd.init import init
 from mascope_cli.runtime import runtime
+from mascope_cli.version import resolve_version
 
 
 app = typer.Typer()
 
+app.command(name="init")(init)
+
+# Operator commands — available everywhere.
 app.add_typer(cmd.env_app, name="env")
 app.add_typer(cmd.demo_app, name="demo")
-app.add_typer(cmd.dev_app, name="dev")
 app.add_typer(cmd.prod_app, name="prod")
 app.add_typer(cmd.logs_app, name="logs")
-app.add_typer(cmd.backend_app, name="backend")
-app.add_typer(cmd.agent_app, name="agent")
 app.add_typer(cmd.cert_app, name="cert")
-app.add_typer(cmd.test_app, name="test")
+
+# Developer commands — they operate on the monorepo source tree (run
+# services, migrations, test suites), so they are only registered when the
+# CLI runs from a checkout. A wheel install neither shows nor imports them,
+# keeping their dependencies (the `dev` extra) out of the operator install.
+if source_checkout():
+    from mascope_cli.cmd.agent import agent_app
+    from mascope_cli.cmd.backend import backend_app
+    from mascope_cli.cmd.dev import dev_app
+    from mascope_cli.cmd.test import test_app
+
+    app.add_typer(dev_app, name="dev")
+    app.add_typer(backend_app, name="backend")
+    app.add_typer(agent_app, name="agent")
+    app.add_typer(test_app, name="test")
 
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     env: Annotated[
         Optional[str],
         typer.Option(
@@ -68,6 +86,11 @@ def main(
     \b
     Type `mascope <cmd> --help` to learn more about a specific command.
     """
+    # `mascope init` creates the runtime home, so it must run before one
+    # exists — skip the runtime-backed setup for it (the log options below
+    # only touch env vars).
+    needs_runtime = ctx.invoked_subcommand != "init"
+
     # Default the version from git, but let an explicitly-set MASCOPE_VERSION win
     # (e.g. pinning a release image for a prod deploy: MASCOPE_VERSION=v1.0.0).
     # Record whether it was pinned: a prod deploy honors a pin but otherwise
@@ -77,10 +100,12 @@ def main(
         os.environ["_MASCOPE_VERSION_PINNED"] = "1"
     else:
         os.environ["_MASCOPE_VERSION_PINNED"] = "0"
-        os.environ["MASCOPE_VERSION"] = runtime.parse_version()
+        if needs_runtime:
+            os.environ["MASCOPE_VERSION"] = resolve_version(runtime)
 
-    # override active env with CLI option (null if not provided)
-    runtime.state.override("env", env)
+    if needs_runtime:
+        # override active env with CLI option (null if not provided)
+        runtime.state.override("env", env)
 
     # Set log level for terminal output. Always sync the env var so docker
     # compose never sees a stale value from a previous invocation.

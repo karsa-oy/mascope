@@ -1,3 +1,4 @@
+import math
 import os
 import shutil
 from datetime import datetime
@@ -608,11 +609,9 @@ async def delete_sample_files(
 
         # Check if any affected instruments are now missing from the database
         # This happens when we deleted the last sample file for an instrument
-        if missing_instruments := [
-            instrument
-            for instrument in instruments_affected
-            if instrument not in final_instruments
-        ]:
+        if any(
+            instrument not in final_instruments for instrument in instruments_affected
+        ):
             # Clean up orphaned datasets and emit instrument deletion events
             await delete_acquisition_datasets()
 
@@ -919,6 +918,21 @@ async def upload_sample_file(
 # ---------------------
 
 
+def finite_or_none(values: list) -> list:
+    """
+    Replace non-finite floats (NaN, +/-inf) with ``None`` for JSON transport.
+
+    Peak arrays can legitimately carry NaN (e.g. quantities a given instrument
+    type does not produce), but strict JSON has no representation for them and
+    ``json.dumps`` raises - the whole peaks response used to 400 on a single
+    NaN. ``None`` serializes as ``null``, which chart consumers treat as a gap.
+
+    :param values: Peak values as plain Python floats.
+    :return: The same list with every non-finite entry replaced by ``None``.
+    """
+    return [v if v is None or math.isfinite(v) else None for v in values]
+
+
 @api_controller()
 async def get_sample_file_peaks(
     sample_file_id: str, areas: bool, heights: bool, average: bool = True
@@ -1017,6 +1031,13 @@ async def get_sample_file_peaks(
         response_data.pop("area", None)
     if not heights:
         response_data.pop("height", None)
+
+    # Step 7: Make the payload JSON-safe: peak arrays can carry NaN (e.g.
+    # quantities the instrument type does not produce) and strict JSON
+    # serialization rejects non-finite floats.
+    response_data = {
+        key: finite_or_none(values) for key, values in response_data.items()
+    }
 
     message = f"Successfully loaded {len(response_data['mz'])} peaks from sample file '{filename}'"
     return {

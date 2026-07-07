@@ -1,4 +1,4 @@
-import traceback
+import uuid
 
 import httpx
 from fastapi import HTTPException, status
@@ -32,14 +32,16 @@ class DuplicateException(HTTPException):
 
 def process_exception(e: Exception, context_message: str) -> ApiException:
     error_message = f"{context_message}. {str(e)}."
-    traceback_info = traceback.format_exc()
-    # Construct the technical message with structured JSON
-    tech_message_details = {
-        "error_message": error_message.replace("\n", "; "),
-        "traceback": traceback_info.replace("\n", "; "),
-    }
-    # Encode the technical message details into JSON-compatible format
-    tech_message = jsonable_encoder(tech_message_details)
+    # Opaque reference for correlating a client-visible error with the
+    # server-side log entry. The traceback and internal details are only
+    # logged, never returned to the client.
+    error_id = uuid.uuid4().hex
+    tech_message = {"error_id": error_id}
+    # Unexpected exceptions are logged with their traceback for debugging. For
+    # expected client errors whose exception repr embeds request data (e.g. a
+    # RequestValidationError renders the offending "input" values, which can be
+    # credentials), log only the redacted message - no traceback.
+    log_with_traceback = True
 
     # Use pattern matching to determine user message and status code
     match e:
@@ -50,6 +52,18 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         case ApiException():
             user_message = e.user_message
             status_code = e.status_code
+            # Keep payloads that application code attached on purpose
+            # (e.g. raise_api_warning details consumed by the frontend).
+            if isinstance(e.tech_message, dict):
+                tech_message = jsonable_encoder(
+                    {**e.tech_message, "error_id": error_id}
+                )
+            elif e.tech_message:
+                # Non-dict payload (e.g. a plain string): keep it under a key so
+                # the error_id stays present for log correlation.
+                tech_message = jsonable_encoder(
+                    {"detail": e.tech_message, "error_id": error_id}
+                )
 
         case InvalidPasswordException():
             # Password policy violation from UserManager.validate_password.
@@ -98,26 +112,50 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
             status_code = 400  # Bad Request
 
         case RequestValidationError():
+            # str(e) and each error's "input" field carry the raw offending
+            # values (which can include credentials); never log or return them.
+            # Log only the field location + validator message.
             error_messages = [error["msg"] for error in e.errors()]
+            safe_details = [
+                f"{'.'.join(str(p) for p in error.get('loc', []))}: {error['msg']}"
+                for error in e.errors()
+            ]
+            error_message = (
+                f"{context_message}. Request validation failed: "
+                f"{'; '.join(safe_details)}."
+            )
             combined_error_message = "; ".join(error_messages)
             user_message = f"{context_message}. {combined_error_message}"
             status_code = 422  # Unprocessable entity
+            # The traceback's final line is str(e), which carries the raw input.
+            log_with_traceback = False
 
         case AttributeError():
-            user_message = error_message
+            # str(e) can name internal attributes/objects; keep it out of the
+            # client response (the full message is still logged server-side).
+            user_message = f"{context_message}. Unexpected error."
             status_code = 400  # Bad Request
 
         case RuntimeError():
-            user_message = error_message
+            # RuntimeError messages often embed internal paths/state; do not
+            # echo them to the client (logged server-side under error_id).
+            user_message = f"{context_message}. Unexpected error."
             status_code = 500  # Internal Server Error
 
         case _:  # Default case
-            user_message = f"{context_message}. Unexpected error. {str(e)}."
+            # Do not echo str(e) for unexpected exceptions: messages such as
+            # FileNotFoundError include internal filesystem paths.
+            user_message = f"{context_message}. Unexpected error."
             status_code = 500  # Internal Server Error
 
-    # Log the exception with context
-    with runtime.logger.contextualize(status_code=status_code):
-        runtime.logger.exception(e)
+    # Log the exception with context server-side, correlated by error_id. The
+    # traceback is included for unexpected exceptions but omitted where the
+    # exception repr would leak request data (see log_with_traceback).
+    with runtime.logger.contextualize(status_code=status_code, error_id=error_id):
+        if log_with_traceback:
+            runtime.logger.exception(error_message)
+        else:
+            runtime.logger.error(error_message)
 
     return ApiException(user_message, tech_message, status_code)
 

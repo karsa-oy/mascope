@@ -5,7 +5,7 @@ import pytest
 
 from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
     generate_target_ions_from_composition,
-    generate_target_ions_from_mass,
+    group_target_isotopes,
 )
 from mascope_backend.db import (
     IonizationMechanism,
@@ -108,26 +108,70 @@ async def test_generate_target_ions_from_composition(
         assert_isotope_links(target_ions, target_isotopes)
 
 
-@pytest.mark.asyncio
-async def test_generate_target_ions_from_mass(
-    test_target_compounds_by_mass: list[tuple[float, TargetCompound]],
-    test_ionization_mechanisms: list[IonizationMechanism],
-) -> None:
-    """Test generating target ions from target compounds defined by mass.
+@pytest.mark.parametrize("compound_formula", ["()", "H2O"])
+def test_empty_modification_mechanism_yields_no_atomless_ions(compound_formula):
+    """An empty-modification mechanism ("++") must not produce atomless ions.
 
-    :param test_target_compounds_by_mass: List of target compounds defined by mass.
-    :type test_target_compounds_by_mass: list[tuple[float, TargetCompound]]
-    :param test_ionization_mechanisms: List of ionization mechanisms to use for generating target ions.
-    :type test_ionization_mechanisms: list[IonizationMechanism]
-
-    :return: None
+    The pydantic validator rejects "++" at the API, but rows created before
+    that guard (or built directly) still reach ion generation. An atomless ion
+    used to reach group_target_isotopes with m/z ~ -0.00055 (electron mass
+    correction of an empty pattern), whose non-positive bin width sent the
+    grouping loop spinning forever, hanging the whole worker.
     """
-    for target_compound_mass, target_compound in test_target_compounds_by_mass:
-        target_ions, target_isotopes = generate_target_ions_from_mass(
-            target_compound_mass, target_compound, test_ionization_mechanisms
-        )
-        # Generic checks: ensure some ions and isotopes were generated
-        assert len(target_ions) > 0, "No target ions generated"
-        assert len(target_isotopes) > 0, "No target isotopes generated"
-        # Link integrity
-        assert_isotope_links(target_ions, target_isotopes)
+    compound = TargetCompound(
+        target_compound_id="unit-empty-mech",
+        target_compound_formula=compound_formula,
+    )
+    mechanism = IonizationMechanism(
+        ionization_mechanism_id="unit-mech-plusplus",
+        ionization_mechanism_polarity="+",
+        ionization_mechanism="++",
+    )
+
+    target_ions, target_isotopes = generate_target_ions_from_composition(
+        compound, [mechanism]
+    )
+
+    if compound_formula == "()":
+        # "++" adds nothing to an empty compound: no atoms, no ion
+        assert target_ions == []
+        assert target_isotopes == []
+    else:
+        # For a real compound "++" degenerates to electron abstraction and
+        # must still terminate and yield a well-formed ion
+        assert [ion.target_ion_formula for ion in target_ions] == ["H2O+"]
+        assert target_isotopes
+
+
+def test_group_target_isotopes_terminates_on_nonpositive_mz():
+    """Grouping must terminate even for m/z <= 0 (degenerate input)."""
+    masses, probs, formulae = group_target_isotopes(
+        [-0.000549, 0.0, 18.0106], [0.5, 0.2, 0.3], ["a", "b", "c"], 1e4
+    )
+    assert len(masses) == len(probs) == len(formulae) == 3
+
+
+@pytest.mark.parametrize("bad_formula", ["xyz", "136.1252", "Zz", "^C"])
+def test_invalid_compound_formula_yields_no_ions(bad_formula):
+    """An invalid compound formula must produce no ions (and never raise).
+
+    parse_composition silently drops unrecognised characters, so without the
+    up-front validity check these would either create bogus adduct-only ions or
+    make IsoSpecPy raise. Both are guarded: the compound is skipped.
+    """
+    compound = TargetCompound(
+        target_compound_id="unit-invalid",
+        target_compound_formula=bad_formula,
+    )
+    mechanism = IonizationMechanism(
+        ionization_mechanism_id="unit-mech",
+        ionization_mechanism_polarity="+",
+        ionization_mechanism="+H+",
+    )
+
+    target_ions, target_isotopes = generate_target_ions_from_composition(
+        compound, [mechanism]
+    )
+
+    assert target_ions == []
+    assert target_isotopes == []

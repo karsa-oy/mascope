@@ -3,7 +3,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 # Environment setup
 ENV MASCOPE_PATH=/app
 ENV MASCOPE_TIMEZONE=Etc/UTC
-ENV PATH=/root/.local/bin:$PATH
+# Install the mascope uv tool into a fixed system-wide location instead of the
+# build user's home, so the non-root runtime user can execute it. db-init.sh,
+# demo-init.sh and the reproducibility test reference /opt/uv/tools/mascope/bin
+# directly - keep them in sync if these change.
+ENV UV_TOOL_DIR=/opt/uv/tools
+ENV UV_TOOL_BIN_DIR=/opt/uv/bin
+ENV PATH=/opt/uv/bin:$PATH
 RUN ln -snf /usr/share/zoneinfo/$MASCOPE_TIMEZONE /etc/localtime && echo $MASCOPE_TIMEZONE > /etc/timezone
 
 # Install system dependencies
@@ -59,8 +65,27 @@ RUN echo '{"env":{"active":"prod","override":null},"mode":{"active":"prod","over
 ADD . .
 
 # Install Mascope backend and all workspace dependencies
-# This creates the mascope-backend console script in /root/.local/bin
+# This creates the mascope-backend console script in /opt/uv/bin (UV_TOOL_BIN_DIR)
 RUN uv tool install .
+
+# Run as a non-root user so files written to the bind mounts (filestore
+# uploads, pre-migration dumps in /backups, log files in the env dir) land on
+# the host owned by the deploy user instead of root. UID/GID default to 1000
+# (the first user on Ubuntu); if the deploying user differs, rebuild with
+#   docker build --build-arg MASCOPE_UID=$(id -u) --build-arg MASCOPE_GID=$(id -g) ...
+ARG MASCOPE_UID=1000
+ARG MASCOPE_GID=1000
+RUN groupadd --gid "${MASCOPE_GID}" mascope \
+    && useradd --uid "${MASCOPE_UID}" --gid "${MASCOPE_GID}" --create-home mascope
+
+# Pre-create the runtime dirs the app writes to. The demo stack mounts named
+# volumes at .runtime/secrets, .runtime/env/demo and .runtime/demo; an empty
+# named volume inherits the ownership of the image directory it mounts over,
+# so these must exist here owned by the runtime user.
+RUN mkdir -p .runtime/secrets .runtime/env/demo .runtime/demo \
+    && chown -R mascope:mascope .runtime
+
+USER mascope
 
 # Launch backend service
 # Docker-compose overrides with specific service names: "api-server" or "file-converter"

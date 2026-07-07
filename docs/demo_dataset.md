@@ -155,7 +155,16 @@ the reproducibility test drives.
 ## End-to-end reproducibility test
 
 Location: `server/backend/tests/system/reproducibility/`. It is the asserted
-form of the `--rebuild` path:
+form of the `--rebuild` path, driven against a **rebuild-mode demo compose
+stack** (`MASCOPE_DEMO_REBUILD=1` makes `demo_init` restore the reference seed
+instead of the snapshot, so the stack comes up with no samples):
+
+```sh
+MASCOPE_DEMO_REBUILD=1 docker compose -f docker-compose.demo.yaml up -d
+MASCOPE_REPRO_TEST=1 uv run pytest server/backend/tests/system/reproducibility/ -v
+```
+
+What it asserts:
 
 1. Assert input integrity: every `raw/` file SHA-256 matches the manifest.
 2. Run the real conversion + peak detection + matching pipeline on `raw/`.
@@ -177,8 +186,10 @@ never drift. Because the key includes `filename`, goldens must be captured from
 a from-bundle rebuild (step A3) so the stored filenames match a reproducibility
 rebuild of the same `raw/`.
 
-Booting the stack and ingesting raw files makes this a **heavy** test. Run on a
-schedule / pre-release, not every commit. When the pipeline legitimately changes
+Booting the stack and ingesting raw files makes this a **heavy** test. It does
+not run per-PR: CI runs it nightly against the default branch and on manual
+dispatch (`.github/workflows/reproducibility.yaml`) - dispatch it on a branch
+before merging a pipeline-touching PR. When the pipeline legitimately changes
 the numbers, regenerate the goldens with `mascope demo snapshot --update`,
 review the diff, and cut a new bundle version. Goldens are never updated
 silently.

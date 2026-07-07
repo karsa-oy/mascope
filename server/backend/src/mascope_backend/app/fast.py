@@ -8,6 +8,7 @@ is complete.
 """
 
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 
@@ -85,8 +86,13 @@ fast = FastAPI(lifespan=lifespan)
 async def logger_middleware(request: Request, call_next):
     worker_pid = os.getpid()
 
-    # Make the request and receive a response
+    # Make the request and receive a response, timing the server-side handling
+    start = time.perf_counter()
     response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
+
+    # Surface the timing to browser devtools / API clients
+    response.headers["Server-Timing"] = f"app;dur={duration_ms}"
 
     # add logging context
     client_host = request.client.host if request.client else "unknown"
@@ -98,6 +104,7 @@ async def logger_middleware(request: Request, call_next):
         request_id=str(uuid.uuid4()),
         status_code=response.status_code,
         worker_pid=worker_pid,
+        duration_ms=duration_ms,
     ):
         # Log full URL with query params in debug mode
         if runtime.config.log_level == "debug":
@@ -160,16 +167,9 @@ async def validation_exception_handler(
     :return: Structured JSON error response.
     :rtype: JSONResponse
     """
-    try:
-        body = await request.json()
-    except Exception:
-        body = None
-
-    context_message = (
-        f"Validation error on route {request.method}"
-        f" {request.url.path} with body={body!r}"
-    )
-    runtime.logger.error(f"Validation error on {request.method} {request.url.path}")
+    # The request body is deliberately not included in the response or the
+    # logs: it can carry credentials (e.g. login forms) and other user data.
+    context_message = f"Validation error on route {request.method} {request.url.path}"
     return handle_exception(exc, context_message, response_type="http")
 
 

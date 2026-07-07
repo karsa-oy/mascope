@@ -1,14 +1,10 @@
 # flake8: noqa
-from .agent import agent_app
-from .backend import backend_app
+# Operator command groups — always available, wheel and checkout alike.
+# Developer groups (dev, test, agent, backend) are imported by main.py only
+# when running from a source checkout: they drive the monorepo itself and
+# pull in the `dev` extra's dependencies (alembic, sqlalchemy, psycopg2).
 from .cert import cert_app
-from .dev import dev_app
+from .demo import demo_app
 from .env import env_app
 from .logs import logs_app
 from .prod import prod_app
-from .test import test_app
-
-# Imported after `dev` on purpose: the demo command pulls in `mascope_cli.pg`,
-# which has a load-order dependency on `cmd.dev` being initialized first
-# (pg.utils -> cmd.dev.docker). Importing demo earlier triggers a circular import.
-from .demo import demo_app

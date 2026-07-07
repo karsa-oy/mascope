@@ -12,29 +12,11 @@ import time
 
 import typer
 
+from mascope_cli.docker import is_docker_running
 from mascope_cli.runtime import runtime
 
 
 dev_docker_app = typer.Typer()
-
-
-def is_docker_running() -> bool:
-    """
-    Check if Docker daemon is running.
-
-    :return: True if Docker daemon is accessible, False otherwise
-    :rtype: bool
-    """
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=5,
-            check=False,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
 
 
 def start_docker_desktop() -> bool:

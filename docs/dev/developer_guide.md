@@ -35,7 +35,7 @@ This document is structured as follows:
   - [Schema migrations](#schema-migrations)
   - [Database management commands](#database-management-commands)
   - [PostgreSQL tuning reference](#postgresql-tuning-reference)
-  - [Scheduled database backups (cron)](#scheduled-database-backups-cron)
+  - [Automated backups (cron + restic)](#automated-backups-cron--restic)
 - 🖥️ **[Frontend](#️-frontend)** - VueJS user interface
 - 📚 **[Libraries](#-libraries)** - shared Python libraries
 - 🚚 **[Deploying](#-deploying)** - prod operations guide
@@ -51,13 +51,12 @@ mascope/           # Monorepo root directory
     chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
     match/             # Matching (targeted analysis) module
-    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
-    tools/             # Standalone package with peak alignment etc.
+    tools/             # Formula parsing, isotope prediction, peak alignment etc.
   server/            # Mascope app server
     backend/           # API server (Python, FastAPI, PostgreSQL)
       alembic/           # Alembic migration environment
@@ -1562,93 +1561,156 @@ docker exec mascope_prod_postgres psql -U mascope_user \
 
 ---
 
-### Scheduled Database Backups (Cron)
+### Automated Backups (Cron + Restic)
 
-Mascope uses `cron` to automate PostgreSQL backups via the `mascope prod db backup` CLI commands.
-Cron jobs are **per-user, per-machine** - they are not tied to a project directory or environment.
-All backup commands operate on the **active environment's database only**.
+Production hosts run `tooling/backup-cron.sh` nightly from cron. The script has
+two layers:
 
-Backups are written to `.runtime/database/backups/prod/` as compressed `.dump` files
-(PostgreSQL custom format via `pg_dump -Fc`).
+1. **Local dumps** — `mascope prod db backup create` writes a compressed `.dump`
+   file (PostgreSQL custom format, `pg_dump -Fc`) of the **active environment's
+   database** to `.runtime/database/backups/prod/`, then prunes dumps older than
+   `LOCAL_RETENTION_DAYS` (default 7). These give fast same-host restores.
+2. **Encrypted off-site copy** — [restic](https://restic.net/) pushes the dump
+   directory **and the filestore** (uploaded raw files) to an encrypted remote
+   repository, then applies the `KEEP_DAILY`/`KEEP_WEEKLY`/`KEEP_MONTHLY`
+   retention policy (defaults 7/4/6). These survive host loss.
+
+Off-site backups are encrypted client-side by restic, so the storage provider
+never sees plaintext — this is what lets the privacy notice claim encrypted
+backups (GDPR Art. 32).
 
 ### Prerequisites
 
-Before setting up cron, confirm the required values on the server:
+```bash
+which mascope   # /home/<user>/.local/bin/mascope
+which docker    # /usr/bin/docker
+which restic    # /usr/bin/restic (installed by tooling/ubuntu.sh)
+echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
+```
+
+### Setup
+
+1. **Create the off-site repository.** Any restic-supported backend works:
+   - *Hetzner Storage Box* — enable SSH support in the Storage Box settings and
+     install the host's SSH key (`ssh-copy-id -p 23 u123456@u123456.your-storagebox.de`).
+   - *S3-compatible object storage* (e.g. Contabo Object Storage) — create a
+     bucket and an access key pair.
+   - *Own backup server* — see below.
+
+   Prefer the **other** hosting provider than the one the server runs on, so a
+   provider-level incident cannot take out both the service and its backups.
+
+   #### Using your own backup server
+
+   A machine with large disks (e.g. an office server) can serve as the backup
+   target over plain SFTP. Do not expose its SSH port to the internet — connect
+   the VPSes and the backup server through a VPN overlay instead
+   ([Tailscale](https://tailscale.com/) is the quickest: install on both ends,
+   no inbound router ports needed):
+
+   ```bash
+   # on the backup server: dedicated user, key-only SSH.
+   # NB: do not name the user `backup` — that is a built-in Ubuntu system
+   # account (uid 34, nologin shell) and adduser will silently no-op.
+   sudo adduser --disabled-password --gecos "" mascope-backup
+   sudo -u mascope-backup mkdir -p /home/mascope-backup/.ssh
+   sudo mkdir -p /path/to/big-disk/mascope-backups
+   sudo chown mascope-backup:mascope-backup /path/to/big-disk/mascope-backups
+   # append each VPS's public key to /home/mascope-backup/.ssh/authorized_keys
+   # (mode 600, owner mascope-backup; ~/.ssh mode 700)
+
+   # on each VPS (backup.env) — note the absolute repository path:
+   RESTIC_REPOSITORY=sftp:mascope-backup@<tailscale-ip>:/path/to/big-disk/mascope-backups/<hostname>
+   ```
+
+   Caveats: the backup server needs disk redundancy (RAID/ZFS) and monitoring
+   like any other piece of infrastructure, and its location is a
+   data-processing location (Art. 30 record / DPA). With SFTP push, a
+   compromised VPS could delete its own off-site backups; for a hardened setup,
+   run restic's `rest-server --append-only` on the backup server instead.
+   Migrating to a hosted target later is just a `RESTIC_REPOSITORY` change
+   (`restic init` on the new target, or `restic copy` to carry snapshots over).
+
+2. **Configure the host:**
+
+   ```bash
+   cp tooling/backup.env.example "$MASCOPE_PATH/.runtime/secrets/backup.env"
+   chmod 600 "$MASCOPE_PATH/.runtime/secrets/backup.env"
+   # then edit: repository, encryption password, FILESTORE_PATH, retention
+
+   # the backend image runs as UID 1000, so new dumps land owned by the
+   # deploy user — but dumps created by releases older than that (or by the
+   # docker daemon creating the mount dir) may still be root-owned. Hand
+   # them to the user that runs the cron job once, or pruning fails:
+   sudo chown -R "$(whoami)" "$MASCOPE_PATH/.runtime/database/backups"
+   ```
+
+   ⚠️ Store the `RESTIC_PASSWORD` in the company password manager **before the
+   first run** — without it the backups are unrecoverable, by design.
+
+3. **Test manually** before relying on cron:
+
+   ```bash
+   MASCOPE_PATH=$MASCOPE_PATH bash tooling/backup-cron.sh
+   restic snapshots   # with backup.env sourced — should list the new snapshot
+   ```
+
+4. **Install the cron job** (`crontab -e`). Cron does **not** load
+   `/etc/environment` or shell profiles, so the header must set the environment
+   explicitly:
+
+   ```
+   SHELL=/usr/bin/bash
+   PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
+   MASCOPE_PATH=/home/karsa/Mascope
+
+   # Nightly backup at 4 AM: local dump + prune + encrypted off-site push
+   0 4 * * * $MASCOPE_PATH/tooling/backup-cron.sh 2>&1 | logger -t mascope-backup
+   ```
+
+   Output goes to syslog: `grep mascope-backup /var/log/syslog | tail -20`.
+
+   The backend image runs as UID 1000 (override with the `MASCOPE_UID` /
+   `MASCOPE_GID` build args), so filestore files are owned by the deploy user.
+   Files written by releases that still ran as root need a one-time
+   `sudo chown -R "$(whoami)" <filestore>` — until then a user-level cron
+   cannot read them.
+
+5. **Monitoring (recommended):** set `HEALTHCHECK_URL` in `backup.env` to a
+   [healthchecks.io](https://healthchecks.io) ping URL. The script pings it on
+   success and `<url>/fail` on failure, so a silently broken cron job (the
+   classic backup failure mode) still raises an email alert.
+
+### Restoring
 
 ```bash
-# Confirm mascope is installed and its location
-which mascope                  # should return /home/<user>/.local/bin/mascope
+# Same-host restore from a local dump (list, then restore):
+mascope prod db backup list
+mascope prod db restore
 
-# Confirm MASCOPE_PATH (set in /etc/environment by ubuntu.sh, NOT exported into SSH/cron sessions)
-echo $MASCOPE_PATH             # e.g. /home/karsa/Mascope
-
-# Confirm docker is available
-which docker                   # should return /usr/bin/docker
+# Disaster recovery from off-site (new host):
+set -a; source "$MASCOPE_PATH/.runtime/secrets/backup.env"; set +a
+restic snapshots                                  # pick a snapshot
+restic restore latest --target /tmp/mascope-restore
+# then: mascope prod db restore from the recovered .dump file, and copy the
+# recovered filestore back to the MASCOPE_FILESTORE path.
 ```
 
-### Crontab setup
-
-Edit the crontab with:
-
-```bash
-crontab -e    # opens in $EDITOR (nano by default)
-crontab -l    # view current crontab
-```
-
-The crontab requires explicit environment variables -cron does **not** load `/etc/environment`
-or the user's shell profile:
-
-```
-SHELL=/usr/bin/bash
-PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
-MASCOPE_PATH=/home/karsa/Mascope
-```
-
-- `PATH` -must include `~/.local/bin` (where `uv tool` installs `mascope`) and `/usr/bin` (where `docker` lives)
-- `MASCOPE_PATH` -required by the `mascope` runtime to locate the project; set by `tooling/ubuntu.sh` in `/etc/environment` but **not** automatically exported into cron
-
-### Recommended crontab
-
-Backup create and delete are **chained in a single job** with `&&` to avoid simultaneous
-writes to `state.json`:
-
-```
-SHELL=/usr/bin/bash
-PATH=/home/karsa/.local/bin:/usr/bin:/usr/local/bin
-MASCOPE_PATH=/home/karsa/Mascope
-
-# Daily backup at 4 AM -create then prune, 7-day retention, active env only
-0 4 * * * { mascope prod db backup create -l cron && mascope prod db backup delete --retention-days 7; } 2>&1 | logger -t mascope-prod-db-backup
-```
-
-Both stdout and stderr are captured and forwarded to syslog under the tag `mascope-prod-db-backup`.
-
-### Useful commands
-
-```bash
-# View recent backup files and sizes
-mascope prod db backup list -a
-
-# Manual backup (active env)
-mascope prod db backup create
-
-# Preview what deletion would remove (dry run)
-mascope prod db backup delete --retention-days 7 --dry-run
-
-# Check recent cron execution logs
-grep mascope-prod-db-backup /var/log/syslog | tail -20
-
-```
+Do a **restore drill** (restore latest snapshot to a scratch directory and
+`pg_restore --list` the dump) after first setup and then periodically — an
+untested backup is not a backup.
 
 ### Notes
 
-- Use https://crontab.guru to generate and verify cron expressions.
-- `pg_dump` for large databases (tens of GB) can take several minutes - this is normal.
-  The backup file will grow incrementally in `.runtime/database/backups/prod/` while in progress.
+- All `mascope prod db backup` commands operate on the **active environment's
+  database only**; deletion never touches other environments' dumps.
+- `pg_dump` for large databases (tens of GB) can take several minutes — the
+  dump file grows incrementally while in progress. restic uploads are
+  incremental/deduplicated, so nightly pushes are much smaller than the first.
 - **Large databases: dump uncompressed.** `pg_dump -Fc` compresses with
   single-core gzip, which is both the dump-time bottleneck and the reason
-  off-site deduplication (restic) cannot see unchanged data between
-  consecutive dumps. Set in the env's `prod.mascope.toml`:
+  restic cannot deduplicate consecutive dumps (each night re-uploads the full
+  dump). Set in the env's `prod.mascope.toml`:
 
   ```toml
   [backend.database]
@@ -1656,13 +1718,17 @@ grep mascope-prod-db-backup /var/log/syslog | tail -20
   ```
 
   This speeds up nightly dumps *and* the pre-migration dump during upgrades
-  (shorter downtime window). Uncompressed dumps take 2–4× more local disk —
-  shorten the local retention window to compensate. One-off override:
-  `mascope prod db backup create --compress 0`.
-- Backup filenames embed a timestamp and optional `cron` label, e.g.
-  `mascope_test_env_20260313_040001_cron.dump`
-- Deletion only affects dumps matching the **active environment** - other environments'
-  dumps in the same directory are untouched.
+  (shorter downtime window), and lets restic deduplicate and zstd-compress
+  dump generations off-site. Uncompressed dumps take 2–4× more local disk —
+  lower `LOCAL_RETENTION_DAYS` in `backup.env` to compensate. One-off
+  override: `mascope prod db backup create --compress 0`.
+- Backup filenames embed a timestamp and the `cron` label, e.g.
+  `mascope_test_env_20260313_040001_cron.dump`.
+- The script chains dump create and prune sequentially to avoid simultaneous
+  writes to `state.json`.
+- Pre-migration dumps created by `tooling/db-init.sh` land in the same
+  `.runtime/database/backups/prod/` directory, so they are pushed off-site and
+  pruned locally by the same run. Use https://crontab.guru to adjust schedules.
 
 ## 🖥️ Frontend
 
@@ -1688,9 +1754,11 @@ src/          source code
     data/         data stores w/ mutating APIs
     ui/           ui stores w/ read-only APIs
   ...           global vue app configs
-tests/        playwright tests
-  fixtures/     reusable test patterns
-  ...
+tests/        frontend tests
+  unit/         vitest unit tests (pure logic, no backend)
+  e2e/          hermetic playwright tests (demo stack)
+    fixtures/     auth, api seeding, env config
+    setup/        one-time api login -> storage state
 .vscode/      VS Code workspace settings
 index.html    static template w/ font imports
 package.json  npm package w/ dependencies
@@ -1708,6 +1776,7 @@ The Mascope frontend is build with the following technologies:
 - [Pinia stores](https://pinia.vuejs.org/introduction.html) with the [setup store syntax](https://pinia.vuejs.org/core-concepts/#Setup-Stores)
 - [PrimeVue](https://primevue.org/introduction/) as the component library
 - [Vite](https://vitejs.dev/guide/) as the build tool + dev server
+- [Vitest](https://vitest.dev/guide/) for unit tests
 - [Playwright](https://playwright.dev/docs/intro) for end-to-end tests
 
 ### Frontend Development
@@ -2338,36 +2407,47 @@ const layer = "my_dialog";
 
 ### Frontend Tests
 
-> [!CAUTION]
-> These tests are super flakey and not really in use at the moment.
+Frontend tests come in two layers under `server/frontend/tests/`:
 
-Our frontend currently only has a handful of tests written in [Playwright](https://playwright.dev/docs/intro).
-These are end-to-end tests which work by running headless browsers and emulating real user behavior like clicks.
-The test then checks that certain elements are or are not visible in the page.
+- **`tests/unit/`** — [Vitest](https://vitest.dev/guide/) unit tests for pure logic
+  (formatters, chemistry helpers, validation composables, chart data transforms).
+  No backend needed, sub-second runs. This is where most new tests should go.
+- **`tests/e2e/`** — hermetic [Playwright](https://playwright.dev/docs/intro) end-to-end
+  tests. They run against any live stack, by default the demo stack
+  (`docker compose -f docker-compose.demo.yaml up`, frontend at `http://localhost:8080`,
+  seeded demo dataset + `demo@mascope.app` login). Authentication happens once via the
+  REST API (`tests/e2e/setup/auth.setup.js`) and is shared as storage state; the `api`
+  and `scratch` fixtures seed state through the API so the UI is only used for the
+  behavior under test. Both suites run in CI on every PR.
 
 #### Running the tests
 
-To run the tests, you can run one of the following commands:
-
 ```
-COMMAND               ARG           USECASE                DESCRIPTION
-npm run test          optional      test feature branch    run all tests on chrome only
-npm run test:full     optional      test prod release      run all tests on chrome, safari & firefox
-npm run test:only     required      debug failed tests     run one test
-npm run test:trace    required      debug failed tests     run test with a trace
-npm run test:headed   recommended   debug failed tests     run test(s) headed
-npm run test:gen      none          write new tests        run the visual test generator
+COMMAND                  ARG           USECASE                DESCRIPTION
+npm run test:unit        optional      always                 run unit tests (fast, no stack)
+npm run test:e2e         optional      test feature branch    run e2e suite on chromium
+npm run test:e2e:full    optional      test prod release      run e2e on chrome, safari & firefox
+npm run test:only        required      debug failed tests     run one e2e test
+npm run test:trace       required      debug failed tests     run e2e test with a trace
+npm run test:headed      recommended   debug failed tests     run e2e test(s) headed
+npm run test:gen         none          write new tests        run the visual test generator
 ```
 
-Here, the argument is a string with the name of the test or a keyword (playwright will
-execute all tests matching the string). You can also run the tests directly with playwright,
-refer to the Playwright docs for more details.
+Or via the CLI: `mascope test run frontend` (unit) and
+`mascope test run frontend -m system` (e2e).
 
-#### Flakey tests
+The e2e environment is configured via `MASCOPE_E2E_BASE_URL`, `MASCOPE_E2E_API_URL`,
+`MASCOPE_E2E_EMAIL` and `MASCOPE_E2E_PASSWORD` (see `tests/e2e/fixtures/env.js`);
+`MASCOPE_E2E_STACK=demo` lets Playwright bring the demo stack up itself.
 
-Use the debugging methods listed above when facing flakey tests. Often tests will be less flakey when
-you run them in headed mode, and when you don't run them concurrently (this is why we configured Playwright
-to use only one worker).
+#### Test conventions
+
+- Prefer accessible locators (`getByLabel`, `getByRole`) over CSS selectors; add
+  `data-testid` only where no accessible handle exists.
+- Seed state through the `api` fixture, not by clicking through the UI.
+- Hermetic e2e tests run with zero retries locally — if a test needs a retry to pass,
+  fix the test. Failed runs keep a trace (`trace: retain-on-failure`); open it with
+  `npx playwright show-trace <path>` or `npm run test:trace -- "<test name>"`.
 
 ---
 
@@ -2381,13 +2461,12 @@ Javascript). In addition to the three libraries listed here, the [Runtime Librar
     chem/              # LEGACY: Chemical calculations
     file/              # Sample file loading, names & paths
     match/             # Matching (targeted analysis) module
-    molmass/           # Chemical formula parsing
     runtime/           # Config, logging, state and data
     sdk/               # Public client API library
     signal/            # Signal & peak processing
     thermo/            # ThermoFisher Orbitrap hardware API
     tofwerk/           # Tofwerk TOF hardware API
-    tools/             # Standalone package with peak alignment etc.
+    tools/             # Formula parsing, isotope prediction, peak alignment etc.
 ```
 
 The libraries dependency structure is as follows:
@@ -2395,7 +2474,7 @@ The libraries dependency structure is as follows:
 ```mermaid
 flowchart LR
     backend([mascope_backend])
-    molmass([mascope_molmass])
+    tools([mascope_tools])
     signal([mascope_signal])
     file([mascope_file])
     tofwerk([mascope_tofwerk])
@@ -2405,7 +2484,7 @@ flowchart LR
     cli([mascope_cli])
 
     classDef library fill:#ba642e,stroke-width: 0;
-    class molmass,signal,file,tofwerk,thermo library;
+    class tools,signal,file,tofwerk,thermo library;
 
     classDef service fill:#02607a,stroke-width: 0;
     class backend service;
@@ -2424,7 +2503,7 @@ flowchart LR
     backend --> signal
     backend --> tofwerk
     backend --> thermo
-    backend --> molmass
+    backend --> tools
 
     %% libraries
     thermo --> file
@@ -2437,7 +2516,7 @@ flowchart LR
     backend -.-> runtime
     thermo -.-> runtime
     tofwerk -.-> runtime
-    molmass -.-> runtime
+    tools -.-> runtime
     file -.-> runtime
     signal -.-> runtime
     file_agent -.-> runtime
@@ -2451,34 +2530,38 @@ This library exposes a public Python SDK for end-users to leverage especially in
 
 #### Publish
 
-To publish the package in the _real_ [Python Package Index (PyPI)](https://pypi.org/), you need to register an account and generate an API token. Then follow the steps:
+Publishing to [PyPI](https://pypi.org/) is automated for both `mascope-sdk` and
+`mascope-tools` by the `publish-pypi` workflow
+(`.github/workflows/publish-pypi.yaml`). To release a new version:
 
-1. Set the package version manually in `libraries/sdk/pyproject.toml` to the last commit date in ISO format on the branch you are releasing from:
-
-   ```sh
-   git log -1 --date=format:"%Y.%m.%d" --format="%ad"   # Get the commit date
-   2025.6.19                                            # Example date output to copy
-   ```
-
-2. Build the distributable from the SDK directory:
+1. In a PR, set `version` in the package's `pyproject.toml`
+   (`libraries/sdk/` or `libraries/tools/`) to the commit date in unpadded
+   CalVer (e.g. `2026.7.6` — no leading zeros; PEP 440 strips them anyway):
 
    ```sh
-   cd libraries/sdk
-   uv build                                             # Build distributable
+   git log -1 --date=format:"%Y.%-m.%-d" --format="%ad"   # Version to copy
    ```
 
-3. Publish from the mascope repo root (important: `uv build` creates `dist/` in the root directory, not in `libraries/sdk/`):
+2. Merge to `master`. The workflow compares each package's version against
+   PyPI, and builds, import-checks and uploads the ones that are new. Versions
+   already on PyPI are skipped, so re-runs and unrelated pushes are no-ops.
 
-   ```sh
-   cd ../..                                             # Navigate back to mascope root
-   uv publish --token <MY_TOKEN>                        # Publish from root where dist/ exists
-   ```
+Authentication uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+(OIDC) — there are no tokens to manage. Each PyPI project is configured
+(pypi.org → project → Publishing) to trust this repository's
+`publish-pypi.yaml` workflow and the `pypi` GitHub environment; approval
+requirements can be set on that environment in the repository settings.
 
-### Molmass
+To publish manually (e.g. from a fork or in an emergency), the underlying
+steps are in `.github/scripts/publish-package.sh`: `uv build --package
+mascope_sdk` from the repo root (note: `dist/` is created in the root, not in
+the package directory), then `uv publish --token <MY_TOKEN>`.
 
-`mascope_molmass` is a fork of the [molmass](https://github.com/cgohlke/molmass/tree/master) package, used for chemical formula parsing and arithmetics, i.e. applying addition and abstraction ionization mechanisms to neutral molecule formulae. The reason for the fork is to have the ability to define "custom elements" in the `mascope_molmass/elements.py` module.
+### Chemical formulas and custom elements
 
-The formula parsing has been adapted to allow the caret `^` to be used in a formula, denoting custom elements. The motivation is to enable defining custom isotopic distribution for an element, required to properly support analysing data measured with isotopically labeled ionization reagent. For example, `^N` is used to denote `[15N]` substituted nitrogen, with 98% substitution rate.
+Chemical formula parsing, ion arithmetic (applying addition/abstraction ionization mechanisms to a neutral formula) and isotope-pattern prediction all live in `mascope_tools.composition`. This previously relied on a fork of the [molmass](https://github.com/cgohlke/molmass/tree/master) package (`mascope_molmass`); that fork has been retired and its logic consolidated into `mascope_tools` (parsing via `pyteomics`, isotope envelopes via `IsoSpecPy`).
+
+Formulas may use the caret `^` to denote a labelled **custom element** with a non-natural isotopic distribution — required to analyse data measured with an isotopically labelled ionization reagent. For example `^N` denotes `[15N]`-substituted nitrogen at 98% substitution. Custom elements are defined in one place, `mascope_tools.composition.custom_elements.CUSTOM_ELEMENTS`, which the backend (target-ion generation, cheminfo formula conversion) and `mascope_tools` (mass computation, isotope prediction) both consume. Classic Hill-notation formatting (used for the stored `target_ion_formula` / `target_isotope_formula` strings) is `mascope_tools.composition.utils.to_hill_notation`.
 
 ---
 

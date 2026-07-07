@@ -2,7 +2,7 @@ class MissingMascopePathException(Exception):
     def __init__(self):
         super().__init__(
             """
-    MASCOPE_PATH environment variable is not set: please set it with to 
+    MASCOPE_PATH environment variable is not set: please set it to
     a path containing a valid Mascope runtime directory.
 
     If you are a Mascope user, contact your Mascope server administrator.

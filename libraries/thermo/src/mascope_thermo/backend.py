@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime
 from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
@@ -957,9 +958,7 @@ class OpenTFRawBackend:
         ms_type: MsType | None = "Ms",
     ) -> tuple[np.ndarray, np.ndarray]:
         selected = self._selected(polarity, t_min, t_max, ms_type)
-        times = np.array(
-            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
-        )
+        times = np.array([s["retention_time"] * _SECONDS_PER_MINUTE for s in selected])
         tic = np.array([s["total_ion_current"] for s in selected], dtype=np.float64)
         return times, tic
 
@@ -1055,7 +1054,9 @@ class OpenTFRawBackend:
                 "LowMass": float(s["low_mz"]),
                 "HighMass": float(s["high_mz"]),
                 "ScanNumber": int(s["scan_number"]),
-                "MsType": "Ms" if int(s["ms_level"]) == 1 else f"Ms{int(s['ms_level'])}",
+                "MsType": "Ms"
+                if int(s["ms_level"]) == 1
+                else f"Ms{int(s['ms_level'])}",
             }
             for s in selected
         }
@@ -1070,8 +1071,7 @@ class OpenTFRawBackend:
         high = high if mz_max is None else mz_max
         if low > high:
             raise InvalidRangeError(
-                f"Invalid m/z range: mz_min={low}, mz_max={high}, "
-                "where mz_min > mz_max"
+                f"Invalid m/z range: mz_min={low}, mz_max={high}, where mz_min > mz_max"
             )
         return low, high
 
@@ -1093,9 +1093,7 @@ class OpenTFRawBackend:
             masses = np.asarray(labels["mz"], dtype=np.float64)
             intensities = np.asarray(labels["intensity"], dtype=np.float64)
             resolutions = np.asarray(labels["resolution"], dtype=np.float64)
-            signal_to_noise = np.asarray(
-                labels["signal_to_noise"], dtype=np.float64
-            )
+            signal_to_noise = np.asarray(labels["signal_to_noise"], dtype=np.float64)
             # Keep only FT label peaks (finite resolution / S:N), mirroring
             # Thermo, where non-FT scans return no centroid label peaks at all.
             mask = (
@@ -1279,8 +1277,10 @@ class OpenTFRawBackend:
         valid = (cand > -np.inf) & (fallback > 0)
         ratio = np.zeros(masses.size)
         ratio[valid] = cand[valid] / fallback[valid]
-        apply = valid & (ratio >= _AVG_CENTROID_HEIGHT_BAND[0]) & (
-            ratio <= _AVG_CENTROID_HEIGHT_BAND[1]
+        apply = (
+            valid
+            & (ratio >= _AVG_CENTROID_HEIGHT_BAND[0])
+            & (ratio <= _AVG_CENTROID_HEIGHT_BAND[1])
         )
         out[apply] = cand[apply]
         return out
@@ -1332,9 +1332,7 @@ class OpenTFRawBackend:
             mask = np.logical_and(mz_min <= mz, mz <= mz_max)
             scan_mzs.append(mz[mask])
             scan_specs.append(intensities[mask])
-        times = np.array(
-            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
-        )
+        times = np.array([s["retention_time"] * _SECONDS_PER_MINUTE for s in selected])
         return scan_mzs, scan_specs, times
 
     def average_profile(
@@ -1359,9 +1357,7 @@ class OpenTFRawBackend:
             masses, intensities, resolutions, _ = self.average_centroids(
                 scan_indices, ppm=ppm, average=average
             )
-            grid, summed = self._reconstruct_profile(
-                masses, intensities, resolutions
-            )
+            grid, summed = self._reconstruct_profile(masses, intensities, resolutions)
             return grid, summed, num_combined
         # NumPy reimplementation of Thermo's AverageScans over profile data.
         # AverageScans averages in the FREQUENCY domain: an ion's
@@ -1682,9 +1678,7 @@ class OpenTFRawBackend:
             right = np.searchsorted(scan_mz, highs, side="right")
             intensities[:, j] = prefix[right] - prefix[left]
 
-        times = np.array(
-            [s["retention_time"] * _SECONDS_PER_MINUTE for s in selected]
-        )
+        times = np.array([s["retention_time"] * _SECONDS_PER_MINUTE for s in selected])
         return intensities, times
 
     def ms2_precursor_by_scan(
@@ -1699,9 +1693,7 @@ class OpenTFRawBackend:
         out: dict[int, float] = {}
         for s in self._selected(polarity, t_min, t_max, ms_type="Ms2"):
             scan_number = int(s["scan_number"])
-            filter_string = self._raw.scan_filter(scan_number) or s.get(
-                "filter_string"
-            )
+            filter_string = self._raw.scan_filter(scan_number) or s.get("filter_string")
             if not filter_string:
                 continue
             match = re.search(r"ms2 ([\d.]+)@", filter_string)

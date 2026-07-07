@@ -1,8 +1,41 @@
+import re
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.models.base_pydantic_model import QueryParamsModel
+from mascope_tools.composition.utils import assert_valid_formula
+
+
+# A bare numeric mass such as "136.1252", "60", "1e3". Matched explicitly rather
+# than via float(), which also parses "NaN"/"inf"/"Infinity" and would
+# misclassify the chemically valid formula "NaN" (sodium nitride) as a mass.
+_NUMERIC_MASS = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+
+def validate_compound_formula(value: Optional[str]) -> Optional[str]:
+    """Validate a target compound formula, rejecting masses and invalid formulas.
+
+    Mass-based target compounds (a plain number such as ``"136.1252"`` instead of
+    a chemical formula) are no longer supported: their ions/isotopes used to be
+    generated from the mass alone, which relied on the retired molmass fork.
+    Compounds must now be given by composition so an isotope pattern can be
+    computed. An empty formula (``"()"``, adduct-only) is still allowed.
+
+    Anything that is not a parseable chemical formula (unknown elements such as
+    ``"Zz"``, unknown custom elements such as ``"^C"``, stray characters) is also
+    rejected here: ion generation would silently skip such a compound, leaving a
+    compound record that can never produce ions or matches.
+    """
+    if value is None:
+        return value
+    if _NUMERIC_MASS.fullmatch(value.strip()):
+        raise ValueError(
+            "Mass-based target compounds are no longer supported; provide a "
+            "chemical formula (e.g. 'C6H12O6'), not a numeric mass."
+        )
+    assert_valid_formula(value)
+    return value
 
 
 class TargetCompoundBase(BaseModel):
@@ -17,6 +50,10 @@ class TargetCompoundBase(BaseModel):
     )
     cas_number: Optional[str] = Field(
         None, description="CAS Number of the target compound"
+    )
+
+    _validate_formula = field_validator("target_compound_formula")(
+        validate_compound_formula
     )
 
 
@@ -39,6 +76,10 @@ class TargetCompoundUpdate(BaseModel):
     )
     cas_number: Optional[str] = Field(
         None, description="CAS Number of the target compound"
+    )
+
+    _validate_formula = field_validator("target_compound_formula")(
+        validate_compound_formula
     )
 
 

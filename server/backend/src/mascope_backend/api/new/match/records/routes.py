@@ -15,10 +15,12 @@ from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.match.records import (
     get_match_collection_records,
     get_match_ion_records,
+    get_match_ion_series,
     get_match_isotope_records,
 )
 from mascope_backend.api.new.match.records.schemas import (
     MatchIonRecordsBody,
+    MatchIonSeriesBody,
     MatchIsotopeRecordsQueryParams,
     MatchRecordsQueryParams,
     MatchRecordsResponse,
@@ -143,6 +145,37 @@ async def get_match_ion_records_route(
     else:
         raise ValueError("Either sample_item_ids or sample_batch_id must be provided.")
     result = await get_match_ion_records(**body.model_dump())
+    return MatchRecordsResponse.model_validate(result)
+
+
+@match_records_router.post("/ion/series", response_model=MatchRecordsResponse)
+@api_route()
+async def get_match_ion_series_route(
+    body: MatchIonSeriesBody, user: User = Depends(current_active_user)
+) -> MatchRecordsResponse:
+    """
+    Retrieve per-sample match ion data in a compact columnar form.
+
+    Returns one record per requested target ion with its metadata and a
+    `match_series` object of parallel arrays (sample item IDs, intensity sums,
+    match categories). Intended for chart data loads over many samples, where
+    the row-per-(ion, sample) shape of `/ion` would repeat the ion metadata
+    thousands of times.
+
+    :param body: Request body including sample/batch scope and ion scope
+    :type body: MatchIonSeriesBody
+    :param user: The current authenticated user. Requires workspace guest role.
+    :type user: User
+    :return: Target ions with columnar per-sample match data
+    :rtype: MatchRecordsResponse
+    """
+    if body.sample_item_ids:
+        await check_sample_access_bulk(body.sample_item_ids, user, "guest")
+    elif body.sample_batch_id:
+        await check_batch_access(body.sample_batch_id, user, "guest")
+    else:
+        raise ValueError("Either sample_item_ids or sample_batch_id must be provided.")
+    result = await get_match_ion_series(**body.model_dump())
     return MatchRecordsResponse.model_validate(result)
 
 
