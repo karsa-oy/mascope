@@ -25,6 +25,26 @@ This separation is the central design decision: the score is the *pure-math meas
 chemistry, instrument context, and candidate arbitration are layered on top and never
 folded back into it.
 
+## 1a. Role in the peak-centric pipeline
+
+The fit score is the **scoring engine** of the peak-centric assignment paradigm
+([`peak_assignment_paradigm.md`](../../../docs/dev/peak_assignment_paradigm.md)): it ranks
+candidate compositions per peak in **Stage A** (known/database compositions) and **Stage B**
+(untargeted `find_compositions`). "Find the best-fitting known composition; if none fits well
+enough, fall through to untargeted" is exactly *highest fit score in Stage A, gated by a
+threshold*. The value persists as the `PeakAssignment` fit column; the identification **tier**
+(identified / candidate / …) is decided by the separate confidence layer
+([`assignment_confidence.md`](../../../docs/dev/assignment_confidence.md)).
+
+**Naming.** This is being renamed `match_score` → **`fit_score`** across the schema/API to
+say plainly that it measures *fit*, not identification.
+
+**Default (legacy targeted path).** `MASCOPE_MATCH_SCORE_VERSION` defaults to **1** so the
+existing targeted match behaviour is unchanged; the fit score (`=2`) is adopted
+*deliberately* — as the peak-centric engine's scoring — rather than by silently flipping the
+legacy default. It also degrades gracefully: where a lighter aggregation path lacks the
+per-isotopologue evidence, scoring falls back to v1.
+
 ## 2. Scientific rationale
 
 High mass accuracy alone is insufficient to determine elemental composition: even at
