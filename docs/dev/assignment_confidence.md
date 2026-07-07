@@ -237,6 +237,26 @@ no backend or DB, only `mascope_tools` + tests.
   that chemistry never re-imports the measurement. Per-instrument calibration of how
   plausibility combines with fit is P2 (arbitration + FDR).
 
+### P2 progress
+
+- **Candidate arbitration landed** (`mascope_tools.composition.arbitration`,
+  `arbitrate_candidates`). For a single peak it competes the candidates by
+  **evidence = fit × plausibility** (the fit score `score_pattern_v2` × the graded
+  Seven Golden Rules plausibility), ranks them, reports a per-candidate **confidence**
+  (evidence normalised across the peak's candidates), and is **honest about ties** —
+  candidates within `tie_tol` of the best evidence are flagged rather than forced into a
+  false winner (Schymanski L5). Deterministic; unit-tested (`test_arbitration.py`),
+  including the key property that a spectrally-good but chemically-impossible formula
+  (e.g. over-saturated `C6H17NO4`) loses to a plausible one.
+- **Dependency direction preserved (§3):** arbitration imports the fit score's *values*
+  and the chemistry plausibility; neither imports arbitration. The fit score stays pure.
+- **Remaining P2:** calibrate the confidence to a true **P(correct)** per instrument
+  (the `calibrate_score` Platt curve is the single-candidate seed), and a **target-decoy
+  FDR** over a run using the `tooling/score_eval` decoy harness (does `fit × plausibility`
+  rank true formulas above the *plausible* mass-degenerate decoys, and what is the
+  false-discovery rate at a confidence cut?). The arbitration ranking + honest-tie report
+  are the landed core; the calibrated confidence number and FDR are the next increment.
+
 ## 5. References
 
 - Kind, T.; Fiehn, O. *Mass accuracy is insufficient even at less than 1 ppm.* BMC
