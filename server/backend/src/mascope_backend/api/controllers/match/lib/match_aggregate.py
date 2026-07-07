@@ -20,6 +20,18 @@ from mascope_match.params import (
 )
 
 
+# The v2 (fit) score needs per-isotopologue evidence. Lighter aggregation paths (and
+# some callers) do not carry these columns; there v2 is skipped and v1 stands.
+_V2_REQUIRED_COLS = frozenset(
+    {"match_mz_error", "relative_abundance", "sample_peak_intensity"}
+)
+
+
+def _can_score_v2(df: pd.DataFrame) -> bool:
+    """True iff v2 is enabled and the frame carries the columns v2 needs."""
+    return match_score_version() == 2 and _V2_REQUIRED_COLS.issubset(df.columns)
+
+
 async def set_ions_match_category(
     match_ions_df: pd.DataFrame, match_params: Optional[BaseMatchParams] = None
 ) -> pd.DataFrame:
@@ -241,7 +253,7 @@ async def aggregate_match_ions(
     # Phase C experiment: optionally replace the per-ion match_score with the
     # consolidated mascope_tools v2 score (detectability-gated, SNR-aware, calibrated).
     # Additive + gated: v1 above is computed unchanged; v2 overwrites only when enabled.
-    if match_score_version() == 2:
+    if _can_score_v2(filtered_match_isotope_df):
         keys = [
             c
             for c in match_ions_data_df.columns
@@ -317,7 +329,7 @@ def aggregate_match_ions_light(
 
     # Phase C experiment: optionally replace per-ion match_score with the v2 score
     # (additive + gated; v1 unchanged).
-    if match_score_version() == 2:
+    if _can_score_v2(filtered_match_isotope_df):
         mu, sigma = fit_sample_mass_accuracy(filtered_match_isotope_df)
         noise = sample_noise_floor(filtered_match_isotope_df)
         v2 = (
