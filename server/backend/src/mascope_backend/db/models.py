@@ -1075,6 +1075,78 @@ class InstrumentFunction(Base):
     sample_file = relationship("SampleFile", back_populates="instrument_function")
 
 
+# ---------------------------------------------------------------------------
+# Reference chemistry databases (public-database integration)
+# ---------------------------------------------------------------------------
+
+
+class ReferenceSource(Base):
+    """One ingested public-database source at one version.
+
+    Records provenance for the mirrored reference compounds: which source, which
+    release, under what license, and how many records. A source can have several
+    rows over time (versioned loads for reproducibility); ``is_active`` marks the
+    one that queries read, and re-ingesting a source flips the previous load
+    inactive.
+    """
+
+    __tablename__ = "reference_source"
+
+    reference_source_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    name: Mapped[str] = mapped_column(String(64), index=True)
+    version: Mapped[str] = mapped_column(String(128))
+    license: Mapped[str] = mapped_column(String(64))
+    record_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    ingested_at: Mapped[dt] = mapped_column(TIMESTAMP(timezone=True))
+
+    # Relationships
+    reference_compound = relationship(
+        "ReferenceCompound",
+        back_populates="reference_source",
+        cascade="all, delete",
+        passive_deletes=True,
+    )
+
+
+class ReferenceCompound(Base):
+    """One compound as it appears in one source version.
+
+    Landing table for annotation lookups: ``formula`` (canonical Hill order) and
+    ``monoisotopic_mass`` are computed on ingest and indexed so annotation is an
+    indexed lookup rather than a scan. ``inchikey`` is the cross-source dedup key.
+    One row per (compound, source) preserves provenance and the per-record
+    ``license`` (load-bearing for mixed-license sources and commercial use).
+    """
+
+    __tablename__ = "reference_compound"
+
+    reference_compound_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    reference_source_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("reference_source.reference_source_id", ondelete="CASCADE"),
+        index=True,
+    )
+    formula: Mapped[str] = mapped_column(String(512), index=True)
+    monoisotopic_mass: Mapped[Optional[float]] = mapped_column(Float, index=True)
+    inchikey: Mapped[Optional[str]] = mapped_column(String(27), index=True)
+    name: Mapped[Optional[str]] = mapped_column(Text)
+    smiles: Mapped[Optional[str]] = mapped_column(Text)
+    inchi: Mapped[Optional[str]] = mapped_column(Text)
+    source_native_id: Mapped[str] = mapped_column(String(128))
+    xrefs: Mapped[Optional[dict]] = mapped_column(JSON)
+    license: Mapped[str] = mapped_column(String(64))
+
+    # Relationships
+    reference_source = relationship(
+        "ReferenceSource", back_populates="reference_compound"
+    )
+
+
 __all__ = [
     "Base",
     "Workspace",
@@ -1102,4 +1174,6 @@ __all__ = [
     "MatchRating",
     "AttributeTemplate",
     "InstrumentFunction",
+    "ReferenceSource",
+    "ReferenceCompound",
 ]

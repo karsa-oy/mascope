@@ -14,6 +14,7 @@ from mascope_backend.api.new.cheminfo.utils import (
     to_custom_element_format,
     to_explicit_isotope_format,
 )
+from mascope_backend.api.new.reference import service as reference_service
 from mascope_backend.db import (
     IonizationMechanism,
     async_session,
@@ -36,6 +37,7 @@ async def retrieve_compositions_by_mz(
     ionization_mechanism_ids: list[str],
     mz_precision: float = cheminfo_config.DEFAULT_MZ_PRECISION,
     formula_ranges: str = cheminfo_config.DEFAULT_FORMULA_RANGE,
+    known_only: bool = False,
 ) -> dict:
     """
     Find molecular compositions for a given m/z value using Mascope Tools.
@@ -48,6 +50,9 @@ async def retrieve_compositions_by_mz(
     - Map results to the expected response format
       + Explicit isotope formats in formulas are reverted back to custom element format
         e.g. "[15N]" to "^N"
+    - Annotate each result with known reference compounds sharing its formula
+      (name, structure, source, license). Purely additive - the de novo scoring
+      is untouched.
 
     NOTE: Conversion between custom element notation and explicit isotope notation is only a
     best guess. E.g. "[15N]" will always be converted to "^N" even if the user intended to refer to
@@ -61,12 +66,16 @@ async def retrieve_compositions_by_mz(
     :type formula_ranges: str
     :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
     :type ionization_mechanism_ids: None | list[str]
+    :param known_only: When True, keep only results whose formula matches a known
+        reference compound - the suspect-screening prior. Defaults to False.
+    :type known_only: bool
     :return: Metadata and a result array of records containing the following fields:
         - target_compound_formula
         - target_compound_unsaturation
         - ionization_mechanism
         - target_isotope_mz
         - target_isotope_mz_error_ppm
+        - known_compounds (list of matching reference-database identities)
     :rtype: dict
     """
     # Fetch ionization mechanisms from database
@@ -155,6 +164,10 @@ async def retrieve_compositions_by_mz(
             # Skip malformed results rather than failing
             continue
 
+    # Annotate results with known reference compounds sharing each formula.
+    # Additive: a lookup failure must never fail the de novo composition search.
+    results = await _annotate_with_reference(results, known_only=known_only)
+
     # Return formatted response
     total_results = len(results)
     return {
@@ -163,6 +176,33 @@ async def retrieve_compositions_by_mz(
         "total": total_results,
         "data": results,
     }
+
+
+async def _annotate_with_reference(results: list[dict], known_only: bool) -> list[dict]:
+    """Attach ``known_compounds`` to each result from the reference mirror.
+
+    Batches all result formulas into a single indexed lookup. On any failure the
+    results are returned unannotated (each with an empty ``known_compounds``) so
+    annotation can never break composition search.
+
+    :param results: Composition results, each carrying ``target_compound_formula``.
+    :param known_only: Drop results with no known-compound match when True.
+    :return: The results with ``known_compounds`` attached (and filtered if asked).
+    """
+    formulas = [r["target_compound_formula"] for r in results]
+    try:
+        annotations = await reference_service.annotate_formulas(formulas)
+    except Exception as e:
+        runtime.logger.warning(f"Reference annotation skipped: {e}")
+        annotations = {}
+
+    annotated = []
+    for result in results:
+        known = annotations.get(result["target_compound_formula"], [])
+        if known_only and not known:
+            continue
+        annotated.append({**result, "known_compounds": known})
+    return annotated
 
 
 @api_controller_background_task(
