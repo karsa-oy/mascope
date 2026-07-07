@@ -965,6 +965,13 @@ class MatchIon(Base):
     __table_args__ = (
         CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
         CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+        # Ordered (backward) scan for best-score-per-ion aggregation
+        # (batch match records)
+        Index(
+            "ix_match_ion_target_ion_id_match_score",
+            "target_ion_id",
+            "match_score",
+        ),
     )
 
 
