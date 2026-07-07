@@ -1,5 +1,6 @@
 """High-level data loading functions for the Mascope SDK."""
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -7,6 +8,25 @@ from loguru import logger
 
 from ._concurrent import run_concurrent
 from .client import MascopeClient
+
+
+def _name_mask(series: "pd.Series", pattern: str, *, exact: bool) -> "pd.Series":
+    """Boolean mask selecting rows whose name matches ``pattern``.
+
+    Matching is always case-insensitive. When ``exact`` is False (the default)
+    ``pattern`` is treated as a literal substring: regex metacharacters carry no
+    special meaning, so ``"Sample (A)"`` matches the batch literally named
+    ``"Sample (A)"`` rather than being interpreted as a regex group. When
+    ``exact`` is True the whole name must equal ``pattern``.
+
+    :param series: Series of names to match against.
+    :param pattern: Filter string.
+    :param exact: Require a full-string match instead of a substring match.
+    :return: Boolean mask aligned with ``series``.
+    """
+    if exact:
+        return series.str.casefold() == pattern.casefold()
+    return series.str.contains(re.escape(pattern), case=False, na=False)
 
 
 def _resolve_sample(client: MascopeClient, sample: str) -> str:
@@ -87,14 +107,18 @@ def _collect_sample_tasks(
     dataset: str,
     batches: str | None = None,
     samples: str | None = None,
+    *,
+    exact: bool = False,
 ) -> tuple[list[tuple[Any, str]], str]:
     """Resolve dataset/batches and collect (sample_row, batch_name) pairs.
 
     :param client: The MascopeClient instance.
     :param dataset: Dataset name, substring, or regex pattern (or ID).
-    :param batches: Optional filter on batch names (case-insensitive substring or regex)
-    :param samples: Optional filter on sample names (case-insensitive substring or
-      regex)
+    :param batches: Optional case-insensitive filter on batch names. Treated as a
+      literal substring, or a full-name match when ``exact`` is True.
+    :param samples: Optional case-insensitive filter on sample names. Treated as a
+      literal substring, or a full-name match when ``exact`` is True.
+    :param exact: Require the filter to match the whole name instead of a substring.
     :return: Tuple of (sample_tasks, dataset_id).
     :raises ValueError: If dataset or batches cannot be resolved.
     """
@@ -117,7 +141,7 @@ def _collect_sample_tasks(
 
     if batches is not None:
         all_batches = all_batches[
-            all_batches["sample_batch_name"].str.contains(batches, case=False, na=False)
+            _name_mask(all_batches["sample_batch_name"], batches, exact=exact)
         ]
         if all_batches.empty:
             logger.warning("No batches matching '{}'", batches)
@@ -138,9 +162,7 @@ def _collect_sample_tasks(
 
         if samples is not None:
             batch_samples = batch_samples[
-                batch_samples["sample_item_name"].str.contains(
-                    samples, case=False, na=False
-                )
+                _name_mask(batch_samples["sample_item_name"], samples, exact=exact)
             ]
             if batch_samples.empty:
                 continue
@@ -158,6 +180,7 @@ def load_peaks(
     batches: str | None = None,
     *,
     samples: str | None = None,
+    exact: bool = False,
     matches: bool = True,
     areas: bool = True,
     heights: bool = True,
@@ -178,11 +201,18 @@ def load_peaks(
     :type client: MascopeClient
     :param dataset: Dataset name (or substring) or dataset ID.
     :type dataset: str
-    :param batches: Optional substring filter on batch names (case-insensitive).
-                    If not provided, all batches in the dataset are loaded.
+    :param batches: Optional case-insensitive filter on batch names. By default
+                    this is a literal substring, so it can select several batches
+                    at once (e.g. ``"blank"`` matches every batch whose name
+                    contains "blank"). If not provided, all batches in the
+                    dataset are loaded.
     :type batches: str, optional
-    :param samples: Optional substring filter on sample names (case-insensitive).
+    :param samples: Optional case-insensitive substring filter on sample names.
     :type samples: str, optional
+    :param exact: Match ``batches`` / ``samples`` against the whole name instead
+                  of as a substring. Use this to select a single named batch.
+                  Defaults to False.
+    :type exact: bool
     :param matches: Include matched compounds/ions/isotopes. Defaults to True.
     :type matches: bool
     :param areas: Include peak areas. Defaults to True.
@@ -240,7 +270,9 @@ def load_peaks(
             confirm_above=None,
         )
     """
-    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(
+        client, dataset, batches, samples=samples, exact=exact
+    )
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -448,6 +480,7 @@ def load_peak_timeseries(
     batches: str | None = None,
     *,
     samples: str | None = None,
+    exact: bool = False,
     compound: str | list[str] | None = None,
     ion: str | list[str] | None = None,
     isotope: str | list[str] | None = None,
@@ -471,10 +504,13 @@ def load_peak_timeseries(
     :type client: MascopeClient
     :param dataset: Dataset name (or substring) or dataset ID.
     :type dataset: str
-    :param batches: Optional substring filter on batch names (case-insensitive).
+    :param batches: Optional case-insensitive substring filter on batch names.
     :type batches: str, optional
-    :param samples: Optional substring filter on sample names (case-insensitive).
+    :param samples: Optional case-insensitive substring filter on sample names.
     :type samples: str, optional
+    :param exact: Match ``batches`` / ``samples`` against the whole name instead
+                  of as a substring. Defaults to False.
+    :type exact: bool
     :param compound: Target compound name(s) or formula(s).
     :type compound: str | list[str], optional
     :param ion: Target ion formula(s) to resolve.
@@ -546,7 +582,9 @@ def load_peak_timeseries(
     formula_set = set(formula_values)
 
     # --- Discover samples across batches ---
-    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(
+        client, dataset, batches, samples=samples, exact=exact
+    )
     if not sample_tasks:
         logger.warning("No samples found")
         return None
