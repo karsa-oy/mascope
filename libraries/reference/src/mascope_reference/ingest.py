@@ -71,6 +71,7 @@ def ingest(
     path: Path,
     version: str,
     *,
+    source_name: str | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
     activate: bool = True,
     prune: bool = False,
@@ -83,6 +84,10 @@ def ingest(
     :param path: Path to the downloaded dump.
     :param version: Version tag for this load (release date/tag), for
         reproducibility and provenance.
+    :param source_name: Provenance name for this load, overriding the adapter's.
+        Lets several loads of a generic adapter (e.g. ``custom``) coexist as
+        distinct sources instead of replacing one another. Defaults to
+        ``adapter.name``.
     :param batch_size: Rows per bulk insert.
     :param activate: Mark this load active and deactivate prior loads of the
         same source. Set ``False`` to stage a load without exposing it.
@@ -96,6 +101,7 @@ def ingest(
     if not path.exists():
         raise FileNotFoundError(f"Reference dump not found: {path}")
 
+    name = source_name or adapter.name
     ingested = 0
     skipped = 0
     with engine.begin() as conn:
@@ -103,7 +109,7 @@ def ingest(
             # Only one active version per source at a time.
             conn.execute(
                 update(reference_source)
-                .where(reference_source.c.name == adapter.name)
+                .where(reference_source.c.name == name)
                 .where(reference_source.c.is_active.is_(True))
                 .values(is_active=False)
             )
@@ -111,7 +117,7 @@ def ingest(
         source_id = conn.execute(
             insert(reference_source)
             .values(
-                name=adapter.name,
+                name=name,
                 version=version,
                 license=adapter.license,
                 record_count=0,
@@ -146,10 +152,10 @@ def ingest(
         )
 
         if prune and activate:
-            _prune_inactive(conn, adapter.name, keep_source_id=source_id)
+            _prune_inactive(conn, name, keep_source_id=source_id)
 
     return IngestResult(
-        source=adapter.name,
+        source=name,
         version=version,
         reference_source_id=source_id,
         ingested=ingested,

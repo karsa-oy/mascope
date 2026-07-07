@@ -10,6 +10,7 @@ from mascope_reference.adapters import (
     ChebiAdapter,
     CoconutAdapter,
     CompToxAdapter,
+    CustomAdapter,
     HmdbAdapter,
     LipidMapsAdapter,
     NormanAdapter,
@@ -28,6 +29,7 @@ _ADAPTERS: dict[str, Adapter] = {
         LipidMapsAdapter(),
         CoconutAdapter(),
         NormanAdapter(),
+        CustomAdapter(),
     )
 }
 

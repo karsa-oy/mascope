@@ -9,7 +9,7 @@ becomes the active version of its source.
 """
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
@@ -80,6 +80,18 @@ def sync(
             help="Version tag for this load (release date/tag), for reproducibility.",
         ),
     ],
+    name: Annotated[
+        Optional[str],
+        typer.Option(
+            "--name",
+            "-n",
+            help=(
+                "Provenance name for this load, overriding the source name. Use "
+                "with the 'custom' source so multiple hand-authored lists coexist "
+                "as distinct sources (e.g. --name riva2019-hom)."
+            ),
+        ),
+    ] = None,
     batch_size: Annotated[
         int,
         typer.Option("--batch-size", help="Rows per bulk insert."),
@@ -108,7 +120,7 @@ def sync(
 
     engine = _sync_engine()
     runtime.logger.info(
-        f"Ingesting '{source}' (version '{version}') from {path.name}..."
+        f"Ingesting '{name or source}' (version '{version}') from {path.name}..."
     )
 
     def _progress(count: int) -> None:
@@ -120,6 +132,7 @@ def sync(
             adapter,
             path,
             version,
+            source_name=name,
             batch_size=batch_size,
             activate=not stage,
             prune=prune,

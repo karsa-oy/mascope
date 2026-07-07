@@ -8,8 +8,9 @@ for the design.
 ## What it does
 
 - **ETL adapters** ([`adapters/`](src/mascope_reference/adapters)) - one per
-  source (PubChem, EPA CompTox, ChEBI, HMDB, LIPID MAPS, COCONUT, NORMAN). Each
-  streams a downloaded dump into normalized [`ReferenceRecord`](src/mascope_reference/record.py)
+  source (PubChem, EPA CompTox, ChEBI, HMDB, LIPID MAPS, COCONUT, NORMAN), plus a
+  generic `custom` adapter for hand-authored / paper-derived peak lists. Each
+  streams a dump into normalized [`ReferenceRecord`](src/mascope_reference/record.py)
   instances. Pure transforms - no database, no chemistry engine.
 - **Normalization** ([`normalize.py`](src/mascope_reference/normalize.py)) -
   canonicalizes formulas to the *same* Hill order as the de novo path (reusing
@@ -41,3 +42,7 @@ Fetch a dump out of band, then:
 mascope reference sync pubchem /path/to/Compound.sdf.gz --version 2026-07
 mascope reference status
 ```
+
+To author your own reference data from a published peak list (e.g. atmospheric
+compounds not yet in the public databases), use the `custom` adapter - see
+[docs/dev/reference_data_authoring.md](../../docs/dev/reference_data_authoring.md).
