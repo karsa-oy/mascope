@@ -39,6 +39,7 @@ docker compose -f docker-compose.demo.yaml up -d
 ```sh
 mascope prod ps                  # container status
 mascope prod logs --follow       # stream logs
+mascope prod update              # update the stack to the latest release
 mascope prod db backup           # dump the database
 mascope prod db restore --yes    # restore the latest dump
 mascope logs query --grep error  # search the application's file logs
@@ -47,9 +48,12 @@ mascope env list                 # manage runtime environments
 
 Run `mascope --help` or `mascope <command> --help` for the full reference.
 
-Pin the deployed application version with `MASCOPE_VERSION` (e.g.
-`MASCOPE_VERSION=v1.1.0 mascope prod up`); without a pin the stack follows
-the `latest` release images.
+`mascope prod update` pulls the target release images, restarts the stack
+with them and runs any pending database migrations (preceded by an automatic
+pre-migration dump). Move to a specific release with
+`mascope prod update --version v1.2.0`, or pin the deployed version for all
+commands with `MASCOPE_VERSION`; without a pin the stack follows the
+`latest` release images.
 
 ## Development
 

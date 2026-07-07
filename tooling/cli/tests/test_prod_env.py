@@ -163,3 +163,42 @@ def test_docker_passthrough_without_args_errors(cli_runner, compose):
 
     assert result.exit_code == 1
     assert compose.calls == []
+
+
+# --- prod update ---
+
+
+def test_update_pulls_then_restarts_then_reports(cli_runner, compose):
+    result = cli_runner.invoke(app, ["prod", "update"])
+
+    assert result.exit_code == 0
+    steps = [c["command"].split("' ", 1)[1] for c in compose.calls]
+    assert steps == ["pull", "up --detach", "ps"]
+
+
+def test_update_version_pin_reaches_compose(cli_runner, compose):
+    result = cli_runner.invoke(app, ["prod", "update", "--version", "v1.2.0"])
+
+    assert result.exit_code == 0
+    assert all(
+        call["env_vars"]["MASCOPE_VERSION"] == "v1.2.0" for call in compose.calls
+    )
+
+
+def test_update_rejects_a_non_release_version(cli_runner, compose):
+    # Missing the leading `v` — must fail before any compose call.
+    result = cli_runner.invoke(app, ["prod", "update", "--version", "1.2.0"])
+
+    assert result.exit_code == 1
+    assert compose.calls == []
+
+
+def test_update_failed_pull_never_touches_the_stack(cli_runner, compose):
+    compose.returncode = 3
+
+    result = cli_runner.invoke(app, ["prod", "update"])
+
+    assert result.exit_code == 3
+    # Only the pull ran; the running stack was not restarted.
+    assert len(compose.calls) == 1
+    assert compose.calls[0]["command"].endswith("pull")
