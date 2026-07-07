@@ -11,10 +11,11 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import MultiSelect from 'primevue/multiselect'
+import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
 import { api } from '@/api'
-import { BaseMatchTag } from '@/lib/base'
+import { BaseMatchTag, BaseTierTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
 
@@ -278,6 +279,29 @@ function knownCompoundsTooltip(known) {
 }
 
 const expanded = ref({})
+
+// The committed assignment for the focused peak (from the latest run). When
+// present, the inspector shows it and the on-demand search is collapsed behind
+// a "Re-search" toggle. See docs/dev/peak_assignment_frontend.md.
+const focusedAssignment = computed(() =>
+  app.data.peakAssignment.peak.forPeak(app.data.peak.focused?.peak_id)
+)
+const showSearch = ref(false)
+watch(
+  focusedAssignment,
+  (assignment) => {
+    showSearch.value = !assignment
+  },
+  { immediate: true }
+)
+
+const fitPercent = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+})
+const formatFit = (value) =>
+  value != null && !Number.isNaN(value) ? fitPercent.format(value) : '-'
 </script>
 
 <template>
@@ -316,6 +340,80 @@ const expanded = ref({})
       </span>
     </template>
     <div class="col" style="gap: 1rem; align-items: stretch; max-width: 900px">
+      <section v-if="focusedAssignment" class="inspector">
+        <div class="insp-head">
+          <div class="insp-formula">
+            {{ focusedAssignment.assigned_formula || 'Unassigned' }}
+          </div>
+          <BaseTierTag
+            :tier="focusedAssignment.tier"
+            :fit-score="focusedAssignment.fit_score"
+            :role="focusedAssignment.role"
+            :source="focusedAssignment.source"
+          />
+        </div>
+        <div
+          class="insp-sub"
+          v-if="
+            focusedAssignment.ion_formula ||
+            focusedAssignment.isotope_label ||
+            focusedAssignment.source
+          "
+        >
+          <span v-if="focusedAssignment.ion_formula">{{ focusedAssignment.ion_formula }}</span>
+          <span v-if="focusedAssignment.isotope_label">
+            &middot; {{ focusedAssignment.isotope_label }}</span
+          >
+          <span v-if="focusedAssignment.source" class="src"> &middot; {{ focusedAssignment.source }}</span>
+        </div>
+        <div class="evidence">
+          <div class="ev">
+            <span class="k">fit</span>
+            <span class="v">{{ formatFit(focusedAssignment.fit_score) }}</span>
+          </div>
+          <div class="ev" v-if="focusedAssignment.mz_error_ppm != null">
+            <span class="k">m/z error</span>
+            <span class="v">{{ num.mzError.format(focusedAssignment.mz_error_ppm) }} ppm</span>
+          </div>
+          <div class="ev" v-if="focusedAssignment.abundance_error != null">
+            <span class="k">abund. error</span>
+            <span class="v">{{
+              num.relativeAbundanceError.format(focusedAssignment.abundance_error)
+            }}</span>
+          </div>
+          <div class="ev" v-if="focusedAssignment.isotope_label">
+            <span class="k">isotope</span>
+            <span class="v">{{ focusedAssignment.isotope_label }}</span>
+          </div>
+        </div>
+        <div v-if="focusedAssignment.alternatives?.length" class="alts">
+          <div class="alts-label">Close alternatives</div>
+          <div v-for="(alt, i) in focusedAssignment.alternatives" :key="i" class="alt">
+            <span class="f">{{ alt.assigned_formula || alt.ion_formula || '?' }}</span>
+            <span class="s" v-if="alt.fit_score != null">
+              fit {{ formatFit(alt.fit_score)
+              }}<span v-if="alt.mz_error_ppm != null">
+                &middot; {{ num.mzError.format(alt.mz_error_ppm) }} ppm</span
+              >
+            </span>
+          </div>
+        </div>
+        <div class="insp-actions">
+          <Button
+            :label="showSearch ? 'Hide search' : 'Re-search'"
+            size="small"
+            text
+            severity="secondary"
+            icon="pi ph ph-magnifying-glass"
+            @click="showSearch = !showSearch"
+          />
+        </div>
+      </section>
+      <div
+        v-show="showSearch"
+        class="col search-region"
+        style="gap: 1rem; align-items: stretch; width: 100%"
+      >
       <menu class="topbar">
         <FloatLabel style="flex: 0 0 80px">
           <InputNumber v-model="params.mzPrecision" id="mzPrecision" :min="1" :max="100" fluid />
@@ -539,6 +637,7 @@ const expanded = ref({})
           <ProgressSpinner />
         </div>
       </div>
+      </div>
     </div>
   </Panel>
 </template>
@@ -567,5 +666,85 @@ const expanded = ref({})
   max-width: 22ch;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Peak inspector: the committed assignment for the focused peak. */
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--p-content-border-color, #e3e6ec);
+  border-radius: 8px;
+  background: var(--p-content-background, transparent);
+}
+.insp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.insp-formula {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.insp-sub {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+.insp-sub .src {
+  text-transform: capitalize;
+}
+.evidence {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 1rem;
+}
+.ev {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.ev .k {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.ev .v {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.alts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.alts-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.alt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px solid var(--p-content-border-color, #eef0f4);
+}
+.alt .s {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.insp-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
