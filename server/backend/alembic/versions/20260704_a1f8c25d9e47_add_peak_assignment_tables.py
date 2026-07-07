@@ -14,7 +14,7 @@ The unique constraint on (peak_assignment_run_id, sample_peak_id) enforces
 the single-owner-per-peak invariant within a run.
 
 Revision ID: a1f8c25d9e47
-Revises: b3e9f1c2a4d7
+Revises: c4f7a2e9b1d8
 Create Date: 2026-07-04 12:00:00.000000
 
 """
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a1f8c25d9e47"
-down_revision: Union[str, Sequence[str], None] = "b3e9f1c2a4d7"
+down_revision: Union[str, Sequence[str], None] = "c4f7a2e9b1d8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
