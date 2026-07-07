@@ -5,6 +5,7 @@ from pathlib import Path
 from mascope_reference.adapters.chebi import ChebiAdapter
 from mascope_reference.adapters.coconut import CoconutAdapter
 from mascope_reference.adapters.comptox import CompToxAdapter
+from mascope_reference.adapters.custom import CustomAdapter
 from mascope_reference.adapters.hmdb import HmdbAdapter
 from mascope_reference.adapters.lipidmaps import LipidMapsAdapter
 from mascope_reference.adapters.norman import NormanAdapter
@@ -226,3 +227,47 @@ def test_hmdb_adapter(tmp_path):
     # Second metabolite has no smiles/inchi - those fields are None, not missing.
     assert records[1].smiles is None
     assert records[1].formula == "C3H10N2"
+
+
+# A hand-authored list: a rich row (name + cas + citation) and a bare row
+# (formula only, id falls back to a row number).
+CUSTOM_CSV = (
+    "name,formula,cas,reference,inchikey\n"
+    "Pinonic acid,C10H16O3,473-72-3,10.1000/example,BFKGXSVWFIQNJS-UHFFFAOYSA-N\n"
+    ",C10H16O5,,,\n"
+)
+
+
+def test_custom_adapter(tmp_path):
+    path = _write(tmp_path, "hom-list.csv", CUSTOM_CSV)
+    records = list(CustomAdapter().parse(path))
+    assert len(records) == 2
+
+    rich = records[0]
+    assert rich.source == "custom"
+    assert rich.name == "Pinonic acid"
+    assert rich.formula == "C10H16O3"
+    assert rich.source_native_id == "Pinonic acid"  # falls back to name
+    assert rich.xrefs == {"cas": "473-72-3", "reference": "10.1000/example"}
+    assert rich.inchikey == "BFKGXSVWFIQNJS-UHFFFAOYSA-N"
+    assert rich.license == "custom"
+
+    bare = records[1]
+    assert bare.formula == "C10H16O5"
+    assert bare.name is None
+    assert bare.source_native_id == "custom-2"  # falls back to row number
+
+
+def test_custom_adapter_tsv_and_aliases(tmp_path):
+    # Tab-separated, and the header uses the 'molecular_formula' alias.
+    tsv = "compound\tmolecular_formula\nTerpenylic acid\tC8H12O4\n"
+    path = _write(tmp_path, "list.tsv", tsv)
+    records = list(CustomAdapter().parse(path))
+    assert len(records) == 1
+    assert records[0].name == "Terpenylic acid"
+    assert records[0].formula == "C8H12O4"
+
+
+def test_custom_adapter_skips_rows_without_formula(tmp_path):
+    path = _write(tmp_path, "bad.csv", "name,formula\nNoFormula,\n")
+    assert list(CustomAdapter().parse(path)) == []

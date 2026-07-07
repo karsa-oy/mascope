@@ -134,3 +134,20 @@ def test_stage_does_not_activate(sync_engine, tmp_path):
             )
         ).scalars().all()
     assert active == ["v2"]
+
+
+def test_source_name_override_lets_loads_coexist(sync_engine, tmp_path):
+    # Two loads of the same adapter under different provenance names must not
+    # deactivate each other - both stay active as distinct sources.
+    path = _write(tmp_path, "pubchem.sdf", SDF_TWO)
+    r1 = ingest(sync_engine, PubChemAdapter(), path, version="1", source_name="list-a")
+    r2 = ingest(sync_engine, PubChemAdapter(), path, version="1", source_name="list-b")
+    assert r1.source == "list-a" and r2.source == "list-b"
+
+    with sync_engine.connect() as conn:
+        active = conn.execute(
+            select(reference_source.c.name)
+            .where(reference_source.c.is_active.is_(True))
+            .order_by(reference_source.c.name)
+        ).scalars().all()
+    assert active == ["list-a", "list-b"]
