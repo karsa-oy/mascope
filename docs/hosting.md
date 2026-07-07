@@ -92,12 +92,18 @@ migrations. To roll back, check out the previous tag and repeat
 `mascope prod docker pull && mascope prod up` (restore the pre-migration backup
 if a migration had run).
 
+`mascope prod update` does the pull-and-recreate in one step, and
+`mascope prod update --check` tells you up front whether a release carries a
+database migration (downtime) or not. Servers can also update themselves on a
+schedule - see the [maintainer runbook](maintaining.md).
+
 #### Persistence & backups
 
 State lives under `.runtime/` (PostgreSQL data + the filestore) - back it up.
 `mascope prod db backup` takes a manual dump; see the database section of the
 developer guide.
 
-For the full operations reference (runtime, database tuning, backups, env sync,
-deployment internals), see the
+For the full operations reference - provisioning, updates, backups, and
+troubleshooting - see the [maintainer runbook](maintaining.md). For deployment
+internals (runtime, database tuning, env sync) see the
 [developer guide](dev/developer_guide.md).

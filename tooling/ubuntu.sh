@@ -211,7 +211,7 @@ function install_mascope() {
         --with-executables-from mascope-cli
     uv tool update-shell
 
-    write_section "ENABLING SYSTEMD SERVICE"
+    write_section "INSTALLING SYSTEMD UNITS"
 
     MASCOPE_BIN=$(command -v mascope)
     if [[ -z "${MASCOPE_BIN}" ]]; then
@@ -219,24 +219,54 @@ function install_mascope() {
         exit 1
     fi
 
+    SYSTEMD_SRC="${ROOT_PATH}/tooling/systemd"
+
+    # Boot service: brings the stack up on boot / down on stop. Templated with
+    # the deploy user and the resolved mascope binary.
     sed -e "s|@@USER@@|${USER}|g" \
         -e "s|@@MASCOPE_BIN@@|${MASCOPE_BIN}|g" \
-        "${ROOT_PATH}/tooling/mascope.service" \
+        "${SYSTEMD_SRC}/mascope.service" \
         | sudo tee /etc/systemd/system/mascope.service > /dev/null
+
+    # Unattended-update service + timer. Installed but deliberately NOT enabled:
+    # the operator sets a release token in /etc/mascope/update.env and enables
+    # the timer when ready (see docs/maintaining.md).
+    sed -e "s|@@USER@@|${USER}|g" \
+        -e "s|@@MASCOPE_BIN@@|${MASCOPE_BIN}|g" \
+        "${SYSTEMD_SRC}/mascope-update.service" \
+        | sudo tee /etc/systemd/system/mascope-update.service > /dev/null
+    sudo cp "${SYSTEMD_SRC}/mascope-update.timer" \
+        /etc/systemd/system/mascope-update.timer
+
+    # Update config (window / grace / release token). Seed once with restricted
+    # permissions; never clobber an existing file - it may hold the token.
+    sudo install -d -m 755 /etc/mascope
+    if [[ ! -f /etc/mascope/update.env ]]; then
+        sudo install -m 600 -o "${USER}" -g "${USER}" \
+            "${SYSTEMD_SRC}/update.env.example" /etc/mascope/update.env
+        write_line "seeded /etc/mascope/update.env"
+    else
+        write_line "kept existing /etc/mascope/update.env"
+    fi
 
     sudo systemctl daemon-reload
     sudo systemctl enable mascope.service
     write_line "mascope.service enabled for user '${USER}' (bin: ${MASCOPE_BIN})"
+    write_line "Auto-updates are INSTALLED but DISABLED. To turn them on: set GH_TOKEN in /etc/mascope/update.env, then run 'sudo systemctl enable --now mascope-update.timer'. See docs/maintaining.md."
 }
 
 function uninstall_mascope() {
-    write_section "DISABLING SYSTEMD SERVICE"
+    write_section "DISABLING SYSTEMD UNITS"
 
-    sudo systemctl stop mascope.service || true
-    sudo systemctl disable mascope.service || true
-    sudo rm -f /etc/systemd/system/mascope.service
+    # Boot service and both auto-update units. /etc/mascope/update.env is left
+    # in place so a reinstall keeps the token and settings.
+    for unit in mascope-update.timer mascope-update.service mascope.service; do
+        sudo systemctl stop "$unit" || true
+        sudo systemctl disable "$unit" || true
+        sudo rm -f "/etc/systemd/system/$unit"
+    done
     sudo systemctl daemon-reload
-    write_line "mascope.service disabled and removed"
+    write_line "systemd units disabled and removed (kept /etc/mascope/update.env)"
 
     write_section "UNINSTALLING MASCOPE BINARIES"
 
