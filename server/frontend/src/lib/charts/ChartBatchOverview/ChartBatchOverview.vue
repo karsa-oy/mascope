@@ -45,33 +45,27 @@ const unit = computed(() =>
 )
 
 /**
- * Scale traces based on average/sum mode
+ * Scale traces based on average/sum mode.
+ * Builds shallow trace copies with new y/customdata where the mode changes
+ * them — no deep clone: the store's arrays are never mutated here, and the
+ * unit-bearing customdata is computed once and shared across all traces.
  */
 const traces = computed(() => {
   if (!data.traces.length) return []
 
-  // Collect sample lengths into an object {[sample_item_id]: sample.length}
-  const sampleLengths = app.data.sample.list.reduce(
-    (o, sample) => ({ ...o, [sample.sample_item_id]: sample.length }),
-    {}
-  )
-  return scale.value.mode == 'average'
-    ? data.traces.map((trace) => {
-        let newTrace = structuredClone(toRaw(trace))
-        newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts/s'])
-        return newTrace
-      })
-    : data.traces.map((trace) => {
-        // Scale chart traces by dividing all y-values by sampleLength
-        let newTrace = structuredClone(toRaw(trace))
-        // Use x-coordinate (sample_item_id) to retrieve sample length
-        newTrace.y = trace.y.map((value, i) =>
-          value !== null ? value * sampleLengths[app.data.sample.list[i].sample_item_id] : null
-        )
-        // Unit is in the second element of customdata. Append with "counts"
-        newTrace.customdata = trace.customdata.map((cd) => [cd[0], 'counts'])
-        return newTrace
-      })
+  const sampleList = app.data.sample.list
+  const average = scale.value.mode == 'average'
+  // Unit lives in the second element of customdata; datetime in the first
+  const customdata = sampleList.map((sample) => [sample.datetime, average ? 'counts/s' : 'counts'])
+
+  return data.traces.map((trace) => ({
+    ...toRaw(trace),
+    customdata,
+    // In "sum" mode multiply intensity rates by sample length to get counts
+    y: average
+      ? trace.y
+      : trace.y.map((value, i) => (value !== null ? value * sampleList[i].length : null))
+  }))
 })
 
 const xAxis = computed(() => ({
