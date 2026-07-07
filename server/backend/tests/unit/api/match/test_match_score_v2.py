@@ -88,11 +88,11 @@ def test_satellite_matched_isotopologue_treated_as_absent():
 
 def test_match_score_version_env(monkeypatch):
     monkeypatch.delenv("MASCOPE_MATCH_SCORE_VERSION", raising=False)
-    assert match_score_version() == 2  # v2 is the consolidated default
-    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "1")
-    assert match_score_version() == 1  # explicit legacy escape hatch
+    assert match_score_version() == 1  # legacy targeted path defaults to v1
+    monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "2")
+    assert match_score_version() == 2  # opt into the fit score
     monkeypatch.setenv("MASCOPE_MATCH_SCORE_VERSION", "garbage")
-    assert match_score_version() == 2  # malformed -> default, not a silent downgrade
+    assert match_score_version() == 1  # malformed -> default
 
 
 def test_category_thresholds_are_score_version_aware(monkeypatch):

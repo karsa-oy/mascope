@@ -32,14 +32,18 @@ PRED_SIGMA_PPM = 0.5
 
 
 def match_score_version() -> int:
-    """Backend match-score switch: 1 = legacy Sum(score*rel_ab), 2 = consolidated
-    mascope_tools v2. Env `MASCOPE_MATCH_SCORE_VERSION` (default 2 — v2 is the
-    consolidated default; set =1 to fall back to the legacy score). Both paths stay
-    wired so a sample can be scored each way and compared."""
+    """Backend match-score switch: 1 = legacy Sum(score*rel_ab), 2 = the consolidated
+    fit score (mascope_tools v2). Env `MASCOPE_MATCH_SCORE_VERSION`.
+
+    Default is **1** on the legacy targeted path: on the peak-centric integration the
+    fit score is adopted *deliberately* (it is the scoring engine for the peak-centric
+    Stage A/B engine and the `fit_score` column), not by silently changing the legacy
+    targeted behaviour. Set =2 to score the legacy path with the fit score for
+    comparison. Both paths stay wired."""
     try:
-        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "2"))
+        return int(os.environ.get("MASCOPE_MATCH_SCORE_VERSION", "1"))
     except (TypeError, ValueError):
-        return 2  # malformed value -> the default, not a silent downgrade to v1
+        return 1  # malformed value -> the default
 
 
 def fit_sample_mass_accuracy(
