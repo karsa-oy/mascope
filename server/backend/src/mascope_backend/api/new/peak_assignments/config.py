@@ -53,3 +53,19 @@ class PeakAssignmentConfig(BaseModel):
         ge=0,
         description="Maximum number of runner-up candidates stored per peak.",
     )
+    # Confidence-tier bands on the FIT-SCORE scale (score_pattern_v2), not the legacy
+    # match_params scale. The fit score demotes lone mass-only matches by design, so its
+    # bands sit lower than v1's 0.8/0.7; these are the DESIGN.md v2 estimates
+    # (identified >= 0.8, candidate >= 0.5), pending per-instrument recalibration.
+    identified_threshold: float = Field(
+        0.8,
+        ge=0.0,
+        le=1.0,
+        description="Fit score at or above which a peak is tiered 'identified'.",
+    )
+    candidate_threshold: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Fit score at or above which a peak is tiered 'candidate'.",
+    )

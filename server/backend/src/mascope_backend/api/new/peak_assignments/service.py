@@ -486,8 +486,8 @@ async def assign_sample_peaks(
                 match_isotope_df,
                 sample_item_id=sample_item_id,
                 peak_assignment_run_id=run.peak_assignment_run_id,
-                possible_threshold=match_params.possible_match_threshold,
-                probable_threshold=match_params.probable_match_threshold,
+                possible_threshold=config.candidate_threshold,
+                probable_threshold=config.identified_threshold,
                 max_alternatives=config.max_alternatives,
             )
         runtime.logger.info(
@@ -552,8 +552,8 @@ async def assign_sample_peaks(
                     peak_lookup=peak_lookup,
                     sample_item_id=sample_item_id,
                     peak_assignment_run_id=run.peak_assignment_run_id,
-                    possible_threshold=match_params.possible_match_threshold,
-                    probable_threshold=match_params.probable_match_threshold,
+                    possible_threshold=config.candidate_threshold,
+                    probable_threshold=config.identified_threshold,
                     mechanism_id_by_notation=mechanism_id_by_notation,
                     formula_formatter=to_custom_element_format,
                 )
