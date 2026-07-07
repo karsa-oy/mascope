@@ -14,6 +14,7 @@ dependencies = [
     "mascope_runtime",
     "mascope_chem",
     "mascope_match",
+    "mascope_reference",
     "mascope_sdk",
     "mascope_signal",
     "mascope_tofwerk",
@@ -60,6 +61,7 @@ mascope_cli = { workspace = true }
 mascope_chem = { workspace = true }
 mascope_file = { workspace = true }
 mascope_match = { workspace = true }
+mascope_reference = { workspace = true }
 mascope_sdk = { workspace =  true }
 mascope_signal = { workspace = true }
 mascope_tofwerk = { workspace = true }
