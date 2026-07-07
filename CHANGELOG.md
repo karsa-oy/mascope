@@ -7,6 +7,24 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
+- Unattended, self-classifying updates for pinned deployments (`mascope-cli`
+  2026.7.8). `mascope prod update --check` classifies a pending update as
+  up-to-date, a *fast* update (new images, no database migration, near-zero
+  downtime) or a *migration* update (a schema migration will run and cause
+  downtime) by reading the Alembic head the target release carries and comparing
+  it to the live database, so a maintenance window is only scheduled when one is
+  actually needed. Releases now publish a small `mascope-manifest.json` (a GitHub
+  Release asset) recording that head, which `--check --manifest` reads without
+  inspecting the image. `mascope prod update --auto` (driven by the systemd
+  `mascope-update.timer` in `tooling/systemd/`) applies fast updates inside a
+  configurable maintenance window (`MASCOPE_UPDATE_WINDOW`) with a post-apply
+  health check, and applies a migration update once its grace period elapses
+  (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator runs `mascope prod
+  update --confirm`; `mascope prod update --snooze N` postpones it. A failed
+  health check alerts and stops without rolling back automatically. Requires the
+  server to be pinned to a release tag with read access to the repository
+  releases.
+
 ### Changed
 
 - SDK (`mascope-sdk` 2026.7.7): the `load_peaks` / `load_peak_timeseries`
