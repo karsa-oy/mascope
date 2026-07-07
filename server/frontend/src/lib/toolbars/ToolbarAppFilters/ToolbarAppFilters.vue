@@ -7,6 +7,7 @@ import { useApp } from '@/stores'
 import { BaseKarsaLogo } from '@/lib/base'
 
 import AppFilterChips from './AppFilterChips.vue'
+import LocationShareButton from './LocationShareButton.vue'
 
 import { SidebarMenu } from './SidebarMenu'
 
@@ -34,6 +35,7 @@ const filtering = ref(false)
     <template #start>
       <div class="row">
         <SidebarMenu />
+        <LocationShareButton />
       </div>
     </template>
     <template #center>

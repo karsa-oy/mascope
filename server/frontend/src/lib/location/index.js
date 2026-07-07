@@ -3,16 +3,23 @@ import { defineStore } from 'pinia'
 
 import { makeLogger } from '@/lib/logging'
 import { useApp } from '@/stores'
+import { useAuth } from '@/stores/auth'
 
 import { LOCATION_LEVELS, normalizeLocation, levelIds } from './schema'
+import { hasLocationQuery, locationFromQuery, locationToUrl } from './url'
 
 export * from './schema'
+export * from './url'
 
 const logger = makeLogger({ prefix: 'location', icon: '🧭' })
 
 // How long to wait for a restored chain to converge before giving up on the
 // deferred visualization restore.
 const CONVERGE_TIMEOUT_MS = 30000
+
+// How long to let a shared location converge before checking which levels
+// actually resolved, so we can warn about anything the viewer cannot access.
+const VERIFY_DELAY_MS = 4000
 
 // Resolve a dotted store path (e.g. 'match.collection') against app.data.
 const resolveStore = (data, path) => path.split('.').reduce((node, part) => node?.[part], data)
@@ -127,5 +134,81 @@ export const useLocation = defineStore('app.location', () => {
     if (loc.tab && loc.tab !== 'match') ui.tab.hydrate(loc.tab)
   }
 
-  return { read, apply }
+  /**
+   * After a shared location has had time to converge, warn about any requested
+   * level that did not resolve - typically because the viewer lacks access to
+   * that workspace/dataset or the record was deleted.
+   */
+  const verifyApplied = (requested) => {
+    setTimeout(() => {
+      const current = read()
+      const missing = LOCATION_LEVELS.filter((level) => {
+        const want = levelIds(requested, level)
+        if (want.length === 0) return false
+        const have = levelIds(current, level)
+        return want.some((id) => !have.includes(id))
+      }).map((level) => level.field)
+
+      if (missing.length > 0) {
+        logger.warn('shared location partially unresolved', { data: { missing } })
+        useApp().ui.notification.push({
+          type: 'shared_link',
+          status: 'warning',
+          message: `Part of the shared view could not be opened (${missing.join(', ')}); you may not have access to it.`
+        })
+      }
+    }, VERIFY_DELAY_MS)
+  }
+
+  /** Full shareable URL for the current location. */
+  const shareUrl = () =>
+    locationToUrl(read(), {
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    })
+
+  /** Copy a link to the current view to the clipboard, notifying the user. */
+  const copyShareLink = async () => {
+    const url = shareUrl()
+    const { ui } = useApp()
+    try {
+      await navigator.clipboard.writeText(url)
+      ui.notification.push({
+        type: 'shared_link',
+        status: 'success',
+        message: 'Link to this view copied to clipboard'
+      })
+    } catch (error) {
+      logger.warn('clipboard write failed', { data: { error: String(error) } })
+      ui.notification.push({
+        type: 'shared_link',
+        status: 'warning',
+        message: 'Could not copy the link automatically'
+      })
+    }
+    return url
+  }
+
+  /**
+   * If the current URL carries a shared location, apply it (winning over the
+   * personal snapshot), strip the query so a later manual reload falls through
+   * to the personal snapshot, and schedule an access check.
+   */
+  const importFromUrl = () => {
+    const search = window.location.search
+    if (!hasLocationQuery(search)) return false
+
+    const loc = locationFromQuery(search)
+    logger.log('opening shared location from URL')
+    apply(loc)
+    window.history.replaceState({}, '', window.location.pathname)
+    verifyApplied(loc)
+    return true
+  }
+
+  // Import a shared location once the user is authenticated and the stores
+  // start loading; the lazy targets set by apply() win the ensuing refocus.
+  useAuth().onLogin(() => importFromUrl())
+
+  return { read, apply, shareUrl, copyShareLink, importFromUrl }
 })
