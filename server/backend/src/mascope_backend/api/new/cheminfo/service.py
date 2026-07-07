@@ -178,9 +178,7 @@ async def retrieve_compositions_by_mz(
     }
 
 
-async def _annotate_with_reference(
-    results: list[dict], known_only: bool
-) -> list[dict]:
+async def _annotate_with_reference(results: list[dict], known_only: bool) -> list[dict]:
     """Attach ``known_compounds`` to each result from the reference mirror.
 
     Batches all result formulas into a single indexed lookup. On any failure the

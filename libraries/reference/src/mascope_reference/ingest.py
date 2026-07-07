@@ -165,12 +165,16 @@ def ingest(
 
 def _prune_inactive(conn, source_name: str, keep_source_id: int) -> None:
     """Delete all but the given load for a source (compounds then source rows)."""
-    stale = conn.execute(
-        reference_source.select()
-        .with_only_columns(reference_source.c.reference_source_id)
-        .where(reference_source.c.name == source_name)
-        .where(reference_source.c.reference_source_id != keep_source_id)
-    ).scalars().all()
+    stale = (
+        conn.execute(
+            reference_source.select()
+            .with_only_columns(reference_source.c.reference_source_id)
+            .where(reference_source.c.name == source_name)
+            .where(reference_source.c.reference_source_id != keep_source_id)
+        )
+        .scalars()
+        .all()
+    )
     if not stale:
         return
     conn.execute(
