@@ -63,7 +63,7 @@ POLL_S = 15
 STABLE_POLLS = 3
 
 # Python of the in-image mascope uv tool (same path tooling/demo-init.sh uses).
-CONTAINER_PYTHON = "/root/.local/share/uv/tools/mascope/bin/python"
+CONTAINER_PYTHON = "/opt/uv/tools/mascope/bin/python"
 
 requires_repro_stack = pytest.mark.skipif(
     os.environ.get("MASCOPE_REPRO_TEST") != "1",

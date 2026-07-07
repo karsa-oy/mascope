@@ -3,6 +3,8 @@
 **/playwright-report
 **/build
 **/*.egg-info
-.venv
+**/.venv
+.git
+.claude
 .runtime/**
 runtime/env/*

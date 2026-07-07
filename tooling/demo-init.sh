@@ -44,7 +44,7 @@ DB="${MASCOPE_DB_NAME}"
 
 # Mascope is installed as a uv tool, so its Python + entry points live in the
 # tool venv (the same place db-init.sh finds alembic), not the base interpreter.
-TOOL_BIN="/root/.local/share/uv/tools/mascope/bin"
+TOOL_BIN="/opt/uv/tools/mascope/bin"
 PYTHON="$TOOL_BIN/python"
 ALEMBIC_BIN="$TOOL_BIN/alembic"
 

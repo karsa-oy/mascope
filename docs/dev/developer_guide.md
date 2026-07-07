@@ -1638,9 +1638,10 @@ echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
    chmod 600 "$MASCOPE_PATH/.runtime/secrets/backup.env"
    # then edit: repository, encryption password, FILESTORE_PATH, retention
 
-   # the dump directory and pre-existing dumps are usually root-owned
-   # (created by the docker daemon / init container) — hand them to the
-   # user that runs the cron job, or pruning fails:
+   # the backend image runs as UID 1000, so new dumps land owned by the
+   # deploy user — but dumps created by releases older than that (or by the
+   # docker daemon creating the mount dir) may still be root-owned. Hand
+   # them to the user that runs the cron job once, or pruning fails:
    sudo chown -R "$(whoami)" "$MASCOPE_PATH/.runtime/database/backups"
    ```
 
@@ -1669,10 +1670,11 @@ echo $MASCOPE_PATH   # e.g. /home/karsa/Mascope (from /etc/environment)
 
    Output goes to syslog: `grep mascope-backup /var/log/syslog | tail -20`.
 
-   If filestore files are root-owned (containers currently run as root), a
-   user-level cron cannot read them — install the job in root's crontab
-   (`sudo crontab -e`) or grant read access with ACLs
-   (`setfacl -R -m u:karsa:rX <filestore>`).
+   The backend image runs as UID 1000 (override with the `MASCOPE_UID` /
+   `MASCOPE_GID` build args), so filestore files are owned by the deploy user.
+   Files written by releases that still ran as root need a one-time
+   `sudo chown -R "$(whoami)" <filestore>` — until then a user-level cron
+   cannot read them.
 
 5. **Monitoring (recommended):** set `HEALTHCHECK_URL` in `backup.env` to a
    [healthchecks.io](https://healthchecks.io) ping URL. The script pings it on
