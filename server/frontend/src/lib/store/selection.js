@@ -143,6 +143,14 @@ export const useSelection = (name, key, records, options = {}) => {
     toFocus.value = arg
   }
 
+  // lazy multi-selection: a set of ids to select once the records that carry
+  // them have loaded. Counterpart to lazyFocus for multi-select stores; used
+  // when applying a target location whose data is not resident yet.
+  const toSelect = ref(null)
+  const lazySelect = (ids) => {
+    toSelect.value = Array.isArray(ids) ? ids : ids != null ? [ids] : null
+  }
+
   // focus logging
   if (singleselect) {
     watch(focused, (nextFocus, prevFocus) => {
@@ -292,6 +300,20 @@ export const useSelection = (name, key, records, options = {}) => {
     // Capture previous selection state BEFORE reload (works for both single & multi-select)
     const previousSelectedIds = selected.value.map((s) => s[key])
 
+    // --- scheduled lazy multi-selection takes priority ---
+    // Only consume the target once records are present; while the store is
+    // empty (deps unmet) keep it queued for a later load.
+    if (toSelect.value?.length && records().length > 0) {
+      const wanted = toSelect.value
+      const recordsToSelect = records().filter((r) => wanted.includes(r[key]))
+      toSelect.value = null
+      if (recordsToSelect.length > 0) {
+        logger.debug(`lazy selecting ${recordsToSelect.length} record(s)`)
+        selected.value = recordsToSelect
+        return focused.value
+      }
+    }
+
     // --- scheduled lazy focus takes priority ---
     const nextId = toFocus.value?.[key]
     const nextValid = records()
@@ -402,6 +424,7 @@ export const useSelection = (name, key, records, options = {}) => {
     unfocus,
     prepRefocus,
     lazyFocus,
+    lazySelect,
     resetPersist
   }
 }
