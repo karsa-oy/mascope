@@ -155,24 +155,32 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
 })
 ```
 
-Register both in [`stores/data/index.js`](../../server/frontend/src/stores/data/index.js):
+Register both in [`stores/data/index.js`](../../server/frontend/src/stores/data/index.js) as a
+namespace (nested, **not** spread — spreading a Pinia store snapshots its refs and breaks reactivity):
 
 ```js
 peakAssignment: {
-  run: usePeakAssignmentRun(),
-  ...usePeakAssignment()          // spread so app.data.peakAssignment.list / byPeakId / run
+  run: usePeakAssignmentRun(),   // app.data.peakAssignment.run.{list,focused,assign,latestCompleted}
+  peak: usePeakAssignment()      // app.data.peakAssignment.peak.{list,byPeakId,forPeak,tierCounts,run}
 }
 ```
+
+The selection state of both stores is registered in
+[`stores/data/filter.js`](../../server/frontend/src/stores/data/filter.js)
+(`peak_assignment_run`, `peak_assignment`) so `useSelection` binds to the shared filter store
+rather than a local fallback ref.
 
 **Filtering** (tier/role/source) is **client-side** off `data.list` — the full ledger is already in
 memory, so filter chips are instant. The server query params exist for later pagination only.
 
 ### 2.3 Run-completion refresh — `peak_assignment_reload` event (decided)
 
-The backend will emit a **`peak_assignment_reload`** cross-store event when a run finalizes, mirroring
-the way `rematch_sample` emits `match_reload` (backend task **B1**, §7). The run store then refreshes
-through the existing `useData` events framework with no component-scoped notification watcher — hence
-`events: ['peak_assignment_reload']` in §2.1. The event name is deliberately semantic (not
+The backend emits a **`peak_assignment_reload`** cross-store event when a run finalizes, mirroring the
+way `rematch_sample` emits `match_reload` (backend task **B1**, §7 — implemented as
+`success_reload=[("peak_assignment", "sample_batch_id")]` on the `assign_sample_peaks` decorator; the
+room id resolves from the returned `_notification_data.sample_batch_id`, the same room the client
+already joins for match). The run store refreshes through the existing `useData` events framework with
+no component-scoped notification watcher — hence `events: ['peak_assignment_reload']` in §2.1. The event name is deliberately semantic (not
 `peak_assignment_run_reload`) to match the `match_reload` precedent and to let both stores subscribe if
 needed.
 
@@ -236,6 +244,28 @@ returns the same `{ match_ions, match_isotopes }` shape they consume today.
 - **E — Batch level.** Batch-overview coloring by tier; GKA / Van Krevelen (backend Phase 4).
 
 ## 7. Work distribution
+
+### Implementation status
+
+Landed on `design/peak-centric-frontend` (build + lint + 82 unit tests green; backend change
+compile-checked, backend suite needs Postgres):
+
+| ID | Status | Commit |
+|---|---|---|
+| **F1** store spine + tier tag | ✅ done | `feat(frontend): peak-assignment stores and tier tag (F1)` |
+| **F2** peak ledger | ✅ done | `feat(frontend): reframe peak browser as the assignment ledger (F2)` |
+| **F3** peak inspector | ✅ done | `feat(frontend): peak inspector shows the committed assignment (F3)` |
+| **F4** annotated spectrum | ✅ done | `feat(frontend): color the spectrum by assignment tier (F4)` |
+| **F5** assignments browser + config dialog | ✅ done | `feat(frontend): assignments browser with run selector and config dialog (F5)` |
+| **F6** Fit-view rename | ✅ done (rename only) | `feat(frontend): rename the Match tab to Fit view (F6)` |
+| **B1** `peak_assignment_reload` event | ✅ done | `feat(peak-assignments): emit peak_assignment_reload on run finalize (B1)` |
+| **F6** composition Fit wiring | ⏳ blocked on **B2** | — |
+| **B2** composition Fit visualization | ⏳ not started (needs a live stack) | — |
+
+Not yet verified end-to-end against a running demo stack (the reads, the reload event, the launch
+flow). That needs `docker compose -f docker-compose.demo.yaml up -d` + a peak-assignment run.
+
+### Full task list
 
 Tasks are cut so they can be handed to separate agents with minimal collision. **F1 is the foundation**
 — it freezes the store API and delivers `BaseTierTag`, which every other frontend task consumes — so it
