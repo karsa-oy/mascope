@@ -252,7 +252,7 @@ function install_mascope() {
     sudo systemctl daemon-reload
     sudo systemctl enable mascope.service
     write_line "mascope.service enabled for user '${USER}' (bin: ${MASCOPE_BIN})"
-    write_line "Auto-updates are INSTALLED but DISABLED. To turn them on: set GH_TOKEN in /etc/mascope/update.env, then run 'sudo systemctl enable --now mascope-update.timer'. See docs/maintaining.md."
+    write_line "Auto-updates are INSTALLED but DISABLED. To turn them on: 'sudo systemctl enable --now mascope-update.timer' (no token needed). See docs/maintaining.md."
 }
 
 function uninstall_mascope() {

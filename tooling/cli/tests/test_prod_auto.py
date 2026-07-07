@@ -10,6 +10,7 @@ classification and window state.
 import datetime
 import importlib
 import json
+import urllib.error
 
 import pytest
 import typer
@@ -113,40 +114,48 @@ def test_wait_healthy_times_out(monkeypatch):
     assert au.wait_healthy("backend", timeout=1, interval=1) is False
 
 
-# --- discovery seams ---
+# --- discovery seams (tokenless HTTPS) ---
 
 
 def test_latest_release_tag(monkeypatch):
-    class _R:
-        returncode = 0
-        stdout = "v1.4.0\n"
-
-    monkeypatch.setattr(au, "_run", lambda *a, **k: _R())
+    monkeypatch.setattr(au, "_http_get_json", lambda url, **k: {"tag_name": "v1.4.0"})
     assert au.latest_release_tag("karsa-oy/mascope") == "v1.4.0"
 
 
 def test_latest_release_tag_failure(monkeypatch):
-    class _R:
-        returncode = 1
-        stdout = ""
+    def _boom(url, **k):
+        raise urllib.error.URLError("no network")
 
-    monkeypatch.setattr(au, "_run", lambda *a, **k: _R())
+    monkeypatch.setattr(au, "_http_get_json", _boom)
     assert au.latest_release_tag("karsa-oy/mascope") is None
 
 
 def test_download_manifest(monkeypatch, tmp_path):
-    def fake_run(cmd, timeout=30):
-        (tmp_path / au.MANIFEST_FILENAME).write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        au,
+        "_http_get_json",
+        lambda url, **k: {
+            "assets": [
+                {
+                    "name": au.MANIFEST_FILENAME,
+                    "browser_download_url": "https://example.test/m.json",
+                }
+            ]
+        },
+    )
 
-        class _R:
-            returncode = 0
-            stdout = ""
+    def _fake_download(url, dest, **k):
+        dest.write_text("{}", encoding="utf-8")
 
-        return _R()
-
-    monkeypatch.setattr(au, "_run", fake_run)
+    monkeypatch.setattr(au, "_http_download", _fake_download)
     path = au.download_manifest("karsa-oy/mascope", "v1.4.0", tmp_path)
     assert path == tmp_path / au.MANIFEST_FILENAME
+
+
+def test_download_manifest_no_asset(monkeypatch, tmp_path):
+    # A release predating the manifest has no matching asset -> None (fallback).
+    monkeypatch.setattr(au, "_http_get_json", lambda url, **k: {"assets": []})
+    assert au.download_manifest("karsa-oy/mascope", "v1.2.0", tmp_path) is None
 
 
 # --- _auto orchestration ---

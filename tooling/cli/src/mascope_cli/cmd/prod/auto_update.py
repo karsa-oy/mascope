@@ -12,15 +12,18 @@ release, classifies it with the preflight, and acts by classification:
   update and notify, so a human can schedule the window. Applying migration
   updates on confirmation or after a grace period is handled separately.
 
-Talking to GitHub (finding the latest release and downloading its manifest)
-goes through small seams that tests stub; on a real server they need read
-access to the repository releases (a token in the environment, e.g. via
-``gh auth`` or ``GH_TOKEN``).
+Finding the latest release and downloading its manifest use the public GitHub
+REST API over plain HTTPS - no token and no ``gh`` needed, since the repository
+and its release assets are public. A nightly timer stays well within the
+anonymous rate limit. Both calls go through small seams that tests stub.
 """
 
 import datetime
 import json
+import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -231,7 +234,7 @@ def record_status(mascope_path: str, message: str) -> None:
         fh.write(f"{stamp} {message}\n")
 
 
-# --- GitHub discovery seams ---
+# --- docker command runner (used by the health check) ---
 
 
 def _run(cmd: list[str], timeout: Optional[int] = 30) -> subprocess.CompletedProcess:
@@ -240,44 +243,71 @@ def _run(cmd: list[str], timeout: Optional[int] = 30) -> subprocess.CompletedPro
     )
 
 
+# --- GitHub release discovery (public, tokenless HTTPS) ---
+
+_GITHUB_API = "https://api.github.com"
+# GitHub rejects API requests that send no User-Agent.
+_HTTP_HEADERS = {"User-Agent": "mascope-cli", "Accept": "application/vnd.github+json"}
+
+
+def _http_get_json(url: str, timeout: int = 30) -> dict:
+    """GET ``url`` and parse the JSON body. Raises on transport/parse errors."""
+    request = urllib.request.Request(url, headers=_HTTP_HEADERS)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def _http_download(url: str, dest: Path, timeout: int = 30) -> None:
+    """Download ``url`` to ``dest``. Raises on transport errors."""
+    request = urllib.request.Request(url, headers=_HTTP_HEADERS)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        with dest.open("wb") as fh:
+            shutil.copyfileobj(response, fh)
+
+
 def latest_release_tag(repo: str) -> Optional[str]:
     """
-    Newest published release tag for ``repo`` via the GitHub API (``gh``).
+    Newest published release tag for ``repo`` (e.g. ``v1.4.0``), read from the
+    public GitHub REST API without authentication.
 
-    Returns None if it cannot be determined (no releases, no network, or no
-    read access).
+    Returns None if it cannot be determined (no releases, no network).
     """
-    result = _run(["gh", "api", f"repos/{repo}/releases/latest", "--jq", ".tag_name"])
-    if result.returncode != 0:
+    try:
+        data = _http_get_json(f"{_GITHUB_API}/repos/{repo}/releases/latest")
+    except (urllib.error.URLError, OSError, ValueError):
         return None
-    tag = result.stdout.strip()
+    tag = data.get("tag_name")
     return tag or None
 
 
 def download_manifest(repo: str, tag: str, dest_dir: Path) -> Optional[Path]:
     """
     Download the release's manifest asset into ``dest_dir``. Returns the path,
-    or None if the release has no manifest asset (older releases predate it).
+    or None if the release has no manifest asset (releases predating the
+    manifest) or it could not be fetched.
     """
     dest_dir.mkdir(parents=True, exist_ok=True)
-    result = _run(
-        [
-            "gh",
-            "release",
-            "download",
-            tag,
-            "-R",
-            repo,
-            "-p",
-            MANIFEST_FILENAME,
-            "-D",
-            str(dest_dir),
-            "--clobber",
-        ]
-    )
-    if result.returncode != 0:
+    try:
+        release = _http_get_json(f"{_GITHUB_API}/repos/{repo}/releases/tags/{tag}")
+    except (urllib.error.URLError, OSError, ValueError):
         return None
+
+    asset_url = next(
+        (
+            asset.get("browser_download_url")
+            for asset in release.get("assets", [])
+            if asset.get("name") == MANIFEST_FILENAME
+        ),
+        None,
+    )
+    if not asset_url:
+        return None
+
     path = dest_dir / MANIFEST_FILENAME
+    try:
+        _http_download(asset_url, path)
+    except (urllib.error.URLError, OSError):
+        return None
     return path if path.exists() else None
 
 
