@@ -243,6 +243,10 @@ no backend or DB, only `mascope_tools` + tests.
   Bioinformatics 2006, 7:234.
   [link](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-7-234)
 - Kind, T.; Fiehn, O. *Seven Golden Rules…* BMC Bioinformatics 2007, 8:105.
+  Open-access mirror: [PMC1851972](https://pmc.ncbi.nlm.nih.gov/articles/PMC1851972/).
+  **`chemical_plausibility` takes its numbers verbatim from this paper's Table 2**
+  (element-ratio common / extended / extreme bands for H/C, N/C, O/C, P/C, S/C, F/C,
+  Cl/C, Br/C, Si/C) **and Table 3** (the multi-element NOPS count restrictions, Rule 6).
   [link](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-8-105)
 - Böcker, S. et al. *SIRIUS: decomposing isotope patterns…* Bioinformatics 2009,
   25(2):218–224. [link](https://academic.oup.com/bioinformatics/article/25/2/218/218950)
