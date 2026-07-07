@@ -11,8 +11,10 @@ import { api } from '@/api'
 import { runtime } from '@/lib/runtime.js'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
+import BaseUpdateBanner from '@/lib/base/BaseUpdateBanner.vue'
 import { useApp } from '@/stores'
 import { useLocation } from '@/lib/location'
+import { useUpdate } from '@/lib/update'
 import { PaneLogin, PaneOwnerSignup } from '@/lib/panes'
 
 const { connected } = api
@@ -20,9 +22,14 @@ const { connected } = api
 const app = useApp()
 const toast = useToast()
 
-// Instantiate the location store so it registers its shared-link import hook,
-// which runs once the user authenticates.
-useLocation()
+// Instantiate the location store so it registers its shared-link import hook
+// (runs once the user authenticates), and mirror the location into the address
+// bar so the current view is always bookmarkable and shareable.
+const location = useLocation()
+location.enableMirroring()
+
+// Watch for a newer frontend build shipped while the tab is open.
+useUpdate().start()
 
 // toaster
 app.ui.notification
@@ -82,6 +89,7 @@ app.ui.notification
   </div>
   <Toast position="bottom-right" v-if="!app.ui.notification.drawer" />
   <ConfirmDialog />
+  <BaseUpdateBanner />
 
   <!-- Disconnected - Block UI with an overlay and show an error message -->
   <BlockUI :blocked="!connected" fullScreen />
