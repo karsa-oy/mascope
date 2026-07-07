@@ -74,14 +74,41 @@ Validated `rule_senior` against the 92 demo target compounds:
 
 ## 6. Next steps (priority order)
 
-1. **Rename `match_score` → `fit_score`** — schema/API + the new `PeakAssignment` score
-   column. Coordinated refactor.
-2. **Wire the fit score into the peak-centric engine's Stage A/B scoring** (it currently
-   uses the older `score_pattern`).
-3. **Phase 3 — confidence layers**: start with the chemistry layer (graded plausibility;
-   `assignment_confidence.md` P1), then candidate arbitration + target-decoy FDR (P2).
-4. **Rewrite the how-it-works user docs** (`docs/user/how-it-works/matching.md` has a
-   maintainer TODO) once the pipeline settles.
+**Landed since this handoff (all on `epic/peak-centric-assignment`):**
+
+1. ✅ **Phase 3 chemistry — graded plausibility (P1).** `chemical_plausibility` /
+   `formula_plausibility` in `heuristic_filter.py`: a per-candidate plausibility in
+   `[0,1]` = Senior/RDBE (Rule 2) × element-ratio (Rules 4–5, Table 2) × heteroatom
+   co-occurrence (Rule 6, Table 3), numbers verbatim from Kind & Fiehn 2007. Grades, does
+   not gate; fail-open. Unit-tested + validated on the 91 demo formulas (only the
+   over-saturated `C6H17NO4` scores 0). See `assignment_confidence.md` §4.
+2. ✅ **Wired the fit score into the peak-centric engine's Stage A/B scoring.** Stage A:
+   `engine.score_ions_by_fit` (deliberate ion-level `score_pattern_v2` per `target_ion_id`,
+   post-gating). Stage B: uses the isotope-pattern fit score `assign_compositions` already
+   computes (v1 degradation, no SNR). Both replace the crude `abundance_term·mz_term`.
+   See `fit_score.md` §1a.
+3. ✅ **Renamed `match_score` → `fit_score`** on the `PeakAssignment` surface: model column
+   + range check constraint, `PeakAssignmentRecord` schema, engine output dicts,
+   read-model, tests, and an Alembic migration (`b2e9d7c14a05`, chained from the
+   peak-assignment-tables head). **Migration written but NOT run** — needs confirmation.
+   Legacy `match_ion` / `match_isotope.match_score` deliberately untouched.
+
+**Open (need a human / a live stack):**
+
+4. **Run the rename migration** `b2e9d7c14a05` and the migration test suite
+   (`server/backend/tests/migrations/`, ephemeral drift DB) — a DB-migrating operation,
+   left for the human.
+5. **Recalibrate the confidence-tier bands for the fit scale.** Stage A/B now score on the
+   fit scale (a lone mass-only match scores low by design), but `tier_for_score` still uses
+   the legacy `match_params` thresholds (0.8/0.7). DESIGN.md suggests v2 bands ≈ 0.8/0.5.
+   This changes *what users see* (single-peak matches demote) → a product decision.
+6. **Live end-to-end validation of Stage A.** `score_ions_by_fit` is unit-tested pure;
+   its real-SNR path (filestore zarr → `compute_match_isotopes`) needs a demo-stack run to
+   confirm end-to-end (the backend/integration suites need Postgres + the demo bundle).
+7. **Phase 3 P2 — candidate arbitration + target-decoy FDR** (`assignment_confidence.md`):
+   compete candidates by fit × plausibility, calibrate per instrument, emit a confidence.
+8. **Rewrite the how-it-works user docs** (`docs/user/how-it-works/matching.md` TODO) once
+   the pipeline settles.
 
 ## 7. Environment / ops notes
 

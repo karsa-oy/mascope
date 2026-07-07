@@ -136,7 +136,7 @@ Analogous to peaky's `manifest.json`. `PeakAssignment` rows FK to a run.
 | `assigned_formula` | committed neutral formula |
 | `ion_formula`, `ionization_mechanism_id`, `isotope_label` | adduct + M0/M+1... |
 | `source` | `database` / `untargeted` - which stage won the peak |
-| `match_score`, `mz_error_ppm`, `abundance_error` | evidence |
+| `fit_score`, `mz_error_ppm`, `abundance_error` | evidence (`fit_score` = the fit-quality measurement, [`fit_score.md`](../../libraries/tools/docs/fit_score.md)) |
 | `tier` | `identified` / `candidate` / `below_assignability` / `unassigned` |
 | `target_compound_id`, `target_ion_id` (nullable) | set when the winner came from the known library |
 | `owner_peak_assignment_id` (nullable) | an `iso_child` points at its `M0` |

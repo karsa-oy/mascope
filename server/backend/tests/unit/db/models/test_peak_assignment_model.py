@@ -76,7 +76,7 @@ def _assignment(run, sample_item_id, sample_peak_id, **overrides) -> PeakAssignm
         "tier": "identified",
         "source": "database",
         "assigned_formula": "C6H12O6",
-        "match_score": 0.95,
+        "fit_score": 0.95,
     }
     values.update(overrides)
     return PeakAssignment(**values)
@@ -135,14 +135,14 @@ async def test_single_owner_per_peak_is_enforced(
 
 
 @pytest.mark.asyncio
-async def test_match_score_range_is_enforced(session, db_test_run, db_test_sample_item):
+async def test_fit_score_range_is_enforced(session, db_test_run, db_test_sample_item):
     """The check constraint rejects scores outside [0, 1] but allows NULL."""
     session.add(
         _assignment(
             db_test_run,
             db_test_sample_item.sample_item_id,
             "peak-null-score",
-            match_score=None,
+            fit_score=None,
             source=None,
             role="unassigned",
             tier="unassigned",
@@ -156,7 +156,7 @@ async def test_match_score_range_is_enforced(session, db_test_run, db_test_sampl
             db_test_run,
             db_test_sample_item.sample_item_id,
             "peak-bad-score",
-            match_score=1.5,
+            fit_score=1.5,
         )
     )
     with pytest.raises(IntegrityError):

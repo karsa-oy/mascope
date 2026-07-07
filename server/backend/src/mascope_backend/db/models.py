@@ -1148,7 +1148,11 @@ class PeakAssignment(Base):
     )
     isotope_label: Mapped[Optional[str]] = mapped_column(String(64))
     source: Mapped[Optional[str]] = mapped_column(String(16))
-    match_score: Mapped[Optional[float]] = mapped_column(Float)
+    # The fit score (mascope_tools score_pattern_v2): how well the observed data
+    # fit this assignment's predicted pattern. [0, 1], 1.0 = perfect; NULL for an
+    # unassigned peak. Named `fit_score` (not match/probability) deliberately -- it
+    # is a measurement, not an identification confidence. See fit_score.md.
+    fit_score: Mapped[Optional[float]] = mapped_column(Float)
     mz_error_ppm: Mapped[Optional[float]] = mapped_column(Float)
     abundance_error: Mapped[Optional[float]] = mapped_column(Float)
     tier: Mapped[str] = mapped_column(String(24), server_default=text("'unassigned'"))
@@ -1183,8 +1187,8 @@ class PeakAssignment(Base):
             name="uq_peak_assignment_run_id_sample_peak_id",
         ),
         CheckConstraint(
-            "match_score IS NULL OR match_score BETWEEN 0 AND 1",
-            name="match_score_range",
+            "fit_score IS NULL OR fit_score BETWEEN 0 AND 1",
+            name="fit_score_range",
         ),
     )
 
