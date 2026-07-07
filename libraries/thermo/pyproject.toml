@@ -9,7 +9,7 @@ dependencies = [
     "mascope_file",
     "numpy~=1.26",
     "opentfraw~=1.2",
-    "pythonnet~=3.0",
+    "pythonnet~=3.1",
     "xarray>=2025.06.1",
 ]
 

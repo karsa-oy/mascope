@@ -6,7 +6,7 @@ authors = [{ name = "Oskari Kausiala", email = "oskari.kausiala@karsa.fi" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "mascope_runtime",
-    "colorcet~=3.1",
+    "colorcet~=3.2",
     "datashader>=0.17,<0.18",
     "h5py~=3.11",
     "numpy~=1.26",

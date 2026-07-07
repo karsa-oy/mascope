@@ -247,7 +247,7 @@ def http_post(
         try:
             response = requests.post(
                 full_url,
-                data=json.dumps(data),
+                json=data,
                 headers=headers,
                 verify=verify_ssl,
                 timeout=timeout,

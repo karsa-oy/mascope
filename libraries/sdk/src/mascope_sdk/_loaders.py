@@ -1,5 +1,6 @@
 """High-level data loading functions for the Mascope SDK."""
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -7,6 +8,40 @@ from loguru import logger
 
 from ._concurrent import run_concurrent
 from .client import MascopeClient
+
+
+def _name_mask(
+    series: "pd.Series", pattern: "str | re.Pattern", *, exact: bool
+) -> "pd.Series":
+    """Boolean mask selecting rows whose name matches ``pattern``.
+
+    A plain string is matched case-insensitively as a **literal substring**:
+    regex metacharacters carry no special meaning, so ``"Sample (A)"`` matches
+    the batch literally named ``"Sample (A)"`` rather than being interpreted as
+    a regex group. Set ``exact`` to require the whole name to equal the string.
+
+    To match with a regular expression, pass a **compiled pattern**
+    (``re.compile(...)``); it is used as-is, so control case-sensitivity through
+    its flags (e.g. ``re.compile("2025|2026", re.IGNORECASE)``). ``exact`` does
+    not apply to compiled patterns -- anchor them instead (``r"^name$"``).
+
+    :param series: Series of names to match against.
+    :param pattern: Literal substring (``str``) or compiled regex.
+    :param exact: Require a full-string match instead of a substring match.
+                  Only valid for string patterns.
+    :return: Boolean mask aligned with ``series``.
+    :raises ValueError: If ``exact`` is combined with a compiled pattern.
+    """
+    if isinstance(pattern, re.Pattern):
+        if exact:
+            raise ValueError(
+                "exact=True cannot be combined with a compiled regex pattern; "
+                "anchor the pattern instead, e.g. re.compile(r'^name$')."
+            )
+        return series.str.contains(pattern, na=False)
+    if exact:
+        return series.str.casefold() == pattern.casefold()
+    return series.str.contains(re.escape(pattern), case=False, na=False)
 
 
 def _resolve_sample(client: MascopeClient, sample: str) -> str:
@@ -85,16 +120,21 @@ def _confirm_sample_count(count: int, threshold: int) -> None:
 def _collect_sample_tasks(
     client: MascopeClient,
     dataset: str,
-    batches: str | None = None,
-    samples: str | None = None,
+    batches: "str | re.Pattern | None" = None,
+    samples: "str | re.Pattern | None" = None,
+    *,
+    exact: bool = False,
 ) -> tuple[list[tuple[Any, str]], str]:
     """Resolve dataset/batches and collect (sample_row, batch_name) pairs.
 
     :param client: The MascopeClient instance.
     :param dataset: Dataset name, substring, or regex pattern (or ID).
-    :param batches: Optional filter on batch names (case-insensitive substring or regex)
-    :param samples: Optional filter on sample names (case-insensitive substring or
-      regex)
+    :param batches: Optional case-insensitive filter on batch names. A string is
+      a literal substring (or full-name match when ``exact`` is True); a
+      compiled ``re.Pattern`` is used as a regex. See :func:`_name_mask`.
+    :param samples: Optional case-insensitive filter on sample names, same
+      semantics as ``batches``.
+    :param exact: Require the filter to match the whole name instead of a substring.
     :return: Tuple of (sample_tasks, dataset_id).
     :raises ValueError: If dataset or batches cannot be resolved.
     """
@@ -117,7 +157,7 @@ def _collect_sample_tasks(
 
     if batches is not None:
         all_batches = all_batches[
-            all_batches["sample_batch_name"].str.contains(batches, case=False, na=False)
+            _name_mask(all_batches["sample_batch_name"], batches, exact=exact)
         ]
         if all_batches.empty:
             logger.warning("No batches matching '{}'", batches)
@@ -138,9 +178,7 @@ def _collect_sample_tasks(
 
         if samples is not None:
             batch_samples = batch_samples[
-                batch_samples["sample_item_name"].str.contains(
-                    samples, case=False, na=False
-                )
+                _name_mask(batch_samples["sample_item_name"], samples, exact=exact)
             ]
             if batch_samples.empty:
                 continue
@@ -155,9 +193,10 @@ def _collect_sample_tasks(
 def load_peaks(
     client: MascopeClient,
     dataset: str,
-    batches: str | None = None,
+    batches: "str | re.Pattern | None" = None,
     *,
-    samples: str | None = None,
+    samples: "str | re.Pattern | None" = None,
+    exact: bool = False,
     matches: bool = True,
     areas: bool = True,
     heights: bool = True,
@@ -178,11 +217,19 @@ def load_peaks(
     :type client: MascopeClient
     :param dataset: Dataset name (or substring) or dataset ID.
     :type dataset: str
-    :param batches: Optional substring filter on batch names (case-insensitive).
+    :param batches: Optional case-insensitive filter on batch names. A string is
+                    a literal substring, so it can select several batches at once
+                    (e.g. ``"blank"`` matches every batch whose name contains
+                    "blank"); pass a compiled ``re.Pattern`` to match by regex.
                     If not provided, all batches in the dataset are loaded.
-    :type batches: str, optional
-    :param samples: Optional substring filter on sample names (case-insensitive).
-    :type samples: str, optional
+    :type batches: str | re.Pattern, optional
+    :param samples: Optional case-insensitive filter on sample names, same
+                    semantics as ``batches``.
+    :type samples: str | re.Pattern, optional
+    :param exact: Match a string ``batches`` / ``samples`` against the whole name
+                  instead of as a substring. Use this to select a single named
+                  batch. Not valid with a compiled pattern. Defaults to False.
+    :type exact: bool
     :param matches: Include matched compounds/ions/isotopes. Defaults to True.
     :type matches: bool
     :param areas: Include peak areas. Defaults to True.
@@ -240,7 +287,9 @@ def load_peaks(
             confirm_above=None,
         )
     """
-    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(
+        client, dataset, batches, samples=samples, exact=exact
+    )
     if not sample_tasks:
         logger.warning("No samples found")
         return None
@@ -445,9 +494,10 @@ _NAME_COLUMNS = {
 def load_peak_timeseries(
     client: MascopeClient,
     dataset: str,
-    batches: str | None = None,
+    batches: "str | re.Pattern | None" = None,
     *,
-    samples: str | None = None,
+    samples: "str | re.Pattern | None" = None,
+    exact: bool = False,
     compound: str | list[str] | None = None,
     ion: str | list[str] | None = None,
     isotope: str | list[str] | None = None,
@@ -471,10 +521,16 @@ def load_peak_timeseries(
     :type client: MascopeClient
     :param dataset: Dataset name (or substring) or dataset ID.
     :type dataset: str
-    :param batches: Optional substring filter on batch names (case-insensitive).
-    :type batches: str, optional
-    :param samples: Optional substring filter on sample names (case-insensitive).
-    :type samples: str, optional
+    :param batches: Optional case-insensitive filter on batch names. A string is
+                    a literal substring; pass a compiled ``re.Pattern`` for regex.
+    :type batches: str | re.Pattern, optional
+    :param samples: Optional case-insensitive filter on sample names, same
+                    semantics as ``batches``.
+    :type samples: str | re.Pattern, optional
+    :param exact: Match a string ``batches`` / ``samples`` against the whole name
+                  instead of as a substring. Not valid with a compiled pattern.
+                  Defaults to False.
+    :type exact: bool
     :param compound: Target compound name(s) or formula(s).
     :type compound: str | list[str], optional
     :param ion: Target ion formula(s) to resolve.
@@ -546,7 +602,9 @@ def load_peak_timeseries(
     formula_set = set(formula_values)
 
     # --- Discover samples across batches ---
-    sample_tasks, _ = _collect_sample_tasks(client, dataset, batches, samples=samples)
+    sample_tasks, _ = _collect_sample_tasks(
+        client, dataset, batches, samples=samples, exact=exact
+    )
     if not sample_tasks:
         logger.warning("No samples found")
         return None

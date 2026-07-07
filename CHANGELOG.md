@@ -7,6 +7,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
+### Changed
+
+- SDK (`mascope-sdk` 2026.7.7): the `load_peaks` / `load_peak_timeseries`
+  `batches` and `samples` filters now treat a string as a case-insensitive
+  **literal substring** instead of a regex, so values with metacharacters (e.g.
+  `"Sample (A)"`) match literally. Pass `exact=True` to match a whole name, or a
+  compiled `re.Pattern` (e.g. `re.compile("2025|2026", re.IGNORECASE)`) to filter
+  by regex. Callers relying on regex/alternation in a plain string must switch to
+  a compiled pattern. The dead `**kwargs` on `MascopeClient.load_peaks` /
+  `load_peak_timeseries` was removed, so an unknown keyword such as `batch=...`
+  (singular) now raises `TypeError` instead of being silently ignored.
+
+### Fixed
+
+- SDK (`mascope-sdk` 2026.7.7): `POST` requests now send their body as
+  `application/json`. Previously the body was serialized with
+  `data=json.dumps(...)` and no `Content-Type` header, so the backend received it
+  as opaque bytes and rejected every SDK `POST` carrying a body with a 422
+  validation error (surfaced by `load_peak_timeseries` on
+  `POST /api/samples/{id}/peaks/timeseries`).
 
 ## [v1.2.0] - 2026.07.07
 

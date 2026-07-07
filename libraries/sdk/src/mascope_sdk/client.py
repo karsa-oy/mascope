@@ -4,6 +4,7 @@ This module provides the main client class for interacting with the Mascope API.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -374,16 +375,16 @@ class MascopeClient:
     def load_peaks(
         self,
         dataset: str,
-        batches: str | None = None,
+        batches: "str | re.Pattern | None" = None,
         *,
-        samples: str | None = None,
+        samples: "str | re.Pattern | None" = None,
+        exact: bool = False,
         matches: bool = True,
         areas: bool = True,
         heights: bool = True,
         average: bool = True,
         confirm_above: int | None = 100,
         max_workers: int = 8,
-        **kwargs,
     ) -> pd.DataFrame | None:
         """Load peaks for all samples across one or more batches.
 
@@ -397,14 +398,21 @@ class MascopeClient:
 
         :param dataset: Dataset name, substring, or regex pattern (or ID).
         :type dataset: str
-        :param batches: Optional filter on batch names (case-insensitive).
-                        Accepts a plain substring or a regex pattern
-                        (e.g. ``"2026-01|2026-02"``).
-                        If not provided, all batches in the dataset are loaded.
-        :type batches: str, optional
-        :param samples: Optional filter on sample names (case-insensitive). Accepts
-                        a plain substring or a regex pattern.
-        :type samples: str, optional
+        :param batches: Optional case-insensitive filter on batch names. A string
+                        is a literal substring and may select several batches at
+                        once (e.g. ``"blank"`` matches every batch whose name
+                        contains "blank"); pass a compiled ``re.Pattern`` to match
+                        by regex. If not provided, all batches in the dataset are
+                        loaded.
+        :type batches: str | re.Pattern, optional
+        :param samples: Optional case-insensitive filter on sample names, same
+                        semantics as ``batches``.
+        :type samples: str | re.Pattern, optional
+        :param exact: Match a string ``batches`` / ``samples`` against the whole
+                      name instead of as a substring. Use this to select a single
+                      named batch. Not valid with a compiled pattern. Defaults to
+                      False.
+        :type exact: bool
         :param matches: Include matched compounds/ions/isotopes. Defaults to True.
         :type matches: bool
         :param areas: Include peak areas. Defaults to True.
@@ -469,6 +477,7 @@ class MascopeClient:
             dataset,
             batches,
             samples=samples,
+            exact=exact,
             matches=matches,
             areas=areas,
             heights=heights,
@@ -480,15 +489,15 @@ class MascopeClient:
     def load_peak_timeseries(
         self,
         dataset: str,
-        batches: str | None = None,
+        batches: "str | re.Pattern | None" = None,
         *,
-        samples: str | None = None,
+        samples: "str | re.Pattern | None" = None,
+        exact: bool = False,
         compound: str | list[str] | None = None,
         ion: str | list[str] | None = None,
         isotope: str | list[str] | None = None,
         confirm_above: int | None = 20,
         max_workers: int = 8,
-        **kwargs,
     ) -> pd.DataFrame | None:
         """Load intra-sample peak timeseries for matched peaks across batches.
 
@@ -506,12 +515,17 @@ class MascopeClient:
 
         :param dataset: Dataset name, substring, or regex pattern (or ID).
         :type dataset: str
-        :param batches: Optional filter on batch names (case-insensitive). Accepts
-                        a plain substring or a regex pattern.
-        :type batches: str, optional
-        :param samples: Optional filter on sample names (case-insensitive). Accepts
-                        a plain substring or a regex pattern.
-        :type samples: str, optional
+        :param batches: Optional case-insensitive filter on batch names. A string
+                        is a literal substring; pass a compiled ``re.Pattern`` for
+                        regex.
+        :type batches: str | re.Pattern, optional
+        :param samples: Optional case-insensitive filter on sample names, same
+                        semantics as ``batches``.
+        :type samples: str | re.Pattern, optional
+        :param exact: Match a string ``batches`` / ``samples`` against the whole
+                      name instead of as a substring. Not valid with a compiled
+                      pattern. Defaults to False.
+        :type exact: bool
         :param compound: Target compound name(s) or formula(s).
         :type compound: str | list[str], optional
         :param ion: Target ion formula(s).
@@ -567,6 +581,7 @@ class MascopeClient:
             dataset,
             batches,
             samples=samples,
+            exact=exact,
             compound=compound,
             ion=ion,
             isotope=isotope,
