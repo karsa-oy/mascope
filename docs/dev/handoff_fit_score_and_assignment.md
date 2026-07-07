@@ -90,25 +90,36 @@ Validated `rule_senior` against the 92 demo target compounds:
 3. ✅ **Renamed `match_score` → `fit_score`** on the `PeakAssignment` surface: model column
    + range check constraint, `PeakAssignmentRecord` schema, engine output dicts,
    read-model, tests, and an Alembic migration (`b2e9d7c14a05`, chained from the
-   peak-assignment-tables head). **Migration written but NOT run** — needs confirmation.
-   Legacy `match_ion` / `match_isotope.match_score` deliberately untouched.
+   peak-assignment-tables head). Legacy `match_ion` / `match_isotope.match_score`
+   deliberately untouched. **Applied to `mascope_demo` (dev postgres) end-to-end**; the
+   live API serves `fit_score`.
+4. ✅ **Fit-scale tier bands (0.8 / 0.5).** `PeakAssignmentConfig.identified_threshold`
+   (0.8) / `candidate_threshold` (0.5); Stage A/B tier against them instead of the legacy
+   `match_params` thresholds. Persisted on the run config; provisional (see below).
+5. ✅ **Phase 3 P2 — candidate arbitration (core).**
+   `mascope_tools.composition.arbitration.arbitrate_candidates`: competes a peak's
+   candidates by **fit × plausibility**, emits a normalised confidence, flags ties
+   (Schymanski L5). Unit-tested; `assignment_confidence.md` §4 (P2 progress).
+6. ✅ **Live end-to-end on real demo spectra.** Migrated `mascope_demo` to head, booted the
+   backend from worktree source, and ran `assign_sample_peaks` over the demo samples via the
+   API. Result per sample: `fit_score` median ≈ 0.95 / max 1.0; tiers band cleanly
+   (identified full-envelope ≈ 0.94–0.97, below-assignability = the lone mass-only matches
+   at ≈ 0.01). Data now sits in `mascope_demo.peak_assignment` for the UI.
 
-**Open (need a human / a live stack):**
+**Open (need a human / a decision):**
 
-4. **Run the rename migration** `b2e9d7c14a05` and the migration test suite
-   (`server/backend/tests/migrations/`, ephemeral drift DB) — a DB-migrating operation,
-   left for the human.
-5. **Recalibrate the confidence-tier bands for the fit scale.** Stage A/B now score on the
-   fit scale (a lone mass-only match scores low by design), but `tier_for_score` still uses
-   the legacy `match_params` thresholds (0.8/0.7). DESIGN.md suggests v2 bands ≈ 0.8/0.5.
-   This changes *what users see* (single-peak matches demote) → a product decision.
-6. **Live end-to-end validation of Stage A.** `score_ions_by_fit` is unit-tested pure;
-   its real-SNR path (filestore zarr → `compute_match_isotopes`) needs a demo-stack run to
-   confirm end-to-end (the backend/integration suites need Postgres + the demo bundle).
-7. **Phase 3 P2 — candidate arbitration + target-decoy FDR** (`assignment_confidence.md`):
-   compete candidates by fit × plausibility, calibrate per instrument, emit a confidence.
-8. **Rewrite the how-it-works user docs** (`docs/user/how-it-works/matching.md` TODO) once
-   the pipeline settles.
+7. **Run the rename migration in prod/CI** and the migration test suite
+   (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). NOTE: the CLI
+   migration check (`mascope dev migrate`) runs alembic from the *main* checkout's venv, so
+   it cannot see this branch's `b2e9d7c14a05` — a worktree/main alembic split to resolve
+   (locally the migration was applied via alembic run directly against the worktree code).
+8. **Refine the fit-scale tier bands.** 0.8/0.5 are DESIGN.md estimates; recalibrate per
+   instrument. Changes *what users see* → a product decision.
+9. **Finish Phase 3 P2:** calibrate the arbitration confidence to `P(correct)` per instrument
+   and estimate **target-decoy FDR** with the `tooling/score_eval` harness (does
+   fit × plausibility rank truth above the *plausible* decoys?).
+10. **Rewrite the how-it-works user docs** (`docs/user/how-it-works/matching.md` TODO) once
+    the pipeline settles.
 
 ## 7. Environment / ops notes
 
