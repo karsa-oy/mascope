@@ -20,6 +20,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   packaging smoke test (wheel installed into an isolated environment) run in
   CI on every PR. Without a `MASCOPE_VERSION` pin, a pip-installed CLI
   deploys the `latest` release images.
+- `mascope prod update`: update a deployment in one step — pulls the target
+  release images (`--version vX.Y.Z`, or `latest` without a pin), restarts
+  the stack with them, and shows container status. Database migrations run
+  automatically on startup, preceded by a pre-migration dump; a failed pull
+  aborts before the running stack is touched.
 
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.

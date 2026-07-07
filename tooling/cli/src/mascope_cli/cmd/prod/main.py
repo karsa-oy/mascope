@@ -327,6 +327,54 @@ def build() -> None:
 
 
 @prod_app.command()
+def update(
+    version: Annotated[
+        Optional[str],
+        typer.Option(
+            "--version",
+            help="Release to update to: vX.Y.Z or 'latest'. Defaults to the "
+            "MASCOPE_VERSION pin, or 'latest'.",
+        ),
+    ] = None,
+) -> None:
+    """
+    Update the production stack to a newer release.
+
+    Pulls the target release images and restarts the stack with them
+    (`docker compose pull` followed by `up --detach`), then shows container
+    status. Database migrations run automatically on startup — the db_init
+    service takes a pre-migration dump into the backups directory first.
+    Containers whose image did not change are left running, and a failed
+    pull aborts before the running stack is touched.
+
+    \b
+    Examples:
+        mascope prod update                        # follow the latest release
+        mascope prod update --version v1.2.0       # move to a specific release
+        MASCOPE_VERSION=v1.2.0 mascope prod update # same, via env pin
+    """
+    if version is not None:
+        if version != "latest" and not re.fullmatch(r"v\d+\.\d+\.\d+", version):
+            runtime.logger.error(
+                f"Invalid release '{version}' - expected vX.Y.Z or 'latest'. "
+                "For other image tags, pin via the MASCOPE_VERSION env var."
+            )
+            raise typer.Exit(1)
+        # Same effect as an env pin: _deploy_version honors it for both the
+        # pull and the restart.
+        os.environ["MASCOPE_VERSION"] = version
+        os.environ["_MASCOPE_VERSION_PINNED"] = "1"
+
+    check_data_dirs(_MODE)
+    target = _deploy_version()
+    runtime.logger.info(f"Updating the production stack to '{target}'")
+    _run_compose(["pull"])
+    _run_compose(["up", "--detach"])
+    _run_compose(["ps"])
+    runtime.logger.success(f"Production stack updated to '{target}'")
+
+
+@prod_app.command()
 def logs(
     follow: Annotated[
         bool,
