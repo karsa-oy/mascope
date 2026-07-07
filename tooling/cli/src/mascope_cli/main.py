@@ -32,21 +32,23 @@ app.add_typer(cmd.demo_app, name="demo")
 app.add_typer(cmd.prod_app, name="prod")
 app.add_typer(cmd.logs_app, name="logs")
 app.add_typer(cmd.cert_app, name="cert")
-
 # Developer commands — they operate on the monorepo source tree (run
-# services, migrations, test suites), so they are only registered when the
-# CLI runs from a checkout. A wheel install neither shows nor imports them,
-# keeping their dependencies (the `dev` extra) out of the operator install.
+# services, migrations, test suites, reference-database ingestion), so they are
+# only registered when the CLI runs from a checkout. A wheel install neither
+# shows nor imports them, keeping their dependencies (the `dev` extra) out of
+# the operator install.
 if source_checkout():
     from mascope_cli.cmd.agent import agent_app
     from mascope_cli.cmd.backend import backend_app
     from mascope_cli.cmd.dev import dev_app
+    from mascope_cli.cmd.reference import reference_app
     from mascope_cli.cmd.test import test_app
 
     app.add_typer(dev_app, name="dev")
     app.add_typer(backend_app, name="backend")
     app.add_typer(agent_app, name="agent")
     app.add_typer(test_app, name="test")
+    app.add_typer(reference_app, name="reference")
 
 
 @app.callback()

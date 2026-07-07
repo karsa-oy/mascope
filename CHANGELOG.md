@@ -7,6 +7,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
+- Public chemistry database integration, phases 0-2 (foundations through suspect-screening sources). A new `mascope_reference` library mirrors free-to-use public databases (PubChem, EPA CompTox, ChEBI, HMDB, LIPID MAPS, COCONUT, NORMAN) into `reference_source` / `reference_compound` tables, normalizing every source formula to the same canonical Hill order the de novo engine uses. Ingest a versioned snapshot with `mascope reference sync <source> <dump> --version <tag>` (see `mascope reference sources` / `status`). Composition results are additively annotated with known reference compounds sharing each formula (name, structure, cross-references, source, license), collapsed one-per-compound on InChIKey; pass `known_only: true` for a suspect-screening prior that keeps only formulas backed by a known compound. The peak-assignment table surfaces the matched identity. De novo scoring is untouched. Design: `docs/dev/public_database_integration.md`.
+
 ### Changed
 
 - SDK (`mascope-sdk` 2026.7.7): the `load_peaks` / `load_peak_timeseries`
@@ -57,7 +59,6 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   the stack with them, and shows container status. Database migrations run
   automatically on startup, preceded by a pre-migration dump; a failed pull
   aborts before the running stack is touched.
-
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
 - SDK contract tests: `MascopeClient` is exercised end-to-end against the demo

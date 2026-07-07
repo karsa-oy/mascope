@@ -14,6 +14,7 @@ dependencies = [
     "mascope_file",
     "mascope_signal",
     "mascope_match",
+    "mascope_reference",
     # external
     "colorcet~=3.1",
     "fastapi>=0.115,<1",
