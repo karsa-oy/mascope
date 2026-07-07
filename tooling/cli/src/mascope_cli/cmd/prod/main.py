@@ -26,12 +26,13 @@ import os
 import platform
 import re
 import time
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
 from mascope_cli.cmd import lib
-from mascope_cli.cmd.prod import preflight
+from mascope_cli.cmd.prod import preflight, release_manifest
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs, is_container_running
 from mascope_cli.runtime import runtime
@@ -334,6 +335,54 @@ def build() -> None:
     _run_compose(["build"], building=True)
 
 
+@prod_app.command()
+def manifest(
+    version: Annotated[
+        Optional[str],
+        typer.Option(
+            "--version",
+            help="Version to record in the manifest. Defaults to the resolved "
+            "deploy version.",
+        ),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output",
+            "-o",
+            help="Write the manifest JSON to this file instead of stdout.",
+        ),
+    ] = None,
+) -> None:
+    """
+    Generate the release manifest for this checkout.
+
+    Records the Alembic head baked into the current source tree so a deployed
+    stack can classify a pending update (`mascope prod update --check
+    --manifest ...`) without inspecting the release image. Intended to run at
+    release build time; the produced JSON is published alongside the release
+    images (e.g. as a GitHub Release asset).
+
+    \b
+    Examples:
+        mascope prod manifest
+        mascope prod manifest --version v1.3.0 --output mascope-manifest.json
+    """
+    app_version = version or _deploy_version()
+    backend_path = Path(os.environ["MASCOPE_PATH"]) / "server" / "backend"
+    try:
+        data = release_manifest.build_manifest(app_version, backend_path)
+    except release_manifest.ManifestError as e:
+        runtime.logger.error(str(e))
+        raise typer.Exit(1)
+
+    text = release_manifest.write_manifest(data, output)
+    if output is not None:
+        runtime.logger.success(f"Wrote manifest for '{app_version}' to {output}")
+    else:
+        typer.echo(text)
+
+
 def _report_plan(plan: preflight.UpdatePlan) -> None:
     """Print a human-readable summary of an update preflight classification."""
     runtime.logger.info(f"Target release:   {plan.target}")
@@ -355,14 +404,18 @@ def _report_plan(plan: preflight.UpdatePlan) -> None:
         )
 
 
-def _preflight(target: str, *, pull: bool, as_json: bool) -> None:
+def _preflight(
+    target: str, *, pull: bool, as_json: bool, manifest: Optional[Path] = None
+) -> None:
     """
     Classify the pending update to ``target`` and exit with its code.
 
     Requires the Postgres container to be running, since the applied database
-    revision is read from it. Never returns normally — it always raises
-    ``typer.Exit`` with the classification's exit code (or the error code when
-    the update cannot be classified).
+    revision is read from it. When a release ``manifest`` is given, the target
+    Alembic head (and version label) come from it rather than from inspecting
+    the image. Never returns normally — it always raises ``typer.Exit`` with the
+    classification's exit code (or the error code when the update cannot be
+    classified).
     """
     if not is_container_running(_MODE):
         runtime.logger.error(
@@ -371,6 +424,16 @@ def _preflight(target: str, *, pull: bool, as_json: bool) -> None:
             "is read from the running container)."
         )
         raise typer.Exit(preflight.ERROR_EXIT_CODE)
+
+    target_head: Optional[str] = None
+    if manifest is not None:
+        try:
+            data = release_manifest.load_manifest(manifest)
+        except release_manifest.ManifestError as e:
+            runtime.logger.error(str(e))
+            raise typer.Exit(preflight.ERROR_EXIT_CODE)
+        target = data["app_version"]
+        target_head = data["alembic_head"]
 
     db_cfg = runtime.full_config.backend.database
     backend_cfg = runtime.full_config.backend
@@ -387,6 +450,7 @@ def _preflight(target: str, *, pull: bool, as_json: bool) -> None:
             db_user=db_cfg.user,
             db_name=db_cfg.get_postgres_database_name(env_name=runtime.env.name),
             pull=pull,
+            target_head=target_head,
         )
     except preflight.PreflightError as e:
         runtime.logger.error(str(e))
@@ -430,6 +494,16 @@ def update(
         bool,
         typer.Option("--json", help="With --check, print the classification as JSON."),
     ] = False,
+    manifest: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--manifest",
+            help="With --check, read the target Alembic head from a release "
+            "manifest file instead of inspecting the image.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
 ) -> None:
     """
     Update the production stack to a newer release.
@@ -470,7 +544,7 @@ def update(
 
     if check:
         # Never returns - raises typer.Exit with the classification's code.
-        _preflight(target, pull=pull, as_json=as_json)
+        _preflight(target, pull=pull, as_json=as_json, manifest=manifest)
 
     check_data_dirs(_MODE)
     runtime.logger.info(f"Updating the production stack to '{target}'")

@@ -82,3 +82,17 @@ jobs:
             docker push "ghcr.io/${{ github.repository }}/$service:$TAG"
             echo "Pushed ghcr.io/${{ github.repository }}/$service:$TAG"
           done
+
+      - name: Publish the release manifest
+        # A small JSON recording the Alembic head this release carries, attached
+        # to the GitHub Release. A deployed stack reads it to classify a pending
+        # update (fast vs migration) without pulling and inspecting the image -
+        # see `mascope prod update --check --manifest`.
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export MASCOPE_PATH="$GITHUB_WORKSPACE"
+          uv run mascope prod manifest --version "$TAG" --output mascope-manifest.json
+          cat mascope-manifest.json
+          gh release upload "$TAG" mascope-manifest.json --clobber

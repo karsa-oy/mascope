@@ -209,14 +209,19 @@ def build_plan(
     db_user: str,
     db_name: str,
     pull: bool = True,
+    target_head: Optional[str] = None,
 ) -> UpdatePlan:
     """
     Classify the update to ``target`` without applying it.
 
     Pulls the target backend and frontend images (unless ``pull`` is False),
-    reads the Alembic head baked into the backend image and the revision the
+    determines the Alembic head the target release carries and the revision the
     live database has reached, and compares each running container's image
     against its pulled target.
+
+    The target head comes from ``target_head`` when supplied (e.g. read from a
+    release manifest), which avoids spawning a throwaway container; otherwise it
+    is read out of the backend image.
 
     :raises PreflightError: if an image pull fails or the target migration head
         cannot be read — the same conditions under which an actual update
@@ -227,7 +232,7 @@ def build_plan(
             if not pull_image(image):
                 raise PreflightError(f"Failed to pull image '{image}'")
 
-    target_revision = image_alembic_head(backend_image)
+    target_revision = target_head or image_alembic_head(backend_image)
     if target_revision is None:
         raise PreflightError(
             f"Could not read the Alembic head from image '{backend_image}'"
