@@ -1,48 +1,58 @@
-# Unattended updates (systemd)
+# Mascope systemd units
 
-These units run `mascope prod update --auto` on a schedule so a Mascope server
-keeps itself current without manual coordination.
+The systemd units that run a Mascope deployment. `tooling/ubuntu.sh install`
+templates and installs all of them (filling in the deploy user and the resolved
+`mascope` binary); you normally don't touch them by hand. For the full
+operations story see [docs/maintaining.md](../../docs/maintaining.md).
 
-What `--auto` does each run:
+| File | Installed as | Enabled by `ubuntu.sh`? | Purpose |
+|---|---|---|---|
+| `mascope.service` | `mascope.service` | yes | Bring the stack up on boot (`prod up --detach`) / down on stop. |
+| `mascope-update.service` | `mascope-update.service` | no (oneshot, run by the timer) | One unattended update pass (`prod update --auto`). |
+| `mascope-update.timer` | `mascope-update.timer` | **no - opt-in** | Fire the update service nightly. |
+| `update.env.example` | `/etc/mascope/update.env` (chmod 600) | seeded once | Update window / grace / release token. |
 
-- **Up to date** - nothing happens.
-- **Fast update** (new images, no database migration) - applied inside the
-  maintenance window (`MASCOPE_UPDATE_WINDOW`), then health-checked. On a failed
-  health check it alerts and stops; it never rolls back automatically.
-- **Migration update** (causes downtime) - recorded and reported (exit code
-  30). It is applied automatically at the next maintenance window once its
-  grace period elapses (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator
-  confirms it, and provided it has not been snoozed. On a failed health check
-  it alerts and stops (no auto-rollback).
+Both `.service` files template `@@USER@@` and `@@MASCOPE_BIN@@`; `MASCOPE_PATH`
+and `LD_PRELOAD` come from `/etc/environment`, matching how `ubuntu.sh`
+provisions the box.
 
-An operator can steer a pending migration update:
+## Enabling auto-updates
+
+Auto-updates are installed **disabled** so a fresh server stays quiet until you
+opt in. To turn them on, set a release token (the repo is private) in
+`/etc/mascope/update.env`, then enable the timer:
 
 ```sh
-mascope prod update --confirm      # apply at the next window (skip the grace wait)
-mascope prod update --snooze 7     # postpone it 7 more days
+sudoedit /etc/mascope/update.env          # set GH_TOKEN (and window/grace)
+sudo systemctl enable --now mascope-update.timer
 ```
 
-## Install
+The server must be pinned to a release tag (`vX.Y.Z`) - the channel `--auto`
+tracks.
 
-1. Edit `mascope-update.service`: set `User`, `WorkingDirectory`, `MASCOPE_PATH`,
-   the `MASCOPE_UPDATE_WINDOW`, and provide release read access (a `GH_TOKEN` or
-   `gh auth login` for the service user). The server must be pinned to release
-   tags (`vX.Y.Z`), which is the channel `--auto` tracks.
-2. Copy both units into place and enable the timer:
+## What each `--auto` run does
 
-   ```sh
-   sudo cp mascope-update.service mascope-update.timer /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now mascope-update.timer
-   ```
+- **Up to date** - nothing.
+- **Fast update** (new images, no migration) - applied inside the maintenance
+  window (`MASCOPE_UPDATE_WINDOW`), then health-checked. A failed health check
+  alerts and stops; it never rolls back automatically.
+- **Migration update** (downtime) - recorded and reported (exit 30). Applied at
+  the next window once the grace period elapses (`MASCOPE_UPDATE_GRACE_DAYS`,
+  default 7) or an operator confirms it, unless snoozed.
 
-3. Inspect activity:
+Steer a pending migration update:
 
-   ```sh
-   systemctl list-timers mascope-update.timer
-   journalctl -u mascope-update.service
-   cat "$MASCOPE_PATH/.runtime/update/status.log"   # applied / pending history
-   ```
+```sh
+mascope prod update --check        # classify the pending update, apply nothing
+mascope prod update --confirm      # apply at the next window (skip the grace wait)
+mascope prod update --snooze 7     # postpone it 7 days
+```
 
-A recorded pending migration update lives at
-`$MASCOPE_PATH/.runtime/update/state.json`.
+## Inspecting
+
+```sh
+systemctl list-timers mascope-update.timer
+journalctl -u mascope-update.service
+cat "$MASCOPE_PATH/.runtime/update/status.log"   # applied / pending history
+cat "$MASCOPE_PATH/.runtime/update/state.json"   # the current pending update
+```

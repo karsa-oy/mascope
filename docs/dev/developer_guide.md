@@ -2567,6 +2567,11 @@ Formulas may use the caret `^` to denote a labelled **custom element** with a no
 
 ## 🚚 Deploying
 
+> **Operating a live server?** The [maintainer runbook](../maintaining.md) is the
+> day-to-day reference - provisioning, the boot service, manual and unattended
+> updates, backups, and troubleshooting. This section covers the mechanics
+> underneath it.
+
 ### Ubuntu host setup
 
 Mascope expects an Ubuntu 24.04 machine to run on, although in principle it could potentially run on other Debian-based distributions with little to no modifications. To setup a Mascope host, clone the Mascope repo and run `./tooling/ubuntu.sh install`. This will install the `mascope` CLI to Ubuntu.

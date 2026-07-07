@@ -1,28 +1,22 @@
 [Unit]
 Description=Mascope unattended update check
 Documentation=https://github.com/karsa-oy/mascope
-After=docker.service
+# An update only makes sense once Docker and the stack are up.
+After=docker.service mascope.service
 Requires=docker.service
 
 [Service]
 Type=oneshot
-# Set these to the deploy user and the MASCOPE_PATH of the installation.
-User=mascope
-WorkingDirectory=/opt/mascope
-Environment=MASCOPE_PATH=/opt/mascope
-# Only apply updates during these local hours (HH-HH). Leave unset to allow
-# them at any time the timer fires.
-Environment=MASCOPE_UPDATE_WINDOW=2-5
-# Days a migration update waits before it is auto-applied at the window (unless
-# confirmed sooner, or snoozed). Default 7.
-Environment=MASCOPE_UPDATE_GRACE_DAYS=7
-# Read access to the private repository's releases is required to discover the
-# latest release and download its manifest. Provide a token here or configure
-# `gh auth login` for the service user.
-# Environment=GH_TOKEN=
-
-ExecStart=/usr/local/bin/mascope prod update --auto
+# The deploy user and mascope binary path below are filled in by
+# tooling/ubuntu.sh, matching mascope.service. MASCOPE_PATH (and LD_PRELOAD)
+# come from /etc/environment; update-specific settings and the release token
+# live in the optional /etc/mascope/update.env (see docs/maintaining.md). The
+# leading '-' means the unit still starts when that file is absent.
+User=@@USER@@
+EnvironmentFile=/etc/environment
+EnvironmentFile=-/etc/mascope/update.env
+ExecStart=@@MASCOPE_BIN@@ prod update --auto
 
 # Exit 30 means "a migration update is pending" - informational, not a failure,
-# so systemd should not mark the unit failed for it. 0 is a clean handled run.
+# so systemd must not mark the unit failed for it. 0 is a clean handled run.
 SuccessExitStatus=0 30
