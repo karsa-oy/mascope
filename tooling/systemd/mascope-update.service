@@ -10,9 +10,12 @@ Type=oneshot
 User=mascope
 WorkingDirectory=/opt/mascope
 Environment=MASCOPE_PATH=/opt/mascope
-# Only apply fast (no-migration) updates during these local hours (HH-HH).
-# Leave unset to allow them at any time the timer fires.
+# Only apply updates during these local hours (HH-HH). Leave unset to allow
+# them at any time the timer fires.
 Environment=MASCOPE_UPDATE_WINDOW=2-5
+# Days a migration update waits before it is auto-applied at the window (unless
+# confirmed sooner, or snoozed). Default 7.
+Environment=MASCOPE_UPDATE_GRACE_DAYS=7
 # Read access to the private repository's releases is required to discover the
 # latest release and download its manifest. Provide a token here or configure
 # `gh auth login` for the service user.

@@ -9,8 +9,18 @@ What `--auto` does each run:
 - **Fast update** (new images, no database migration) - applied inside the
   maintenance window (`MASCOPE_UPDATE_WINDOW`), then health-checked. On a failed
   health check it alerts and stops; it never rolls back automatically.
-- **Migration update** (causes downtime) - *not* applied. It is recorded and
-  reported (exit code 30) so an operator can schedule a maintenance window.
+- **Migration update** (causes downtime) - recorded and reported (exit code
+  30). It is applied automatically at the next maintenance window once its
+  grace period elapses (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator
+  confirms it, and provided it has not been snoozed. On a failed health check
+  it alerts and stops (no auto-rollback).
+
+An operator can steer a pending migration update:
+
+```sh
+mascope prod update --confirm      # apply at the next window (skip the grace wait)
+mascope prod update --snooze 7     # postpone it 7 more days
+```
 
 ## Install
 
