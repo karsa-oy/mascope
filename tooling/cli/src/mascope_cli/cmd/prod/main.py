@@ -33,7 +33,6 @@ from mascope_cli.cmd import lib
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs
 from mascope_cli.runtime import runtime
-from mascope_cli.version import resolve_version
 from mascope_runtime import Runtime
 
 
@@ -109,9 +108,11 @@ def _deploy_version() -> str:
     """
     if os.environ.get("_MASCOPE_VERSION_PINNED") == "1":
         return os.environ["MASCOPE_VERSION"]
-    # resolve_version falls back to the installed package version outside a
-    # checkout, so a pip-installed release CLI deploys its own version.
-    version = resolve_version(runtime)
+    # Git only, not resolve_version: the CLI's own package version is a
+    # calver (e.g. v2026.7.7) in a different series from the app's release
+    # image tags (vX.Y.Z), so it must never be used as a deploy tag. A
+    # pip-installed CLI without a pin deploys `latest`.
+    version = runtime.parse_version()
     if re.fullmatch(r"v\d+\.\d+\.\d+", version):
         return version
     return "latest"

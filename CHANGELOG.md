@@ -6,6 +6,21 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- The Mascope CLI is now a standalone PyPI package: `pip install mascope-cli`
+  on a machine with Docker, then `mascope init` (creates a runtime home with
+  editable config, compose files and generated secrets), `mascope cert gen`
+  and `mascope prod up` bring up a deployment — no source checkout needed.
+  Importing the CLI is side-effect free, `mascope --help` works before any
+  environment exists, and commands without a configured home fail with a
+  pointer to `mascope init` instead of a traceback. The standalone install
+  ships the operator surface (`init`, `prod`, `env`, `demo`, `logs`, `cert`);
+  developer commands (`dev`, `test`, `agent`, `backend`) remain available in
+  the monorepo checkout, which is unchanged. The shared runtime library is
+  published alongside as `mascope-runtime`. A hermetic CLI test suite and a
+  packaging smoke test (wheel installed into an isolated environment) run in
+  CI on every PR. Without a `MASCOPE_VERSION` pin, a pip-installed CLI
+  deploys the `latest` release images.
+
 - Frontend unit test layer (Vitest): fast, backend-free tests covering formatters, chemistry helpers, batch import validation and API utilities. Run with `npm run test:unit` or `mascope test run frontend`.
 - Hermetic end-to-end test suite (Playwright) that runs against the demo stack with API-seeded state, covering login, the app shell, and dataset / batch / target collection management. Both frontend suites now run in CI on every PR, with traces and reports uploaded on failure.
 - SDK contract tests: `MascopeClient` is exercised end-to-end against the demo

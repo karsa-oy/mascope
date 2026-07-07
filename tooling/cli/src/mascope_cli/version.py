@@ -3,9 +3,12 @@ Version resolution for the CLI.
 
 In a source checkout the version comes from git (`Runtime.parse_version`:
 release tag or branch build id). A pip-installed CLI has no checkout, so the
-installed distribution version is used instead, formatted like a release tag
-(`v1.2.0`) — which also makes `mascope prod up` deploy the images matching
-the installed CLI rather than `latest`.
+installed distribution version is used instead, formatted as `v{version}`.
+
+This is a display/reporting version only. Deploy image tags are resolved
+separately (see the prod `_deploy_version` helper): the CLI's calver is in a
+different series from the app's `vX.Y.Z` release tags and must never select
+an image.
 """
 
 from importlib import metadata

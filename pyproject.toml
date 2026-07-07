@@ -22,7 +22,8 @@ dependencies = [
 ]
 
 [project.scripts]
-mascope = "mascope_cli.main:app"
+# `mascope` is provided by the mascope_cli package itself, so a standalone
+# wheel install gets the command too.
 mascope-backend = "mascope_backend.main:exec"
 
 [dependency-groups]
