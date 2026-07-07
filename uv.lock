@@ -1507,7 +1507,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "colorcet", specifier = "~=3.1" },
     { name = "fastapi", specifier = ">=0.115,<1" },
-    { name = "fastapi-users", extras = ["oauth", "sqlalchemy"], specifier = ">=15.0.2,<16" },
+    { name = "fastapi-users", extras = ["oauth", "sqlalchemy"], specifier = ">=15.0.5,<16" },
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
     { name = "isospecpy", specifier = ">=2.2.2,<3" },
     { name = "mascope-chem", editable = "libraries/chem" },
