@@ -12,22 +12,24 @@ phased next steps.*
 
 ## 0. How this work is organized
 
-The work splits into two cleanly separable tracks, each its own branch and (when we
-decide) its own pull request:
+This work lands on the **`epic/peak-centric-assignment`** integration branch, where it is
+the science layer of the peak-centric paradigm
+([`peak_assignment_paradigm.md`](peak_assignment_paradigm.md)). Two cleanly separable
+tracks sit on top of epic:
 
-| Track | Branch | Scope | PR |
-|---|---|---|---|
-| **Fit score** (the measurement) | `feat/score-consolidation` | the v2 fit score (`score_pattern_v2`), its backend wiring, raw-fit headline, version-aware categories, SNR/satellite plumbing, golden export, and the fit-score docs | **PR #1 — self-contained, mergeable on its own** |
-| **Assignment confidence** (this doc + the layers) | `feat/assignment-confidence` | everything in §2 below: chemistry, spectral-neighbourhood, instrument/context, probabilistic integration, arbitration, level reporting | **PR #2 — stacked on PR #1** |
+| Track | Scope | Maps to |
+|---|---|---|
+| **Fit score** (the measurement) | the consolidated fit score (`score_pattern_v2`), its backend wiring, SNR/satellite plumbing, and [`fit_score.md`](../../libraries/tools/docs/fit_score.md) | the **scoring engine** for peak-centric Stage A/B; the `fit_score` column |
+| **Assignment confidence** (this doc + the layers) | §2: chemistry, spectral-neighbourhood, instrument/context, probabilistic integration, arbitration, level reporting | the **tier + arbitration layer** (paradigm-doc **Phase 3** "harvest peaky's arbitration/tiers/calibration") |
 
-`feat/assignment-confidence` is a **clean descendant** of `feat/score-consolidation`, so PR
-#2 shows only the confidence-layer diff on top of the fit score. This keeps the fit score
-shippable and reviewable in isolation: if we want to land just the measurement first, we
-can, without dragging the (larger, more exploratory) confidence work with it.
-
-**Design rule that makes this possible:** the fit score never imports from the confidence
+**Design rule that keeps them separable:** the fit score never imports from the confidence
 layers, and competitor-awareness / chemistry / context never get folded back into the
 score. The dependency points one way — confidence builds on fit, not the reverse.
+
+**Legacy coexistence.** The legacy targeted match keeps its v1 behaviour by default
+(`MASCOPE_MATCH_SCORE_VERSION=1`); the fit score is adopted *deliberately* as the
+peak-centric engine's scoring, per the epic's "coexist, don't replace" principle — it is
+not a silent flip of the legacy default.
 
 ## 1. The core premise
 
