@@ -137,7 +137,9 @@ jobs:
   cli-package:
     name: CLI packaging smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The uv tool install below resolves the full workspace (backend included),
+    # which downloads noticeably more than the wheel smoke alone.
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -167,6 +169,20 @@ jobs:
           uv run --isolated --no-project \
             --with dist/mascope_cli-*.whl --find-links dist \
             python .github/scripts/wheel_smoke.py
+
+      - name: Install as a uv tool and check the linked executables
+        run: |
+          # Mirrors the server install (tooling/ubuntu.sh): `uv tool install`
+          # links executables only from the requested package, and the
+          # `mascope` entry point lives in the mascope_cli dependency. This
+          # guards the --with-executables-from wiring, which the wheel smoke
+          # above cannot see (it installs mascope_cli directly).
+          export UV_TOOL_DIR=$(mktemp -d)
+          export UV_TOOL_BIN_DIR=$(mktemp -d)
+          uv tool install --python 3.12 . --with-executables-from mascope-cli
+          test -x "$UV_TOOL_BIN_DIR/mascope"
+          test -x "$UV_TOOL_BIN_DIR/mascope-backend"
+          "$UV_TOOL_BIN_DIR/mascope" --help > /dev/null
 
   e2e:
     name: End-to-end tests (demo stack)
