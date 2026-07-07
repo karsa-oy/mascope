@@ -27,11 +27,25 @@ from typing import Optional
 # db-init.sh greps for out of `alembic heads`.
 _REV_RE = re.compile(r"[a-f0-9]{12}")
 
-# Paths inside the backend image, kept in sync with the Dockerfile and
-# db-init.sh (the alembic tool location and the backend working directory
-# that holds alembic.ini).
-_ALEMBIC_BIN = "/opt/uv/tools/mascope/bin/alembic"
+# Backend working directory inside the image (holds alembic.ini).
 _BACKEND_WORKDIR = "/app/server/backend"
+
+# Shell run inside the target image to print the Alembic head. Two image
+# realities make this less trivial than calling `alembic heads`:
+#   1. alembic lives in the mascope uv-tool environment, whose location depends
+#      on the image's UV_TOOL_DIR: newer (non-root) images set /opt/uv/tools;
+#      older published images leave it unset and uv defaults to
+#      $HOME/.local/share/uv/tools. Resolve it at runtime, don't hardcode.
+#   2. `alembic heads` loads env.py, which imports the backend models; those
+#      read the postgres-password secret at import time (db/secrets.py). Reading
+#      heads never connects to a database, so a throwaway dummy secret in /tmp
+#      is enough to let the import succeed. It lives only in the --rm container.
+_ALEMBIC_HEADS_CMD = (
+    "echo dummy > /tmp/mascope_pw && "
+    "export POSTGRES_PASSWORD_FILE=/tmp/mascope_pw && "
+    'TOOLS="${UV_TOOL_DIR:-$HOME/.local/share/uv/tools}" && '
+    f'cd {_BACKEND_WORKDIR} && "$TOOLS/mascope/bin/alembic" heads'
+)
 
 # Classification -> process exit code. Distinct non-zero codes let a shell
 # updater branch on the outcome (`mascope prod update --check; case $? in ...`)
@@ -105,8 +119,8 @@ def image_alembic_head(image: str) -> Optional[str]:
     Read the Alembic head revision baked into a backend image.
 
     Runs `alembic heads` in a throwaway container (entrypoint overridden, no
-    DB connection required) exactly as db-init.sh does, and returns the first
-    12-char revision id, or None if it could not be determined.
+    DB connection required), the same way db-init.sh reads it, and returns the
+    first 12-char revision id, or None if it could not be determined.
     """
     result = _run(
         [
@@ -117,7 +131,7 @@ def image_alembic_head(image: str) -> Optional[str]:
             "sh",
             image,
             "-c",
-            f"cd {_BACKEND_WORKDIR} && {_ALEMBIC_BIN} heads",
+            _ALEMBIC_HEADS_CMD,
         ]
     )
     if result.returncode != 0:

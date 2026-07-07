@@ -93,6 +93,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export MASCOPE_PATH="$GITHUB_WORKSPACE"
+          # Reading the Alembic head imports the backend models, which read the
+          # postgres-password secret at import time (server/backend .../db/secrets.py).
+          # Manifest generation never connects to a database, so a throwaway dummy
+          # secret is enough to satisfy the import.
+          export POSTGRES_PASSWORD_FILE="$RUNNER_TEMP/mascope_pw"
+          echo dummy > "$POSTGRES_PASSWORD_FILE"
           uv run mascope prod manifest --version "$TAG" --output mascope-manifest.json
           cat mascope-manifest.json
           gh release upload "$TAG" mascope-manifest.json --clobber
