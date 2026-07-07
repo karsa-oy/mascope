@@ -4,6 +4,7 @@ This module provides the main client class for interacting with the Mascope API.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -374,9 +375,9 @@ class MascopeClient:
     def load_peaks(
         self,
         dataset: str,
-        batches: str | None = None,
+        batches: "str | re.Pattern | None" = None,
         *,
-        samples: str | None = None,
+        samples: "str | re.Pattern | None" = None,
         exact: bool = False,
         matches: bool = True,
         areas: bool = True,
@@ -397,17 +398,20 @@ class MascopeClient:
 
         :param dataset: Dataset name, substring, or regex pattern (or ID).
         :type dataset: str
-        :param batches: Optional case-insensitive filter on batch names. By
-                        default this is a literal substring and may select
-                        several batches at once (e.g. ``"blank"`` matches every
-                        batch whose name contains "blank"). If not provided, all
-                        batches in the dataset are loaded.
-        :type batches: str, optional
-        :param samples: Optional case-insensitive substring filter on sample names.
-        :type samples: str, optional
-        :param exact: Match ``batches`` / ``samples`` against the whole name
-                      instead of as a substring. Use this to select a single
-                      named batch. Defaults to False.
+        :param batches: Optional case-insensitive filter on batch names. A string
+                        is a literal substring and may select several batches at
+                        once (e.g. ``"blank"`` matches every batch whose name
+                        contains "blank"); pass a compiled ``re.Pattern`` to match
+                        by regex. If not provided, all batches in the dataset are
+                        loaded.
+        :type batches: str | re.Pattern, optional
+        :param samples: Optional case-insensitive filter on sample names, same
+                        semantics as ``batches``.
+        :type samples: str | re.Pattern, optional
+        :param exact: Match a string ``batches`` / ``samples`` against the whole
+                      name instead of as a substring. Use this to select a single
+                      named batch. Not valid with a compiled pattern. Defaults to
+                      False.
         :type exact: bool
         :param matches: Include matched compounds/ions/isotopes. Defaults to True.
         :type matches: bool
@@ -485,9 +489,9 @@ class MascopeClient:
     def load_peak_timeseries(
         self,
         dataset: str,
-        batches: str | None = None,
+        batches: "str | re.Pattern | None" = None,
         *,
-        samples: str | None = None,
+        samples: "str | re.Pattern | None" = None,
         exact: bool = False,
         compound: str | list[str] | None = None,
         ion: str | list[str] | None = None,
@@ -511,12 +515,16 @@ class MascopeClient:
 
         :param dataset: Dataset name, substring, or regex pattern (or ID).
         :type dataset: str
-        :param batches: Optional case-insensitive substring filter on batch names.
-        :type batches: str, optional
-        :param samples: Optional case-insensitive substring filter on sample names.
-        :type samples: str, optional
-        :param exact: Match ``batches`` / ``samples`` against the whole name
-                      instead of as a substring. Defaults to False.
+        :param batches: Optional case-insensitive filter on batch names. A string
+                        is a literal substring; pass a compiled ``re.Pattern`` for
+                        regex.
+        :type batches: str | re.Pattern, optional
+        :param samples: Optional case-insensitive filter on sample names, same
+                        semantics as ``batches``.
+        :type samples: str | re.Pattern, optional
+        :param exact: Match a string ``batches`` / ``samples`` against the whole
+                      name instead of as a substring. Not valid with a compiled
+                      pattern. Defaults to False.
         :type exact: bool
         :param compound: Target compound name(s) or formula(s).
         :type compound: str | list[str], optional

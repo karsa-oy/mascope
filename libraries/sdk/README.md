@@ -200,14 +200,21 @@ Load averaged peaks ("sum spectrum") for all samples across one or more batches,
 
 The `batches` / `samples` filters are case-insensitive literal substrings, so
 one filter can select several batches at once. Pass `exact=True` to match a
-single batch by its full name instead.
+single batch by its full name, or a compiled `re.Pattern` for a regex.
 
 ```python
+import re
+
 # All peaks from every batch whose name contains "Uronium"
 peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 
 # Exactly one batch, by full name
 peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium 2026-01", exact=True)
+
+# Regex: batches from 2025 or 2026
+peaks = mascope.load_peaks(
+    dataset="My Dataset", batches=re.compile("2025|2026", re.IGNORECASE)
+)
 
 # Filter by sample name
 peaks = mascope.load_peaks(dataset="My Dataset", samples="blank")
