@@ -77,19 +77,21 @@ const tabs = computed(() => [
     `
   },
   {
-    label: 'Match',
+    label: 'Fit',
+    // Internal tab value stays 'match' so existing app.ui.tab.active === 'match'
+    // callers and the TabPanel value keep working; only the label is renamed.
+    value: 'match',
     icon: 'pi pi-verified',
     disabled: !app.data.match.visualized.ion,
     help: `
-      <h1>Match View</h1>
+      <h1>Fit View</h1>
       <p>
-        Visualize the currently selected ion match for the selected sample.
-        Displays the spectrum for each matched isotope as well as the timeseries
-        of matched peaks.
+        Visual verification that a peak's signal fit is good: the spectrum for
+        each matched isotope and the timeseries of the matched peaks.
       </p>
       <p>
-        Shows match metrics (intensity, m/z error, isotope abundance error) while hovering over the chart.
-        You may tweak matching parameters in the settings panel (top-left) to fine-tune matching.
+        Shows fit metrics (intensity, m/z error, isotope abundance error) while hovering over the chart.
+        You may tweak matching parameters in the settings panel (top-left) to fine-tune the fit.
       </p>
     `
   }
@@ -140,8 +142,8 @@ const tabs = computed(() => [
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
-                v-for="{ icon, label, disabled, help } in tabs"
-                :value="label.toLowerCase()"
+                v-for="{ icon, label, value, disabled, help } in tabs"
+                :value="value ?? label.toLowerCase()"
                 :key="label"
                 :disabled="disabled"
                 :pt="app.ui.help.bottom(help)"
