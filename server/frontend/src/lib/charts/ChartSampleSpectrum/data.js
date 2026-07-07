@@ -5,6 +5,59 @@ import { useApp } from '@/stores'
 import { api } from '@/api'
 import { usePreview } from '@/lib/panes'
 
+// Peak coloring by confidence tier for the annotated spectrum. One Plotly trace
+// per tier; role reagent/artifact is grouped separately (orthogonal to tier).
+const TIER_TRACES = [
+  { key: 'identified', name: 'Identified', color: '#1f9d63' },
+  { key: 'candidate', name: 'Candidate', color: '#d99a2b' },
+  { key: 'below_assignability', name: 'Below assignability', color: '#8a94a6' },
+  { key: 'reagent', name: 'Reagent / artifact', color: '#8a5ed0' },
+  { key: 'unassigned', name: 'Unassigned', color: 'grey' }
+]
+
+// Which tier bucket a peak falls in, given the run's assignments.
+function bucketOf(assignments, peak) {
+  const assignment = assignments.forPeak(peak.peak_id)
+  if (!assignment) return 'unassigned'
+  if (assignment.role === 'reagent' || assignment.role === 'artifact') return 'reagent'
+  const tier = assignment.tier
+  return tier === 'identified' || tier === 'candidate' || tier === 'below_assignability'
+    ? tier
+    : 'unassigned'
+}
+
+// Build a vertical-stick Plotly trace for a set of peaks. Three points per peak
+// (0 -> height -> gap) so the hover tooltip triggers along the whole marker.
+// customdata carries [height, area, mz, formula]; [height, area] also lets
+// ChartSampleSpectrum rescale for "average" instead of "sum".
+function peakTrace(name, color, peaks, assignments = null) {
+  return {
+    name,
+    type: 'scatter',
+    mode: 'lines',
+    line: { color },
+    x: peaks.map(({ mz }) => [mz, mz, null]).flat(),
+    y: peaks.map(({ height }) => [0, height, null]).flat(),
+    customdata: peaks
+      .map((peak) => {
+        const formula = assignments?.forPeak(peak.peak_id)?.assigned_formula ?? ''
+        const point = [peak.height, peak.area, peak.mz, formula]
+        return [point, point, null]
+      })
+      .flat(),
+    hovertemplate:
+      [
+        `<i>${name}</i>`,
+        'mz: <b>%{customdata[2]:.4f}</b>',
+        assignments ? 'formula: <b>%{customdata[3]}</b>' : null,
+        'height: <b>%{customdata[0]:.3e}</b>',
+        'area: <b>%{customdata[1]:.3e}</b>'
+      ]
+        .filter(Boolean)
+        .join('<br>') + '<extra></extra>'
+  }
+}
+
 export const useChartData = defineStore('chart.sample.spectrum', () => {
   const spectrumData = shallowRef(null)
   const length = ref()
@@ -71,37 +124,19 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
           '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
       })
     }
-    // add peak traces
+    // add peak traces, colored by assignment tier
     if (!app.data.peak.pending && app.data.peak.list.length > 0) {
-      traces.push({
-        name: 'Peak',
-        type: 'scatter' + gl,
-        mode: 'lines',
-        line: {
-          color: 'grey'
-        },
-        x: app.data.peak.list.map(({ mz }) => [mz, mz, null]).flat(), // *
-        y: app.data.peak.list.map(({ height }) => [0, height, null]).flat(), // *
-        customdata: app.data.peak.list
-          .map(({ height, area, mz }) => [[height, area, mz], [height, area, mz], null])
-          .flat(), // **
-        hovertemplate:
-          [
-            '<i>Peak</i>',
-            'mz: <b>%{customdata[2]:.4f}</b>',
-            'height: <b>%{customdata[0]:.3e}</b>',
-            'area: <b>%{customdata[1]:.3e}</b>'
-          ].join('<br>') + '<extra></extra>' // use "<extra></extra>" to get rid of extra block from the hoverbox
-        // * Plotly's hover tooltip only appears
-        // when hovering near a point, so we
-        // generate 3 points to make it easy
-        // for the user to trigger the tooltop
-        // along the whole marker line.
-
-        // ** Add [height, area] into "customdata" to enable
-        // access in ChartSampleSpectrum when scaling for
-        // "average" instead of "sum".
-      })
+      const assignments = app.data.peakAssignment.peak
+      if (!assignments.run) {
+        // No assignment run: keep the original single grey peak trace.
+        traces.push(peakTrace('Peak', 'grey', app.data.peak.list))
+      } else {
+        // Annotated spectrum: one trace per confidence tier.
+        for (const { key, name, color } of TIER_TRACES) {
+          const peaks = app.data.peak.list.filter((peak) => bucketOf(assignments, peak) === key)
+          if (peaks.length > 0) traces.push(peakTrace(name, color, peaks, assignments))
+        }
+      }
     }
     return traces
   })
