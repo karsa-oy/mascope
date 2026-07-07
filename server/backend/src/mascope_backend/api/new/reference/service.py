@@ -38,9 +38,7 @@ async def annotate_formulas(
     return {
         formula: [
             _to_dict(record)
-            for record in (
-                collapse_by_inchikey(records) if collapse else records
-            )
+            for record in (collapse_by_inchikey(records) if collapse else records)
         ]
         for formula, records in annotated.items()
     }
