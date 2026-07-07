@@ -22,6 +22,7 @@ from mascope_backend.api.new.peak_assignments.engine import (
     TIER_UNASSIGNED,
     build_unassigned_assignments,
     invert_matches_to_peak_assignments,
+    score_ions_by_fit,
     tier_for_score,
     untargeted_matches_to_peak_assignments,
 )
@@ -295,6 +296,75 @@ class TestInvertMatches:
         assert len(assignments[0]["alternatives"]) == 2
 
 
+class TestScoreIonsByFit:
+    """Stage A deliberately scores with the ion-level fit score (score_pattern_v2)
+    instead of the targeted matcher's per-isotopologue term."""
+
+    @staticmethod
+    def _iso(
+        ion: str,
+        rel: float,
+        mz_err: float | None,
+        intensity: float,
+        score: float,
+        snr: float | None = None,
+        peak_id: str = "p",
+    ) -> dict:
+        return {
+            "target_ion_id": ion,
+            "relative_abundance": rel,
+            "match_mz_error": mz_err,
+            "sample_peak_intensity": intensity,
+            "match_score": score,
+            "signal_to_noise": snr,
+            "sample_peak_id": peak_id,
+        }
+
+    def test_noop_when_required_columns_missing(self):
+        df = pd.DataFrame({"target_ion_id": ["a"], "match_score": [0.5]})
+        out = score_ions_by_fit(df)
+        assert out["match_score"].tolist() == [0.5]
+
+    def test_empty_frame_returned_unchanged(self):
+        assert score_ions_by_fit(pd.DataFrame()).empty
+
+    def test_every_isotopologue_of_an_ion_shares_its_fit_score(self):
+        df = pd.DataFrame(
+            [
+                self._iso("ion1", 1.0, 0.5, 1000.0, 0.9, snr=50.0, peak_id="a"),
+                self._iso("ion1", 0.5, 0.5, 500.0, 0.85, snr=30.0, peak_id="b"),
+            ]
+        )
+        out = score_ions_by_fit(df)
+        scores = out["match_score"].tolist()
+        assert scores[0] == pytest.approx(scores[1])
+        assert 0.0 < scores[0] <= 1.0
+
+    def test_gated_out_monoisotopic_scores_zero(self):
+        # apply_match_params zeroes an out-of-tolerance isotopologue's match_score;
+        # the fit score must then treat it as absent (M0 absent -> fit 0).
+        df = pd.DataFrame(
+            [self._iso("ion1", 1.0, 0.5, 1000.0, 0.0, snr=50.0, peak_id="a")]
+        )
+        out = score_ions_by_fit(df)
+        assert out["match_score"].tolist() == [0.0]
+
+    def test_corroborated_envelope_beats_missing_detectable_sibling(self):
+        df = pd.DataFrame(
+            [
+                # full: M0 + a matched M+1
+                self._iso("full", 1.0, 0.5, 1000.0, 0.9, snr=50.0, peak_id="a"),
+                self._iso("full", 0.5, 0.5, 500.0, 0.85, snr=30.0, peak_id="b"),
+                # miss: M0 matched, its predicted M+1 detectable but absent
+                self._iso("miss", 1.0, 0.5, 1000.0, 0.9, snr=50.0, peak_id="c"),
+                self._iso("miss", 0.5, None, float("nan"), 0.0, snr=None, peak_id=""),
+            ]
+        )
+        out = score_ions_by_fit(df)
+        fit = out.groupby("target_ion_id")["match_score"].first()
+        assert fit["full"] > fit["miss"]
+
+
 class TestUntargetedMatches:
     def _matches_df(self) -> pd.DataFrame:
         return pd.DataFrame(
@@ -369,6 +439,38 @@ class TestUntargetedMatches:
             "C6H14N",
         ]
         assert m0["provenance"]["neutral_mass"] == pytest.approx(102.068)
+
+    def test_isotopic_pattern_fit_score_is_used_when_present(self):
+        # When assign_compositions scored the whole envelope, Stage B uses that
+        # fit score, not the crude single-peak abundance*mz term.
+        matches_df = pd.DataFrame(
+            [
+                {
+                    "mz": 100.1,
+                    "formula": "C5H10O2",
+                    "ion": "C5H11O2+",
+                    "isotope_label": "M0",
+                    "ionization_mechanism": "+H+",
+                    "mz_error_ppm": 2.0,
+                    "intensity_error": 0.1,
+                    "isotopic_pattern_score": 0.42,
+                    "other_candidates": "",
+                }
+            ]
+        )
+        assignments = untargeted_matches_to_peak_assignments(
+            matches_df,
+            {100.1: ("pA", 5000.0)},
+            "sample1",
+            "run1",
+            POSSIBLE,
+            PROBABLE,
+            mechanism_id_by_notation={"+H+": "mech1"},
+        )
+        assert len(assignments) == 1
+        # uses the envelope fit (0.42), not the inline 0.9 * 0.98
+        assert assignments[0]["match_score"] == pytest.approx(0.42)
+        assert assignments[0]["tier"] == TIER_BELOW_ASSIGNABILITY
 
     def test_isotope_child_is_attributed_to_its_formula_group_m0(self):
         assignments = untargeted_matches_to_peak_assignments(

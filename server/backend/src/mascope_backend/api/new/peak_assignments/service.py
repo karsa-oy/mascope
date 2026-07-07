@@ -49,6 +49,7 @@ from mascope_backend.api.new.peak_assignments.config import (
 from mascope_backend.api.new.peak_assignments.engine import (
     build_unassigned_assignments,
     invert_matches_to_peak_assignments,
+    score_ions_by_fit,
     untargeted_matches_to_peak_assignments,
 )
 from mascope_backend.db import (
@@ -476,6 +477,11 @@ async def assign_sample_peaks(
             # tiered "identified" here while the Match tab reports no match.
             if not match_isotope_df.empty:
                 match_isotope_df = apply_match_params(match_isotope_df, match_params)
+                # Deliberately score Stage A with the fit score (score_pattern_v2):
+                # the peak-centric engine's scoring engine is the ion-level fit
+                # quality, not the targeted matcher's per-isotopologue term. Runs
+                # after gating so tolerance/intensity cuts carry into the fit.
+                match_isotope_df = score_ions_by_fit(match_isotope_df)
             stage_a_assignments = invert_matches_to_peak_assignments(
                 match_isotope_df,
                 sample_item_id=sample_item_id,
