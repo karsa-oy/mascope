@@ -27,7 +27,7 @@ dependencies = [
     "ruptures>=1.1.10",
     "polars>=1.31.0",
     "pyarrow>=21.0.0",
-    "pyteomics>=4.7.5",
+    "pyteomics>=5.0",
     "tqdm>=4.67.1",
 ]
 
