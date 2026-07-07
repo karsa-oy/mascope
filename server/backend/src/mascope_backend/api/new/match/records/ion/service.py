@@ -34,6 +34,141 @@ from mascope_backend.db import (
 
 
 @api_controller()
+async def get_match_ion_series(
+    sample_item_ids: list[str] | None = None,
+    sample_batch_id: str | None = None,
+    target_collection_id: str | None = None,
+    target_ion_ids: list[str] | None = None,
+) -> dict:
+    """
+    Retrieves per-sample match ion data in a compact columnar form.
+
+    Returns one record per requested target ion carrying the ion metadata once,
+    plus a `match_series` object of parallel arrays (`sample_item_ids`,
+    `sample_peak_intensity_sums`, `match_categories`) holding the per-sample
+    match values. Compared to the row-per-(ion, sample) shape of
+    `get_match_ion_records`, this avoids repeating the ion metadata for every
+    sample, which keeps chart-data responses for large batches small.
+
+    Samples are scoped either by an explicit sample item ID list or by a
+    sample batch ID (resolved via a join, so no per-sample bound parameters).
+    Ions are scoped by explicit target ion IDs or by a target collection.
+
+    :param sample_item_ids: Sample item IDs to include, defaults to None
+    :type sample_item_ids: list[str] | None
+    :param sample_batch_id: Sample batch whose samples to include, defaults to None
+    :type sample_batch_id: str | None
+    :param target_collection_id: Target collection scoping the ions, defaults to None
+    :type target_collection_id: str | None
+    :param target_ion_ids: Explicit target ion filter, defaults to None
+    :type target_ion_ids: list[str] | None
+    :return: Dictionary containing status, message, results count, and series data
+    :rtype: dict
+    """
+    if sample_batch_id:
+        sample_batch = await fetch_sample_batch(sample_batch_id)
+        entity_name = sample_batch.sample_batch_name
+        entity_type = "batch"
+    else:
+        entity_name = f"{len(sample_item_ids)} samples"
+        entity_type = "samples"
+
+    async with async_session() as session:
+        # --- Ion scope ---
+        ion_query = (
+            select(TargetIon, TargetCompound, IonizationMechanism)
+            .select_from(TargetIon)
+            .join(
+                IonizationMechanism,
+                IonizationMechanism.ionization_mechanism_id
+                == TargetIon.ionization_mechanism_id,
+            )
+            .join(
+                TargetCompound,
+                TargetCompound.target_compound_id == TargetIon.target_compound_id,
+            )
+        )
+        if target_ion_ids:
+            ion_query = ion_query.where(TargetIon.target_ion_id.in_(target_ion_ids))
+        else:
+            ion_query = ion_query.join(
+                TargetCompoundInTargetCollection,
+                TargetCompoundInTargetCollection.target_compound_id
+                == TargetIon.target_compound_id,
+            ).where(
+                TargetCompoundInTargetCollection.target_collection_id
+                == target_collection_id
+            )
+
+        ion_rows = (await session.execute(ion_query)).all()
+        requested_ion_ids = [row.TargetIon.target_ion_id for row in ion_rows]
+
+        # --- Match values, one slim row per (ion, sample) ---
+        match_query = select(
+            MatchIon.target_ion_id,
+            MatchIon.sample_item_id,
+            MatchIon.sample_peak_intensity_sum,
+            MatchIon.match_category,
+        ).where(MatchIon.target_ion_id.in_(requested_ion_ids))
+        if sample_batch_id:
+            match_query = match_query.join(
+                SampleItem,
+                SampleItem.sample_item_id == MatchIon.sample_item_id,
+            ).where(SampleItem.sample_batch_id == sample_batch_id)
+        else:
+            match_query = match_query.where(
+                MatchIon.sample_item_id.in_(sample_item_ids)
+            )
+
+        match_rows = (await session.execute(match_query)).all()
+
+        # --- Group match values into parallel arrays per ion ---
+        series_by_ion: dict[str, dict[str, list]] = {}
+        for target_ion_id, sample_item_id, intensity_sum, category in match_rows:
+            series = series_by_ion.setdefault(
+                target_ion_id,
+                {
+                    "sample_item_ids": [],
+                    "sample_peak_intensity_sums": [],
+                    "match_categories": [],
+                },
+            )
+            series["sample_item_ids"].append(sample_item_id)
+            series["sample_peak_intensity_sums"].append(intensity_sum)
+            series["match_categories"].append(category)
+
+        data = [
+            {
+                "target_compound_id": row.TargetCompound.target_compound_id,
+                "target_compound_name": row.TargetCompound.target_compound_name,
+                "target_compound_formula": row.TargetCompound.target_compound_formula,
+                "target_ion_id": row.TargetIon.target_ion_id,
+                "target_ion_formula": row.TargetIon.target_ion_formula,
+                "ionization_mechanism_id": row.TargetIon.ionization_mechanism_id,
+                "ionization_mechanism": row.IonizationMechanism.ionization_mechanism,
+                "match_series": series_by_ion.get(
+                    row.TargetIon.target_ion_id,
+                    {
+                        "sample_item_ids": [],
+                        "sample_peak_intensity_sums": [],
+                        "match_categories": [],
+                    },
+                ),
+            }
+            for row in ion_rows
+        ]
+
+    return {
+        "status": "success",
+        "message": (
+            f"Successfully retrieved match ion series for {entity_type} '{entity_name}'"
+        ),
+        "results": len(data),
+        "data": data,
+    }
+
+
+@api_controller()
 async def get_match_ion_records(
     sample_item_ids: list[str] | None = None,
     sample_batch_id: str | None = None,

@@ -84,6 +84,25 @@ class MatchIonRecordsBody(RequestBodyModel):
         return self
 
 
+class MatchIonSeriesBody(MatchIonRecordsBody):
+    """Request body for the columnar match ion series endpoint"""
+
+    @model_validator(mode="after")
+    def validate_ion_scope(self):
+        """Validate that an ion scope is provided.
+
+        Without one the response would cover every target ion in the
+        database; the series endpoint always serves a bounded chart request.
+        """
+        if not self.target_collection_id and not self.target_ion_ids:
+            raise ValueError(
+                "Please specify target_ion_ids or a target_collection_id "
+                "to retrieve match ion series."
+            )
+
+        return self
+
+
 class MatchIsotopeRecordsQueryParams(MatchRecordsQueryParams):
     """Query parameters for match isotope records endpoint"""
 
