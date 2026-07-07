@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mascope_runtime",
     "mascope_file",
-    "numpy~=1.26",
+    "numpy~=2.5",
     "opentfraw~=1.2",
     "pythonnet~=3.0",
     "xarray>=2025.06.1",
