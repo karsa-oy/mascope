@@ -20,7 +20,7 @@
 #   This script should NOT be run manually. It is automatically executed
 #   by the db_init service in docker-compose.yaml during container startup.
 #   The script uses pre-installed tools from the Docker image at:
-#   /root/.local/share/uv/tools/mascope/bin/
+#   /opt/uv/tools/mascope/bin/
 
 set -euo pipefail
 
@@ -124,13 +124,13 @@ fi
 log_info "Checking migrations..."
 
 # Use the pre-installed alembic from uv tool environment (installed during docker build)
-ALEMBIC_BIN="/root/.local/share/uv/tools/mascope/bin/alembic"
+ALEMBIC_BIN="/opt/uv/tools/mascope/bin/alembic"
 
 # Verify alembic binary exists
 if [[ ! -x "$ALEMBIC_BIN" ]]; then
     log_error "alembic not found at $ALEMBIC_BIN"
     log_error "Available tools:"
-    ls -la /root/.local/share/uv/tools/mascope/bin/ || true
+    ls -la /opt/uv/tools/mascope/bin/ || true
     exit 1
 fi
 
@@ -187,7 +187,8 @@ else
 
     # --------- Pre-migration backup ---------
     # Only taken when actual migrations are pending on a non-empty database.
-    # pg_dump runs inside this init container as root
+    # The image runs as a non-root user matching the deploy user's UID, so the
+    # dump lands on the host owned by that user - no chown needed.
     BACKUP_DIR="/backups"
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     BACKUP_FILE="${BACKUP_DIR}/${MASCOPE_DB_NAME}_${TIMESTAMP}_pre-migration.dump"
@@ -220,12 +221,6 @@ else
         "$MASCOPE_DB_NAME" 2>&1; then
  
         log_info "Pre-migration backup created: $(basename "$BACKUP_FILE")"
- 
-        # Init container runs as root; chown to the owner of the /backups mount
-        # so the host user (and CLI) can manage the file without sudo.
-        MOUNT_OWNER=$(stat -c '%u:%g' "$BACKUP_DIR")
-        chown "$MOUNT_OWNER" "$BACKUP_FILE"
-        log_info "Chowned backup to ${MOUNT_OWNER}"
     else
         log_error "Pre-migration backup failed — aborting to protect data"
         rm -f "$BACKUP_FILE"
