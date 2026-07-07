@@ -171,7 +171,12 @@ function install_mascope() {
     # from git at runtime), so uv's cache cannot tell releases apart and would
     # otherwise reuse a stale wheel - silently shipping old CLI code after an
     # update to a new release.
-    CFLAGS="-std=c17" uv tool install --force --reinstall --python 3.12 .
+    # --with-executables-from: `uv tool install` only links executables
+    # declared by the requested package itself, and the `mascope` entry point
+    # lives in the mascope_cli workspace member (so the standalone PyPI wheel
+    # provides it too) - without this flag only mascope-backend gets a shim.
+    CFLAGS="-std=c17" uv tool install --force --reinstall --python 3.12 . \
+        --with-executables-from mascope-cli
     uv tool update-shell
 
     write_section "ENABLING SYSTEMD SERVICE"
