@@ -81,7 +81,10 @@ const tabs = computed(() => [
     `
   },
   {
-    label: 'Match',
+    label: 'Fit',
+    // Internal tab value stays 'match' so existing app.ui.tab.active === 'match'
+    // callers and the TabPanel value keep working; only the label is renamed.
+    value: 'match',
     icon: 'pi pi-verified',
     disabled: !app.data.match.visualized.ion,
     // Card body comes from the shared docs snippet (docs/user/_help/matching.md)
@@ -138,8 +141,8 @@ const tabs = computed(() => [
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
-                v-for="{ icon, label, disabled, help, doc, helpKey, title } in tabs"
-                :value="label.toLowerCase()"
+                v-for="{ icon, label, value, disabled, help, doc, helpKey, title } in tabs"
+                :value="value ?? label.toLowerCase()"
                 :key="label"
                 :disabled="disabled"
                 :pt="app.ui.help.bottom(help ?? { helpKey, title }, doc ? { doc } : undefined)"
