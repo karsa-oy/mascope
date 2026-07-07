@@ -65,11 +65,16 @@ export const useSelection = (name, key, records, options = {}) => {
   // methods
   const select = multiselect
     ? (...args) => {
-        args.forEach((arg) => {
-          if (!isSelected(arg)) {
-            selected.value.push(records().find((record) => record[key] === arg[key]))
-          }
-        })
+        // Assign a fresh array rather than pushing in place: the selection is
+        // held in a shallowRef, so an in-place mutation would not trigger the
+        // watchers (logging, persistence, subscriptions) that observe it.
+        const additions = args
+          .filter((arg) => !isSelected(arg))
+          .map((arg) => records().find((record) => record[key] === arg[key]))
+          .filter((record) => !!record)
+        if (additions.length > 0) {
+          selected.value = [...selected.value, ...additions]
+        }
       }
     : // singleselect
       (arg) => {
@@ -198,61 +203,86 @@ export const useSelection = (name, key, records, options = {}) => {
   }
 
   // persistence
+  //
+  // A persistent selection is written to localStorage as a JSON array of ids
+  // (one element for single-select, N for multi-select) and restored once the
+  // store's records have loaded. Restoration validates each id against the
+  // freshly loaded records: unknown ids are dropped, and the whole entry is
+  // discarded only when records exist yet none of the stored ids survive. An
+  // empty record set means deps are not met yet, so the entry is kept and
+  // retried on the next load.
 
   const stateLoaded = ref(false)
   const storageKey = `module[${name}]`
+
   const restoreState = () => {
-    if (!stateLoaded.value && persist) {
-      const state = localStorage.getItem(storageKey)
+    if (stateLoaded.value || !persist) return false
 
-      // Check for null, empty string, and 'undefined' string
-      if (!state || state === 'undefined' || state === 'null') {
-        logger.debug('state not found or invalid in storage', { data: { storageKey, state } })
-        return false
-      }
-
-      // Verify the restored ID exists in current records
-      const exists = records().some((record) => record[key] === state)
-      if (!exists) {
-        // Only clean up if there are records to compare against.
-        // If records are empty (e.g. deps not yet met), keep the entry
-        // so it can be restored once data arrives.
-        if (records().length > 0) {
-          logger.debug('stored state no longer valid', { data: { storageKey, state } })
-          localStorage.removeItem(storageKey)
-        }
-        return false
-      }
-
-      logger.debug('loading focus from storage', { data: { state, storageKey } })
-      focus({ [key]: state })
-      stateLoaded.value = true
-      return true
-    } else {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw || raw === 'undefined' || raw === 'null') {
+      logger.debug('state not found or invalid in storage', { data: { storageKey, raw } })
       return false
     }
-  }
-  const persistState = (record) => {
-    if (record && record[key] != null) {
-      logger.debug(`saving focus to storage`, {
-        icon: '💾',
-        data: { record, storageKey }
-      })
-      localStorage.setItem(storageKey, record[key])
+
+    // Decode stored ids. The current format is a JSON array; tolerate a bare
+    // id string written by earlier single-select-only persistence.
+    let ids
+    try {
+      const parsed = JSON.parse(raw)
+      ids = Array.isArray(parsed) ? parsed : [parsed]
+    } catch {
+      ids = [raw]
+    }
+    ids = ids.filter((id) => id != null)
+    if (ids.length === 0) return false
+
+    // Records not loaded yet (deps unmet): keep the entry and retry later.
+    if (records().length === 0) return false
+
+    // Restore only ids that still exist; drop the entry if none survive.
+    const restorable = ids.filter((id) => records().some((record) => record[key] === id))
+    if (restorable.length === 0) {
+      logger.debug('stored state no longer valid', { data: { storageKey, ids } })
+      localStorage.removeItem(storageKey)
+      return false
+    }
+
+    logger.debug('loading selection from storage', { data: { ids: restorable, storageKey } })
+    if (multiselect) {
+      selected.value = records().filter((record) => restorable.includes(record[key]))
     } else {
-      logger.debug(`clearing focus from storage`, {
-        icon: '💾',
-        data: { storageKey }
-      })
+      focus({ [key]: restorable[0] })
+    }
+    stateLoaded.value = true
+    return true
+  }
+
+  const persistState = () => {
+    const ids = selectedIds.value
+    if (ids.length > 0) {
+      logger.debug(`saving selection to storage`, { icon: '💾', data: { ids, storageKey } })
+      localStorage.setItem(storageKey, JSON.stringify(ids))
+    } else {
+      logger.debug(`clearing selection from storage`, { icon: '💾', data: { storageKey } })
       localStorage.removeItem(storageKey)
     }
   }
+
   const resetPersist = () => {
     stateLoaded.value = false
     localStorage.removeItem(storageKey)
   }
+
   if (persist) {
-    watch(focused, persistState)
+    // Watch a primitive serialization of the ids, not the `selected` array
+    // reference. Refocus after a deps-unmet sync reassigns the selection to a
+    // fresh empty array; watching the reference would fire persistState on that
+    // empty -> empty churn and wipe the stored id before restoreState can read
+    // it back. Serializing means only real content changes persist.
+    watch(
+      () => selectedIds.value.join(','),
+      () => persistState()
+    )
   }
 
   // focus automation

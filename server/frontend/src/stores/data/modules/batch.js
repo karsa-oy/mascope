@@ -24,7 +24,8 @@ export const useBatch = defineStore('app.data.batch', () => {
         dataset_id: useDataset().focusedId
       }),
       selection: {
-        subscribe: true
+        subscribe: true,
+        persist: true
       },
       read: (sample_batch_id) =>
         api.http.get(`/sample/batches/${sample_batch_id}`, {

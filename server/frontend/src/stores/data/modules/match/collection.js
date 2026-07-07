@@ -31,6 +31,7 @@ export const useMatchCollection = defineStore('app.data.match.collection', () =>
       },
       selection: {
         subscribe: true,
+        persist: true,
         /**
          * Cross-store sync: focus target collection when match collection focused
          */
