@@ -27,13 +27,15 @@ dependencies = [
 mascope = "mascope_cli.main:app"
 
 [project.optional-dependencies]
-# `mascope dev migrate` / `mascope dev db` / `mascope fleet` — monorepo
+# `mascope dev migrate` / `mascope dev db` / `mascope fleet` / `mascope reference`
+# — monorepo
 # development only.
 dev = [
     "alembic>=1.18.1",
     "sqlalchemy~=2.0",
     "psycopg2-binary>=2.9.12",
     "pyyaml>=6,<7",
+    "mascope_reference",
 ]
 # `mascope demo build-bundle` / `verify` peak comparison (imported lazily).
 demo = [
