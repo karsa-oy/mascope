@@ -4,8 +4,10 @@ loaders. These do not need a running stack.
 """
 
 import inspect
+import re
 
 import pandas as pd
+import pytest
 
 from mascope_sdk import MascopeClient
 from mascope_sdk._loaders import _name_mask
@@ -39,6 +41,20 @@ def test_exact_match_does_not_match_a_substring():
     mask = _name_mask(BATCHES, "Blank", exact=True)
 
     assert BATCHES[mask].tolist() == []
+
+
+def test_compiled_pattern_is_used_as_a_regex():
+    # A compiled pattern opts back into regex (here: alternation + flags).
+    pattern = re.compile("blank 1|calibration", re.IGNORECASE)
+
+    mask = _name_mask(BATCHES, pattern, exact=False)
+
+    assert BATCHES[mask].tolist() == ["Blank 1", "Calibration"]
+
+
+def test_exact_with_a_compiled_pattern_raises():
+    with pytest.raises(ValueError, match="anchor the pattern"):
+        _name_mask(BATCHES, re.compile("blank"), exact=True)
 
 
 def _params(func):
