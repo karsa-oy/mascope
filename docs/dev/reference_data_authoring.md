@@ -105,6 +105,40 @@ That is it. The compounds are now annotated wherever the assignment engine
 produces a matching formula - the **Identity** column in peak assignment, and the
 `known_only` suspect-screening prior on the composition query.
 
+### In a deployment (production)
+
+`mascope reference` is a developer command: it pulls the chemistry dependencies
+(via `mascope_reference` -> `mascope_tools`) that are deliberately kept out of the
+lightweight operator CLI. Two ways to load reference data into a running
+deployment, depending on how it was installed:
+
+- **Deployment from a source checkout** - run the CLI command against the prod
+  env directly (it connects to the deployment's database):
+
+  ```sh
+  mascope --env prod reference sync custom /path/to/list.csv --name my-list -v 2024
+  ```
+
+- **Any deployment (incl. a pip-installed operator CLI with no checkout)** - the
+  backend image already ships the chemistry dependencies, so run the ingest
+  **inside the backend container**. Mount your dump where the container can read
+  it, then:
+
+  ```sh
+  docker compose exec backend \
+      python -m mascope_backend.db.scripts.reference_sync \
+      custom /data/list.csv --name my-list --version 2024
+  ```
+
+  It takes the same arguments as `mascope reference sync` (`source`, `file`,
+  `--version`, `--name`, `--batch-size`, `--prune`, `--stage`) and runs the
+  identical versioned ingest - just where the dependencies live. The database is
+  the one the backend is already configured for, so no connection flags are
+  needed.
+
+A polished operator-facing wrapper (`mascope prod reference ...`) is planned as
+part of productization (Phase 5 in [public_database_integration.md](public_database_integration.md)).
+
 ---
 
 ## 4. Managing lists over time
