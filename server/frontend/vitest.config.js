@@ -17,6 +17,7 @@ export default defineConfig({
   envPrefix: 'MASCOPE_',
   test: {
     environment: 'happy-dom',
+    setupFiles: ['tests/unit/setup/localStorage.js'],
     include: ['tests/unit/**/*.spec.js'],
     coverage: {
       provider: 'v8',
