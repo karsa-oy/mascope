@@ -80,7 +80,8 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
     {
       key,
       deps: () => ({ sample_item_id: useSample().focusedId }),
-      selection: true                // focused run == the run being viewed
+      selection: true,               // focused run == the run being viewed
+      events: ['peak_assignment_reload']   // backend emits on run finalize (B1)
     }
   )
 
@@ -166,18 +167,21 @@ peakAssignment: {
 **Filtering** (tier/role/source) is **client-side** off `data.list` — the full ledger is already in
 memory, so filter chips are instant. The server query params exist for later pagination only.
 
-### 2.3 Run-completion refresh — pick one
+### 2.3 Run-completion refresh — `peak_assignment_reload` event (decided)
 
-- **Minimal (no backend change).** A small composable `usePeakAssignmentProgress()` mounted in the
-  Assignments browser registers `app.ui.notification.on('assign_sample_peaks', ...)`; on a terminal
-  `success` whose `data.sample_item_id === sample.focusedId`, it calls `run.load()` then selects the
-  new `peak_assignment_run_id`, which cascades into the assignment store via deps. (The notification
-  store's `on()` self-unmounts via `onBeforeUnmount`, so it must live in a component, not a store.)
-- **Idiomatic (one backend ask, recommended).** Emit a `peak_assignment_run` socket event
-  (`created`/`updated`) — or a `peak_assignment_reload` cross-store event — when a run finalizes, the
-  way `rematch_sample` emits `match_reload`. Then `usePeakAssignmentRun` handles it automatically via
-  the `useData` events framework (`events: ['peak_assignment_reload']`), no component watcher. This is
-  the same pattern the match stores already use and is the clean long-term answer.
+The backend will emit a **`peak_assignment_reload`** cross-store event when a run finalizes, mirroring
+the way `rematch_sample` emits `match_reload` (backend task **B1**, §7). The run store then refreshes
+through the existing `useData` events framework with no component-scoped notification watcher — hence
+`events: ['peak_assignment_reload']` in §2.1. The event name is deliberately semantic (not
+`peak_assignment_run_reload`) to match the `match_reload` precedent and to let both stores subscribe if
+needed.
+
+On the event: `usePeakAssignmentRun` re-syncs its runs; the Assignments browser then **selects the
+newly completed run when the user launched it this session, otherwise surfaces a "new run available"
+affordance** rather than yanking the view off a run they were inspecting. Selecting a run changes
+`usePeakAssignment`'s deps, which cascades the ledger reload. (The earlier notification-watch fallback
+is dropped now that the event exists; the `assign_sample_peaks` progress notification is still used
+purely for the progress bar via the existing `PaneProgress`.)
 
 ## 3. Component changes (kept small)
 
@@ -196,24 +200,21 @@ Layout is unchanged. Most work is reframing three existing panes + one new tag +
 The **inspector reads from the focused peak**, not its own selection: `app.data.peakAssignment.byPeakId
 .get(String(app.data.peak.focused?.peak_id))`. No new selection wiring needed for the common path.
 
-## 4. The Fit view rename & the untargeted-visualization gap
+## 4. The Fit view rename & composition-driven visualization (decided)
 
-Renaming the tab is cosmetic. The **functional** issue: the Fit view
+Renaming the tab is cosmetic. The **functional** change: the Fit view
 ([`visualized.js`](../../server/frontend/src/stores/data/modules/match/visualized.js)) is driven
 entirely by `target_ion_id` + `target_collection_id` (`/match/aggregate/.../ion`,
-`/visualization/ion_focus`). That works for **database** assignments (they carry `target_ion_id`) but
-**untargeted winners have no `target_ion_id`** — so "verify this fit" cannot open the Fit view for a
-Stage B assignment as things stand.
+`/visualization/ion_focus`), which **untargeted winners don't carry**. Decision: the **Fit
+visualization will accept a composition** (formula + ionization mechanism + sample), not only a
+`target_ion_id` (backend task **B2**, §7). With it the Fit view works for *every* assignment and the
+Assignments browser can offer "Verify fit" on any row.
 
-Options (a backend/product call, flag for the epic):
-- **A. Composition-driven Fit view** — a visualization endpoint that renders the isotope envelope +
-  per-isotopologue timeseries from a *formula + ionization mechanism*, not a `target_ion_id`. Cleanest;
-  makes the Fit view work for every assignment.
-- **B. Ephemeral/persisted target ion** — Stage B commits a lightweight `TargetIon` (or a scratch one
-  on demand) so the existing Fit path just works. Reuses everything but muddies the target tables.
-
-Until one lands, the Assignments browser should only offer "Verify fit" on rows where
-`target_ion_id != null`, and show the inspector's isotope evidence for the rest.
+Frontend consequence (task **F6**): `useMatchVisualized.set(...)` gains a composition branch —
+when the focused assignment has a `target_ion_id` it takes today's path; otherwise it calls the new
+composition endpoint with `assigned_formula` + `ionization_mechanism_id` from the `PeakAssignment`
+row. The chart components (`ChartMatchSpectra`, `ChartMatchTimeseries`) are unchanged as long as B2
+returns the same `{ match_ions, match_isotopes }` shape they consume today.
 
 ## 5. Labels
 
@@ -226,21 +227,47 @@ Until one lands, the Assignments browser should only offer "Verify fit" on rows 
 - **A — Read the run (ships first, GET-only).** `usePeakAssignmentRun` + `usePeakAssignment` + index
   registration; `BaseTierTag`; ledger columns in `PaneBrowserPeak`; spectrum coloring. No writes, no
   new science. Depends only on endpoints already on the epic branch.
-- **B — Launch & watch.** Run-config dialog + `run.assign()`; completion refresh (§2.3 — do the
-  backend socket event here); run selector in the Assignments browser.
+- **B — Launch & watch.** Run-config dialog + `run.assign()`; completion refresh via
+  `peak_assignment_reload` (§2.3); run selector in the Assignments browser.
 - **C — Inspect & act.** Inspector `alternatives` + commit-alternative + add-to-target-list; "Re-search"
-  fallback. Needs the untargeted-visualization decision (§4) for "Verify fit".
+  fallback; "Verify fit" via the composition Fit view (§4).
 - **D — Retire the match_ion table.** Fold the Targets view into a `source=database` /
   `target_compound_id != null` filter over the ledger; remove `MatchIonTable` once parity is reached.
 - **E — Batch level.** Batch-overview coloring by tier; GKA / Van Krevelen (backend Phase 4).
 
-## 7. Backend asks (small, for a clean frontend)
+## 7. Work distribution
 
-1. **A run-finalized socket event** (`peak_assignment_run` created/updated, or `peak_assignment_reload`),
-   mirroring `match_reload`, so run refresh is idiomatic (§2.3).
-2. **A composition-driven Fit visualization** (or ephemeral target ion) so the Fit view works for
-   untargeted assignments (§4).
-3. None for the read path: the `read` handler's `data.data` unwrap means we take run metadata from the
-   runs endpoint (via the run store) rather than the `{run, data}` envelope — no backend change needed,
-   but if we later want the envelope's `run` in one call, add a dedicated handler rather than reusing
-   `read`.
+Tasks are cut so they can be handed to separate agents with minimal collision. **F1 is the foundation**
+— it freezes the store API and delivers `BaseTierTag`, which every other frontend task consumes — so it
+lands first. The two backend tasks are independent of F1 and of each other and can start immediately.
+Once F1 is in, F2–F5 touch disjoint files and parallelize freely.
+
+| ID | Task | Files (primary) | Depends on | Notes |
+|---|---|---|---|---|
+| **F1** | Store spine + tier tag | `stores/data/modules/peakAssignment/{run,assignment}.js`, `stores/data/index.js`, `lib/base/BaseTierTag.vue` | GET endpoints (landed) | **The shared contract.** §2. Do first. |
+| **B1** | `peak_assignment_reload` event | `api/new/peak_assignments/service.py` (finalize path) + the socket emit helper used by `match_reload` | — | Small. Mirror `match_reload`. §2.3. |
+| **B2** | Composition-driven Fit visualization | new endpoint(s) beside `/match/aggregate/.../ion` + `/visualization/ion_focus` | — | Larger. Accept formula + mechanism + sample; return the same `{match_ions, match_isotopes}` shape. §4. |
+| **F2** | Peak ledger | `PaneBrowserPeak.vue` | F1 | Reads `byPeakId`, `tierCounts`. §3. |
+| **F3** | Peak inspector | `PanePeakAssign.vue` | F1 | Winner + evidence + `alternatives`; existing search → "Re-search". §3. |
+| **F4** | Annotated spectrum | `ChartSampleSpectrum/data.js` | F1 | Per-tier Plotly traces from `byPeakId`. §3. |
+| **F5** | Assignments browser + run selector + config dialog | `PaneBrowserMatch.vue`, new run-config dialog | F1; **B1** for live refresh | Coexist "Targets"/"Assignments"; row click focuses the peak. §3. |
+| **F6** | Fit view rename + composition wiring | `Dashboard.vue` (label), `match/visualized.js` | **B2** | Rename now; composition branch when B2's contract is fixed. §4. |
+
+**Suggested sequencing**
+
+1. **Now, in parallel:** F1 (foundation), B1, B2.
+2. **After F1:** F2, F3, F4, F5 in parallel; F5 stubs the refresh until B1 lands.
+3. **After B2:** F6.
+
+**Collision map.** The only shared frontend surfaces are `stores/data/index.js` and `BaseTierTag.vue`,
+both **owned by F1** and consumed read-only thereafter. F2 (`PaneBrowserPeak`), F4
+(`ChartSampleSpectrum`), and F5 (`PaneBrowserMatch`) are disjoint files; F3 (`PanePeakAssign`) is
+disjoint from all of them. So post-F1 the frontend work has no file overlap.
+
+**Branching.** Backend tasks (B1, B2) branch off `epic/peak-centric-assignment`. Frontend tasks branch
+off `design/peak-centric-frontend` (which already carries this doc), or off F1's branch once it lands,
+then merge back to epic. Keep each task a `feat(peak-assignments): …` / `feat(frontend): …` commit.
+
+**Read-path note.** No backend change is needed for reads: the `read` handler's `data.data` unwrap means
+run metadata comes from the runs endpoint (via the run store), not the `{run, data}` envelope. If a
+future call wants the envelope's `run` inline, add a dedicated handler rather than reusing `read`.
