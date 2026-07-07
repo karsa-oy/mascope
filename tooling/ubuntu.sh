@@ -80,20 +80,52 @@ function clear_state() {
     rm "${ROOT_PATH}/.runtime/state.json" || true
 }
 
+function uv_is_recent_enough() {
+    # Probe for the newest uv capability the script relies on instead of
+    # comparing version numbers: `uv tool install --with-executables-from`
+    # (links the `mascope` executable from the mascope_cli dependency).
+    uv tool install --help 2>/dev/null | grep -q -- '--with-executables-from'
+}
+
+function ensure_uv() {
+    if [[ -z $(command -v uv) ]]; then
+        write_line "uv not detected, installing..."
+
+        sudo snap install --classic astral-uv
+        return
+    fi
+
+    if uv_is_recent_enough; then
+        write_line "uv detected ($(uv --version)), skipping install."
+        return
+    fi
+
+    # A pre-existing uv can predate features the script needs; update it
+    # through whichever channel manages it.
+    write_line "uv detected ($(uv --version)) but too old, updating..."
+    if snap list astral-uv &> /dev/null; then
+        sudo snap refresh astral-uv
+    else
+        # Standalone-installer uv; fails harmlessly on other installs
+        # (e.g. pip), which the re-check below turns into a clear error.
+        uv self update || true
+    fi
+
+    if ! uv_is_recent_enough; then
+        write_line "ERROR: uv is too old (needs 'uv tool install --with-executables-from', CI uses uv 0.11.x) and could not be updated automatically. Update uv manually and re-run."
+        exit 1
+    fi
+
+    write_line "uv updated to $(uv --version)."
+}
+
 function install_tooling() {
     write_section "INSTALLING TOOLING"
 
     sudo apt update
     sudo apt install -y curl build-essential python3-dev pkg-config
     
-    if [[ -z $(command -v uv) ]]; then
-        write_line "uv not detected, installing..."
-        
-        sudo snap install --classic astral-uv
-    else
-
-        write_line "uv detected, skipping install."
-    fi
+    ensure_uv
 
     if [[ $(node -v) != v22* ]]; then
         write_line "Node 22 not detected, installing..."
