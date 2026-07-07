@@ -37,9 +37,12 @@ const traces = computed(() =>
   scale.value.mode === 'average'
     ? data.traces
     : data.traces.map((trace) => {
-        // Scale chart traces by dividing all y-values by sampleLength
-        let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value) => (value ? value * sampleLength.value : value))
+        // Shallow copy with scaled y (and customdata for peak traces);
+        // unchanged fields keep sharing the store's arrays
+        const newTrace = {
+          ...toRaw(trace),
+          y: trace.y.map((value) => (value ? value * sampleLength.value : value))
+        }
         // For peak traces, scale "customdata" containing [height, area]
         if (newTrace.name.endsWith('Peak')) {
           newTrace.customdata = trace.customdata.map((subarr) => {

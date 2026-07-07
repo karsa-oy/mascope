@@ -41,12 +41,12 @@ const traces = computed(() => {
   }
   return scale.value.mode == 'average'
     ? data.traces
-    : data.traces.map((trace) => {
-        // Scale chart traces by multiplying all y-values by sampleLength
-        let newTrace = structuredClone(toRaw(trace))
-        newTrace.y = trace.y.map((value) => value * sampleLength.value)
-        return newTrace
-      })
+    : // Shallow copy with scaled y; unchanged fields keep sharing the
+      // store's arrays
+      data.traces.map((trace) => ({
+        ...toRaw(trace),
+        y: trace.y.map((value) => value * sampleLength.value)
+      }))
 })
 
 // transform raw visualiation data into seperate charts

@@ -33,11 +33,9 @@ const traces = computed(() => {
     return []
   }
   return scale.value.mode == 'average'
-    ? data.traces.map((trace) => {
-        let newTrace = structuredClone(toRaw(trace))
-        newTrace.fill = 'none'
-        return newTrace
-      })
+    ? // Shallow copy: only the fill mode changes, the (potentially long,
+      // one point per scan) data arrays can be shared with the store
+      data.traces.map((trace) => ({ ...toRaw(trace), fill: 'none' }))
     : data.traces.toReversed()
 })
 
