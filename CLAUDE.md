@@ -15,6 +15,7 @@ compose. See `docs/dev/developer_guide.md` for the full picture.
 | Frontend unit (Vitest) | `npm run test:unit` in `server/frontend` | nothing | ~1 s |
 | Frontend e2e (Playwright) | `npm run test:e2e` in `server/frontend` | a running stack, see below | minutes |
 | Deployment smoke | `bash tooling/smoke-test.sh` | a running stack | seconds |
+| API benchmark | `MASCOPE_BENCH_TEST=1 uv run pytest server/backend/tests/system/benchmark/` | a running demo stack | minutes (scales the data) |
 
 Run the suite that covers what you changed before finishing. Frontend unit tests are
 the default place for new frontend tests; only reach for e2e when the behavior spans
