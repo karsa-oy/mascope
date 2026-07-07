@@ -36,7 +36,7 @@ class PeakAssignmentRecord(BaseModel):
     ionization_mechanism_id: str | None = None
     isotope_label: str | None = None
     source: str | None = None
-    match_score: float | None = None
+    fit_score: float | None = None
     mz_error_ppm: float | None = None
     abundance_error: float | None = None
     tier: str
