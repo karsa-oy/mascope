@@ -94,17 +94,13 @@ only adds downtime.)
 installed **disabled**. `--auto` automatically tracks the newest GitHub
 **release tag** (`vX.Y.Z`) - there is no version to pin by hand. To turn it on:
 
-1. `--auto` discovers releases through the `gh` CLI, which must be
-   authenticated even though the repository (and its images) are public. Either
-   run `gh auth login` as the deploy user, or set any GitHub token as `GH_TOKEN`
-   in `/etc/mascope/update.env` - no special scopes are needed for the public
-   repo.
-2. Make sure the stack is running - the applied database revision is read from
-   the live Postgres container.
-3. Enable it:
+1. Make sure the stack is running - the applied database revision is read from
+   the live Postgres container. **No credentials are needed**: `--auto` reads
+   the public GitHub releases API over plain HTTPS.
+2. Enable the timer (adjust the window / grace first if you like):
 
    ```sh
-   sudoedit /etc/mascope/update.env
+   sudoedit /etc/mascope/update.env      # optional: MASCOPE_UPDATE_WINDOW, grace
    sudo systemctl enable --now mascope-update.timer
    ```
 
@@ -127,7 +123,7 @@ mascope prod update --snooze 7   # postpone 7 days
 ```
 
 Configuration lives in `/etc/mascope/update.env` (`MASCOPE_UPDATE_WINDOW`,
-`MASCOPE_UPDATE_GRACE_DAYS`, `MASCOPE_UPDATE_REPO`, `GH_TOKEN`). Observe activity:
+`MASCOPE_UPDATE_GRACE_DAYS`, `MASCOPE_UPDATE_REPO`). Observe activity:
 
 ```sh
 systemctl list-timers mascope-update.timer
@@ -171,7 +167,7 @@ mascope prod db restore <dump-file> --yes    # or omit the file for the latest
 | Path | What |
 |---|---|
 | `/etc/environment` | `MASCOPE_PATH`, `LD_PRELOAD` (read by the systemd units) |
-| `/etc/mascope/update.env` | update window / grace / repo / `GH_TOKEN` (chmod 600) |
+| `/etc/mascope/update.env` | update window / grace / repo (chmod 600) |
 | `$MASCOPE_PATH/.runtime/secrets/` | `postgres_password.txt`, `jwt_secret_key.txt`, `server_owner_secret_key.txt`, TLS cert/key, `backup.env` |
 | `$MASCOPE_PATH/.runtime/database/backups/prod/` | database dumps (incl. pre-migration) |
 | `$MASCOPE_PATH/.runtime/update/` | `state.json` (pending update), `status.log` |
@@ -184,8 +180,8 @@ secrets in `.runtime/secrets/` exist.
 
 **Update timer never fires / always fails.** `systemctl list-timers` to confirm
 it is enabled; `journalctl -u mascope-update.service` for the reason. Exit 2 is
-usually a missing/invalid `GH_TOKEN` or a stack that is down (the DB revision is
-read from the running Postgres). Exit 30 is *not* a failure - it means a
+usually a stack that is down (the DB revision is read from the running Postgres)
+or no network to reach the releases API. Exit 30 is *not* a failure - it means a
 migration update is pending.
 
 **A migration update won't apply.** It waits for the maintenance window, the

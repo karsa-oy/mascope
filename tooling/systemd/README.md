@@ -19,16 +19,15 @@ provisions the box.
 ## Enabling auto-updates
 
 Auto-updates are installed **disabled** so a fresh server stays quiet until you
-opt in. To turn them on, set a release token (the repo is private) in
-`/etc/mascope/update.env`, then enable the timer:
+opt in. No credentials are needed - release discovery uses the public GitHub API
+over HTTPS. Just enable the timer, optionally adjusting the window/grace first:
 
 ```sh
-sudoedit /etc/mascope/update.env          # set GH_TOKEN (and window/grace)
+sudoedit /etc/mascope/update.env          # optional: window / grace
 sudo systemctl enable --now mascope-update.timer
 ```
 
-The server must be pinned to a release tag (`vX.Y.Z`) - the channel `--auto`
-tracks.
+`--auto` tracks the newest GitHub release tag (`vX.Y.Z`) automatically.
 
 ## What each `--auto` run does
 
