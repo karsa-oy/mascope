@@ -211,6 +211,198 @@ def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str
     return pl.Series(mask, dtype=pl.Boolean), log_messages
 
 
+# ---------------------------------------------------------------------------
+# Graded chemical plausibility (Seven Golden Rules, Phase 3 / P1).
+#
+# The rules above (`rule_element_ratio`, `rule_senior`) are BOOLEAN gates: a
+# candidate either passes or is hard-cut. The confidence layer
+# (docs/dev/assignment_confidence.md) needs the same chemistry expressed as a
+# GRADED per-candidate plausibility in [0, 1] so it can *weigh* candidates rather
+# than reject them -- a formula whose ratios sit in the common range is
+# high-probability, one pushing into the distribution's tail is lower-probability,
+# and an impossible structure is ~0.
+#
+# `chemical_plausibility` composes three independent factors (each in [0, 1]), by
+# multiplication, per the confidence-layer design rule that every layer is a
+# likelihood:
+#   1. Senior/RDBE structural feasibility (Rule 2) -- 1.0 feasible, 0.0 impossible.
+#   2. Element-ratio plausibility (Rules 4-5) -- graded across the paper's
+#      common / extended / extreme ratio bands.
+#   3. Heteroatom co-occurrence probability (Rule 6) -- graded against the
+#      multi-element count restrictions.
+#
+# Conservative / fail-open by design: any element outside the standard tables, a
+# carbon-free formula (X/C ratios undefined), or an unparseable formula scores
+# 1.0 for the affected factor -- unusual chemistry is never wrongly penalised.
+# Only a *provably impossible* neutral graph (over-saturated / disconnectable) is
+# driven to 0. Numbers are taken verbatim from Kind & Fiehn 2007 (BMC
+# Bioinformatics 8:105), Tables 2 (element ratios) and 3 (element-count
+# restrictions).
+# ---------------------------------------------------------------------------
+
+# Floor for the ratio/Rule-6 tapers: the plausibility a wildly out-of-range (but
+# not structurally impossible) ratio decays to. Non-zero so the graded score is
+# never a hard reject -- that job belongs to the boolean rules / arbitration.
+PLAUSIBILITY_FLOOR = 0.1
+
+# Element/C ratio bands (Kind & Fiehn 2007, Table 2), keyed by the numerator
+# element X (ratio = n_X / n_C). Each entry is
+# (common_min, common_max, extended_min, extended_max): the common range covers
+# ~99.7% of known formulas, the extended range ~99.99%. Only H/C has a meaningful
+# non-zero minimum. A ratio is scored ONLY when both X and C are present, mirroring
+# `rule_element_ratio` (absence of an element is not an "unusual ratio").
+_RATIO_BANDS: dict[str, tuple[float, float, float, float]] = {
+    "H": (0.2, 3.1, 0.1, 6.0),
+    "F": (0.0, 1.5, 0.0, 6.0),
+    "Cl": (0.0, 0.8, 0.0, 2.0),
+    "Br": (0.0, 0.8, 0.0, 2.0),
+    "N": (0.0, 1.3, 0.0, 4.0),
+    "O": (0.0, 1.2, 0.0, 3.0),
+    "P": (0.0, 0.3, 0.0, 2.0),
+    "S": (0.0, 0.8, 0.0, 3.0),
+    "Si": (0.0, 0.5, 0.0, 1.0),
+}
+
+# Multi-element count restrictions (Kind & Fiehn 2007, Table 3, Rule 6): when a
+# combination of heteroatoms co-occurs ABOVE the trigger counts, none of them is
+# expected to exceed the listed cap. Each check is (trigger, caps): trigger maps
+# element -> strict lower bound that must ALL hold for the check to apply; caps
+# maps element -> the count above which the formula becomes improbable.
+_RULE6_CHECKS: list[tuple[dict[str, int], dict[str, int]]] = [
+    ({"N": 1, "O": 1, "P": 1, "S": 1}, {"N": 10, "O": 20, "P": 4, "S": 3}),
+    ({"N": 3, "O": 3, "P": 3}, {"N": 11, "O": 22, "P": 6}),
+    ({"O": 1, "P": 1, "S": 1}, {"O": 14, "P": 3, "S": 3}),
+    ({"P": 1, "S": 1, "N": 1}, {"P": 3, "S": 3, "N": 4}),
+    ({"N": 6, "O": 6, "S": 6}, {"N": 19, "O": 14, "S": 8}),
+]
+
+
+def element_counts(formula: str) -> dict[str, int] | None:
+    """Base-element counts for a neutral formula (isotopes folded into their base
+    element, e.g. ``[13C]`` -> ``C``). Returns ``None`` if the formula cannot be
+    parsed -- callers fail open (plausibility 1.0) on ``None``."""
+    try:
+        counts = Composition(formula=normalize_formula_with_isotopes(formula))
+        return {el: n for el, n in counts.items() if n}
+    except Exception:
+        return None
+
+
+def _taper(value: float, near: float, far: float) -> float:
+    """Plausibility as ``value`` leaves a band. ``near`` is the band edge (score
+    1.0) and ``far`` is the next edge (score 0.5); past ``far`` the score decays
+    linearly to ``PLAUSIBILITY_FLOOR`` over one more ``|far - near|`` step. Works
+    for both an upper edge (far > near) and a lower edge (far < near)."""
+    span = abs(far - near)
+    if span <= 0:
+        return 1.0
+    dist = abs(value - near)
+    if (far >= near and value <= near) or (far < near and value >= near):
+        return 1.0
+    if dist <= span:  # between the near and far edges: 1.0 -> 0.5
+        return 1.0 - 0.5 * (dist / span)
+    # beyond the far edge: 0.5 -> floor over one more span, then flat
+    frac = min(1.0, (dist - span) / span)
+    return max(PLAUSIBILITY_FLOOR, 0.5 - (0.5 - PLAUSIBILITY_FLOOR) * frac)
+
+
+def element_ratio_plausibility(counts: dict[str, int]) -> float:
+    """Rules 4-5 as a graded likelihood in [0, 1] (Kind & Fiehn 2007, Table 2).
+
+    Product over every X/C ratio (X present, C present) of a per-ratio score that
+    is 1.0 inside the common range, tapers to 0.5 at the extended edge, then to
+    ``PLAUSIBILITY_FLOOR`` beyond. Carbon-free formulas score 1.0 (X/C undefined --
+    fail open)."""
+    n_c = counts.get("C", 0)
+    if n_c <= 0:
+        return 1.0
+    score = 1.0
+    for element, (c_min, c_max, e_min, e_max) in _RATIO_BANDS.items():
+        n_x = counts.get(element, 0)
+        if n_x <= 0:
+            continue
+        ratio = n_x / n_c
+        upper = _taper(ratio, c_max, e_max)
+        lower = _taper(ratio, c_min, e_min) if c_min > 0 else 1.0
+        score *= min(upper, lower)
+    return score
+
+
+def heteroatom_probability_plausibility(counts: dict[str, int]) -> float:
+    """Rule 6 as a graded likelihood in [0, 1] (Kind & Fiehn 2007, Table 3).
+
+    For each multi-element restriction whose trigger counts are all exceeded, an
+    element above its cap contributes a factor ``cap / count`` (floored at
+    ``PLAUSIBILITY_FLOOR``) -- a smooth stand-in for the paper's hard cap. Formulas
+    that trigger no restriction, or stay within every cap, score 1.0."""
+    score = 1.0
+    for trigger, caps in _RULE6_CHECKS:
+        if all(counts.get(el, 0) > thr for el, thr in trigger.items()):
+            for el, cap in caps.items():
+                n = counts.get(el, 0)
+                if n > cap:
+                    score *= max(PLAUSIBILITY_FLOOR, cap / n)
+    return score
+
+
+def senior_plausibility(counts: dict[str, int]) -> float:
+    """Rule 2 (Lewis/Senior) as a plausibility in [0, 1]. 1.0 for any structurally
+    feasible neutral (including odd-electron radicals -- fail open, as in
+    `rule_senior`) and any formula with an element outside ``_SENIOR_VALENCE``;
+    0.0 only for a *provably impossible* graph (negative RDBE / disconnectable)."""
+    if not counts or any(el not in _SENIOR_VALENCE for el in counts):
+        return 1.0  # fail open on unknown elements / empty
+    n_atoms = sum(counts.values())
+    valence_sum = sum(_SENIOR_VALENCE[el] * n for el, n in counts.items())
+    twice_rdbe = 2 + sum((_SENIOR_VALENCE[el] - 2) * n for el, n in counts.items())
+    not_oversaturated = twice_rdbe >= 0
+    connect_ok = n_atoms <= 1 or valence_sum >= 2 * (n_atoms - 1)
+    return 1.0 if (not_oversaturated and connect_ok) else 0.0
+
+
+def formula_plausibility(formula: str) -> float:
+    """Combined graded chemical plausibility in [0, 1] for a single NEUTRAL formula
+    -- the product of the Senior/RDBE (Rule 2), element-ratio (Rules 4-5) and
+    heteroatom co-occurrence (Rule 6) factors. Unparseable formulas fail open to
+    1.0. See the section header for the design; numbers from Kind & Fiehn 2007."""
+    counts = element_counts(formula)
+    if counts is None:
+        return 1.0
+    return (
+        senior_plausibility(counts)
+        * element_ratio_plausibility(counts)
+        * heteroatom_probability_plausibility(counts)
+    )
+
+
+# Below this, a candidate's chemistry is weak enough to note in the filter log.
+PLAUSIBILITY_LOG_THRESHOLD = 0.3
+
+
+def chemical_plausibility(
+    candidates: pl.DataFrame, **kwargs
+) -> tuple[pl.Series, list[str]]:
+    """Per-candidate graded chemical plausibility in [0, 1] for the confidence
+    layer (Seven Golden Rules; docs/dev/assignment_confidence.md, P1).
+
+    Unlike `rule_element_ratio` / `rule_senior`, this does NOT filter -- it returns
+    a Float64 plausibility per NEUTRAL formula that the arbitration layer weighs
+    against the fit score. Deterministic and fail-open; see `formula_plausibility`.
+    """
+    log_messages: list[str] = []
+    if candidates.is_empty():
+        return pl.Series([], dtype=pl.Float64), log_messages
+    scores = [
+        formula_plausibility(f) for f in candidates.get_column("formula").to_list()
+    ]
+    for formula, score in zip(candidates.get_column("formula").to_list(), scores):
+        if score < PLAUSIBILITY_LOG_THRESHOLD:
+            log_messages.append(
+                f"Low chemical plausibility ({score:.2f}) for formula '{formula}'."
+            )
+    return pl.Series(scores, dtype=pl.Float64), log_messages
+
+
 def rule_known_chemical_space(
     candidates: pl.DataFrame, **kwargs
 ) -> tuple[pl.Series, list[str]]:

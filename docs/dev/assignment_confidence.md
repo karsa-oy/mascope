@@ -94,13 +94,14 @@ non-negative ring-and-double-bond equivalents; a chemically connectable graph mu
 (3) isotope pattern, (4) H/C ratio bounds, (5) N/O/P/S-to-C ratio bounds, (6) element-ratio
 *probabilities* from large compound databases, (7) presence/co-occurrence of certain
 elements.
-*Today.* `heuristic_filter.py` implements `rule_element_ratio` (Rules 4–5) and
-`rule_valence` (even/odd electron). `rule_senior` is **stubbed** (`TODO: requires graph
-theory`); the probabilistic element-ratio rule (6) and a principled RDBE check are not
-yet there. **Partial — the spike.**
-*Gap.* Complete the rule set as a **scored, referenced filter** (a graded plausibility in
-[0,1] per candidate, not just a boolean pass), so it can feed the decision layer rather
-than hard-cut candidates. RDBE/Senior needs a valence-graph feasibility check.
+*Today.* `heuristic_filter.py` has the boolean gates (`rule_element_ratio`, Rules 4–5;
+`rule_senior`, a real RDBE + Senior valence-graph check, Rule 2) **and** a graded
+`chemical_plausibility` in $[0,1]$ that composes the Senior/RDBE, element-ratio (Table 2)
+and heteroatom co-occurrence (Table 3, Rule 6) factors as referenced likelihoods — the
+first real evidence layer. **Landed (see §4 P1 progress).**
+*Gap.* None fundamental for the chemistry layer itself. What remains is *consuming* the
+plausibility in arbitration (P2): calibrating how it combines with the fit score per
+instrument, and the target–decoy FDR. The isotope rule (3) stays in the fit score, not here.
 
 ### L2 — Spectral-neighbourhood corroboration (adducts, isotopes, fragments)
 *Basis.* A real compound rarely appears as a single peak. Its isotopologues, its different
@@ -209,6 +210,32 @@ no backend or DB, only `mascope_tools` + tests.
   `C10H17O7` (odd H, no N) and `Br` (a lone halogen, the bromide reagent). These now *pass*
   the rule (fail-open), but it is worth confirming whether they are legitimate radical
   species or off-by-one-H / reagent-representation artefacts in the test data.
+- **Graded plausibility landed (P1 complete).** `chemical_plausibility` /
+  `formula_plausibility` (`heuristic_filter.py`) return a per-candidate plausibility in
+  $[0,1]$ — the **product** of three referenced factors (Kind & Fiehn 2007), one per
+  design-rule *likelihood layer*:
+    1. **Senior/RDBE** (Rule 2): `1.0` for any feasible neutral (radicals included —
+       fail-open), `0.0` only for a *provably impossible* graph (negative-RDBE /
+       disconnectable).
+    2. **Element ratio** (Rules 4–5): graded across the paper's **common / extended /
+       extreme** X/C bands (Table 2, verbatim). `1.0` inside the common range, tapering to
+       `0.5` at the extended edge, then to a non-zero `PLAUSIBILITY_FLOOR`. Scored only when
+       both X and C are present (fail-open on carbon-free formulas).
+    3. **Heteroatom co-occurrence** (Rule 6): graded against the multi-element count
+       restrictions (Table 3, verbatim).
+  It **grades, it does not gate** — the boolean `rule_element_ratio` / `rule_senior` still do
+  the hard enumeration cut; this plausibility is the *weight* the arbitration layer (P2) will
+  multiply against the fit score. Fully deterministic and fail-open; unit-tested per rule in
+  `test_plausibility.py`.
+- **Validated against the 91 demo target formulas** (embedded in the test, hermetic): every
+  genuine formula scores `> 0.5` (the tiny molecules `CH2O2`/`CH4N2O` are the lowest at
+  ~0.74–0.78, graded down only because X/C ratios are noisy for one-carbon species), and the
+  radicals stay at `1.0`. Only `C6H17NO4` (the over-saturated data error) is driven to `0.0`,
+  reproducing the `rule_senior` finding. **Nothing real is wrongly rejected.**
+- **Remaining (moves to P2):** the *isotope rule* (Rule 3) is intentionally NOT folded in —
+  it is already the fit score's job (`score_pattern_v2`), kept separate per the design rule
+  that chemistry never re-imports the measurement. Per-instrument calibration of how
+  plausibility combines with fit is P2 (arbitration + FDR).
 
 ## 5. References
 
