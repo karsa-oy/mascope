@@ -1,0 +1,248 @@
+"""
+Automated update orchestration for `mascope prod update --auto`.
+
+Runs unattended (e.g. from a systemd timer). It resolves the newest pinned
+release, classifies it with the preflight, and acts by classification:
+
+- up-to-date: nothing to do.
+- fast update (new images, no migration): apply it inside the maintenance
+  window, guarded by a post-apply health check. On failure it alerts and
+  stops - it never rolls back automatically (an operator decides).
+- migration update (downtime): do NOT apply unattended. Record it as a pending
+  update and notify, so a human can schedule the window. Applying migration
+  updates on confirmation or after a grace period is handled separately.
+
+Talking to GitHub (finding the latest release and downloading its manifest)
+goes through small seams that tests stub; on a real server they need read
+access to the repository releases (a token in the environment, e.g. via
+``gh auth`` or ``GH_TOKEN``).
+"""
+
+import datetime
+import json
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+from mascope_cli.cmd.prod.release_manifest import MANIFEST_FILENAME
+
+
+# Exit codes for the --auto run, chosen so a timer/monitor can distinguish
+# "handled" from "needs a human" from "broken" without parsing output.
+AUTO_OK = 0  # nothing to do, or a fast update applied cleanly
+AUTO_MIGRATION_PENDING = 30  # a migration update was recorded + notified
+AUTO_ERROR = 2  # discovery, apply, or health check failed
+
+
+@dataclass
+class PendingUpdate:
+    """A migration update seen but not yet applied."""
+
+    version: str
+    alembic_head: str
+    first_seen_at: str
+
+    def to_dict(self) -> dict:
+        return {
+            "version": self.version,
+            "alembic_head": self.alembic_head,
+            "first_seen_at": self.first_seen_at,
+        }
+
+
+def _now() -> datetime.datetime:
+    """Current local time (seam for tests)."""
+    return datetime.datetime.now()
+
+
+def update_dir(mascope_path: str) -> Path:
+    """Directory holding the updater's state and status log."""
+    return Path(mascope_path) / ".runtime" / "update"
+
+
+# --- Maintenance window ---
+
+
+def parse_window(spec: Optional[str]) -> Optional[tuple[int, int]]:
+    """
+    Parse a ``"HH-HH"`` local-hour maintenance window (e.g. ``"2-5"``).
+
+    Returns None when ``spec`` is empty (meaning "no restriction - any time").
+
+    :raises ValueError: if the spec is malformed or hours are out of range.
+    """
+    if not spec:
+        return None
+    try:
+        start_s, end_s = spec.split("-", 1)
+        start, end = int(start_s), int(end_s)
+    except ValueError:
+        raise ValueError(f"Invalid window '{spec}' - expected 'HH-HH' (e.g. '2-5')")
+    for h in (start, end):
+        if not 0 <= h <= 23:
+            raise ValueError(f"Window hour {h} out of range 0-23")
+    return start, end
+
+
+def in_window(now: datetime.datetime, window: Optional[tuple[int, int]]) -> bool:
+    """
+    Whether ``now`` falls in the window. A window that wraps midnight
+    (start > end, e.g. 22-3) is handled. None means always allowed.
+    """
+    if window is None:
+        return True
+    start, end = window
+    hour = now.hour
+    if start <= end:
+        return start <= hour < end
+    # Wraps midnight: in-window if at/after start OR before end.
+    return hour >= start or hour < end
+
+
+# --- Pending-update state ---
+
+
+def load_pending(mascope_path: str) -> Optional[PendingUpdate]:
+    """Load the recorded pending update, or None if there is none."""
+    path = update_dir(mascope_path) / "state.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")).get("pending")
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not data:
+        return None
+    return PendingUpdate(
+        version=data["version"],
+        alembic_head=data["alembic_head"],
+        first_seen_at=data["first_seen_at"],
+    )
+
+
+def save_pending(mascope_path: str, pending: PendingUpdate) -> None:
+    """Persist the pending update, creating the update dir if needed."""
+    d = update_dir(mascope_path)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "state.json").write_text(
+        json.dumps({"pending": pending.to_dict()}, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def clear_pending(mascope_path: str) -> None:
+    """Remove any recorded pending update."""
+    path = update_dir(mascope_path) / "state.json"
+    if path.exists():
+        path.unlink()
+
+
+def record_pending(mascope_path: str, version: str, alembic_head: str) -> PendingUpdate:
+    """
+    Record ``version`` as pending, preserving ``first_seen_at`` if the same
+    version was already pending (so the grace clock is not reset each tick).
+    """
+    existing = load_pending(mascope_path)
+    if existing is not None and existing.version == version:
+        return existing
+    pending = PendingUpdate(
+        version=version,
+        alembic_head=alembic_head,
+        first_seen_at=_now().replace(microsecond=0).isoformat(),
+    )
+    save_pending(mascope_path, pending)
+    return pending
+
+
+def record_status(mascope_path: str, message: str) -> None:
+    """Append a timestamped line to the updater's status log."""
+    d = update_dir(mascope_path)
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = _now().replace(microsecond=0).isoformat()
+    with (d / "status.log").open("a", encoding="utf-8") as fh:
+        fh.write(f"{stamp} {message}\n")
+
+
+# --- GitHub discovery seams ---
+
+
+def _run(cmd: list[str], timeout: Optional[int] = 30) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd, capture_output=True, text=True, check=False, timeout=timeout
+    )
+
+
+def latest_release_tag(repo: str) -> Optional[str]:
+    """
+    Newest published release tag for ``repo`` via the GitHub API (``gh``).
+
+    Returns None if it cannot be determined (no releases, no network, or no
+    read access).
+    """
+    result = _run(["gh", "api", f"repos/{repo}/releases/latest", "--jq", ".tag_name"])
+    if result.returncode != 0:
+        return None
+    tag = result.stdout.strip()
+    return tag or None
+
+
+def download_manifest(repo: str, tag: str, dest_dir: Path) -> Optional[Path]:
+    """
+    Download the release's manifest asset into ``dest_dir``. Returns the path,
+    or None if the release has no manifest asset (older releases predate it).
+    """
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    result = _run(
+        [
+            "gh",
+            "release",
+            "download",
+            tag,
+            "-R",
+            repo,
+            "-p",
+            MANIFEST_FILENAME,
+            "-D",
+            str(dest_dir),
+            "--clobber",
+        ]
+    )
+    if result.returncode != 0:
+        return None
+    path = dest_dir / MANIFEST_FILENAME
+    return path if path.exists() else None
+
+
+# --- Health check ---
+
+
+def health_status(container: str) -> Optional[str]:
+    """Docker health status of a container (healthy/starting/unhealthy), or None."""
+    result = _run(
+        ["docker", "inspect", "--format", "{{.State.Health.Status}}", container]
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def wait_healthy(container: str, timeout: int = 180, interval: int = 5) -> bool:
+    """
+    Poll ``container`` until it reports healthy or ``timeout`` seconds elapse.
+
+    A container without a healthcheck (status None) is treated as not-healthy
+    here; callers point this at the backend, which defines one.
+    """
+    deadline = _now() + datetime.timedelta(seconds=timeout)
+    while _now() < deadline:
+        if health_status(container) == "healthy":
+            return True
+        _sleep(interval)
+    return health_status(container) == "healthy"
+
+
+def _sleep(seconds: int) -> None:
+    """Sleep seam (overridden in tests to avoid real waits)."""
+    import time
+
+    time.sleep(seconds)

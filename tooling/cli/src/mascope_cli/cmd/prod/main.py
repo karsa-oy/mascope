@@ -32,7 +32,7 @@ from typing import Annotated, Optional
 import typer
 
 from mascope_cli.cmd import lib
-from mascope_cli.cmd.prod import preflight, release_manifest
+from mascope_cli.cmd.prod import auto_update, preflight, release_manifest
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs, is_container_running
 from mascope_cli.runtime import runtime
@@ -46,6 +46,10 @@ _MODE = "prod"
 # reference the update preflight pulls and inspects.
 _BACKEND_IMAGE = "ghcr.io/karsa-oy/mascope/backend"
 _FRONTEND_IMAGE = "ghcr.io/karsa-oy/mascope/frontend"
+
+# Repository whose releases the unattended updater tracks. Overridable via
+# MASCOPE_UPDATE_REPO for forks/mirrors.
+_DEFAULT_UPDATE_REPO = "karsa-oy/mascope"
 
 prod_app = typer.Typer()
 prod_app.add_typer(prod_db_app, name="db")
@@ -463,6 +467,135 @@ def _preflight(
     raise typer.Exit(plan.exit_code)
 
 
+def _apply_fast_update(target: str, backend_container: str, mascope_path: str) -> None:
+    """
+    Apply a fast (no-migration) update to ``target`` and verify health.
+
+    Pins the deploy to ``target``, restarts the stack, and waits for the
+    backend to report healthy. On success clears any pending record; on failure
+    it alerts and stops - it never rolls back automatically. Raises
+    ``typer.Exit`` with the appropriate AUTO_* code either way.
+    """
+    os.environ["MASCOPE_VERSION"] = target
+    os.environ["_MASCOPE_VERSION_PINNED"] = "1"
+
+    check_data_dirs(_MODE)
+    runtime.logger.info(f"Applying fast update to '{target}'")
+    _run_compose(["pull"])
+    _run_compose(["up", "--detach"])
+
+    if auto_update.wait_healthy(backend_container):
+        auto_update.clear_pending(mascope_path)
+        message = f"Fast update to {target} applied; backend healthy."
+        runtime.logger.success(message)
+        auto_update.record_status(mascope_path, message)
+        _run_compose(["ps"])
+        raise typer.Exit(auto_update.AUTO_OK)
+
+    message = (
+        f"Fast update to {target} applied but the backend did not become "
+        "healthy - manual intervention needed (no automatic rollback)."
+    )
+    runtime.logger.error(message)
+    auto_update.record_status(mascope_path, message)
+    raise typer.Exit(auto_update.AUTO_ERROR)
+
+
+def _auto(*, pull: bool) -> None:
+    """
+    Unattended update: resolve the newest release, classify it, and act.
+
+    - up-to-date: nothing to do.
+    - fast update: apply inside the maintenance window (health-checked); outside
+      the window, do nothing and retry on the next tick.
+    - migration update: record it as pending and notify; never apply here.
+
+    Never returns normally - always raises ``typer.Exit`` with an AUTO_* code.
+    """
+    mascope_path = os.environ["MASCOPE_PATH"]
+
+    try:
+        window = auto_update.parse_window(os.environ.get("MASCOPE_UPDATE_WINDOW"))
+    except ValueError as e:
+        runtime.logger.error(str(e))
+        raise typer.Exit(auto_update.AUTO_ERROR)
+
+    if not is_container_running(_MODE):
+        runtime.logger.error(
+            "Postgres container is not running - the applied database revision "
+            "is read from it. Start the stack with 'mascope prod up'."
+        )
+        raise typer.Exit(auto_update.AUTO_ERROR)
+
+    repo = os.environ.get("MASCOPE_UPDATE_REPO", _DEFAULT_UPDATE_REPO)
+    target = auto_update.latest_release_tag(repo)
+    if target is None:
+        runtime.logger.error(
+            f"Could not determine the latest release of '{repo}' - check network "
+            "and read access to the repository releases."
+        )
+        raise typer.Exit(auto_update.AUTO_ERROR)
+
+    # Prefer the release manifest's Alembic head; fall back to image inspection.
+    target_head: Optional[str] = None
+    manifest_path = auto_update.download_manifest(
+        repo, target, auto_update.update_dir(mascope_path) / "manifests"
+    )
+    if manifest_path is not None:
+        try:
+            target_head = release_manifest.load_manifest(manifest_path)["alembic_head"]
+        except release_manifest.ManifestError as e:
+            runtime.logger.warning(f"Ignoring invalid release manifest: {e}")
+
+    db_cfg = runtime.full_config.backend.database
+    backend_cfg = runtime.full_config.backend
+    frontend_cfg = runtime.full_config.frontend
+    backend_container = backend_cfg.get_backend_container_name(mode=_MODE)
+
+    try:
+        plan = preflight.build_plan(
+            target=target,
+            backend_image=f"{_BACKEND_IMAGE}:{target}",
+            backend_container=backend_container,
+            frontend_image=f"{_FRONTEND_IMAGE}:{target}",
+            frontend_container=frontend_cfg.get_frontend_container_name(mode=_MODE),
+            pg_container=db_cfg.get_postgres_container_name(mode=_MODE),
+            db_user=db_cfg.user,
+            db_name=db_cfg.get_postgres_database_name(env_name=runtime.env.name),
+            pull=pull,
+            target_head=target_head,
+        )
+    except preflight.PreflightError as e:
+        runtime.logger.error(str(e))
+        raise typer.Exit(auto_update.AUTO_ERROR)
+
+    if plan.classification == "up-to-date":
+        auto_update.clear_pending(mascope_path)
+        runtime.logger.success(f"Already up to date ({target}).")
+        raise typer.Exit(auto_update.AUTO_OK)
+
+    if plan.classification == "migration-update":
+        pending = auto_update.record_pending(mascope_path, target, plan.target_revision)
+        message = (
+            f"Migration update {target} available (first seen "
+            f"{pending.first_seen_at}); not applied automatically - schedule a "
+            "maintenance window."
+        )
+        runtime.logger.warning(message)
+        auto_update.record_status(mascope_path, message)
+        raise typer.Exit(auto_update.AUTO_MIGRATION_PENDING)
+
+    # fast-update
+    if not auto_update.in_window(auto_update._now(), window):
+        runtime.logger.info(
+            f"Fast update {target} available; waiting for the maintenance window "
+            f"({os.environ.get('MASCOPE_UPDATE_WINDOW')})."
+        )
+        raise typer.Exit(auto_update.AUTO_OK)
+
+    _apply_fast_update(target, backend_container, mascope_path)
+
+
 @prod_app.command()
 def update(
     version: Annotated[
@@ -504,6 +637,17 @@ def update(
             dir_okay=False,
         ),
     ] = None,
+    auto: Annotated[
+        bool,
+        typer.Option(
+            "--auto",
+            help="Unattended update (for a timer): resolve the latest release and "
+            "apply a fast update inside the maintenance window "
+            "(MASCOPE_UPDATE_WINDOW, e.g. '2-5'), or record and notify a "
+            "migration update without applying it. Exit codes: 0 handled, "
+            "30 migration pending, 2 error.",
+        ),
+    ] = False,
 ) -> None:
     """
     Update the production stack to a newer release.
@@ -520,6 +664,10 @@ def update(
     database migration will run and cause downtime) without applying anything.
     This is the signal to decide whether a maintenance window is needed.
 
+    Pass --auto for an unattended, timer-driven update: it resolves the latest
+    release itself (ignoring --version), applies fast updates inside the
+    maintenance window, and only records + notifies migration updates.
+
     \b
     Examples:
         mascope prod update                        # follow the latest release
@@ -527,7 +675,12 @@ def update(
         MASCOPE_VERSION=v1.2.0 mascope prod update # same, via env pin
         mascope prod update --check                # classify without applying
         mascope prod update --check --json         # machine-readable preflight
+        mascope prod update --auto                 # unattended (for a timer)
     """
+    if auto:
+        # Standalone unattended path - resolves its own target and exits.
+        _auto(pull=pull)
+
     if version is not None:
         if version != "latest" and not re.fullmatch(r"v\d+\.\d+\.\d+", version):
             runtime.logger.error(

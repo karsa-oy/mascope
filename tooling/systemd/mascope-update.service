@@ -1,0 +1,25 @@
+[Unit]
+Description=Mascope unattended update check
+Documentation=https://github.com/karsa-oy/mascope
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Set these to the deploy user and the MASCOPE_PATH of the installation.
+User=mascope
+WorkingDirectory=/opt/mascope
+Environment=MASCOPE_PATH=/opt/mascope
+# Only apply fast (no-migration) updates during these local hours (HH-HH).
+# Leave unset to allow them at any time the timer fires.
+Environment=MASCOPE_UPDATE_WINDOW=2-5
+# Read access to the private repository's releases is required to discover the
+# latest release and download its manifest. Provide a token here or configure
+# `gh auth login` for the service user.
+# Environment=GH_TOKEN=
+
+ExecStart=/usr/local/bin/mascope prod update --auto
+
+# Exit 30 means "a migration update is pending" - informational, not a failure,
+# so systemd should not mark the unit failed for it. 0 is a clean handled run.
+SuccessExitStatus=0 30
