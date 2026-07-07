@@ -21,6 +21,7 @@ Database management:
     mascope prod db restore --yes
 """
 
+import json
 import os
 import platform
 import re
@@ -30,13 +31,20 @@ from typing import Annotated, Optional
 import typer
 
 from mascope_cli.cmd import lib
+from mascope_cli.cmd.prod import preflight
 from mascope_cli.cmd.prod.db import prod_db_app
-from mascope_cli.pg.utils import check_data_dirs
+from mascope_cli.pg.utils import check_data_dirs, is_container_running
 from mascope_cli.runtime import runtime
 from mascope_runtime import Runtime
 
 
 _MODE = "prod"
+
+# Published production image repositories, matching the `image:` fields in
+# docker-compose.yaml. The target release tag is appended to form the full
+# reference the update preflight pulls and inspects.
+_BACKEND_IMAGE = "ghcr.io/karsa-oy/mascope/backend"
+_FRONTEND_IMAGE = "ghcr.io/karsa-oy/mascope/frontend"
 
 prod_app = typer.Typer()
 prod_app.add_typer(prod_db_app, name="db")
@@ -326,6 +334,71 @@ def build() -> None:
     _run_compose(["build"], building=True)
 
 
+def _report_plan(plan: preflight.UpdatePlan) -> None:
+    """Print a human-readable summary of an update preflight classification."""
+    runtime.logger.info(f"Target release:   {plan.target}")
+    runtime.logger.info(f"Target revision:  {plan.target_revision}")
+    runtime.logger.info(
+        f"Current revision: {plan.current_revision or '(none - not yet migrated)'}"
+    )
+    if plan.classification == "up-to-date":
+        runtime.logger.success("Up to date - no update available.")
+    elif plan.classification == "fast-update":
+        runtime.logger.warning(
+            "Fast update available - new images, no database migration "
+            "(near-zero downtime)."
+        )
+    else:  # migration-update
+        runtime.logger.warning(
+            "Migration update available - a database migration will run on "
+            "startup; schedule a maintenance window."
+        )
+
+
+def _preflight(target: str, *, pull: bool, as_json: bool) -> None:
+    """
+    Classify the pending update to ``target`` and exit with its code.
+
+    Requires the Postgres container to be running, since the applied database
+    revision is read from it. Never returns normally — it always raises
+    ``typer.Exit`` with the classification's exit code (or the error code when
+    the update cannot be classified).
+    """
+    if not is_container_running(_MODE):
+        runtime.logger.error(
+            "Postgres container is not running - start the stack with "
+            "'mascope prod up' before checking (the applied database revision "
+            "is read from the running container)."
+        )
+        raise typer.Exit(preflight.ERROR_EXIT_CODE)
+
+    db_cfg = runtime.full_config.backend.database
+    backend_cfg = runtime.full_config.backend
+    frontend_cfg = runtime.full_config.frontend
+
+    try:
+        plan = preflight.build_plan(
+            target=target,
+            backend_image=f"{_BACKEND_IMAGE}:{target}",
+            backend_container=backend_cfg.get_backend_container_name(mode=_MODE),
+            frontend_image=f"{_FRONTEND_IMAGE}:{target}",
+            frontend_container=frontend_cfg.get_frontend_container_name(mode=_MODE),
+            pg_container=db_cfg.get_postgres_container_name(mode=_MODE),
+            db_user=db_cfg.user,
+            db_name=db_cfg.get_postgres_database_name(env_name=runtime.env.name),
+            pull=pull,
+        )
+    except preflight.PreflightError as e:
+        runtime.logger.error(str(e))
+        raise typer.Exit(preflight.ERROR_EXIT_CODE)
+
+    if as_json:
+        typer.echo(json.dumps(plan.to_dict()))
+    else:
+        _report_plan(plan)
+    raise typer.Exit(plan.exit_code)
+
+
 @prod_app.command()
 def update(
     version: Annotated[
@@ -336,6 +409,27 @@ def update(
             "MASCOPE_VERSION pin, or 'latest'.",
         ),
     ] = None,
+    check: Annotated[
+        bool,
+        typer.Option(
+            "--check",
+            help="Classify the pending update without applying it, then exit. "
+            "Exit codes: 0 up-to-date, 10 fast update, 20 migration update, "
+            "2 error.",
+        ),
+    ] = False,
+    pull: Annotated[
+        bool,
+        typer.Option(
+            "--pull/--no-pull",
+            help="With --check, pull the target images before classifying. "
+            "--no-pull compares only images already present locally.",
+        ),
+    ] = True,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="With --check, print the classification as JSON."),
+    ] = False,
 ) -> None:
     """
     Update the production stack to a newer release.
@@ -347,11 +441,18 @@ def update(
     Containers whose image did not change are left running, and a failed
     pull aborts before the running stack is touched.
 
+    Pass --check to classify the pending update as up-to-date, a fast update
+    (new images, no migration, near-zero downtime), or a migration update (a
+    database migration will run and cause downtime) without applying anything.
+    This is the signal to decide whether a maintenance window is needed.
+
     \b
     Examples:
         mascope prod update                        # follow the latest release
         mascope prod update --version v1.2.0       # move to a specific release
         MASCOPE_VERSION=v1.2.0 mascope prod update # same, via env pin
+        mascope prod update --check                # classify without applying
+        mascope prod update --check --json         # machine-readable preflight
     """
     if version is not None:
         if version != "latest" and not re.fullmatch(r"v\d+\.\d+\.\d+", version):
@@ -365,8 +466,13 @@ def update(
         os.environ["MASCOPE_VERSION"] = version
         os.environ["_MASCOPE_VERSION_PINNED"] = "1"
 
-    check_data_dirs(_MODE)
     target = _deploy_version()
+
+    if check:
+        # Never returns - raises typer.Exit with the classification's code.
+        _preflight(target, pull=pull, as_json=as_json)
+
+    check_data_dirs(_MODE)
     runtime.logger.info(f"Updating the production stack to '{target}'")
     _run_compose(["pull"])
     _run_compose(["up", "--detach"])
