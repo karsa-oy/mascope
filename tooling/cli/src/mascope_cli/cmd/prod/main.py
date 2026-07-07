@@ -467,38 +467,79 @@ def _preflight(
     raise typer.Exit(plan.exit_code)
 
 
-def _apply_fast_update(target: str, backend_container: str, mascope_path: str) -> None:
+def _apply_update(
+    target: str, backend_container: str, mascope_path: str, *, kind: str
+) -> None:
     """
-    Apply a fast (no-migration) update to ``target`` and verify health.
+    Apply an update to ``target`` and verify health.
 
     Pins the deploy to ``target``, restarts the stack, and waits for the
-    backend to report healthy. On success clears any pending record; on failure
-    it alerts and stops - it never rolls back automatically. Raises
-    ``typer.Exit`` with the appropriate AUTO_* code either way.
+    backend to report healthy. For a migration update the db_init service takes
+    the pre-migration dump and runs the migration on startup. On success clears
+    the pending record; on failure it alerts and stops - it never rolls back
+    automatically. Raises ``typer.Exit`` with the appropriate AUTO_* code.
+
+    :param kind: "fast" or "migration" - for log/status wording only.
     """
     os.environ["MASCOPE_VERSION"] = target
     os.environ["_MASCOPE_VERSION_PINNED"] = "1"
 
     check_data_dirs(_MODE)
-    runtime.logger.info(f"Applying fast update to '{target}'")
+    runtime.logger.info(f"Applying {kind} update to '{target}'")
     _run_compose(["pull"])
     _run_compose(["up", "--detach"])
 
     if auto_update.wait_healthy(backend_container):
         auto_update.clear_pending(mascope_path)
-        message = f"Fast update to {target} applied; backend healthy."
+        message = f"{kind.capitalize()} update to {target} applied; backend healthy."
         runtime.logger.success(message)
         auto_update.record_status(mascope_path, message)
         _run_compose(["ps"])
         raise typer.Exit(auto_update.AUTO_OK)
 
     message = (
-        f"Fast update to {target} applied but the backend did not become "
-        "healthy - manual intervention needed (no automatic rollback)."
+        f"{kind.capitalize()} update to {target} applied but the backend did not "
+        "become healthy - manual intervention needed (no automatic rollback)."
     )
     runtime.logger.error(message)
     auto_update.record_status(mascope_path, message)
     raise typer.Exit(auto_update.AUTO_ERROR)
+
+
+def _manage_pending(*, confirm: bool, snooze: Optional[int]) -> None:
+    """
+    Confirm or snooze the recorded pending migration update, then exit.
+
+    Never returns normally - always raises ``typer.Exit``.
+    """
+    mascope_path = os.environ["MASCOPE_PATH"]
+
+    if snooze is not None:
+        if snooze <= 0:
+            runtime.logger.error("--snooze days must be a positive integer.")
+            raise typer.Exit(1)
+        pending = auto_update.snooze_pending(mascope_path, snooze)
+        if pending is None:
+            runtime.logger.warning("No pending migration update to snooze.")
+            raise typer.Exit(0)
+        message = (
+            f"Snoozed migration update {pending.version} until {pending.snooze_until}."
+        )
+        runtime.logger.success(message)
+        auto_update.record_status(mascope_path, message)
+        raise typer.Exit(0)
+
+    pending = auto_update.confirm_pending(mascope_path)
+    if pending is None:
+        runtime.logger.warning("No pending migration update to confirm.")
+        raise typer.Exit(0)
+    message = (
+        f"Confirmed migration update {pending.version}; it will apply at the next "
+        "maintenance window."
+    )
+    runtime.logger.success(message)
+    auto_update.record_status(mascope_path, message)
+    raise typer.Exit(0)
 
 
 def _auto(*, pull: bool) -> None:
@@ -508,7 +549,9 @@ def _auto(*, pull: bool) -> None:
     - up-to-date: nothing to do.
     - fast update: apply inside the maintenance window (health-checked); outside
       the window, do nothing and retry on the next tick.
-    - migration update: record it as pending and notify; never apply here.
+    - migration update: record it as pending; apply it inside the window once
+      the grace period elapses or it has been confirmed (and is not snoozed);
+      otherwise notify and wait.
 
     Never returns normally - always raises ``typer.Exit`` with an AUTO_* code.
     """
@@ -576,10 +619,29 @@ def _auto(*, pull: bool) -> None:
 
     if plan.classification == "migration-update":
         pending = auto_update.record_pending(mascope_path, target, plan.target_revision)
+        try:
+            grace_days = int(os.environ.get("MASCOPE_UPDATE_GRACE_DAYS", "7"))
+        except ValueError:
+            runtime.logger.error(
+                "MASCOPE_UPDATE_GRACE_DAYS must be an integer number of days."
+            )
+            raise typer.Exit(auto_update.AUTO_ERROR)
+
+        if auto_update.should_apply_migration(
+            pending, auto_update._now(), grace_days, window
+        ):
+            reason = (
+                "confirmed" if pending.confirmed else f"grace of {grace_days}d elapsed"
+            )
+            runtime.logger.info(
+                f"Applying migration update {target} ({reason}, in window)."
+            )
+            _apply_update(target, backend_container, mascope_path, kind="migration")
+
         message = (
             f"Migration update {target} available (first seen "
-            f"{pending.first_seen_at}); not applied automatically - schedule a "
-            "maintenance window."
+            f"{pending.first_seen_at}); not applied yet - waiting for the "
+            "maintenance window, grace period, or an explicit confirm."
         )
         runtime.logger.warning(message)
         auto_update.record_status(mascope_path, message)
@@ -593,7 +655,7 @@ def _auto(*, pull: bool) -> None:
         )
         raise typer.Exit(auto_update.AUTO_OK)
 
-    _apply_fast_update(target, backend_container, mascope_path)
+    _apply_update(target, backend_container, mascope_path, kind="fast")
 
 
 @prod_app.command()
@@ -648,6 +710,21 @@ def update(
             "30 migration pending, 2 error.",
         ),
     ] = False,
+    confirm: Annotated[
+        bool,
+        typer.Option(
+            "--confirm",
+            help="Confirm the pending migration update so --auto applies it at the "
+            "next maintenance window without waiting out the grace period.",
+        ),
+    ] = False,
+    snooze: Annotated[
+        Optional[int],
+        typer.Option(
+            "--snooze",
+            help="Postpone the pending migration update by this many days, then exit.",
+        ),
+    ] = None,
 ) -> None:
     """
     Update the production stack to a newer release.
@@ -676,7 +753,13 @@ def update(
         mascope prod update --check                # classify without applying
         mascope prod update --check --json         # machine-readable preflight
         mascope prod update --auto                 # unattended (for a timer)
+        mascope prod update --confirm              # approve the pending migration
+        mascope prod update --snooze 7             # postpone it 7 days
     """
+    if confirm or snooze is not None:
+        # Standalone management of the recorded pending migration update.
+        _manage_pending(confirm=confirm, snooze=snooze)
+
     if auto:
         # Standalone unattended path - resolves its own target and exits.
         _auto(pull=pull)

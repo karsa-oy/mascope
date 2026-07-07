@@ -42,12 +42,19 @@ class PendingUpdate:
     version: str
     alembic_head: str
     first_seen_at: str
+    # Postpone auto-apply until this local ISO timestamp (set by a snooze).
+    snooze_until: Optional[str] = None
+    # Operator/customer confirmed: apply at the next window without waiting out
+    # the grace period.
+    confirmed: bool = False
 
     def to_dict(self) -> dict:
         return {
             "version": self.version,
             "alembic_head": self.alembic_head,
             "first_seen_at": self.first_seen_at,
+            "snooze_until": self.snooze_until,
+            "confirmed": self.confirmed,
         }
 
 
@@ -118,6 +125,8 @@ def load_pending(mascope_path: str) -> Optional[PendingUpdate]:
         version=data["version"],
         alembic_head=data["alembic_head"],
         first_seen_at=data["first_seen_at"],
+        snooze_until=data.get("snooze_until"),
+        confirmed=data.get("confirmed", False),
     )
 
 
@@ -152,6 +161,65 @@ def record_pending(mascope_path: str, version: str, alembic_head: str) -> Pendin
     )
     save_pending(mascope_path, pending)
     return pending
+
+
+def snooze_pending(mascope_path: str, days: int) -> Optional[PendingUpdate]:
+    """
+    Postpone auto-apply of the pending update by ``days``. Returns the updated
+    record, or None if there is nothing pending.
+    """
+    pending = load_pending(mascope_path)
+    if pending is None:
+        return None
+    pending.snooze_until = (
+        (_now() + datetime.timedelta(days=days)).replace(microsecond=0).isoformat()
+    )
+    # Snoozing overrides a prior confirmation - the operator changed their mind.
+    pending.confirmed = False
+    save_pending(mascope_path, pending)
+    return pending
+
+
+def confirm_pending(mascope_path: str) -> Optional[PendingUpdate]:
+    """
+    Mark the pending update confirmed so it applies at the next window without
+    waiting out the grace period. Returns the updated record, or None if there
+    is nothing pending.
+    """
+    pending = load_pending(mascope_path)
+    if pending is None:
+        return None
+    pending.confirmed = True
+    pending.snooze_until = None
+    save_pending(mascope_path, pending)
+    return pending
+
+
+def should_apply_migration(
+    pending: PendingUpdate,
+    now: datetime.datetime,
+    grace_days: int,
+    window: Optional[tuple[int, int]],
+) -> bool:
+    """
+    Decide whether a pending migration update may be applied unattended now.
+
+    True only when inside the maintenance window and not snoozed, and either
+    the operator confirmed it or its grace period has elapsed since it was
+    first seen.
+    """
+    if not in_window(now, window):
+        return False
+    if pending.snooze_until and now < datetime.datetime.fromisoformat(
+        pending.snooze_until
+    ):
+        return False
+    if pending.confirmed:
+        return True
+    grace_deadline = datetime.datetime.fromisoformat(
+        pending.first_seen_at
+    ) + datetime.timedelta(days=grace_days)
+    return now >= grace_deadline
 
 
 def record_status(mascope_path: str, message: str) -> None:
