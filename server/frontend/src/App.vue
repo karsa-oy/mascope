@@ -12,12 +12,17 @@ import { runtime } from '@/lib/runtime.js'
 import { beautifySnakeCase } from '@/lib/utils'
 import { BaseKarsaLogo } from '@/lib/base'
 import { useApp } from '@/stores'
+import { useLocation } from '@/lib/location'
 import { PaneLogin, PaneOwnerSignup } from '@/lib/panes'
 
 const { connected } = api
 
 const app = useApp()
 const toast = useToast()
+
+// Instantiate the location store so it registers its shared-link import hook,
+// which runs once the user authenticates.
+useLocation()
 
 // toaster
 app.ui.notification

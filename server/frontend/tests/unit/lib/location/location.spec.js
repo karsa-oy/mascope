@@ -4,6 +4,9 @@ import { createPinia, setActivePinia } from 'pinia'
 // A mutable holder so the mocked useApp() returns whatever the test sets up.
 const { app } = vi.hoisted(() => ({ app: { current: null } }))
 vi.mock('@/stores', () => ({ useApp: () => app.current }))
+// The store registers a shared-link import hook on login; stub auth so the
+// real auth store (and its api/runtime imports) stay out of this unit test.
+vi.mock('@/stores/auth', () => ({ useAuth: () => ({ onLogin: vi.fn() }) }))
 
 import { useLocation } from '@/lib/location'
 
