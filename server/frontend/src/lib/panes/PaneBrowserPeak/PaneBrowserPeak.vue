@@ -1,6 +1,5 @@
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue'
-import Button from 'primevue/button'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Panel from 'primevue/panel'
@@ -8,6 +7,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import TabMenu from 'primevue/tabmenu'
 
 import { num } from '@/lib/formatters'
+import { BaseTierTag } from '@/lib/base'
 import { useApp } from '@/stores'
 import { usePeakScroller } from './stores'
 
@@ -21,6 +21,26 @@ defineProps({
     required: true
   }
 })
+
+// The per-peak assignments of the focused run, joined to peaks by
+// String(peak_id) === sample_peak_id (see docs/dev/peak_assignment_frontend.md).
+const assignments = computed(() => app.data.peakAssignment.peak)
+const hasRun = computed(() => !!assignments.value.run)
+const tierCounts = computed(() => assignments.value.tierCounts)
+
+const assignmentFor = (peak) => assignments.value.forPeak(peak?.peak_id)
+
+// Source badge shown next to the committed formula.
+const sourceIcon = (source) => {
+  switch (source) {
+    case 'database':
+      return 'pi ph ph-database'
+    case 'untargeted':
+      return 'pi ph ph-magnifying-glass'
+    default:
+      return null
+  }
+}
 
 // Watch for table ref to become available and bind to scroller
 watch(
@@ -64,10 +84,11 @@ onBeforeUnmount(() => {
     style="border: none; min-width: 280px; max-width: 400px; width: 100%"
     :pt="
       app.ui.help.top(`
-        <h1>Peak Browser</h1>
+        <h1>Peak Ledger</h1>
 
         <p>
-        List of detected peaks in the currently selected sample. Click on a peak to assign a composition.
+        Every detected peak in the selected sample and its committed assignment - formula,
+        confidence tier and fit score - from the latest assignment run. Click a peak to inspect it.
         </p>
       `)
     "
@@ -76,13 +97,22 @@ onBeforeUnmount(() => {
       <TabMenu :model="[{ label: 'Peaks', icon: 'pi ph ph-crosshair' }]" style="overflow: hidden" />
     </template>
     <template #icons>
-      <span style="opacity: 0.5"
-        >{{ app.data.peak.list.filter((p) => p.match.length > 0).length }}/{{
-          app.data.peak.list.length
-        }}
-        peaks matched
-      </span></template
-    >
+      <span v-if="hasRun" class="tier-summary">
+        <span class="tier-stat identified" v-tooltip.bottom="'Identified'">
+          {{ tierCounts.identified }}
+        </span>
+        <span class="tier-stat candidate" v-tooltip.bottom="'Candidate'">
+          {{ tierCounts.candidate }}
+        </span>
+        <span class="tier-stat below" v-tooltip.bottom="'Below assignability'">
+          {{ tierCounts.below_assignability }}
+        </span>
+        <span class="tier-stat unassigned" v-tooltip.bottom="'Unassigned'">
+          {{ tierCounts.unassigned }}
+        </span>
+      </span>
+      <span v-else style="opacity: 0.5">{{ app.data.peak.list.length }} peaks &middot; no run</span>
+    </template>
     <DataTable
       v-if="!app.data.peak.pending"
       ref="peakTable"
@@ -105,52 +135,31 @@ onBeforeUnmount(() => {
           {{ num.mz.format(data.mz) }}
         </template>
       </Column>
-      <Column field="height" header="height" sortable style="height: 20px; min-width: 6rem">
+      <Column field="height" header="height" sortable style="height: 20px; min-width: 5rem">
         <template #body="{ data }">
           {{ num.peakIntensity.format(data.height) }}
         </template>
       </Column>
-      <Column field="area" header="area" sortable style="height: 20px; min-width: 6rem">
+      <Column header="assignment" style="height: 20px; min-width: 9rem">
         <template #body="{ data }">
-          {{ num.peakIntensity.format(data.area) }}
-        </template>
-      </Column>
-      <Column field="match" header="formula" sortable style="height: 20px">
-        <template #body="{ data }">
-          <div class="formula-buttons">
-            <Button
-              size="small"
-              text
-              severity="secondary"
-              v-tooltip.top="
-                `${match.target_compound_formula}${
-                  app.data.ionization.mechanism.list.find(
-                    (m) => m.ionization_mechanism_id === match.ionization_mechanism_id
-                  )?.ionization_mechanism || ''
-                }:\n ${match.target_ion_formula}`
-              "
-              @click="
-                async () => {
-                  if (data.match.length > 0) {
-                    await app.data.match.visualized.set({
-                      sampleId: app.data.sample.focusedId,
-                      ionId: match.target_ion_id,
-                      collectionId:
-                        match.target_collection_ids.find(
-                          (id) => id === app.data.match.collection.focusedId // In case the currently focused collection is among the matches, prioritize it
-                        ) || match.target_collection_ids[0], // Otherwise just take the first one,
-                      isotopeId: data.match[index].target_isotope_id
-                    })
-                    app.ui.tab.active = 'match'
-                  }
-                }
-              "
-              v-for="(match, index) in data.match"
-              :key="match.target_isotope_id"
-            >
-              {{ match.target_isotope_formula }}
-            </Button>
+          <div v-if="assignmentFor(data)" class="assignment-cell">
+            <span class="formula" v-if="assignmentFor(data).assigned_formula">
+              <span
+                v-if="sourceIcon(assignmentFor(data).source)"
+                :class="sourceIcon(assignmentFor(data).source)"
+                class="source-icon"
+                v-tooltip.top="assignmentFor(data).source"
+              />
+              {{ assignmentFor(data).assigned_formula }}
+            </span>
+            <BaseTierTag
+              :tier="assignmentFor(data).tier"
+              :fit-score="assignmentFor(data).fit_score"
+              :role="assignmentFor(data).role"
+              :source="assignmentFor(data).source"
+            />
           </div>
+          <span v-else-if="hasRun" class="empty">&mdash;</span>
         </template>
       </Column>
     </DataTable>
@@ -171,11 +180,58 @@ onBeforeUnmount(() => {
   height: 36px !important;
 }
 
-.formula-buttons {
+.assignment-cell {
   display: flex;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.formula {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
   gap: 0.25rem;
-  align-items: flex-start;
-  align-content: center;
+}
+
+.source-icon {
+  opacity: 0.5;
+  font-size: 0.8rem;
+}
+
+.empty {
+  opacity: 0.4;
+}
+
+.tier-summary {
+  display: inline-flex;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.tier-stat {
+  min-width: 1.6rem;
+  text-align: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.tier-stat.identified {
+  color: var(--p-green-600, #1f9d63);
+  background: color-mix(in srgb, var(--p-green-500, #22c55e) 15%, transparent);
+}
+.tier-stat.candidate {
+  color: var(--p-amber-600, #c9861f);
+  background: color-mix(in srgb, var(--p-amber-500, #f59e0b) 15%, transparent);
+}
+.tier-stat.below {
+  color: var(--p-surface-500, #6f7889);
+  background: color-mix(in srgb, var(--p-surface-500, #6f7889) 12%, transparent);
+}
+.tier-stat.unassigned {
+  color: var(--p-surface-400, #9aa2b1);
+  border: 1px dashed color-mix(in srgb, var(--p-surface-400, #9aa2b1) 50%, transparent);
 }
 </style>
