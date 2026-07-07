@@ -261,6 +261,22 @@ function getIsotopeRows(data) {
   }))
 }
 
+// Reference-database identities the cheminfo annotation attaches to each
+// candidate (data.cheminfo.known_compounds); empty for de novo-only formulas.
+function knownCompoundLabel(known) {
+  if (!known?.length) return ''
+  const name = known[0]?.name?.length ? known[0].name : 'Unnamed'
+  return known.length > 1 ? `${name} +${known.length - 1}` : name
+}
+
+function knownCompoundsTooltip(known) {
+  if (!known?.length) return ''
+  const names = known
+    .map((k) => `${k?.name?.length ? k.name : 'Unnamed'}${k?.source ? ` (${k.source})` : ''}`)
+    .join(', ')
+  return `Known compound in public reference database: ${names}`
+}
+
 const expanded = ref({})
 </script>
 
@@ -405,6 +421,30 @@ const expanded = ref({})
           </template>
         </Column>
         <Column>
+          <template #header>
+            <span
+              class="pi ph ph-flask"
+              v-tooltip.left="{
+                value: 'Known compound (public reference database)',
+                showDelay: 500
+              }"
+            />
+          </template>
+          <template #body="{ data }">
+            <span
+              v-if="data.cheminfo?.known_compounds?.length"
+              class="known-identity"
+              v-tooltip.left="{
+                value: knownCompoundsTooltip(data.cheminfo.known_compounds),
+                showDelay: 300
+              }"
+            >
+              <span class="pi ph ph-flask" />
+              {{ knownCompoundLabel(data.cheminfo.known_compounds) }}
+            </span>
+          </template>
+        </Column>
+        <Column>
           <template #body="{ data }">
             <PopoverTargetCompoundAdd
               :formula="data.target_compound_formula"
@@ -516,5 +556,16 @@ const expanded = ref({})
 
 :deep(.p-panel-header) {
   display: flex !important;
+}
+
+.known-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--p-primary-color);
+  white-space: nowrap;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
