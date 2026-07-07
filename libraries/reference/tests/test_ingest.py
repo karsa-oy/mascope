@@ -109,9 +109,7 @@ def test_reingest_with_prune_drops_prior_version(sync_engine, tmp_path):
     ingest(sync_engine, PubChemAdapter(), path, version="v2", prune=True)
 
     with sync_engine.connect() as conn:
-        versions = conn.execute(
-            select(reference_source.c.version)
-        ).scalars().all()
+        versions = conn.execute(select(reference_source.c.version)).scalars().all()
         # Only the current version remains; compounds all point at it.
         assert versions == ["v2"]
         distinct_sources = conn.execute(
@@ -128,11 +126,15 @@ def test_stage_does_not_activate(sync_engine, tmp_path):
     ingest(sync_engine, PubChemAdapter(), path, version="v3", activate=False)
 
     with sync_engine.connect() as conn:
-        active = conn.execute(
-            select(reference_source.c.version).where(
-                reference_source.c.is_active.is_(True)
+        active = (
+            conn.execute(
+                select(reference_source.c.version).where(
+                    reference_source.c.is_active.is_(True)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert active == ["v2"]
 
 
@@ -145,9 +147,13 @@ def test_source_name_override_lets_loads_coexist(sync_engine, tmp_path):
     assert r1.source == "list-a" and r2.source == "list-b"
 
     with sync_engine.connect() as conn:
-        active = conn.execute(
-            select(reference_source.c.name)
-            .where(reference_source.c.is_active.is_(True))
-            .order_by(reference_source.c.name)
-        ).scalars().all()
+        active = (
+            conn.execute(
+                select(reference_source.c.name)
+                .where(reference_source.c.is_active.is_(True))
+                .order_by(reference_source.c.name)
+            )
+            .scalars()
+            .all()
+        )
     assert active == ["list-a", "list-b"]

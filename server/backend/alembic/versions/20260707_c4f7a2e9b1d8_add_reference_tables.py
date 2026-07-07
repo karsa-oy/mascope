@@ -37,7 +37,9 @@ def upgrade() -> None:
         sa.Column("record_count", sa.Integer(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("ingested_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.PrimaryKeyConstraint("reference_source_id", name=op.f("pk_reference_source")),
+        sa.PrimaryKeyConstraint(
+            "reference_source_id", name=op.f("pk_reference_source")
+        ),
     )
     op.create_index(
         op.f("ix_reference_source_name"),
@@ -69,9 +71,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["reference_source_id"],
             ["reference_source.reference_source_id"],
-            name=op.f(
-                "fk_reference_compound_reference_source_id_reference_source"
-            ),
+            name=op.f("fk_reference_compound_reference_source_id_reference_source"),
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint(
@@ -120,8 +120,6 @@ def downgrade() -> None:
         table_name="reference_compound",
     )
     op.drop_table("reference_compound")
-    op.drop_index(
-        op.f("ix_reference_source_is_active"), table_name="reference_source"
-    )
+    op.drop_index(op.f("ix_reference_source_is_active"), table_name="reference_source")
     op.drop_index(op.f("ix_reference_source_name"), table_name="reference_source")
     op.drop_table("reference_source")
