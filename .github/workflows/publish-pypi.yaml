@@ -1,9 +1,9 @@
 name: Publish packages to PyPI
 
-# Publishes mascope-sdk, mascope-tools and mascope-runtime when their
-# pyproject version changes on master: bump the version in a PR, merge, and
-# this workflow uploads the new release. Idempotent — a version that already
-# exists on PyPI is skipped, so re-runs and unrelated pushes are safe.
+# Publishes mascope-sdk, mascope-tools, mascope-runtime and mascope-cli when
+# their pyproject version changes on master: bump the version in a PR, merge,
+# and this workflow uploads the new release. Idempotent — a version that
+# already exists on PyPI is skipped, so re-runs and unrelated pushes are safe.
 #
 # Auth is PyPI Trusted Publishing (OIDC), no tokens: each PyPI project must
 # have a trusted publisher configured for this repository, this workflow file
@@ -16,6 +16,7 @@ on:
       - libraries/sdk/pyproject.toml
       - libraries/tools/pyproject.toml
       - libraries/runtime/pyproject.toml
+      - tooling/cli/pyproject.toml
   workflow_dispatch:
 
 permissions:
@@ -55,7 +56,11 @@ jobs:
       - name: Publish mascope-tools (if the version is new)
         run: bash .github/scripts/publish-package.sh libraries/tools mascope-tools mascope_tools
 
-      # Groundwork for the standalone mascope-cli (it depends on this
-      # package); nothing else on PyPI consumes it yet.
+      # mascope-runtime before mascope-cli: the CLI depends on it, so when a
+      # single commit bumps both, the runtime release must exist before the
+      # CLI wheel is resolved and tested.
       - name: Publish mascope-runtime (if the version is new)
         run: bash .github/scripts/publish-package.sh libraries/runtime mascope-runtime mascope_runtime
+
+      - name: Publish mascope-cli (if the version is new)
+        run: bash .github/scripts/publish-package.sh tooling/cli mascope-cli mascope_cli

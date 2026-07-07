@@ -48,6 +48,15 @@ def test_branch_build_deploys_latest(monkeypatch):
     assert prod_main._deploy_version() == "latest"
 
 
+def test_pip_installed_cli_deploys_latest(monkeypatch):
+    # Outside a checkout the CLI's own calver package version (v2026.x.y)
+    # must not be mistaken for an app release image tag: deploy `latest`.
+    monkeypatch.setenv("_MASCOPE_VERSION_PINNED", "0")
+    monkeypatch.setattr(prod_main.runtime, "parse_version", lambda: "unknown-version")
+    monkeypatch.setattr("mascope_cli.version.metadata.version", lambda name: "2026.7.7")
+    assert prod_main._deploy_version() == "latest"
+
+
 # --- _compose_env ---
 
 
