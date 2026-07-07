@@ -149,7 +149,7 @@ class TestInvertMatches:
         assert len(winner["alternatives"]) == 1
         assert winner["alternatives"][0]["target_ion_id"] == "ion2"
         assert winner["alternatives"][0]["assigned_formula"] == "C7H16O5"
-        assert winner["alternatives"][0]["match_score"] == pytest.approx(0.75)
+        assert winner["alternatives"][0]["fit_score"] == pytest.approx(0.75)
 
     def test_isotope_child_points_at_its_ions_m0_assignment(self):
         match_df = pd.DataFrame(
@@ -432,7 +432,7 @@ class TestUntargetedMatches:
         assert m0["ionization_mechanism_id"] == "mech1"
         assert m0["target_compound_id"] is None
         # score = (1 - 0.1) * (1 - 2.0/100)
-        assert m0["match_score"] == pytest.approx(0.9 * 0.98)
+        assert m0["fit_score"] == pytest.approx(0.9 * 0.98)
         assert m0["tier"] == TIER_IDENTIFIED
         assert [alt["assigned_formula"] for alt in m0["alternatives"]] == [
             "C4H8N2O",
@@ -469,7 +469,7 @@ class TestUntargetedMatches:
         )
         assert len(assignments) == 1
         # uses the envelope fit (0.42), not the inline 0.9 * 0.98
-        assert assignments[0]["match_score"] == pytest.approx(0.42)
+        assert assignments[0]["fit_score"] == pytest.approx(0.42)
         assert assignments[0]["tier"] == TIER_BELOW_ASSIGNABILITY
 
     def test_isotope_child_is_attributed_to_its_formula_group_m0(self):
@@ -541,7 +541,7 @@ class TestUntargetedMatches:
         )
         assert len(assignments) == 1
         # score = (1 - 0.1) * (1 - 2.0/100), not 0 from a collapsed mz term.
-        assert assignments[0]["match_score"] == pytest.approx(0.9 * 0.98)
+        assert assignments[0]["fit_score"] == pytest.approx(0.9 * 0.98)
         assert assignments[0]["tier"] == TIER_IDENTIFIED
 
     def test_ionization_placeholder_formula_is_skipped(self):
