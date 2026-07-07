@@ -14,6 +14,11 @@ persistence.
 import numpy as np
 import pandas as pd
 
+from mascope_backend.api.controllers.match.lib.match_score_v2 import (
+    fit_sample_mass_accuracy,
+    ion_score_v2,
+    sample_noise_floor,
+)
 from mascope_backend.db.id import gen_id
 
 
@@ -89,6 +94,71 @@ def _isotope_offset_label(iso_mz: float, main_mz: float | None) -> str | None:
     if offset == 0:
         return "M0"
     return f"M+{offset}" if offset > 0 else f"M{offset}"
+
+
+# Columns the ion-level fit score needs on the isotope frame. Absent (e.g. a lighter
+# match path) -> the fit scoring is skipped and the per-isotopologue score stands.
+_FIT_SCORE_COLS = frozenset(
+    {"target_ion_id", "relative_abundance", "match_mz_error", "sample_peak_intensity"}
+)
+
+
+def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
+    """Set each isotopologue's ``match_score`` to its ion's fit score (Stage A).
+
+    The peak-centric engine adopts the fit score (`score_pattern_v2`) *deliberately*
+    as its scoring engine -- unconditionally, not gated on the legacy
+    ``MASCOPE_MATCH_SCORE_VERSION`` switch, per the epic's "coexist, don't replace"
+    principle. Where the targeted matcher emits a per-isotopologue
+    ``abundance_term * mz_term``, this replaces it with the consolidated ion-level
+    fit quality: the whole predicted isotope envelope scored against the spectrum
+    (mass, intensity, SNR-detectability), computed exactly as the aggregate match
+    path does (`ion_score_v2` per ``target_ion_id`` with the sample's fitted mass
+    accuracy). Every isotopologue of an ion carries that ion's fit, so the
+    single-owner arbitration in `invert_matches_to_peak_assignments` awards a
+    contested peak to the better-corroborated assignment, not the one with the
+    best single-peak mass hit.
+
+    Call AFTER `apply_match_params`: it zeroes ``sample_peak_intensity`` for
+    out-of-tolerance isotopologues, and this treats any isotopologue the gating
+    rejected (``match_score == 0``) as absent, so the fit score honours the same
+    tolerance / intensity-floor gating as the targeted Match tab.
+
+    Real per-peak ``signal_to_noise`` (carried from the filestore by
+    `compute_match_isotopes`) makes this the full v2 fit; without it `ion_score_v2`
+    falls back to its intensity-derived proxy SNR. No-op (returns the frame
+    unchanged) when empty or missing the required columns.
+
+    NOTE (follow-up, not this change): the confidence-tier *bands* are still the
+    legacy `match_params` thresholds. The fit score sits on a different scale (a
+    lone mass-only match scores low by design), so the identified/candidate bands
+    want recalibrating for the fit scale (DESIGN.md: v2 bands ~0.8/0.5) -- a
+    product decision, tracked separately from this measurement change.
+    """
+    if match_isotope_df.empty or not _FIT_SCORE_COLS.issubset(
+        match_isotope_df.columns
+    ):
+        return match_isotope_df
+
+    df = match_isotope_df.copy()
+    # Honour apply_match_params gating: an isotopologue it rejected (score 0) is
+    # absent to the fit score (its intensity may still be set, e.g. below the
+    # intensity floor but within tolerance).
+    if "match_score" in df.columns:
+        gated_out = pd.to_numeric(df["match_score"], errors="coerce").fillna(0.0) == 0
+        df.loc[gated_out, "sample_peak_intensity"] = 0.0
+
+    mu, sigma = fit_sample_mass_accuracy(df)
+    noise = sample_noise_floor(df)
+    fit_by_ion = df.groupby("target_ion_id", sort=False, dropna=False).apply(
+        lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise),
+        include_groups=False,
+    )
+    match_isotope_df = match_isotope_df.copy()
+    match_isotope_df["match_score"] = (
+        match_isotope_df["target_ion_id"].map(fit_by_ion).astype(float)
+    )
+    return match_isotope_df
 
 
 def invert_matches_to_peak_assignments(
@@ -239,9 +309,15 @@ def untargeted_matches_to_peak_assignments(
     those rows into the persisted PeakAssignment shape. Rows with the '---'
     placeholder are skipped (their peaks stay unassigned).
 
-    The Stage B score reuses the targeted matcher's maths:
-    ``score = (1 - min(1, |intensity_error|)) * max(0, 1 - |mz_error_ppm|/100)``
-    with the abundance term dropped when no isotope envelope was evaluated.
+    Scoring uses the fit score. `assign_compositions` (via `match_isotopic_pattern`)
+    already scores each candidate's whole predicted isotope envelope against the
+    spectrum and carries it as ``isotopic_pattern_score``; Stage B uses that as the
+    match score. The untargeted path has no per-peak signal-to-noise, so this is the
+    isotope-pattern fit score (mascope_tools ``score_pattern``) -- the fit score's
+    documented degradation where SNR evidence is absent, not the crude single-peak
+    term the engine used before. When no envelope was scored (the column is
+    absent/NaN) it falls back to the legacy single-peak maths
+    ``score = (1 - min(1, |intensity_error|)) * max(0, 1 - |mz_error_ppm|/100)``.
 
     :param matches_df: First element returned by assign_compositions.
     :param peak_lookup: Maps peak m/z -> (sample_peak_id, intensity) for the
@@ -291,15 +367,22 @@ def untargeted_matches_to_peak_assignments(
             mz_error_ppm = _float_or_none(row.get("composition_error_ppm"))
         abundance_error = _float_or_none(row.get("intensity_error"))
 
-        mz_term = (
-            max(0.0, 1.0 - 1e-2 * abs(mz_error_ppm))
-            if mz_error_ppm is not None
-            else 0.0
-        )
-        abundance_term = (
-            1.0 - min(1.0, abs(abundance_error)) if abundance_error is not None else 1.0
-        )
-        score = abundance_term * mz_term
+        # Prefer the isotope-pattern fit score mascope_tools already computed over
+        # the candidate's whole predicted envelope; fall back to the single-peak
+        # term only when no envelope was scored for this row.
+        score = _score_or_none(row.get("isotopic_pattern_score"))
+        if score is None:
+            mz_term = (
+                max(0.0, 1.0 - 1e-2 * abs(mz_error_ppm))
+                if mz_error_ppm is not None
+                else 0.0
+            )
+            abundance_term = (
+                1.0 - min(1.0, abs(abundance_error))
+                if abundance_error is not None
+                else 1.0
+            )
+            score = abundance_term * mz_term
 
         isotope_label = _str_or_none(row.get("isotope_label")) or "M0"
         is_m0 = isotope_label == "M0"

@@ -36,6 +36,23 @@ threshold*. The value persists as the `PeakAssignment` fit column; the identific
 (identified / candidate / …) is decided by the separate confidence layer
 ([`assignment_confidence.md`](../../../docs/dev/assignment_confidence.md)).
 
+**Wired into the engine (landed).** The peak-centric engine
+(`api/new/peak_assignments/`) adopts the fit score *deliberately* as its scoring —
+unconditionally, not via the legacy `MASCOPE_MATCH_SCORE_VERSION` switch:
+- **Stage A** (`engine.score_ions_by_fit`): the per-ion fit score (`ion_score_v2` →
+  `score_pattern_v2`) over each ion's full isotopologue envelope with the sample's fitted
+  mass accuracy and real per-peak SNR, replacing the targeted matcher's per-isotopologue
+  `abundance_term · mz_term`. Run after `apply_match_params`, so tolerance / intensity-floor
+  gating carries into the fit.
+- **Stage B** (`engine.untargeted_matches_to_peak_assignments`): uses the isotope-pattern
+  fit score `assign_compositions` already computes (`match_isotopic_pattern`), i.e. the fit
+  score's **v1 degradation** — the untargeted path carries no SNR — instead of the crude
+  single-peak term.
+- **Follow-up (product):** the confidence-tier *bands* are still the legacy `match_params`
+  thresholds; on the fit scale a lone mass-only match scores low by design, so the
+  identified / candidate bands want recalibrating (DESIGN.md v2 bands ≈ 0.8 / 0.5). Tracked
+  as a threshold-semantics decision, separate from this measurement wiring.
+
 **Naming.** This is being renamed `match_score` → **`fit_score`** across the schema/API to
 say plainly that it measures *fit*, not identification.
 
