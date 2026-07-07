@@ -1,3 +1,9 @@
+<!-- MAINTAINER TODO (peak-centric integration): once the peak-centric pipeline settles,
+update this page to describe (1) the consolidated "fit score" (renamed from match score;
+see docs/dev/../libraries/tools/docs/fit_score.md) and (2) peak-centric Stage A/B assignment
+and confidence tiers (docs/dev/peak_assignment_paradigm.md, assignment_confidence.md). Until
+then this page documents the legacy targeted matching, which remains the default. -->
+
 # Target Isotope Matching
 The [isotope matching](../../../libraries/match/src/mascope_match/compute/isotopes.py) workflow establishes high-confidence links between a predefined list of target compositions and detected experimental peaks in sample mass spectra.
 

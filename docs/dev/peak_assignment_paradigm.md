@@ -83,7 +83,10 @@ is persistence, arbitration, and productization - not the science.
   - `apply_heuristic_rules` applies valence / Senior / element-ratio /
     known-chemical-space filters.
   - `predict_isotopes` + `score_pattern` do isotope-envelope scoring with the
-    **same maths** the targeted matcher uses.
+    **same maths** the targeted matcher uses. The consolidated **fit score**
+    (`score_pattern_v2`, detectability-gated + SNR- and resolution-aware) is the
+    scoring engine for both stages — see
+    [`fit_score.md`](../../libraries/tools/docs/fit_score.md).
   - `assign_compositions(peaks_df, config, heuristics)` already performs
     **whole-spectrum, one-row-per-peak assignment**: enumerate -> filter ->
     isotope-match -> pick best -> mark isotope children -> leave the rest `---`.
@@ -200,7 +203,9 @@ Each phase is intended to land independently and leave the system shippable.
 - Tiers (identified / candidate / below-assignability / unassigned),
   alternatives, mass-degeneracy notes.
 - Harvest peaky's `assignment/*` logic (arbitration, tiers, degeneracy,
-  offset-aware calibration) into a backend module.
+  offset-aware calibration) into a backend module. The **science-based design + phased
+  plan** for this layer (evidence layers, Schymanski/MSI levels, target-decoy
+  calibration, references) is [`assignment_confidence.md`](assignment_confidence.md).
 
 ### Phase 4 - Batch level
 - Cross-sample / time merge, homologous-series (GKA) detection, Van Krevelen,
