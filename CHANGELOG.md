@@ -4,6 +4,27 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Changed
+
+- SDK (`mascope-sdk` 2026.7.7): the `load_peaks` / `load_peak_timeseries`
+  `batches` and `samples` filters now treat a string as a case-insensitive
+  **literal substring** instead of a regex, so values with metacharacters (e.g.
+  `"Sample (A)"`) match literally. Pass `exact=True` to match a whole name, or a
+  compiled `re.Pattern` (e.g. `re.compile("2025|2026", re.IGNORECASE)`) to filter
+  by regex. Callers relying on regex/alternation in a plain string must switch to
+  a compiled pattern. The dead `**kwargs` on `MascopeClient.load_peaks` /
+  `load_peak_timeseries` was removed, so an unknown keyword such as `batch=...`
+  (singular) now raises `TypeError` instead of being silently ignored.
+
+### Fixed
+
+- SDK (`mascope-sdk` 2026.7.7): `POST` requests now send their body as
+  `application/json`. Previously the body was serialized with
+  `data=json.dumps(...)` and no `Content-Type` header, so the backend received it
+  as opaque bytes and rejected every SDK `POST` carrying a body with a 422
+  validation error (surfaced by `load_peak_timeseries` on
+  `POST /api/samples/{id}/peaks/timeseries`).
+
 ## [v1.2.0] - 2026.07.07
 
 ### Changed
