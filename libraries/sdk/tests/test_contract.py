@@ -146,7 +146,7 @@ def _first_batches(mascope):
         batches = mascope.batches.list(dataset["dataset_id"])
         if batches is not None and not batches.empty:
             return batches
-    pytest.fail("demo stack has no dataset with batches")
+    raise AssertionError("demo stack has no dataset with batches")
 
 
 def _first_sample_id(mascope) -> str:

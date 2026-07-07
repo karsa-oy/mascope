@@ -1,4 +1,3 @@
-import pandas as pd
 from sqlalchemy import and_, select
 
 from mascope_backend.db import (
@@ -97,23 +96,13 @@ async def resolve_ionization_modes_by_peaks(
     :rtype: list[IonizationMode]
     """
 
-    # Import here to avoid circular imports
-    from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller import (
-        get_target_isotopes,
-    )
-
     all_ionization_modes = await fetch_all_ionization_modes()
     for ionization_mode in all_ionization_modes:
         if ionization_mode.ionization_mode_polarity not in sample_file.polarity:
             continue
-        calibration_collection_id = ionization_mode.calibration_collection_id
-        calibration_isotopes_response = await get_target_isotopes(
-            target_collection_id=calibration_collection_id
-        )
-        _calibration_isotopes_df = pd.DataFrame(
-            calibration_isotopes_response.get("data", [])
-        )
-        # TODO: Match the calibration isotopes to the peaks in the sample file
+        # TODO: Fetch the calibration isotopes for
+        # ionization_mode.calibration_collection_id (via get_target_isotopes)
+        # and match them against the peaks in the sample file.
         raise NotImplementedError(
             "Resolving ionization modes by peaks. Calibration isotopes matching not implemented yet",
         )
