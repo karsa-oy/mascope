@@ -390,6 +390,11 @@ async def _finalize_run(
 @api_controller_background_task(
     success_notification_rooms=["user_id"],
     error_notification_rooms=["user_id"],
+    # Emit peak_assignment_reload to the sample's batch room on completion, so
+    # the frontend run store refreshes via the useData events framework (mirrors
+    # how rematch_sample emits match_reload). The room id resolves from the
+    # returned _notification_data.sample_batch_id.
+    success_reload=[("peak_assignment", "sample_batch_id")],
 )
 async def assign_sample_peaks(
     sample_item_id: str,
