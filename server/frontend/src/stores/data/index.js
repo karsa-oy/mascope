@@ -9,6 +9,7 @@ import {
   useMatchVisualized
 } from './modules/match'
 import { usePeak } from './modules/peak'
+import { usePeakAssignment, usePeakAssignmentRun } from './modules/peakAssignment'
 import { useSample } from './modules/sample'
 import { useTargetCollection, useTargetCompound } from './modules/target'
 import { useTemplate } from './modules/template'
@@ -28,6 +29,10 @@ export const useData = () => ({
   batch: useBatch(),
   sample: useSample(),
   peak: usePeak(),
+  peakAssignment: {
+    run: usePeakAssignmentRun(),
+    peak: usePeakAssignment()
+  },
   target: {
     collection: useTargetCollection(),
     compound: useTargetCompound()
