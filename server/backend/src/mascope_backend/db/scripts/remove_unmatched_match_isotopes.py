@@ -1,11 +1,13 @@
 """
-Maintenance script to remove unmatched (placeholder) match isotopes.
+Maintenance script to remove unmatched (score-0) match isotopes.
 
-Deletes match_isotope rows with an empty sample_peak_id - isotopes that had no
-matched peak. These are no longer stored by the backend and are reconstructed on
-read from their target_isotope, so removing the historical ones is lossless and
-reclaims the bulk of the table. Run in bounded batches; follow with
-``VACUUM FULL match_isotope`` (or pg_repack) to return the freed space to the OS.
+Deletes match_isotope rows with match_score = 0 - isotopes that are not a real
+match (no peak in the window, or a peak whose m/z / abundance error is so large it
+scores 0 and can never become a match at any read-time tolerance). These are no
+longer stored by the backend and are reconstructed on read from their
+target_isotope, so removing the historical ones is lossless and reclaims the bulk
+of the table. Run in bounded batches; follow with ``VACUUM FULL match_isotope``
+(or pg_repack) to return the freed space to the OS.
 
 Usage:
     mascope dev db script run remove_unmatched_match_isotopes

@@ -1,20 +1,21 @@
 """
-Database operation to remove unmatched (placeholder) match isotopes.
+Database operation to remove unmatched (score-0) match isotopes.
 
-Deletes ``match_isotope`` rows that represent an *unmatched* isotope - a target
-isotope with no peak within the match window. These rows carry only constant /
-derivable placeholder values (empty ``sample_peak_id``, zero intensity, target m/z,
-score 0) and are reconstructed on read from their ``target_isotope``, so persisting
-them is pure bloat (historically ~80% of the table). An empty ``sample_peak_id``
-(``DEFAULT_UNMATCHED_SAMPLE_PEAK_ID``) is the unambiguous marker; a matched row
-always carries a real, non-empty peak id.
+Deletes ``match_isotope`` rows with ``match_score = 0`` - isotopes that are not a
+real match. A score of 0 means either no peak within the match window, or a peak
+whose m/z error (>= 100 ppm) or abundance error (>= 100%) is so large it scores 0
+and can never become a match at any read-time tolerance (apply_match_params only
+ever zeroes scores, never raises them). Such rows carry no analytical value - they
+only ever render 0% - and are reconstructed on read from their ``target_isotope``,
+so persisting them is pure bloat. This matches the "found peak" definition used by
+export_goldens (``match_score > 0``).
 
-The delete is lossless: it only ever removes rows a matched-only backend would
-never have written, so higher-level aggregates (match_ion / match_compound / ...)
-are unchanged and need no recomputation. It is done in bounded batches so a
-multi-hundred-million-row table can be cleaned without one giant transaction /
-WAL blowup. Run ``VACUUM FULL match_isotope`` (or pg_repack) afterwards to return
-the freed space to the OS.
+The delete is lossless for higher-level aggregates: a score-0 isotope contributes
+0 to every aggregate (score * abundance and, after apply_match_params, intensity),
+so match_ion / match_compound / ... are unchanged and need no recomputation. It is
+done in bounded batches so a multi-hundred-million-row table can be cleaned without
+one giant transaction / WAL blowup. Run ``VACUUM FULL match_isotope`` (or pg_repack)
+afterwards to return the freed space to the OS.
 
 Entry Points:
 - Async: `remove_unmatched_match_isotopes()` for async callers
@@ -37,7 +38,7 @@ async def remove_unmatched_match_isotopes(
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> dict:
     """
-    Remove unmatched (empty sample_peak_id) match isotopes in bounded batches.
+    Remove unmatched (match_score = 0) match isotopes in bounded batches.
 
     Assumes the database engine is already configured.
 
@@ -55,7 +56,7 @@ async def remove_unmatched_match_isotopes(
     async with async_session() as session:
         total_unmatched = int(
             await session.scalar(
-                text("SELECT count(*) FROM match_isotope WHERE sample_peak_id = ''")
+                text("SELECT count(*) FROM match_isotope WHERE match_score = 0")
             )
         )
 
@@ -80,7 +81,7 @@ async def remove_unmatched_match_isotopes(
                 text(
                     "DELETE FROM match_isotope WHERE ctid IN ("
                     "  SELECT ctid FROM match_isotope "
-                    "  WHERE sample_peak_id = '' LIMIT :batch_size"
+                    "  WHERE match_score = 0 LIMIT :batch_size"
                     ")"
                 ),
                 {"batch_size": batch_size},

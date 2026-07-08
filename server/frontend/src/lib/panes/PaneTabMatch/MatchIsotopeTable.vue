@@ -55,10 +55,11 @@ const uiMatchCategory = (match) => {
           <span class="pi ph ph-seal-percent" />
         </template>
         <template #body="{ data }">
-          <!-- Only isotopes with a stored match record show a tag; reconstructed
-               unmatched isotopes (no detected peak) show none instead of a 0%. -->
+          <!-- Only real matches (possible/probable, category >= 1) show a tag.
+               Isotopes that are not a match under the current tolerances - no
+               detected peak, or a peak scored 0 - show none instead of a 0%. -->
           <BaseMatchTag
-            v-if="data.match?.has_record"
+            v-if="uiMatchCategory(data.match) >= 1"
             :match-score="data.match?.match_score"
             :match-category="uiMatchCategory(data.match)"
             :alarming="data.match?.alarming"
