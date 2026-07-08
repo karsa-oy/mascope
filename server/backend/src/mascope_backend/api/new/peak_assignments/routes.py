@@ -16,16 +16,20 @@ from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.peak_assignments.batch import assign_sample_batch_peaks
 from mascope_backend.api.new.peak_assignments.schemas import (
     AssignSamplePeaksBody,
+    AssignmentVerificationsResponse,
     CompositionFitBody,
     CompositionVisualizeBody,
     PeakAssignmentQueryParams,
     PeakAssignmentRunsResponse,
     PeakAssignmentsResponse,
+    VerifyAssignmentBody,
 )
 from mascope_backend.api.new.peak_assignments.service import (
     assign_sample_peaks,
+    create_verification,
     get_peak_assignment_runs,
     get_peak_assignments,
+    get_verifications,
 )
 from mascope_backend.api.new.peak_assignments.visualization import (
     aggregate_composition_fit,
@@ -91,6 +95,65 @@ async def get_peak_assignment_runs_route(
     await check_sample_access(sample_item_id, user, "guest")
     result = await get_peak_assignment_runs(sample_item_id=sample_item_id)
     return PeakAssignmentRunsResponse.model_validate(result)
+
+
+@peak_assignments_router.get(
+    "/sample/{sample_item_id}/verifications",
+    response_model=AssignmentVerificationsResponse,
+)
+@api_route(token_access=True)
+async def get_verifications_route(
+    sample_item_id: str,
+    user: User = Depends(current_active_user),
+) -> AssignmentVerificationsResponse:
+    """
+    Retrieve the verification verdicts recorded for a sample, newest first.
+
+    Append-only history; the current verdict for an assignment is the latest by
+    ``verified_utc`` for its observed peak + formula + adduct.
+
+    :param sample_item_id: The unique identifier of the sample.
+    :param user: The current authenticated user. Requires workspace guest role.
+    :return: Verification records for the sample.
+    """
+    await check_sample_access(sample_item_id, user, "guest")
+    result = await get_verifications(sample_item_id=sample_item_id)
+    return AssignmentVerificationsResponse.model_validate(result)
+
+
+@peak_assignments_router.post(
+    "/sample/{sample_item_id}/verify",
+    response_model=AssignmentVerificationsResponse,
+)
+@api_route(status_code=201, token_access=True)
+async def verify_assignment_route(
+    sample_item_id: str,
+    body: VerifyAssignmentBody,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_sample_role("editor")),
+) -> AssignmentVerificationsResponse:
+    """
+    Record a verification verdict on an assignment (confirm / reject / unsure).
+
+    Snapshots the assignment's score at verification time and stores the verdict + evidence
+    level as an append-only label -- the honest source for refitting the confidence
+    calibration later (verification-calibration loop, V1).
+
+    :param sample_item_id: The unique identifier of the sample.
+    :param body: The assignment id, verdict, evidence level, and optional note.
+    :param user: The current authenticated user. Requires workspace editor role.
+    :param membership: Workspace membership with editor role on the sample.
+    :return: The created verification record.
+    """
+    result = await create_verification(
+        sample_item_id=sample_item_id,
+        peak_assignment_id=body.peak_assignment_id,
+        verdict=body.verdict,
+        evidence_level=body.evidence_level,
+        note=body.note,
+        user_id=user.id,
+    )
+    return AssignmentVerificationsResponse.model_validate(result)
 
 
 @peak_assignments_router.post("/sample/{sample_item_id}/assign")
