@@ -113,7 +113,7 @@ watchDebounced(
 
 <template>
   <div ref="popoverEl" v-if="visible" :style="floatingStyles" class="help-popover">
-    <div class="help-content" v-html="app.ui.help.current?.message" />
+    <div class="help-content" v-html="app.ui.help.currentMessage" />
     <a
       v-if="app.ui.help.current?.doc"
       class="help-learn-more"

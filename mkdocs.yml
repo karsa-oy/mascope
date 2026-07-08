@@ -3,6 +3,11 @@ site_description: High-resolution mass spectrometry data analysis platform
 docs_dir: docs/user
 site_dir: site
 
+# Snippet files shared between the docs pages and the in-app help popovers
+# (rendered to help-content.json). They are include fragments, not pages.
+exclude_docs: |
+  _help/
+
 # Activate locally with:
 #   uv add --group docs mkdocs-material
 #   uv run mkdocs serve        # live preview at http://localhost:8000
@@ -37,6 +42,11 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+  # Lets a page pull in a shared snippet with `--8<-- "_help/<name>.md"`; the
+  # same snippets feed the in-app help popovers (see tooling/docs/build_help_content.py).
+  - pymdownx.snippets:
+      base_path:
+        - docs/user
 
 nav:
   - Home: index.md

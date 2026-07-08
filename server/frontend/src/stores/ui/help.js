@@ -20,6 +20,22 @@ export const useHelp = defineStore('app.ui.help', () => {
   const current = ref()
   const event = ref()
 
+  // Help-card bodies rendered from the shared docs snippets (keyed by helpKey;
+  // see tooling/docs/build_help_content.py). Fetched once from the docs served
+  // alongside the app; in dev (no /docs/) this stays empty and helpKey cards
+  // fall back to their title plus the "Learn more" link.
+  const content = ref({})
+  const loadContent = async () => {
+    if (typeof fetch === 'undefined') return
+    try {
+      const res = await fetch(docUrl('help-content.json'), { cache: 'no-cache' })
+      if (res.ok) content.value = await res.json()
+    } catch {
+      // docs (and this JSON) are not served here; leave content empty
+    }
+  }
+  loadContent()
+
   const toggle = () => {
     active.value = !active.value
   }
@@ -77,12 +93,18 @@ export const useHelp = defineStore('app.ui.help', () => {
     alignments.forEach((alignment) => {
       // create an API that combines position and alignment
       const placement = [position, alignment].filter((x) => x !== null).join('_')
-      // layer defaults to 'default' *before* the spread, so callers can pass
-      // extra options (e.g. { doc }) without having to restate the layer -- a
-      // card with layer undefined never matches the active layer and so never
-      // shows.
-      ptApi[placement] = (message, options = {}) =>
-        pt({ placement, message, layer: 'default', ...options })
+      // The first argument is the message string for legacy inline cards, or an
+      // options object ({ helpKey, title, doc }) for docs-sourced cards. layer
+      // defaults to 'default' before the spreads, so callers can add options
+      // without restating it -- a card with layer undefined never matches the
+      // active layer and so never shows.
+      ptApi[placement] = (messageOrOptions, options = {}) => {
+        const base =
+          typeof messageOrOptions === 'string'
+            ? { message: messageOrOptions }
+            : { ...(messageOrOptions ?? {}) }
+        return pt({ placement, layer: 'default', ...base, ...options })
+      }
     })
   })
 
@@ -107,15 +129,29 @@ export const useHelp = defineStore('app.ui.help', () => {
     { debounce: 300 }
   )
 
+  // Resolve the popover body for the active card: an inline message wins (legacy
+  // cards); otherwise render the card's title plus the docs snippet named by
+  // helpKey.
+  const currentMessage = computed(() => {
+    const card = current.value
+    if (!card) return ''
+    if (card.message) return card.message
+    const title = card.title ? `<h1>${card.title}</h1>` : ''
+    const body = card.helpKey ? (content.value[card.helpKey] ?? '') : ''
+    return title + body
+  })
+
   return {
     active,
     cards,
     current,
+    currentMessage,
     event,
     toggle,
     set,
     layer,
     docUrl,
+    loadContent,
     // hooks
     directive,
     pt,

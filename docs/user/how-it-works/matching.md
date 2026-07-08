@@ -1,4 +1,7 @@
 # Target Isotope Matching
+
+--8<-- "_help/matching.md"
+
 The [isotope matching](https://github.com/karsa-oy/mascope/blob/master/libraries/match/src/mascope_match/compute/isotopes.py) workflow establishes high-confidence links between a predefined list of target compositions and detected experimental peaks in sample mass spectra.
 
 The procedure should be distinguished from unconstrained [composition assignment scoring](https://github.com/karsa-oy/mascope/blob/master/libraries/tools/src/mascope_tools/composition/finder.py) (which screens peaks against wide combinatorial formula spaces).

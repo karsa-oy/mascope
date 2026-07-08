@@ -29,7 +29,11 @@ RUN pip install --no-cache-dir "mkdocs-material>=9.7,<10"
 
 COPY mkdocs.yml ./
 COPY docs ./docs
-RUN mkdocs build --strict   # outputs to ./site
+COPY tooling/docs/build_help_content.py ./
+RUN mkdocs build --strict && \
+    # emit help-content.json next to the site so nginx serves it at
+    # /docs/help-content.json for the in-app help popovers
+    python build_help_content.py
 
 # RUNTIME
 FROM nginx:1.27-alpine
