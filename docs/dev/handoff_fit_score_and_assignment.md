@@ -167,10 +167,10 @@ Validated `rule_senior` against the 92 demo target compounds:
   (migration `d1a2c3b4e5f6`) holds the Platt curve + per-adduct corroboration log-odds;
   `calibration_store.load_calibration` reads the active row and falls back to the in-code
   provisional curve. The service loads it and passes it to the engine, which folds adduct
-  corroboration into `p_correct`. *Remaining:* the "calibrate my instrument" UX (fit + write a
-  new active row from a user's standards+decoys run) is still open — designed in
-  [`verification_calibration_loop.md`](verification_calibration_loop.md) (interactive verification
-  → golden labels → refit), which is that UX's label source.
+  corroboration into `p_correct`. The refit path (fit a new active row from labels) is **built** as
+  D9/V2 (`recalibrate_instrument`); *remaining:* the front-end "calibrate my instrument" trigger +
+  the verification capture UI that feeds it — designed in
+  [`verification_calibration_loop.md`](verification_calibration_loop.md).
 - **D7. Recalibrate the fit-scale tier bands** (currently the 0.8/0.5 estimates) per
   instrument — a "what users see" decision.
 - **D9. Interactive verification → calibration golden set.** Human-in-the-loop confirm/reject in
@@ -179,8 +179,10 @@ Validated `rule_senior` against the 92 demo target compounds:
   confirmation-bias loop (guardrails recorded there). **V1 capture backend shipped** (the
   `assignment_verification` table, migration `e4f2a7c9d3b1`, + verify/verifications API); the V1
   UI is handed to the frontend ([`verification_capture_frontend.md`](verification_capture_frontend.md)).
-  **V2 next:** aggregate labels per instrument → `fit_calibration` → new active D6 row (the
-  "recalibrate this instrument" UX) — buildable now on synthetic labels.
+  **V2 built:** `recalibrate_instrument` + `POST /calibration/{instrument}/recalibrate` (superuser)
+  refit the curve from labels (provisional until enough reference-grade positives), writing a new
+  active store row — verified on synthetic + demo; waits on real V1-UI labels to switch on. **V3
+  open:** active-learning queue, evidence-level weighting in the fit, Schymanski surfacing.
 
 **E — ops**
 - **E8. Run the rename migration in prod/CI** and the migration test suite
