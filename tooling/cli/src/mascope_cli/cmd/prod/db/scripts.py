@@ -26,7 +26,18 @@ prod_db_scripts_app = typer.Typer()
 
 _MODE = "prod"
 _SCRIPTS_MODULE = "mascope_backend.db.scripts"
-_PYTHON = "/root/.local/share/uv/tools/mascope/bin/python"
+
+# Candidate paths to the mascope uv-tool Python inside the backend container.
+# The install location depends on how the image was built:
+#   - /opt/uv/tools: current Dockerfile (UV_TOOL_DIR=/opt/uv/tools), also used by
+#     db-init.sh, demo-init.sh and the reproducibility test.
+#   - /root/.local/share/uv/tools: legacy images built before UV_TOOL_DIR was set.
+# The interpreter is resolved at runtime (see _resolve_container_python) instead
+# of hardcoding one, so the runner works regardless of which image is deployed.
+_PYTHON_CANDIDATES = [
+    "/opt/uv/tools/mascope/bin/python",
+    "/root/.local/share/uv/tools/mascope/bin/python",
+]
 
 # Environment variables forwarded from the host into the backend container
 # when running scripts via `docker exec -e`.
@@ -66,6 +77,45 @@ def _discover_scripts() -> dict[str, str]:
             pass
 
     return result
+
+
+def _resolve_container_python(container: str) -> str | None:
+    """
+    Resolve the mascope uv-tool Python inside the backend container.
+
+    Probes the known uv-tool locations (which differ between current and legacy
+    images) and falls back to any ``python``/``python3`` on PATH that can import
+    ``mascope_backend``. Returns the resolved interpreter path, or ``None`` if
+    none is found (e.g. the container is not the mascope backend, or is not
+    running).
+
+    :param container: Backend container name.
+    :type container: str
+    :return: Path to a usable interpreter inside the container, or None.
+    :rtype: str | None
+    """
+    # A single shell probe: first existing tool Python wins; else the first
+    # PATH python that can import the package. Prints the chosen path and exits 0.
+    candidates = " ".join(f'"{p}"' for p in _PYTHON_CANDIDATES)
+    probe = (
+        f"for p in {candidates}; do "
+        '  if [ -x "$p" ]; then echo "$p"; exit 0; fi; '
+        "done; "
+        "for p in python python3; do "
+        '  if "$p" -c "import mascope_backend" >/dev/null 2>&1; then '
+        '    command -v "$p"; exit 0; '
+        "  fi; "
+        "done; "
+        "exit 1"
+    )
+    result = subprocess.run(
+        ["docker", "exec", container, "sh", "-c", probe],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return lines[-1] if result.returncode == 0 and lines else None
 
 
 @prod_db_scripts_app.callback()
@@ -182,7 +232,19 @@ def run_script(
     # --- Execute inside backend container ---
     module = scripts[script]
     backend_container = runtime.full_config.backend.get_backend_container_name(_MODE)
-    runtime.logger.info(f"Running in '{backend_container}': {module}")
+
+    container_python = _resolve_container_python(backend_container)
+    if container_python is None:
+        runtime.logger.error(
+            f"Could not find a mascope Python in container '{backend_container}'. "
+            "Is the backend container running, and built from the mascope image? "
+            f"(looked for {', '.join(_PYTHON_CANDIDATES)} and python/python3 on PATH)"
+        )
+        raise typer.Exit(1)
+
+    runtime.logger.info(
+        f"Running in '{backend_container}' ({container_python}): {module}"
+    )
 
     # Forward selected host env vars into the container
     env_args: list[str] = []
@@ -192,7 +254,15 @@ def run_script(
             env_args += ["-e", f"{var}={val}"]
 
     result = subprocess.run(
-        ["docker", "exec", *env_args, backend_container, _PYTHON, "-m", module],
+        [
+            "docker",
+            "exec",
+            *env_args,
+            backend_container,
+            container_python,
+            "-m",
+            module,
+        ],
         check=False,
     )
 
