@@ -171,6 +171,8 @@ def worktree_key(cwd: str | None = None) -> str:
         if result.returncode == 0 and result.stdout.strip():
             return str(Path(result.stdout.strip()).resolve())
     except (FileNotFoundError, subprocess.TimeoutExpired):
+        # git is not installed, or the call hung past the timeout: intentionally
+        # fall through to the working-directory fallback below.
         pass
     return str(Path(cwd).resolve())
 
