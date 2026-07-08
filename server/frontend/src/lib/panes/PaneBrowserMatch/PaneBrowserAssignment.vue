@@ -6,6 +6,7 @@ import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import ProgressSpinner from 'primevue/progressspinner'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import ToggleSwitch from 'primevue/toggleswitch'
@@ -229,7 +230,11 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
         </button>
       </div>
 
+      <div v-if="assignments.pending" class="center loading-region">
+        <ProgressSpinner />
+      </div>
       <DataTable
+        v-else
         :value="rows"
         dataKey="sample_peak_id"
         size="small"
@@ -351,6 +356,10 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
 .empty {
   width: 100%;
   height: 220px;
+}
+.loading-region {
+  width: 100%;
+  min-height: 10rem;
 }
 
 .tier-strip {
