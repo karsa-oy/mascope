@@ -25,6 +25,16 @@ const runs = computed(() => app.data.peakAssignment.run)
 const assignments = computed(() => app.data.peakAssignment.peak)
 const tierCounts = computed(() => assignments.value.tierCounts)
 
+// Map ionization_mechanism_id -> readable notation (e.g. "+H+", "+Br-"), for
+// the ledger's ionization column. The assignment carries only the id.
+const mechById = computed(() => {
+  const map = new Map()
+  for (const mech of app.data.ionization.mechanism.list) {
+    map.set(mech.ionization_mechanism_id, mech.ionization_mechanism)
+  }
+  return map
+})
+
 // --- Run selector -----------------------------------------------------------
 
 // One dropdown option per run, labelled with its ordinal, status and age.
@@ -146,6 +156,7 @@ const rows = computed(() => {
       // Flatten the calibrated probability for the sortable P(correct) column;
       // null for untargeted / uncalibrated (rendered as "-", never 0%).
       pCorrect: row.provenance?.p_correct ?? null,
+      mech: mechById.value.get(row.ionization_mechanism_id) ?? null,
       isChild: false
     }))
   parents.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
@@ -162,6 +173,7 @@ const rows = computed(() => {
         ...child,
         tierRank: parent.tierRank,
         pCorrect: child.provenance?.p_correct ?? null,
+        mech: mechById.value.get(child.ionization_mechanism_id) ?? null,
         isChild: true
       }))
     result.push(...children)
@@ -341,6 +353,14 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
             </span>
           </template>
         </Column>
+        <Column field="mech" sortable style="min-width: 5rem">
+          <template #header>
+            <span v-tooltip.top="'Ionization mechanism (adduct)'">ionization</span>
+          </template>
+          <template #body="{ data }">
+            <span class="mech">{{ data.mech || '—' }}</span>
+          </template>
+        </Column>
         <Column field="tierRank" header="tier" sortable style="min-width: 7rem">
           <template #body="{ data }">
             <BaseTierTag
@@ -518,6 +538,12 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
 .formula {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.95rem;
+}
+.mech {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  opacity: 0.85;
+  white-space: nowrap;
 }
 .iso-count {
   margin-left: 0.35rem;
