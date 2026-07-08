@@ -42,6 +42,7 @@ from mascope_backend.api.new.match.params.lib import (
     apply_match_params,
     isotope_abundance_threshold_expr,
 )
+from mascope_backend.api.new.peak_assignments.calibration_store import load_calibration
 from mascope_backend.api.new.peak_assignments.config import (
     PEAK_ASSIGNMENT_ENGINE_VERSION,
     PeakAssignmentConfig,
@@ -74,6 +75,7 @@ from mascope_file.name import get_instrument_type
 from mascope_match import compute_match_isotopes
 from mascope_tools.composition import CompositionSearchConfig
 from mascope_tools.composition.finder import assign_compositions
+from mascope_tools.composition.heuristic_filter import SCORE_VERSION
 
 
 # -------------------------------------------------------------------
@@ -487,6 +489,11 @@ async def assign_sample_peaks(
                 # quality, not the targeted matcher's per-isotopologue term. Runs
                 # after gating so tolerance/intensity cuts carry into the fit.
                 match_isotope_df = score_ions_by_fit(match_isotope_df)
+            instrument = get_instrument_type(sample.filename)
+            # Load this instrument's confidence calibration from the D6 store (active DB row,
+            # else the in-code provisional curve, else None -> uncalibrated). Passing it in keeps
+            # the engine DB-free; its corroboration_weights drive the P3 adduct fold-in.
+            calibration = await load_calibration(instrument, SCORE_VERSION)
             stage_a_assignments = invert_matches_to_peak_assignments(
                 match_isotope_df,
                 sample_item_id=sample_item_id,
@@ -494,8 +501,8 @@ async def assign_sample_peaks(
                 possible_threshold=config.candidate_threshold,
                 probable_threshold=config.identified_threshold,
                 max_alternatives=config.max_alternatives,
-                # instrument selects the P(correct) calibration (None -> uncalibrated).
-                instrument=get_instrument_type(sample.filename),
+                instrument=instrument,
+                calibration=calibration,
             )
         runtime.logger.info(
             f"Stage A assigned {len(stage_a_assignments)} of {len(peaks_df)} "

@@ -1297,6 +1297,52 @@ class ReferenceCompound(Base):
     )
 
 
+class AssignmentCalibration(Base):
+    """Stored score -> P(correct) calibration per instrument (the D6 calibration store).
+
+    Moves the assignment-confidence calibration out of the in-code registry so a curve can be
+    (re)fit per deployment -- e.g. a user runs known standards + near-mass decoys on their
+    instrument -- without a code change. Holds the Platt parameters ``a``/``b`` plus the
+    per-adduct corroboration log-odds (keyed by adduct notation, e.g. ``{"+Br-": 2.28}``) and the
+    provenance mirrored from :class:`mascope_tools.composition.calibration.Calibration`.
+
+    Keyed by ``(instrument, score_version)`` because a curve is only valid for the fit-score
+    version it was fit against; ``is_active`` marks the row the loader reads (refitting flips the
+    previous one inactive). When the table has no active row the loader falls back to the in-code
+    provisional curve, so this is additive and safe to ship empty.
+    """
+
+    __tablename__ = "assignment_calibration"
+
+    assignment_calibration_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    instrument: Mapped[str] = mapped_column(String(32), index=True)
+    score_version: Mapped[int] = mapped_column(Integer, index=True)
+    a: Mapped[float] = mapped_column(Float)
+    b: Mapped[float] = mapped_column(Float)
+    n_pos: Mapped[int] = mapped_column(Integer, default=0)
+    n_neg: Mapped[int] = mapped_column(Integer, default=0)
+    ece: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provisional: Mapped[bool] = mapped_column(Boolean, default=True)
+    corroboration_weights: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    fit_utc: Mapped[Optional[dt]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    created_utc: Mapped[dt] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: dt.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_assignment_calibration_active",
+            "instrument",
+            "score_version",
+            "is_active",
+        ),
+    )
+
+
 __all__ = [
     "Base",
     "Workspace",
@@ -1328,4 +1374,5 @@ __all__ = [
     "InstrumentFunction",
     "ReferenceSource",
     "ReferenceCompound",
+    "AssignmentCalibration",
 ]
