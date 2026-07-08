@@ -128,6 +128,13 @@ Two things are important in practice:
   made-up probability. Today one **provisional** Orbitrap curve ships (fit on a preliminary
   reference set); it will be replaced by a curated fit, and TOF is uncalibrated until a TOF
   reference set exists.
+- **Co-occurring adducts raise it.** A real compound rarely appears as a single ion — it also
+  shows up through other adducts (e.g. `[M+H]⁺` alongside `[M+NH₄]⁺`, or `[M−H]⁻` alongside
+  `[M+Br]⁻`). When the same compound is assigned via several adducts, that independent
+  corroboration **increases the probability**, by an amount *measured per adduct*: a chemically
+  distinctive adduct like bromide corroborates strongly, while a generic one (ammonium,
+  protonation) barely moves it. The lift is bounded, and — like the calibration curve — the
+  per-adduct weights are specific to your instrument's reagent chemistry.
 
 ## Confidence tiers
 
