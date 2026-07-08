@@ -70,7 +70,7 @@ def show(
         bool,
         typer.Option(
             "--export",
-            help="Print shell exports for `eval \"$(mascope instance show --export)\"`",
+            help='Print shell exports for `eval "$(mascope instance show --export)"`',
         ),
     ] = False,
 ) -> None:
