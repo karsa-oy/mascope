@@ -98,6 +98,29 @@ This is the "which of the well-fitting compositions is most likely" problem — 
 identification. Reliability at scale is estimated with **target–decoy** methods, the
 established approach for large-scale MS annotation ([Scheubert et al. 2017][sch17]).
 
+## Calibrated confidence (probability of being correct)
+
+The evidence score ranks assignments, but a raw 0.85 is not "85% likely correct".
+**Calibration** turns the score into an actual **probability of being correct** using
+**Platt scaling** ([Platt 1999][platt]) — a logistic curve `P = sigmoid(a·evidence + b)` fit
+on assignments whose truth is known. So *of everything Mascope reports at 0.9, about 90%
+really are right*.
+
+Two things are important in practice:
+
+- **It is per instrument.** The same raw evidence means different things on an Orbitrap
+  (sub-ppm, high resolution) than on a lower-resolution TOF, so each instrument class has
+  its own curve. The label data comes from **confident identifications** — most strongly,
+  compounds confirmed by a **reference standard** (a Level‑1 identification,
+  [Schymanski et al. 2014][sch14]) — versus near-mass decoys. This is why calibration is
+  tied to your **reference dataset**, and why you can, in principle, **calibrate your own
+  instrument** by running known standards.
+- **When it isn't calibrated, it says so.** If no calibration exists for an instrument yet,
+  Mascope reports the assignment as *uncalibrated* and shows the raw evidence rather than a
+  made-up probability. Today one **provisional** Orbitrap curve ships (fit on a preliminary
+  reference set); it will be replaced by a curated fit, and TOF is uncalibrated until a TOF
+  reference set exists.
+
 ## Confidence tiers
 
 Each assignment is placed in a tier from its fit score:
@@ -143,6 +166,9 @@ communicates identification certainty.
 - <a id="sch17"></a>Scheubert, K. et al. *Significance estimation for large-scale
   metabolomics annotations by spectral matching.* Nature Communications 2017, 8:1494.
   [link](https://www.nature.com/articles/s41467-017-01318-5)
+- <a id="platt"></a>Platt, J. *Probabilistic outputs for support vector machines and
+  comparisons to regularized likelihood methods.* Advances in Large Margin Classifiers,
+  1999. [link](https://en.wikipedia.org/wiki/Platt_scaling)
 - <a id="sch14"></a>Schymanski, E. L. et al. *Identifying small molecules via high
   resolution mass spectrometry: communicating confidence.* Environ. Sci. Technol. 2014,
   48(4):2097–2098. [link](https://pubs.acs.org/doi/10.1021/es5002105)
@@ -158,4 +184,5 @@ communicates identification certainty.
 [sch17]: #sch17
 [sch14]: #sch14
 [sum07]: #sum07
+[platt]: #platt
 [fit_score_dev]: ../../../libraries/tools/docs/fit_score.md
