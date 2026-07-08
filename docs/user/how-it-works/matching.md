@@ -1,10 +1,12 @@
-<!-- MAINTAINER TODO (peak-centric integration): once the peak-centric pipeline settles,
-update this page to describe (1) the consolidated "fit score" (renamed from match score;
-see docs/dev/../libraries/tools/docs/fit_score.md) and (2) peak-centric Stage A/B assignment
-and confidence tiers (docs/dev/peak_assignment_paradigm.md, assignment_confidence.md). Until
-then this page documents the legacy targeted matching, which remains the default. -->
-
 # Target Isotope Matching
+
+> **This page describes the legacy *targeted* match** (do these known compounds appear in
+> the sample?), which remains the default for the target-matching workflow. The peak-first
+> question — assign a composition and a confidence to *every* peak — and the consolidated
+> **fit score** that scores it are described in
+> [Peak Assignment & Identification Confidence](peak_assignment.md). The isotope-level
+> scoring below is being superseded by that fit score (see
+> [the "Fit score" note](#a-note-on-scoring-the-fit-score) at the end of this page).
 The [isotope matching](../../../libraries/match/src/mascope_match/compute/isotopes.py) workflow establishes high-confidence links between a predefined list of target compositions and detected experimental peaks in sample mass spectra.
 
 The procedure should be distinguished from unconstrained [composition assignment scoring](../../../libraries/tools/src/mascope_tools/composition/finder.py) (which screens peaks against wide combinatorial formula spaces).
@@ -97,3 +99,21 @@ $$\text{matchScore}_{\text{collection}} = \max\left(\text{matchScore}_{\text{com
 Finally, the global match score assigned to an experimental sample item is established by the maximum match score among all target collections linked to it:
 
 $$\text{matchScore}_{\text{sample}} = \max\left(\text{matchScore}_{\text{collection}}\right)$$
+
+## A note on scoring: the fit score
+
+The per-isotopologue score above (a fixed mass-penalty × abundance-penalty, summed over the
+envelope) is the **legacy v1** scoring. It has three known weaknesses: it ignores predicted
+isotopologues that should have been visible but were not, it judges intensities without
+reference to noise, and its mass penalty uses a fixed window rather than the instrument's
+measured accuracy.
+
+These are all addressed by the consolidated **fit score** (`score_pattern_v2`): a Gaussian
+mass likelihood whose width is the *fitted* per-sample mass accuracy (so it is fair on both
+Orbitrap and TOF), an intensity likelihood scaled by each peak's signal-to-noise, a
+detectability gate that only penalises an absent peak when it should have been seen, and an
+abundance-weighted geometric-mean aggregation. On the reference dataset this improves both
+ranking (ROC-AUC) and calibration over v1. The fit score is the scoring engine of
+[peak assignment](peak_assignment.md); its full model, parameters and literature references
+are in the [developer reference](../../../libraries/tools/docs/fit_score.md). The legacy v1
+score is retained for the targeted path and documented above for reference.
