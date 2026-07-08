@@ -33,6 +33,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator
 
+
 # Slot 0 maps to the default single-dev ports (8090/5173); on a shared box use
 # instances consistently rather than mixing a bare `mascope dev run` with them.
 API_PORT_BASE = 8090
@@ -67,7 +68,9 @@ def _home(home: Path | str | None) -> Path:
         return Path(home)
     path = os.environ.get("MASCOPE_PATH")
     if not path:
-        raise InstanceError("MASCOPE_PATH is not set; cannot locate the instance registry")
+        raise InstanceError(
+            "MASCOPE_PATH is not set; cannot locate the instance registry"
+        )
     return Path(path)
 
 
