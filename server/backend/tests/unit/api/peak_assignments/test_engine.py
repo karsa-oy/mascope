@@ -388,6 +388,45 @@ class TestInvertMatches:
             == []
         )
 
+    def test_out_of_tolerance_pairing_does_not_claim_its_peak(self):
+        # A trace isotopologue paired to a peak within the wide 0.5 Da search window but
+        # out of tolerance (apply_match_params zeroed its intensity) must NOT own that
+        # peak - it belongs to another compound and should fall through to Stage B.
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(  # in-tolerance M0 -> owns its peak
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="pGood",
+                    sample_peak_intensity=1000.0,
+                    match_score=0.95,
+                ),
+                _isotope_row(  # trace isotopologue, 40 ppm off -> gated to intensity 0
+                    target_isotope_id="iso2",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=182.0741,
+                    relative_abundance=0.06,
+                    sample_peak_id="pStolen",
+                    sample_peak_intensity=0.0,  # apply_match_params zeroed (out of tol)
+                    match_score=0.95,  # ion fit carried onto the row
+                    match_mz_error=40.0,
+                ),
+            ]
+        )
+        assignments = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE
+        )
+        peaks = {a["sample_peak_id"] for a in assignments}
+        assert peaks == {"pGood"}  # the stolen peak is released, not owned
+
     def test_alternatives_are_capped(self):
         rows = [
             _isotope_row(
