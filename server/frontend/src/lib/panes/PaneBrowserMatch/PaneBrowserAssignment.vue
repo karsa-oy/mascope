@@ -186,6 +186,45 @@ const rows = computed(() => {
 const childLabel = (row) =>
   row.isotope_formula ? formatIsotopeFormula(row.isotope_formula) : row.isotope_label || 'iso'
 
+// Custom sort that keeps isotopologue families together under ANY column.
+// PrimeVue's default sorts the flat row array, which decouples children from
+// their parent when sorting by e.g. intensity. Instead: sort the PARENT rows by
+// the chosen field, then re-attach each parent's children (sorted among
+// themselves by the same field) right after it. Folded (no children) it is a
+// plain parent sort, identical to the default.
+function groupedSort({ data, field, order }) {
+  if (!field) return data
+  const dir = order === -1 ? -1 : 1
+  const cmp = (a, b) => {
+    const av = a[field]
+    const bv = b[field]
+    // Missing values sort last regardless of direction.
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (av < bv) return -dir
+    if (av > bv) return dir
+    return 0
+  }
+  const parents = data.filter((row) => !row.isChild)
+  const childrenByOwner = new Map()
+  for (const row of data) {
+    if (!row.isChild) continue
+    const siblings = childrenByOwner.get(row.owner_peak_assignment_id) ?? []
+    siblings.push(row)
+    childrenByOwner.set(row.owner_peak_assignment_id, siblings)
+  }
+  parents.sort(cmp)
+  if (childrenByOwner.size === 0) return parents
+  const result = []
+  for (const parent of parents) {
+    result.push(parent)
+    const kids = childrenByOwner.get(parent.peak_assignment_id)
+    if (kids) result.push(...kids.sort(cmp))
+  }
+  return result
+}
+
 // Calibrated probability formatter for the P(correct) column.
 const pctFmt = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 })
 
@@ -311,6 +350,7 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
         :virtualScrollerOptions="{ itemSize: 35.5 }"
         sortField="tierRank"
         :sortOrder="1"
+        :sortFunction="groupedSort"
         selectionMode="single"
         :metaKeySelection="false"
         v-model:selection="selectedRow"
