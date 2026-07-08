@@ -22,9 +22,14 @@ const CONVERGE_TIMEOUT_MS = 30000
 // The chain converges asynchronously (one API round trip per level) and can
 // take well over a few seconds on a cold backend, so we poll until it settles
 // rather than snapshotting once - otherwise a slow-but-successful restore looks
-// like a failure. A genuinely inaccessible level is detected sooner (see below).
+// like a failure. A genuinely inaccessible level is detected sooner (see below);
+// reaching the budget just stops the poll, it does not warn.
 const VERIFY_POLL_MS = 700
-const VERIFY_TIMEOUT_MS = 15000
+const VERIFY_TIMEOUT_MS = 20000
+
+// How long to keep re-asserting a restored tab while the chain converges, so a
+// late data-driven tab switch (samples loading forces 'batch') cannot win.
+const TAB_SETTLE_TIMEOUT_MS = 20000
 
 // Friendly singular labels for the warning message, keyed by location field.
 const LEVEL_LABELS = {
@@ -43,6 +48,25 @@ const MIRROR_DEBOUNCE_MS = 400
 
 // Resolve a dotted store path (e.g. 'match.collection') against app.data.
 const resolveStore = (data, path) => path.split('.').reduce((node, part) => node?.[part], data)
+
+// Ids currently focused/selected at a chain level, as strings. Ids from a URL
+// are strings while store ids may be numeric (e.g. peak_id), so coerce to keep
+// comparisons type-safe.
+const currentLevelIds = (data, level) => {
+  const store = resolveStore(data, level.path)
+  if (!store) return []
+  const ids = level.multi ? store.selectedIds : store.focusedId != null ? [store.focusedId] : []
+  return ids.map(String)
+}
+
+// The shallowest requested level whose target ids are not all resolved yet.
+const firstUnresolved = (data, requested) =>
+  LOCATION_LEVELS.find((level) => {
+    const want = levelIds(requested, level)
+    if (want.length === 0) return false
+    const have = currentLevelIds(data, level)
+    return want.some((id) => !have.includes(String(id)))
+  })
 
 /**
  * Drive a single chain level toward its target ids. Levels whose target
@@ -78,22 +102,23 @@ const applyLevel = (store, level, loc) => {
 
 /**
  * The match visualization is imperative state, not a data store, so it is
- * restored last: once the sample, collection and ion it needs have focused,
- * fire a single set(). Only a single-sample context is restorable (the
- * visualization query is per focused sample).
+ * restored last: once the sample, collection and ion it needs have loaded, fire
+ * a single set(). It is driven by the explicitly visualized ion, never by the
+ * ion table selection - selecting ions does not open the visualization. Only a
+ * single-sample context is restorable (the visualization query is per sample).
  */
 const restoreVisualization = (data, loc) => {
-  if (!loc.collection || loc.ions.length === 0 || loc.samples.length !== 1) return
+  if (!loc.collection || !loc.visualizedIon || loc.samples.length !== 1) return
 
   const sampleId = loc.samples[0]
   const collectionId = loc.collection
-  const ionId = loc.ions[0]
+  const ionId = loc.visualizedIon
   const isotopeId = loc.isotope
 
   const ready = () =>
     data.sample.focusedId === sampleId &&
     data.match.collection.focusedId === collectionId &&
-    data.match.ion.selectedIds.includes(ionId)
+    data.match.ion.list.some((ion) => ion.target_ion_id === ionId)
 
   const restore = () => {
     logger.debug('restoring visualization', { data: { sampleId, collectionId, ionId } })
@@ -129,6 +154,7 @@ export const useLocation = defineStore('app.location', () => {
       if (!store) continue
       raw[level.field] = level.multi ? [...store.selectedIds] : store.focusedId
     }
+    raw.visualizedIon = data.match.visualized.ion?.target_ion_id ?? null
     raw.isotope = data.match.visualized.isotopeSelected?.target_isotope_id ?? null
     raw.tab = ui.tab.active
     return normalizeLocation(raw)
@@ -140,7 +166,7 @@ export const useLocation = defineStore('app.location', () => {
    */
   const apply = (input) => {
     const loc = normalizeLocation(input)
-    const { data, ui } = useApp()
+    const { data } = useApp()
     logger.debug('applying location', { data: { loc } })
 
     for (const level of LOCATION_LEVELS) {
@@ -149,9 +175,37 @@ export const useLocation = defineStore('app.location', () => {
     }
 
     restoreVisualization(data, loc)
-    // 'match' is reached through the visualization above; the tab store's own
-    // guards keep it there. Other tabs are hydrated directly.
-    if (loc.tab && loc.tab !== 'match') ui.tab.hydrate(loc.tab)
+    restoreTab(loc)
+  }
+
+  /**
+   * Restore the active tab. 'match' follows the visualization (the tab store's
+   * own guard drives it there once an ion is visualized). Other tabs are set
+   * now and then re-asserted until the chain settles, so a late data-driven tab
+   * switch - e.g. samples loading forces 'batch' - cannot override the restored
+   * tab when the chain converges slower than the initial hydrate window.
+   */
+  const restoreTab = (loc) => {
+    const { ui } = useApp()
+    if (!loc.tab || loc.tab === 'match') return
+
+    ui.tab.hydrate(loc.tab)
+
+    const deadline = Date.now() + TAB_SETTLE_TIMEOUT_MS
+    const settle = () => {
+      const { data } = useApp()
+      if (!firstUnresolved(data, loc)) {
+        ui.tab.active = loc.tab
+        ui.tab.endHydrate()
+        return
+      }
+      if (Date.now() >= deadline) {
+        ui.tab.endHydrate()
+        return
+      }
+      setTimeout(settle, VERIFY_POLL_MS)
+    }
+    setTimeout(settle, VERIFY_POLL_MS)
   }
 
   /**
@@ -166,17 +220,6 @@ export const useLocation = defineStore('app.location', () => {
   const verifyApplied = (requested) => {
     const deadline = Date.now() + VERIFY_TIMEOUT_MS
 
-    // The shallowest requested level whose target ids are not all focused yet.
-    const firstUnresolved = () => {
-      const current = read()
-      return LOCATION_LEVELS.find((level) => {
-        const want = levelIds(requested, level)
-        if (want.length === 0) return false
-        const have = levelIds(current, level)
-        return want.some((id) => !have.includes(id))
-      })
-    }
-
     const warn = (level) => {
       const label = LEVEL_LABELS[level.field] ?? level.field
       logger.warn('shared location unresolved', { data: { level: level.field } })
@@ -188,18 +231,30 @@ export const useLocation = defineStore('app.location', () => {
     }
 
     const poll = () => {
-      const level = firstUnresolved()
+      const { data } = useApp()
+      const level = firstUnresolved(data, requested)
       if (!level) return // chain settled - nothing to warn about
 
-      // Provably inaccessible: this level's records have loaded but none of the
-      // requested ids are among them, so waiting longer will not help.
-      const store = resolveStore(useApp().data, level.path)
+      // Warn only when a level is provably inaccessible: its records have
+      // finished loading yet still lack the target, so waiting longer will not
+      // help. A slow-but-successful load keeps polling and never warns; reaching
+      // the deadline just stops the poll quietly.
+      const store = resolveStore(data, level.path)
       const want = levelIds(requested, level)
       const confirmedAbsent =
-        store?.list.length > 0 && want.every((id) => !store.list.some((r) => r[level.key] === id))
+        store &&
+        !store.pending &&
+        store.list.length > 0 &&
+        want.every((id) => !store.list.some((r) => String(r[level.key]) === String(id)))
 
-      if (confirmedAbsent || Date.now() >= deadline) {
+      if (confirmedAbsent) {
         warn(level)
+        return
+      }
+      if (Date.now() >= deadline) {
+        logger.debug('shared location still converging at verify deadline', {
+          data: { level: level.field }
+        })
         return
       }
       setTimeout(poll, VERIFY_POLL_MS)

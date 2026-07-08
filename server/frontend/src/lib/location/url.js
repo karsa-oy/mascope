@@ -16,6 +16,7 @@ const QUERY_KEYS = {
   peak: 'p',
   collection: 'c',
   ions: 'i',
+  visualizedIon: 'vi',
   isotope: 'iso',
   tab: 'tab'
 }
@@ -44,6 +45,7 @@ export const locationToQuery = (loc) => {
   setId('peak', n.peak)
   setId('collection', n.collection)
   setIds('ions', n.ions)
+  setId('visualizedIon', n.visualizedIon)
   setId('isotope', n.isotope)
   if (n.tab) params.set(QUERY_KEYS.tab, n.tab)
   params.set(QUERY_KEYS.v, String(LOCATION_VERSION))
@@ -62,6 +64,7 @@ export const locationFromQuery = (params) => {
     peak: p.get(QUERY_KEYS.peak),
     collection: p.get(QUERY_KEYS.collection),
     ions: splitIds(p.get(QUERY_KEYS.ions)),
+    visualizedIon: p.get(QUERY_KEYS.visualizedIon),
     isotope: p.get(QUERY_KEYS.isotope),
     tab: p.get(QUERY_KEYS.tab)
   })
