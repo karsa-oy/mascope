@@ -286,6 +286,7 @@ def invert_matches_to_peak_assignments(
                 "target_ion_id": _str_or_none(row.get("target_ion_id")),
                 "fit_score": _score_or_none(row.get("match_score")),
                 "mz_error_ppm": _float_or_none(row.get("match_mz_error")),
+                "plausibility": _float_or_none(row.get("_plaus")),
                 "source": SOURCE_DATABASE,
             }
             for _, row in runners.iterrows()
@@ -453,11 +454,15 @@ def untargeted_matches_to_peak_assignments(
         notation = _str_or_none(row.get("ionization_mechanism"))
         group_key = (formula, notation)
 
+        # Untargeted runner-ups come back as formula names only (no per-candidate
+        # fit/m-z-error), but chemical plausibility is computable from the formula
+        # itself, so the inspector can still rank competitors by it.
         other_candidates = _str_or_none(row.get("other_candidates"))
         alternatives = (
             [
                 {
                     "assigned_formula": format_formula(alt.strip()),
+                    "plausibility": round(float(formula_plausibility(alt.strip())), 4),
                     "source": SOURCE_UNTARGETED,
                 }
                 for alt in other_candidates.split(",")
