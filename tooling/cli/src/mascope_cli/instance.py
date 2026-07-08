@@ -240,14 +240,20 @@ def resolve_or_allocate(
 
 def provision(inst: Instance, home: Path | str | None = None) -> None:
     """
-    Ensure the instance's env directory exists.
+    Ensure the instance's env directory is present and runnable.
 
-    The env dir backs the filestore and marks the env as valid for
-    ``mascope dev db`` / ``env`` commands; the ``mascope_<env>`` database is
-    created lazily by ``mascope dev run``.
+    Creates the standard runnable-env subdirectory layout (mirroring the
+    built-in ``default`` env). These must exist before the app starts: the
+    backend's startup filestore GC does ``os.listdir`` on ``filestore`` and the
+    file-converter reads ``filestreams``, so a fresh instance env would
+    otherwise crash on first ``mascope dev run``. The env dir also marks the
+    env as valid for ``mascope dev db`` / ``env`` commands; the
+    ``mascope_<env>`` database is created lazily by ``mascope dev run``.
     """
     home = _home(home)
-    (home / ".runtime" / "env" / inst.env).mkdir(parents=True, exist_ok=True)
+    env_dir = home / ".runtime" / "env" / inst.env
+    for sub in ("filestore", "filestreams", "logs", "temp", "agents/file"):
+        (env_dir / sub).mkdir(parents=True, exist_ok=True)
 
 
 def list_instances(home: Path | str | None = None) -> list[Instance]:

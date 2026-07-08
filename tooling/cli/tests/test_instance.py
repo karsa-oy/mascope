@@ -81,11 +81,14 @@ def test_registry_persists_to_disk(tmp_path):
     }
 
 
-def test_provision_creates_env_dir(tmp_path):
+def test_provision_creates_runnable_env_dirs(tmp_path):
     got = _alloc(tmp_path, "/work/alice")
     inst.provision(got, home=tmp_path)
 
-    assert (tmp_path / ".runtime" / "env" / "wt-alice").is_dir()
+    env_dir = tmp_path / ".runtime" / "env" / "wt-alice"
+    # The backend startup and file-converter need these to exist to run.
+    for sub in ("filestore", "filestreams", "logs", "temp", "agents/file"):
+        assert (env_dir / sub).is_dir(), sub
 
 
 def test_max_slots_exhausted_raises(tmp_path):
