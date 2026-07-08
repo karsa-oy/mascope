@@ -1,0 +1,40 @@
+"""
+Tests for the env-var port overrides in the runtime config loader.
+
+``MASCOPE_API_PORT`` / ``MASCOPE_FRONTEND_PORT`` let each checkout run its
+stack on distinct ports without editing config. The temp ``MASCOPE_PATH`` home
+built by ``conftest`` supplies the real config layers; each test builds a fresh
+``Runtime`` (``log=False`` to avoid reconfiguring the global logger) so the
+override is read at load time.
+"""
+
+from mascope_runtime import Runtime
+
+
+def _runtime() -> Runtime:
+    return Runtime("cli", env="default", log=False)
+
+
+def test_default_ports_without_override():
+    rt = _runtime()
+
+    assert rt.meta.api_port == 8090
+    assert rt.full_config.frontend.port == 5173
+
+
+def test_api_port_env_override(monkeypatch):
+    monkeypatch.setenv("MASCOPE_API_PORT", "9191")
+
+    assert _runtime().meta.api_port == 9191
+
+
+def test_frontend_port_env_override(monkeypatch):
+    monkeypatch.setenv("MASCOPE_FRONTEND_PORT", "5999")
+
+    assert _runtime().full_config.frontend.port == 5999
+
+
+def test_invalid_port_is_ignored(monkeypatch):
+    monkeypatch.setenv("MASCOPE_API_PORT", "not-a-port")
+
+    assert _runtime().meta.api_port == 8090

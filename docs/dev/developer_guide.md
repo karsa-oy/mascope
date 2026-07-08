@@ -181,6 +181,7 @@ Running Mascope in [dev mode](#dev-mode):
 mascope dev run                               # run the backend & frontend (deps + migrations + app)
 mascope dev run --reload                      # HMR for the backend on Windows
 mascope dev run --host                        # expose dev server to the network
+mascope dev run --instance                    # isolated per-worktree stack (see below)
 mascope dev run backend file-converter        # run specific modules
 mascope --log-grep foo dev run                # highlight log lines with foo
 mascope -g foo dev run                        # highlight log lines with foo
@@ -529,6 +530,55 @@ This means `mascope_lab` in the dev postgres and `mascope_lab` in the prod postg
 completely separate databases, each populated independently via migrations or `env sync`.
 Switching envs with `mascope env use` does not affect which databases exist - it only determines
 which database name is used by the next command.
+
+### Running multiple instances on one machine
+
+Several checkouts on one machine - most commonly agents working in independent git worktrees -
+can each run the full app at the same time while sharing a single dev Postgres/Redis pair. The
+shared infrastructure already serves one database per env (`mascope_<env>`); the only things that
+would otherwise collide are the local backend and Vite dev-server ports.
+
+`mascope dev run --instance` (or `-i`, or setting `MASCOPE_INSTANCE=1`) handles this
+automatically. It binds the current worktree to a **slot** and derives everything from it:
+
+| Derived value   | Slot 0 | Slot 1 | Slot _N_        |
+| --------------- | ------ | ------ | --------------- |
+| Env             | `wt-<worktree-basename>` | ... | ... |
+| Backend port    | 8090   | 8091   | `8090 + N`      |
+| Frontend port   | 5173   | 5174   | `5173 + N`      |
+
+Bindings are allocated first-come and stored in `.runtime/instances.json` under the shared
+`MASCOPE_PATH`, so a worktree always resolves to the same slot. Env selection flows through the
+`MASCOPE_ENV` environment variable (never persisted `state.json`), so concurrent runs never
+clobber each other.
+
+```sh
+# Once per machine - the shared infra, started from any checkout:
+mascope dev up
+
+# In each worktree - an isolated stack on its own env + ports:
+mascope dev run --instance
+```
+
+Manage the slot registry with the `instance` command group:
+
+```sh
+mascope instance list            # show all slots: env, ports, worktree
+mascope instance show            # this worktree's instance (allocates if needed)
+mascope instance show --export   # print exports for `eval "$(mascope instance show --export)"`
+mascope instance rm <env>        # release a slot for reuse (add --purge to delete its filestore)
+```
+
+Notes:
+
+- Because every instance shares one Postgres, watch the connection budget: dev pools are
+  `pool_size` + `max_overflow` per worker against `max_connections` (default 100). A handful of
+  instances is fine; for many, raise `max_connections` on the shared server.
+- Redis is a single shared instance with no per-env namespace. For independent tasks this is
+  usually harmless; namespace keys by env if collisions matter.
+- The same ports are exposed manually via `MASCOPE_API_PORT` / `MASCOPE_FRONTEND_PORT` (and the
+  env via `MASCOPE_ENV`), so `eval "$(mascope instance show --export)"` in a shell activates an
+  instance for tools other than `mascope dev run`.
 
 ### Runtime Config
 
