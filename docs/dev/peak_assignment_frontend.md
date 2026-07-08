@@ -279,10 +279,15 @@ Add a **"Verify fit"** action (assignments browser row / inspector) that calls
 `app.data.match.visualized.set({ assignment })` and switches to the Fit tab. The chart components need
 no change — B2 returns the same shapes.
 
-**Status:** contract only. Not implemented — B2 is a self-contained backend feature (two non-persisting
-controllers + routes, plus F6 wiring). The building blocks (`generate_target_ions_from_composition`,
-`compute_match_isotopes`, `_process_isotope`, `_load_peaks_and_averaged_signal`) all exist and are
-traced above; the work is composing them non-persistently and matching the nested response shape.
+**Status: implemented.** `api/new/peak_assignments/visualization.py` holds the non-persisting
+`aggregate_composition_fit` (B2a) and `visualize_composition_focus` (B2b); the visualization core was
+extracted from `visualize_ion_focus` into the shared `emit_isotope_visualization`. Routes:
+`POST /api/peak-assignments/sample/{id}/fit/aggregate` and `.../fit/visualize`. F6:
+`useMatchVisualized.verifyAssignment(assignment)` calls both (aggregate → isotope table, visualize →
+socket spectra/timeseries) and the inspector's **"Verify fit"** button opens the Fit view. Uses the
+composition path for *every* assignment (database and untargeted alike), so the Fit view no longer needs
+a persisted `target_ion_id` or a collection lookup. Verified live: aggregate returns the nested
+match_ions/match_isotopes for an untargeted formula; visualize emits both socket events without error.
 
 ## 4. The Fit view rename & composition-driven visualization (decided)
 
