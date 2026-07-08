@@ -26,7 +26,7 @@ tie report are here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from mascope_tools.composition.heuristic_filter import formula_plausibility
 
@@ -119,3 +119,76 @@ def arbitrate_candidates(
             )
         )
     return out
+
+
+# ---------------------------------------------------------------------------
+# False-discovery-rate estimation for arbitrated assignments (P2).
+#
+# Given, across many peaks, each winner's confidence and whether it was correct
+# (from a labelled golden set, or a target-decoy search where "wrong" = a decoy
+# won), the FDR at a confidence cut is the fraction of accepted winners that are
+# wrong. This is the established significance-estimation view of large-scale
+# annotation (Scheubert et al. 2017): pick a confidence threshold for a tolerated
+# FDR, report how many assignments survive. The q-value monotonises the raw FDR so
+# a threshold can be chosen unambiguously.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FdrPoint:
+    """One point on the FDR-vs-acceptance curve (peaks sorted by confidence)."""
+
+    threshold: float  # confidence cut (accept winners with confidence >= this)
+    n_accepted: int  # winners accepted at this cut
+    fdr: float  # fraction of the accepted winners that are wrong
+    q_value: float  # smallest FDR achievable while still accepting this cut
+
+
+def fdr_curve(
+    confidences: Sequence[float], is_correct: Sequence[bool]
+) -> list[FdrPoint]:
+    """FDR vs acceptance for arbitrated winners, sorted by descending confidence.
+
+    At each cut the accepted set is the confidence-ordered prefix; ``fdr`` is the
+    share of those winners that are wrong. ``q_value`` is the running minimum FDR
+    from the largest acceptance upward, so it is monotone in the threshold and safe
+    to threshold on (the standard target-decoy q-value). Ties in confidence keep a
+    stable order (correct before wrong) so a cut through a tie is not optimistic.
+    """
+    if len(confidences) != len(is_correct):
+        raise ValueError("confidences and is_correct must be the same length")
+    # Sort by confidence desc; within a tie put wrong first so the FDR at the tie is
+    # not understated (conservative).
+    order = sorted(
+        range(len(confidences)),
+        key=lambda i: (-float(confidences[i]), bool(is_correct[i])),
+    )
+    wrong = 0
+    raw: list[list[float]] = []
+    for rank, i in enumerate(order, start=1):
+        if not is_correct[i]:
+            wrong += 1
+        raw.append([float(confidences[i]), rank, wrong / rank])
+    # q-value: min FDR over all cuts at least as permissive as this one.
+    q = 1.0
+    points: list[FdrPoint] = [FdrPoint(0.0, 0, 0.0, 0.0)] * len(raw)
+    for j in range(len(raw) - 1, -1, -1):
+        q = min(q, raw[j][2])
+        points[j] = FdrPoint(raw[j][0], int(raw[j][1]), raw[j][2], q)
+    return points
+
+
+def threshold_at_fdr(
+    confidences: Sequence[float],
+    is_correct: Sequence[bool],
+    target_fdr: float,
+) -> float | None:
+    """Lowest confidence cut whose accepted set holds FDR (q-value) <= ``target_fdr``.
+
+    Returns the confidence to threshold at (accept winners with confidence >= it) for
+    the most permissive acceptance meeting the target, or ``None`` when no cut reaches
+    the target FDR.
+    """
+    points = fdr_curve(confidences, is_correct)
+    accepted = [p for p in points if p.q_value <= target_fdr]
+    return accepted[-1].threshold if accepted else None
