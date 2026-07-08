@@ -82,19 +82,11 @@ const tabs = computed(() => [
     label: 'Match',
     icon: 'pi pi-verified',
     disabled: !app.data.match.visualized.ion,
-    doc: app.ui.help.docUrl('how-it-works/matching/'),
-    help: `
-      <h1>Match View</h1>
-      <p>
-        Visualize the currently selected ion match for the selected sample.
-        Displays the spectrum for each matched isotope as well as the timeseries
-        of matched peaks.
-      </p>
-      <p>
-        Shows match metrics (intensity, m/z error, isotope abundance error) while hovering over the chart.
-        You may tweak matching parameters in the settings panel (top-left) to fine-tune matching.
-      </p>
-    `
+    // Card body comes from the shared docs snippet (docs/user/_help/matching.md)
+    // rather than inline prose -- the docs are the single source of truth.
+    title: 'Match view',
+    helpKey: 'matching',
+    doc: app.ui.help.docUrl('how-it-works/matching/')
   }
 ])
 </script>
@@ -144,11 +136,11 @@ const tabs = computed(() => [
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
-                v-for="{ icon, label, disabled, help, doc } in tabs"
+                v-for="{ icon, label, disabled, help, doc, helpKey, title } in tabs"
                 :value="label.toLowerCase()"
                 :key="label"
                 :disabled="disabled"
-                :pt="app.ui.help.bottom(help, doc ? { doc } : undefined)"
+                :pt="app.ui.help.bottom(help ?? { helpKey, title }, doc ? { doc } : undefined)"
               >
                 <div class="row">
                   <span :class="icon" /><span>{{ label }}</span>
