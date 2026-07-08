@@ -271,10 +271,17 @@ no backend or DB, only `mascope_tools` + tests.
   breaks those ties** — +0.083 contested top-1, a third fewer false winners, and ~1,000 more
   assignments surviving at the same FDR. The fit score stays the pure measurement; the
   arbitration layer adds the chemistry.
+- **Wired into the peak-centric engine (Stage A).** `invert_matches_to_peak_assignments`
+  now selects a peak's winner by **evidence = fit × plausibility** (not fit alone), so a
+  chemically implausible formula cannot win a peak on mass fit, and stores the winner's
+  arbitration **confidence**, **plausibility** and an **is_tie** flag in the assignment's
+  `provenance` (no schema change; the `fit_score` column stays the pure measurement and the
+  tier stays on the fit scale). Unit-tested (the over-saturated `C6H17NO4` loses its peak to
+  glucose). Re-ran on the live demo dataset so the stored assignments reflect it.
 - **Remaining P2:** calibrate the arbitration confidence to an absolute **P(correct)** per
-  instrument (the `calibrate_score` Platt curve is the single-candidate seed; a per-run /
-  per-instrument refit over the fit×plausibility evidence is the next step), and wire the
-  arbitration confidence into the peak-centric engine as a stored field alongside the tier.
+  instrument (the `calibrate_score` Platt curve is the single-candidate seed; a per-instrument
+  refit over the fit×plausibility evidence is the next step), then Stage B arbitration once
+  its candidates carry comparable per-candidate fits.
 
 ## 5. References
 

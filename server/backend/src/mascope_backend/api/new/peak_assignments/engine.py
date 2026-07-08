@@ -20,6 +20,8 @@ from mascope_backend.api.controllers.match.lib.match_score_v2 import (
     sample_noise_floor,
 )
 from mascope_backend.db.id import gen_id
+from mascope_tools.composition.arbitration import DEFAULT_TIE_TOL
+from mascope_tools.composition.heuristic_filter import formula_plausibility
 
 
 # Confidence tiers (a richer replacement for match_category 0/1/2)
@@ -209,9 +211,18 @@ def invert_matches_to_peak_assignments(
     main_isotope_ids = set(main_isotopes["target_isotope_id"])
     main_mz_by_ion = main_isotopes.set_index("target_ion_id")["mz"].to_dict()
 
+    # Arbitration (P2): rank a peak's competing candidates by evidence =
+    # fit x chemical plausibility, not fit alone, so a chemically implausible formula
+    # cannot win a peak on mass fit. The stored fit_score stays the pure measurement;
+    # evidence only drives the winner selection and the reported confidence.
+    formulas = matched["target_compound_formula"].astype(str)
+    plaus_by_formula = {f: formula_plausibility(f) for f in formulas.unique()}
+    matched["_plaus"] = formulas.map(plaus_by_formula)
+    matched["_fit"] = matched["match_score"].map(lambda v: _score_or_none(v) or 0.0)
+    matched["_evidence"] = matched["_fit"] * matched["_plaus"]
     matched["_abs_mz_error"] = matched["match_mz_error"].abs()
     matched = matched.sort_values(
-        ["sample_peak_id", "match_score", "_abs_mz_error"],
+        ["sample_peak_id", "_evidence", "_abs_mz_error"],
         ascending=[True, False, True],
     )
 
@@ -226,6 +237,16 @@ def invert_matches_to_peak_assignments(
             if max_alternatives
             else group.iloc[1:1]
         )
+
+        # Arbitration confidence for the chosen winner: its share of the peak's total
+        # evidence, plus an honest tie flag when a runner-up is within tie_tol.
+        evid = group["_evidence"].to_numpy(dtype=float)
+        total_evidence = float(evid.sum())
+        confidence = float(evid[0] / total_evidence) if total_evidence > 0 else 0.0
+        if total_evidence <= 0:
+            is_tie = len(group) > 1
+        else:
+            is_tie = len(group) > 1 and (evid[0] - evid[1]) <= DEFAULT_TIE_TOL
         alternatives = [
             {
                 "assigned_formula": _str_or_none(row.get("target_compound_formula")),
@@ -275,7 +296,12 @@ def invert_matches_to_peak_assignments(
             "target_ion_id": ion_id,
             "owner_peak_assignment_id": None,
             "alternatives": alternatives or None,
-            "provenance": None,
+            "provenance": {
+                "confidence": round(confidence, 4),
+                "plausibility": round(float(winner["_plaus"]), 4),
+                "evidence": round(float(winner["_evidence"]), 4),
+                "is_tie": is_tie,
+            },
         }
         assignments.append(assignment)
 
