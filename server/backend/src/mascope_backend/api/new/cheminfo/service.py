@@ -1,9 +1,16 @@
 import traceback
 
+import numpy as np
+import pandas as pd
 from sqlalchemy import select
 
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
     aggregate_sample_match_compounds,
+)
+from mascope_backend.api.controllers.match.lib.match_score_v2 import (
+    fit_sample_mass_accuracy,
+    ion_score_v2,
+    sample_noise_floor,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -14,6 +21,8 @@ from mascope_backend.api.new.cheminfo.utils import (
     to_custom_element_format,
     to_explicit_isotope_format,
 )
+from mascope_backend.api.new.peak_assignments.config import PeakAssignmentConfig
+from mascope_backend.api.new.peak_assignments.engine import tier_for_score
 from mascope_backend.api.new.reference import service as reference_service
 from mascope_backend.db import (
     IonizationMechanism,
@@ -23,12 +32,60 @@ from mascope_backend.runtime import runtime
 from mascope_match.params import BaseMatchParams
 from mascope_tools.composition import CompositionSearchConfig
 from mascope_tools.composition.finder import find_compositions
+from mascope_tools.composition.heuristic_filter import formula_plausibility
 from mascope_tools.composition.utils import (
     normalize_formula_with_isotopes,
     parse_composition,
     parse_ionization,
     to_hill_order,
 )
+
+
+# Columns ion_score_v2 needs on a candidate's isotope frame.
+_FIT_COLS = frozenset({"relative_abundance", "match_mz_error", "sample_peak_intensity"})
+
+
+def _annotate_assignment_scores(results: list[dict]) -> None:
+    """Attach fit_score (v2), plausibility and tier to each search candidate.
+
+    Harmonizes the on-demand composition search with the peak-centric assignment
+    engine: the fit is computed exactly as Stage A scores an ion (ion_score_v2
+    over the candidate's isotope envelope with the sample's fitted mass
+    accuracy), the plausibility is the graded Seven Golden Rules score, and the
+    tier uses the same bands -- so the search reports the same measurements as a
+    committed assignment instead of the legacy match score. Mutates in place.
+    """
+    if not results:
+        return
+    all_isotopes = [iso for entry in results for iso in entry.get("children", [])]
+    if not all_isotopes:
+        return
+    iso_df = pd.DataFrame(all_isotopes)
+    if not _FIT_COLS.issubset(iso_df.columns):
+        return
+
+    mu, sigma = fit_sample_mass_accuracy(iso_df)
+    noise = sample_noise_floor(iso_df)
+    cfg = PeakAssignmentConfig()
+    for entry in results:
+        children = entry.get("children", [])
+        fit = None
+        if children:
+            try:
+                fit = ion_score_v2(
+                    pd.DataFrame(children), sigma_ppm=sigma, mu=mu, noise=noise
+                )
+            except Exception:  # scoring must never break the search response
+                fit = None
+        fit = float(fit) if fit is not None and np.isfinite(fit) else None
+        entry["fit_score"] = round(fit, 4) if fit is not None else None
+        entry["tier"] = tier_for_score(
+            fit, cfg.candidate_threshold, cfg.identified_threshold
+        )
+        formula = (entry.get("cheminfo") or {}).get("target_compound_formula")
+        entry["plausibility"] = (
+            round(float(formula_plausibility(formula)), 4) if formula else None
+        )
 
 
 @api_controller()
@@ -365,6 +422,10 @@ async def match_compositions_by_mz(
                 }
                 data.append(matched_info)
                 break
+
+    # Harmonize scoring with the peak-centric engine: fit (v2) + plausibility +
+    # tier per candidate, so the search speaks the same language as assignments.
+    _annotate_assignment_scores(data)
 
     # Return formatted response with notification data
     result_data = {

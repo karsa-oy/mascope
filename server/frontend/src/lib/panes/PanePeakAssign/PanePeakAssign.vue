@@ -15,7 +15,7 @@ import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
 import { api } from '@/api'
-import { BaseMatchTag, BaseTierTag } from '@/lib/base'
+import { BaseTierTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
 import { formatIsotopeFormula } from '@/lib/chem'
@@ -580,7 +580,7 @@ const isPoorMatch = (iso) => {
         v-if="!loading && results.length > 0"
         :value="results"
         dataKey="target_compound_formula"
-        sortField="match.match_score"
+        sortField="fit_score"
         :sortOrder="-1"
         scrollable
         :scrollHeight="`${height - 100}px`"
@@ -610,20 +610,26 @@ const isPoorMatch = (iso) => {
             {{ num.mzError.format(data.cheminfo.target_isotope_mz_error_ppm) }}
           </template>
         </Column>
-        <Column field="match_score" sortable>
+        <Column field="fit_score" sortable>
           <template #header>
             <span
-              class="pi ph ph-seal-percent"
-              v-tooltip="{ value: 'Match score', showDelay: 500 }"
+              class="pi ph ph-seal-check"
+              v-tooltip="{ value: 'Fit score & confidence tier', showDelay: 500 }"
             />
           </template>
           <template #body="{ data }">
-            <BaseMatchTag
-              :match-score="data?.match_score"
-              :match-category="data?.match_category"
-              :alarming="data?.alarming"
-              nofade
+            <BaseTierTag :tier="data.tier" :fit-score="data.fit_score" :source="data.source" />
+          </template>
+        </Column>
+        <Column field="plausibility" sortable>
+          <template #header>
+            <span
+              class="pi ph ph-atom"
+              v-tooltip="{ value: 'Chemical plausibility (Seven Golden Rules)', showDelay: 500 }"
             />
+          </template>
+          <template #body="{ data }">
+            {{ data.plausibility != null ? formatFit(data.plausibility) : '—' }}
           </template>
         </Column>
         <Column field="existing" sortable>
@@ -715,19 +721,6 @@ const isPoorMatch = (iso) => {
             <Column field="match_mz_error" header="Error (ppm)" sortable>
               <template #body="{ data }">
                 {{ num.mzError.format(data.match_mz_error) }}
-              </template>
-            </Column>
-            <Column field="match_score" sortable>
-              <template #header>
-                <span class="pi ph ph-seal-percent" v-tooltip="'Match score'" />
-              </template>
-              <template #body="{ data }">
-                <BaseMatchTag
-                  :match-score="data?.match_score"
-                  :match-category="data?.match_category"
-                  :alarming="data?.alarming"
-                  nofade
-                />
               </template>
             </Column>
           </DataTable>
