@@ -134,6 +134,21 @@ describe('useSelection persistence', () => {
     expect(JSON.parse(localStorage.getItem('module[batch]'))).toEqual(['b'])
   })
 
+  it('applies a queued lazy multi-selection once records arrive', () => {
+    const records = ref([])
+    const sel = useSelection('sample', 'sample_item_id', () => records.value, { mode: 'multiple' })
+
+    // Queue before the data exists: nothing to select yet, target retained.
+    sel.lazySelect(['s1', 's3'])
+    refocus(sel)
+    expect(sel.selectedIds.value).toEqual([])
+
+    // Records arrive; the next refocus consumes the queued selection.
+    records.value = [{ sample_item_id: 's1' }, { sample_item_id: 's2' }, { sample_item_id: 's3' }]
+    refocus(sel)
+    expect(sel.selectedIds.value.sort()).toEqual(['s1', 's3'])
+  })
+
   it('does not write storage when persist is disabled', async () => {
     const records = ref([{ sample_batch_id: 'a' }, { sample_batch_id: 'b' }])
     const sel = useSelection('batch', 'sample_batch_id', () => records.value, {})

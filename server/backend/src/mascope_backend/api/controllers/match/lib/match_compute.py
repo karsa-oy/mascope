@@ -69,12 +69,31 @@ async def compute_and_create_sample_match_isotope_data(
 
     if not match_isotope_df.empty:
         match_isotope_df["sample_item_id"] = sample.sample_item_id
-        # Convert the DataFrame to a list of Pydantic models
-        match_isotopes = [
-            MatchIsotopeBase(**row)
-            for row in match_isotope_df.to_dict(orient="records")
-        ]
-        await create_match_isotopes(match_isotopes)
+        # Persist only isotopes that scored above zero: a real, in-window match.
+        # A score of 0 means either no peak within the match window, or a peak
+        # whose m/z error (>= 100 ppm) or abundance error (>= 100%) is so large it
+        # can never become a match at any read-time tolerance - apply_match_params
+        # only ever zeroes scores, never raises them. Such rows carry no analytical
+        # value (they only ever render 0%), so they are dropped here and
+        # reconstructed on read from their target_isotope in
+        # aggregate_match_isotope_filtered_data. This matches the "found peak"
+        # definition used by export_goldens (match_score > 0).
+        #
+        # INVARIANT: this preserves read-time tolerance loosening only because the
+        # UI sliders cap at exactly the scoring's zero points - m/z tolerance <=
+        # 100 ppm (mz_term = 0 at 100 ppm) and isotope ratio tolerance <= 1.0
+        # (abundance_term = 0 at 100%). Every record reachable as a nonzero match
+        # at any slider setting has score > 0 and is kept. If those slider maxima
+        # are ever raised (see SidebarMatchParams.vue), 100+ ppm records would
+        # become reachable-but-unstored - revisit this threshold in lockstep.
+        matched_isotope_df = match_isotope_df[match_isotope_df["match_score"] > 0]
+        if not matched_isotope_df.empty:
+            # Convert the DataFrame to a list of Pydantic models
+            match_isotopes = [
+                MatchIsotopeBase(**row)
+                for row in matched_isotope_df.to_dict(orient="records")
+            ]
+            await create_match_isotopes(match_isotopes)
 
     # Send progress user notification indicating completion of compute_and_create_sample_match_isotope_data process
     if notification:
