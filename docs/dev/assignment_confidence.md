@@ -113,11 +113,12 @@ evidence and resolves many ambiguities. Tools: **CAMERA**
 peak-shape correlation; **Integrated Probabilistic Annotation**
 ([Del Carratore et al. 2019](https://pubs.acs.org/doi/10.1021/acs.analchem.9b02354)) puts
 isotopes, adducts, and biochemical relations into a single Bayesian model.
-*Today.* Ionization channels are enumerated independently; there is **no cross-peak
-grouping or adduct-consistency corroboration**.
-*Gap.* The biggest untapped source of confidence. Add an adduct/isotope grouping layer that
-rewards candidates whose predicted satellite peaks (other adducts, fragments) are also
-present with consistent intensities.
+*Today.* A **first increment landed** (§4, P3 progress): `corroboration.adduct_corroboration`
+rewards a compound seen via multiple co-occurring adducts (validated on the demo: ~66% of
+confident compounds are multi-adduct). Isotope corroboration already lives in the fit score;
+intensity-consistency across adducts and in-source-fragment grouping are not yet there.
+*Gap.* Fold the adduct corroboration into the reported confidence, then add the
+intensity-consistency and fragment-grouping pieces (the fuller CAMERA/IPA model).
 
 ### L3 — Instrument & acquisition context
 *Basis.* The instrument and method constrain identity. **Mass resolution** sets the mass
@@ -315,6 +316,26 @@ no backend or DB, only `mascope_tools` + tests.
   a TOF curve once a TOF golden set exists; the **persisted, user-refittable per-instrument
   store** (a DB table — deferred); then Stage B arbitration once its candidates carry
   comparable per-candidate fits.
+
+### P3 progress
+
+- **Adduct co-occurrence corroboration (first increment) landed**
+  (`mascope_tools.composition.corroboration.adduct_corroboration`). A real compound rarely
+  appears as a single ion — it shows up through several adducts ($[M+H]^+$, $[M+NH_4]^+$,
+  $[M+Br]^-$ …) that co-occur in one spectrum; their co-occurrence is **independent
+  corroborating evidence** beyond any peak's fit (CAMERA 2012; IPA 2019). Per compound it
+  counts the distinct adduct channels that independently support it and returns a bounded,
+  saturating signal `corroboration = 1 - 2^-(n_adducts-1)` (0 for a lone adduct, 0.5 for two,
+  0.75 for three …). Cross-peak but **competitor-blind within a compound** — it reads only
+  *which* adducts were assigned, never the fit score, so it stays a separate, inspectable
+  layer (design rule §3). Unit-tested (`test_corroboration.py`).
+- **Validated on the refreshed demo** (read-only): of the confident (identified/candidate)
+  compound-instances, **~66% are seen via ≥2 adducts** (2,108 via two, 3,017 via three;
+  2,620 lone) — the signal is both abundant and discriminating.
+- **Remaining P3:** fold the corroboration into the reported confidence (a modeling/product
+  decision on how much a co-occurring adduct set should lift confidence — done as a run-level
+  post-pass over the assignments, not per-peak); then intensity-consistency across adducts and
+  in-source-fragment grouping (the deeper CAMERA/IPA model).
 
 ## 5. References
 

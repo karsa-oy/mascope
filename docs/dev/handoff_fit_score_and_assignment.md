@@ -176,8 +176,12 @@ Validated `rule_senior` against the 92 demo target compounds:
   (locally applied via a direct alembic run against the worktree code).
 
 **F — later phases**
-- **F9. P3 — spectral-neighbourhood corroboration** (adduct/isotope/in-source-fragment
-  grouping; CAMERA/IPA) — the biggest untapped confidence source.
+- **F9. P3 — spectral-neighbourhood corroboration.** ✅ *First increment landed:*
+  `mascope_tools.composition.corroboration.adduct_corroboration` — a compound seen via
+  multiple co-occurring adducts is corroborated (`1 - 2^-(n_adducts-1)`); validated on the
+  demo (~66% of confident compounds are multi-adduct). Unit-tested. *Remaining:* fold it into
+  the reported confidence (a run-level post-pass; modeling/product decision), then
+  intensity-consistency across adducts + in-source-fragment grouping (fuller CAMERA/IPA).
 - **F10. P4 — context & levels** — retention-time / ionization priors + a reported
   Schymanski/MSI identification **level** alongside the confidence.
 
