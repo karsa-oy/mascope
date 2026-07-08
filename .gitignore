@@ -19,6 +19,9 @@ tofdaq
 /.runtime/env/*
 # Downloaded/built demo bundles (large; fetched on demand by `mascope demo`)
 /.runtime/demo/
+# Per-worktree dev-stack instance registry (machine-local, see `mascope instance`)
+/.runtime/instances.json
+/.runtime/instances.json.*
 
 # MkDocs build output
 /site/

@@ -44,7 +44,7 @@ export const usePeak = defineStore('app.data.peak', () => {
       deps: () => ({
         sample_item_id: useSample().focusedId
       }),
-      selection: true
+      selection: { persist: true }
     }
   )
 

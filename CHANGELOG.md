@@ -9,6 +9,23 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
 - Public chemistry database integration, phases 0-2 (foundations through suspect-screening sources). A new `mascope_reference` library mirrors free-to-use public databases (PubChem, EPA CompTox, ChEBI, HMDB, LIPID MAPS, COCONUT, NORMAN) into `reference_source` / `reference_compound` tables, normalizing every source formula to the same canonical Hill order the de novo engine uses. Ingest a versioned snapshot with `mascope reference sync <source> <dump> --version <tag>` (see `mascope reference sources` / `status`). Composition results are additively annotated with known reference compounds sharing each formula (name, structure, cross-references, source, license), collapsed one-per-compound on InChIKey; pass `known_only: true` for a suspect-screening prior that keeps only formulas backed by a known compound. The peak-assignment table surfaces the matched identity, and `mascope demo` seeds a small illustrative reference set so the annotation is visible without downloading a public-database dump. Custom reference data - e.g. published atmospheric peak lists not yet in the public databases - can be authored as a flat CSV/TSV and loaded with `mascope reference sync custom <file> --name <list>` (see `docs/dev/reference_data_authoring.md`). De novo scoring is untouched. Design: `docs/dev/public_database_integration.md`.
 - Peak-centric assignment (first iteration): a sample's peaks can now each be assigned a chemical composition, inverting the target-first workflow. A new background engine matches every peak against the known target library (Stage A) and runs an untargeted composition search over the unexplained remainder (Stage B), then persists one row per observed peak with formula, adduct, isotope role, evidence, and a confidence tier (`identified` / `candidate` / `below_assignability` / `unassigned`). Results are stored in the new `peak_assignment_run` / `peak_assignment` tables (single-owner-per-peak enforced per run, full config recorded for reproducibility) and served by `/api/peak-assignments/sample/{id}` endpoints. Design and phased plan in `docs/dev/peak_assignment_paradigm.md`.
+- Unattended, self-classifying updates for pinned deployments (`mascope-cli`
+  2026.7.8). `mascope prod update --check` classifies a pending update as
+  up-to-date, a *fast* update (new images, no database migration, near-zero
+  downtime) or a *migration* update (a schema migration will run and cause
+  downtime) by reading the Alembic head the target release carries and comparing
+  it to the live database, so a maintenance window is only scheduled when one is
+  actually needed. Releases now publish a small `mascope-manifest.json` (a GitHub
+  Release asset) recording that head, which `--check --manifest` reads without
+  inspecting the image. `mascope prod update --auto` (driven by the systemd
+  `mascope-update.timer` in `tooling/systemd/`) applies fast updates inside a
+  configurable maintenance window (`MASCOPE_UPDATE_WINDOW`) with a post-apply
+  health check, and applies a migration update once its grace period elapses
+  (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator runs `mascope prod
+  update --confirm`; `mascope prod update --snooze N` postpones it. A failed
+  health check alerts and stops without rolling back automatically. Requires the
+  server to be pinned to a release tag with read access to the repository
+  releases.
 
 ### Changed
 

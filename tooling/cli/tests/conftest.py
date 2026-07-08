@@ -71,6 +71,9 @@ def _reset_cli_state(monkeypatch):
         "MASCOPE_LOGLEVEL",
         "MASCOPE_LOGGREP",
         "MASCOPE_ENV",
+        "MASCOPE_API_PORT",
+        "MASCOPE_FRONTEND_PORT",
+        "MASCOPE_INSTANCE",
     ):
         monkeypatch.delenv(var, raising=False)
 

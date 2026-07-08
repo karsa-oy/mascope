@@ -41,12 +41,14 @@ if source_checkout():
     from mascope_cli.cmd.agent import agent_app
     from mascope_cli.cmd.backend import backend_app
     from mascope_cli.cmd.dev import dev_app
+    from mascope_cli.cmd.instance import instance_app
     from mascope_cli.cmd.reference import reference_app
     from mascope_cli.cmd.test import test_app
 
     app.add_typer(dev_app, name="dev")
     app.add_typer(backend_app, name="backend")
     app.add_typer(agent_app, name="agent")
+    app.add_typer(instance_app, name="instance")
     app.add_typer(test_app, name="test")
     app.add_typer(reference_app, name="reference")
 
