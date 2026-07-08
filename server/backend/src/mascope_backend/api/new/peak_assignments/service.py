@@ -54,6 +54,7 @@ from mascope_backend.api.new.peak_assignments.engine import (
     untargeted_matches_to_peak_assignments,
 )
 from mascope_backend.db import (
+    AssignmentVerification,
     IonizationMechanism,
     PeakAssignment,
     PeakAssignmentRun,
@@ -201,6 +202,112 @@ async def get_peak_assignments(
         ),
         "results": len(data),
         "run": run.to_dict(),
+        "data": data,
+    }
+
+
+# -------------------------------------------------------------------
+# Verification capture (verification-calibration loop, V1)
+# -------------------------------------------------------------------
+
+
+@api_controller()
+async def create_verification(
+    sample_item_id: str,
+    peak_assignment_id: str,
+    verdict: str,
+    evidence_level: str | None = None,
+    note: str | None = None,
+    user_id: int | None = None,
+) -> dict:
+    """Record a user's verdict on an assignment (append-only), snapshotting its score.
+
+    Looks up the judged assignment (must belong to the sample), captures its stable identity
+    (sample_peak_id + formula + adduct) and the score at this moment (fit_score / evidence /
+    p_correct), and inserts an :class:`AssignmentVerification`. The snapshot is what makes the
+    later calibration pair `(score, label)` stable even after a re-run changes the assignment.
+
+    :param sample_item_id: Sample the assignment belongs to.
+    :param peak_assignment_id: The assignment being verified.
+    :param verdict: confirmed | rejected | unsure.
+    :param evidence_level: Basis for the verdict (see schemas.EvidenceLevel); the schema
+        requires it for 'confirmed'.
+    :param note: Optional free-text note.
+    :param user_id: The verifying user (attribution).
+    :return: Status envelope with the created verification record.
+    """
+    sample = await fetch_sample(sample_item_id)
+    async with async_session() as session:
+        assignment = await session.get(PeakAssignment, peak_assignment_id)
+        if assignment is None or assignment.sample_item_id != sample_item_id:
+            raise NotFoundException(
+                f"Assignment '{peak_assignment_id}' not found for sample "
+                f"'{sample.sample_item_name}'"
+            )
+        provenance = assignment.provenance or {}
+        verification = AssignmentVerification(
+            assignment_verification_id=gen_id(32),
+            sample_item_id=sample_item_id,
+            peak_assignment_id=assignment.peak_assignment_id,
+            peak_assignment_run_id=assignment.peak_assignment_run_id,
+            sample_peak_id=assignment.sample_peak_id,
+            assigned_formula=assignment.assigned_formula,
+            ionization_mechanism_id=assignment.ionization_mechanism_id,
+            verdict=verdict,
+            evidence_level=evidence_level,
+            fit_score=assignment.fit_score,
+            evidence=provenance.get("evidence"),
+            p_correct=provenance.get("p_correct"),
+            note=note,
+            verified_by=user_id,
+            verified_utc=dt.now(timezone.utc),
+        )
+        session.add(verification)
+        await session.commit()
+        await session.refresh(verification)
+        record = verification.to_dict()
+    return {
+        "status": "success",
+        "message": (
+            f"Recorded '{verdict}' verification for "
+            f"{record.get('assigned_formula') or 'peak'} in sample "
+            f"'{sample.sample_item_name}'"
+        ),
+        "results": 1,
+        "data": [record],
+    }
+
+
+@api_controller()
+async def get_verifications(sample_item_id: str) -> dict:
+    """All verification verdicts recorded for a sample, newest first.
+
+    Returns every verdict (append-only history); the current verdict for a given assignment is
+    the latest by ``verified_utc`` for its ``sample_peak_id`` + formula + adduct. The frontend
+    derives per-assignment state from this list.
+    """
+    sample = await fetch_sample(sample_item_id)
+    async with async_session() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(AssignmentVerification)
+                    .where(AssignmentVerification.sample_item_id == sample_item_id)
+                    .order_by(AssignmentVerification.verified_utc.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+    data = [row.to_dict() for row in rows]
+    return {
+        "status": "success",
+        "message": (
+            f"Retrieved {len(data)} verification"
+            f"{'s' if len(data) != 1 else ''} for sample "
+            f"'{sample.sample_item_name}'"
+        ),
+        "results": len(data),
         "data": data,
     }
 
