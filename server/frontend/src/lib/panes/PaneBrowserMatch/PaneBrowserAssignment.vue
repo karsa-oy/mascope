@@ -457,7 +457,7 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
 
 .formula {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 .iso-count {
   margin-left: 0.35rem;
