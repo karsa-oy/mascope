@@ -128,9 +128,15 @@ async def logger_middleware(request: Request, call_next):
 if runtime.mode == "dev":
     fast.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",  # Vite dev server
-        ],
+        # Per-worktree instances run the Vite dev server on 5173 + slot and
+        # export MASCOPE_FRONTEND_PORT; honour it so instances past slot 0 are
+        # reachable from their own frontend, falling back to the default port.
+        allow_origins=list(
+            {
+                f"http://localhost:{os.environ.get('MASCOPE_FRONTEND_PORT', '5173')}",
+                "http://localhost:5173",  # default Vite dev server
+            }
+        ),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
