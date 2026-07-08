@@ -857,6 +857,14 @@ SCORE_VERSION = 2
 # valid low-resolution matches) — pass the per-sample fitted sigma instead.
 FALLBACK_SIGMA_PPM = 2.0
 
+# SNR-dependent centroiding contribution to the mass-error width, added in quadrature to
+# the fixed (fitted-instrument) sigma: the mass error of a peak scales as
+# sigma^2 = sigma_fixed^2 + (MASS_SNR_K / SNR)^2 -- a weak peak's centroid is legitimately
+# less precise. Fitted on the demo goldens (sigma vs SNR: floor ~0.23 ppm, k ~2.36 ppm), so
+# a trace isotopologue is not scored against the tight high-SNR width. High-SNR peaks are
+# unaffected (MASS_SNR_K/SNR -> 0). Set 0 to recover the fixed-width mass term.
+MASS_SNR_K = 2.36
+
 # Platt calibration (raw fit score -> P(correct)) fitted on the demo Br/Ur golden
 # set. Maps a raw v2 score to a probability; refit per instrument/dataset with the
 # score_eval harness (DESIGN.md §5.3) for production — a sensible default, not a
@@ -883,8 +891,10 @@ def score_pattern_v2(
     """Detectability-gated, SNR-aware match score in [0, 1].
 
     Per predicted isotopologue i (predicted relative abundance `predicted_rel[i]`,
-    base = index 0): a matched peak contributes a Gaussian mass likelihood times an
-    intensity likelihood whose tolerance is set by the peak's own SNR; an ABSENT
+    base = index 0): a matched peak contributes a Gaussian mass likelihood (its width the
+    fitted instrument sigma in quadrature with an SNR-dependent centroiding term,
+    `MASS_SNR_K/SNR`) times an intensity likelihood whose tolerance is set by the peak's
+    own SNR; an ABSENT
     peak contributes `miss_penalty` iff it should have been detectable
     (`predicted_rel[i]*SNR_base >= k_detect`), else it is excluded (below noise, not
     evidence). Aggregation is a predicted-abundance-weighted geometric mean. Returns
@@ -907,7 +917,11 @@ def score_pattern_v2(
     n = len(pr)
 
     matched = oi > 0
-    mass_L = np.exp(-0.5 * (me / sigma_ppm) ** 2)
+    # Per-peak mass width: the fixed (fitted-instrument) sigma in quadrature with an
+    # SNR-dependent centroiding term, so a low-SNR peak's legitimately larger mass error
+    # is not judged against the tight high-SNR width. High-SNR peaks are unchanged.
+    sigma_mass = np.hypot(sigma_ppm, MASS_SNR_K / snr)
+    mass_L = np.exp(-0.5 * (me / sigma_mass) ** 2)
     rel_obs = oi / base_int
     sigma_rel = np.maximum.reduce(
         [
