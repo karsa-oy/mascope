@@ -1,58 +1,50 @@
-# Verification capture in the UI (V1) — frontend contract
+# Labelling (assignment verification) UI — handover
 
-*Backend V1 of the verification → calibration loop is on the epic branch: a user confirms/rejects
-an identification, and the verdict is stored as a labelled record (with a score snapshot) that will
-later refit the confidence calibration. This is the frontend contract for the capture control.
-Design rationale + the guardrails: [`verification_calibration_loop.md`](verification_calibration_loop.md).
-Scope is deliberately small — capture honest labels, nothing else. No calibration refit in the UI
-(that's V2).*
+*Backend V1 of the verification → calibration loop is shipped on the epic branch: a user confirms or
+rejects an identification, and the verdict is stored as a labelled record (with a score snapshot)
+that will later refit the confidence calibration. This is the handover for the **capture UI**.
+Design rationale + guardrails: [`verification_calibration_loop.md`](verification_calibration_loop.md).*
 
-## What to build
+**Scope is deliberately small: capture honest labels.** Build the three surfaces in §2. Do **not**
+build a structured isotope checklist, an active-learning queue, or any "recalibrate" action — those
+are later phases. There is no new science on the UI side; it's a form + a badge + a filter.
 
-A **minimal** control on a peak assignment in the inspector
-([`PanePeakAssign.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakAssign.vue)):
+---
 
-- **Confirm / Reject / Unsure** (make Reject exactly as prominent as Confirm — rejections are
-  first-class calibration negatives).
-- An **evidence-level** dropdown (see enum below). **Required when confirming** (the API rejects a
-  `confirmed` verdict with no evidence level); optional for reject/unsure.
-- An optional **note** (free text).
-- A **verdict badge** on the assignment showing its current verdict (+ evidence level) once set.
-- A ledger filter: **verified / rejected / unverified**.
+## 1. Backend contract (already live)
 
-Not in V1: the structured isotope-by-isotope checklist, and any "recalibrate" action.
+Two endpoints under `/api/peak-assignments` (routes on the epic branch):
 
-## API (epic branch, under `/api/peak-assignments`)
+| Method | Path | Auth | Body → returns |
+|---|---|---|---|
+| `POST` | `/sample/{sample_item_id}/verify` | **editor** | body below → `201` `{ status, message, results, data: [record] }` |
+| `GET` | `/sample/{sample_item_id}/verifications` | guest | `{ status, message, results, data: [record] }` — all verdicts, **newest first** |
 
-| Method | Path | Body / returns |
-|---|---|---|
-| `POST` | `/sample/{sample_item_id}/verify` | body below → `201` `AssignmentVerificationsResponse` (the created record in `data[0]`). Requires **editor**. |
-| `GET` | `/sample/{sample_item_id}/verifications` | `AssignmentVerificationsResponse` — all verdicts for the sample, newest first. Requires guest. |
-
-**POST body:**
+**POST body**
 
 ```json
 { "peak_assignment_id": "…", "verdict": "confirmed",
-  "evidence_level": "reference_standard", "note": "optional" }
+  "evidence_level": "reference_standard", "note": "optional free text" }
 ```
 
-- `verdict`: `confirmed` | `rejected` | `unsure`.
-- `evidence_level` (required iff `confirmed`): `reference_standard` | `msms` | `orthogonal` |
-  `pattern` | `visual`.
+- `verdict`: `"confirmed" | "rejected" | "unsure"`.
+- `evidence_level`: one of the five below. **Required when `verdict === "confirmed"`** — the API
+  returns 422 otherwise (so disable/guard the Confirm submit until an evidence level is picked).
+- `note`: optional.
 
-**Record shape** (`AssignmentVerificationRecord`):
+**Record shape** (`AssignmentVerificationRecord`)
 
 ```
 assignment_verification_id · sample_item_id · peak_assignment_id · peak_assignment_run_id
 sample_peak_id · assigned_formula · ionization_mechanism_id
 verdict · evidence_level · note
-fit_score · evidence · p_correct   (snapshot at verification time)
+fit_score · evidence · p_correct     (snapshot taken at verification time — for display/audit)
 verified_by · verified_utc
 ```
 
-## Evidence levels (labels + meaning)
+### Evidence levels (surface the meaning, not just the key)
 
-Ordered strongest → weakest; surface the meaning, not just the key:
+Strongest → weakest:
 
 | key | label | meaning |
 |---|---|---|
@@ -62,25 +54,124 @@ Ordered strongest → weakest; surface the meaning, not just the key:
 | `pattern` | Isotope/adduct pattern | in-spectrum isotope + adduct corroboration only |
 | `visual` | Visual | manual review, no independent evidence (weakest) |
 
-## Deriving the current verdict
+---
 
-The GET returns the **append-only history**. The current verdict for an assignment is the
-**latest by `verified_utc`** among records matching its stable identity —
-`sample_peak_id` + `assigned_formula` + `ionization_mechanism_id` (not `peak_assignment_id`, which
-changes on every re-run). Join the verifications store to the assignments by that identity, take the
-newest per group, and show it as the badge / drive the ledger filter.
+## 2. What to build (three surfaces)
 
-## Two UX guardrails (from the design)
+### 2a. Capture control — inspector
+[`PanePeakAssign.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakAssign.vue), on the
+committed-assignment card (only for a real assignment — hide for `unassigned` / empty peaks).
 
-1. **Don't anchor the judgment on `p_correct`.** During verification, keep the model's probability
-   de-emphasised (or hidden) so the user judges the *data* — otherwise the labels just echo the model
-   and the eventual calibration learns nothing. Showing fit / isotopes / adducts is fine; leading with
-   "Mascope says 92%" is not.
-2. **Reject is not a second-class action.** Equal prominence to Confirm.
+- Three buttons: **Confirm · Reject · Unsure**. Confirm and Reject get **equal visual weight**
+  (Reject is a first-class negative label, not a destructive-styled afterthought).
+- An **evidence-level** dropdown (the 5 options above, with labels). Required to enable Confirm.
+- An optional **note** field.
+- Submit → `POST …/verify`. On success, collapse to the badge (2b) showing the new verdict.
+
+### 2b. Verdict badge
+On the same card and on each ledger row: once an assignment has a current verdict, show a compact
+badge — e.g. ✓ **Confirmed · reference standard**, ✕ **Rejected**, ? **Unsure** — with the evidence
+level and (on hover) who/when. Clicking it re-opens the control to change the verdict (a new record;
+see §4).
+
+### 2c. Ledger filter
+[`PaneBrowserAssignment.vue`](../../server/frontend/src/lib/panes/PaneBrowserMatch/PaneBrowserAssignment.vue):
+add a **verified / rejected / unverified** filter (a chip strip like the existing tier histogram, or
+a small select). "Unverified" = no current verdict. This makes a labelling pass efficient.
+
+### Wireframe (inspector card)
+
+```
+┌ Assignment ─────────────────────────────────────────────┐
+│ C10H14O9   [identified]   fit 0.83 · plaus 1.0 · P 0.98p │
+│ supported by 2 adducts                                   │
+│                                                          │
+│  Verify:  [ ✓ Confirm ]  [ ✕ Reject ]  [ ? Unsure ]      │
+│  Evidence: ( Reference standard        ▾ )   ← req. to   │
+│  Note:     [___________________________]        confirm  │
+│                                                          │
+│  — after submit —                                        │
+│  ✓ Confirmed · reference standard   (you, 2m ago)  [edit]│
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Store + data flow
+
+Add a `peakAssignment/verification` Pinia module alongside `run` / `peak`:
+
+- **load**: `GET /peak-assignments/sample/{sample_item_id}/verifications` for the focused sample
+  (`use: 'read'`), keyed by `assignment_verification_id`. Refetch on sample switch.
+- **createVerification(body)**: `POST …/verify`; on success, push the returned record into the list
+  (optimistic or refetch) so the badge updates without a full reload.
+- expose a **`currentByAssignment`** getter (see §4).
+
+The peak store already exposes assignments by peak; join verdicts to them via §4.
+
+---
+
+## 4. Deriving the *current* verdict (important)
+
+The GET returns the **append-only history** (every verdict ever recorded). The current verdict for an
+assignment is the **latest by `verified_utc`** among records sharing its **stable identity**:
+
+```
+key = `${sample_peak_id}|${assigned_formula}|${ionization_mechanism_id}`
+```
+
+Use that identity — **not `peak_assignment_id`**, which is regenerated on every assignment run, so a
+label made against last run must still light up this run's matching assignment. Group the list by
+that key, take the max `verified_utc` per group → `currentByAssignment`. Badge + ledger filter read
+from it.
+
+---
+
+## 5. Interaction states
+
+| state | UI |
+|---|---|
+| idle, no verdict | the three buttons + evidence + note |
+| Confirm chosen, no evidence | Confirm submit disabled (or inline "pick an evidence level") |
+| submitting | disable buttons, spinner |
+| success | collapse to the badge (2b); toast optional |
+| error (403 non-editor) | inline "you need editor access to verify" — hide the control for guests |
+| error (network/422) | inline error, keep the form populated for retry |
+| already-verified | show badge; `edit` re-opens the control prefilled with the current verdict |
+
+Guests (no editor role) see the **badge only**, no capture control.
+
+---
+
+## 6. Two UX guardrails (from the design — please honour)
+
+1. **Don't anchor the judgment on `p_correct`.** During verification keep the model's probability
+   de-emphasised (or out of the immediate eye-line) so the user judges the *data* (fit, isotopes,
+   co-occurring adducts), not the number — otherwise the labels just echo the model and the eventual
+   calibration learns nothing. Showing fit/isotopes/adducts is good; leading with "Mascope says 98%"
+   is not.
+2. **Reject is not second-class.** Equal prominence to Confirm; rejections are the negative labels the
+   calibration needs.
+
+---
+
+## 7. Acceptance criteria
+
+- [ ] Editor can confirm/reject/unsure an assignment from the inspector; the verdict persists and the
+      badge reflects it after reload.
+- [ ] Confirm is blocked until an evidence level is chosen; the five levels are labelled.
+- [ ] Reject and Unsure work without an evidence level.
+- [ ] The badge shows the **current** verdict derived by stable identity (survives a re-assign run).
+- [ ] Ledger filter narrows to verified / rejected / unverified.
+- [ ] Guests see the badge but no capture control; a non-editor POST is not attempted.
+- [ ] `p_correct` is not the visual anchor of the verification moment; Reject == Confirm in prominence.
+
+---
 
 ## TL;DR
 
-- POST `/sample/{id}/verify` with `{peak_assignment_id, verdict, evidence_level?, note?}` (editor).
-- GET `/sample/{id}/verifications`; current verdict = latest by `verified_utc` per
-  `sample_peak_id`+formula+adduct.
-- Confirm requires an evidence level; make Reject equally easy; don't lead with `p_correct`.
+Build a confirm/reject/unsure + evidence-dropdown + note control in the inspector, a verdict badge,
+and a verified/rejected ledger filter. `POST /sample/{id}/verify` (editor; confirm needs evidence),
+`GET /sample/{id}/verifications`; current verdict = latest by `verified_utc` per
+`sample_peak_id`+formula+adduct. Don't lead with `p_correct`; make Reject equal to Confirm. Nothing
+else — no checklist, no recalibration.
