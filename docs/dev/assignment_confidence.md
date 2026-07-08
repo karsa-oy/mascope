@@ -113,12 +113,12 @@ evidence and resolves many ambiguities. Tools: **CAMERA**
 peak-shape correlation; **Integrated Probabilistic Annotation**
 ([Del Carratore et al. 2019](https://pubs.acs.org/doi/10.1021/acs.analchem.9b02354)) puts
 isotopes, adducts, and biochemical relations into a single Bayesian model.
-*Today.* A **first increment landed** (§4, P3 progress): `corroboration.adduct_corroboration`
-rewards a compound seen via multiple co-occurring adducts (validated on the demo: ~66% of
-confident compounds are multi-adduct). Isotope corroboration already lives in the fit score;
-intensity-consistency across adducts and in-source-fragment grouping are not yet there.
-*Gap.* Fold the adduct corroboration into the reported confidence, then add the
-intensity-consistency and fragment-grouping pieces (the fuller CAMERA/IPA model).
+*Today.* Adduct co-occurrence corroboration is **measured and folded into `p_correct`** (§4, P3
+progress): a compound seen via several confident adducts lifts each winner by a measured per-adduct
+log-odds (bounded odds update), with the weights carried in the per-instrument calibration store
+(D6). Isotope corroboration already lives in the fit score.
+*Gap.* Intensity-consistency across adducts and in-source-fragment grouping are not yet there (the
+fuller CAMERA/IPA model).
 
 ### L3 — Instrument & acquisition context
 *Basis.* The instrument and method constrain identity. **Mass resolution** sets the mass
@@ -368,16 +368,18 @@ no backend or DB, only `mascope_tools` + tests.
   **real but modest, adduct-specific** signal — not the dominant factor the naive random-null 104×
   implied.
 
-  **Recommendation for the fold-in.** Replace the adduct-agnostic count heuristic
-  (`corroboration = 1 − 2^-(n−1)`, kept only for display/summary) with an **additive per-adduct
-  log-odds update** on the calibrated probability:
-  `logit(p_correct') = logit(p_correct) + Σ_{observed adducts a} w_a`, capped (e.g. ≤ +3 total) and
-  shrunk for robustness, where `w_a` is the measured per-adduct log-odds above. Caveats: (1) the
-  weights are **instrument/library-specific** (they encode the Br/Ur reagent chemistry) and belong
-  in the **calibration store** alongside the Platt curve (D6), fit per instrument + adduct panel,
-  not hardcoded; (2) "present" here is monoisotopic-only, so these LRs are a **conservative lower
-  bound** — a fit-gated corroboration (full adduct envelope) will be a bit stronger; (3) the
-  anchor-swap pool includes real primaries, also conservative. Numbers: `_corroboration_metrics.json`.
+  **Fold-in — implemented (D6).** The measured weights are folded into `p_correct` as an
+  **additive per-adduct log-odds update** (not the adduct-agnostic count heuristic, which is kept
+  only for display): `logit(p_correct') = logit(p_correct) + clamp(Σ_{observed adducts a} w_a, ±cap)`
+  (`apply_corroboration`, cap 3.0). A compound seen via several confident adducts lifts each winner
+  by the co-occurring adducts' `w_a`; the engine does this as a run-level post-pass over the M0
+  winners and records `provenance.corroboration = {adducts, n_adducts, boost}`. The weights ride on
+  the per-instrument :class:`Calibration` in the **calibration store** (`assignment_calibration`
+  table + `calibration_store.load_calibration`, falling back to the in-code provisional curve), so
+  they are refit per instrument + adduct panel, never hardcoded into the engine. Caveats: the
+  weights are **instrument/library-specific** (they encode the Br/Ur reagent chemistry); "present"
+  is monoisotopic-only, so the LRs are a **conservative lower bound**; and the anchor-swap pool
+  includes real primaries (also conservative). Weights: `_corroboration_metrics.json`.
 - **Then:** intensity-consistency across adducts and in-source-fragment grouping (the deeper
   CAMERA/IPA model).
 
