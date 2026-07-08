@@ -302,6 +302,11 @@ const fitPercent = new Intl.NumberFormat('en-US', {
 })
 const formatFit = (value) =>
   value != null && !Number.isNaN(value) ? fitPercent.format(value) : '-'
+
+// The isotopologue family (M0 + M+1, M+2 ...) of the focused assignment. These
+// satellites are folded out of the assignments table; the inspector is where
+// the envelope is shown in full.
+const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssignment.value))
 </script>
 
 <template>
@@ -384,6 +389,27 @@ const formatFit = (value) =>
           <div class="ev" v-if="focusedAssignment.isotope_label">
             <span class="k">isotope</span>
             <span class="v">{{ focusedAssignment.isotope_label }}</span>
+          </div>
+        </div>
+        <div v-if="family.length > 1" class="isotopologues">
+          <div class="alts-label">Isotopologues</div>
+          <div class="iso-head">
+            <span>iso</span><span>m/z</span><span>error</span><span>fit</span>
+          </div>
+          <div
+            v-for="iso in family"
+            :key="iso.peak_assignment_id"
+            class="iso-row"
+            :class="{ current: iso.sample_peak_id === focusedAssignment.sample_peak_id }"
+            v-tooltip.left="'Focus this isotopologue peak'"
+            @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
+          >
+            <span class="iso-label">{{ iso.isotope_label || '—' }}</span>
+            <span class="iso-mz">{{ num.mz.format(iso.sample_peak_mz) }}</span>
+            <span class="iso-err">{{
+              iso.mz_error_ppm != null ? `${num.mzError.format(iso.mz_error_ppm)}` : '—'
+            }}</span>
+            <span class="iso-fit">{{ formatFit(iso.fit_score) }}</span>
           </div>
         </div>
         <div v-if="focusedAssignment.alternatives?.length" class="alts">
@@ -746,5 +772,47 @@ const formatFit = (value) =>
 .insp-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Isotopologue envelope of the focused assignment (M0 + M+1, M+2 ...). */
+.isotopologues {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.iso-head,
+.iso-row {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto 3rem;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.76rem;
+  padding: 0.15rem 0.3rem;
+}
+.iso-head {
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+.iso-row {
+  border-radius: 4px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.iso-row:hover {
+  background: var(--p-content-hover-background, rgba(127, 127, 127, 0.12));
+}
+.iso-row.current {
+  background: color-mix(in srgb, var(--p-primary-color, #6366f1) 14%, transparent);
+}
+.iso-row .iso-label {
+  font-weight: 600;
+}
+.iso-row .iso-err,
+.iso-row .iso-fit {
+  opacity: 0.7;
+  text-align: right;
 }
 </style>

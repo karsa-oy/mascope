@@ -123,11 +123,14 @@ function toggleTier(key) {
   else activeTiers.add(key)
 }
 
-// Table rows: filtered by the active chips, then ordered by confidence
-// (identified first) and fit descending. tierRank lets the tier column sort by
-// confidence too.
+// Table rows: one per assigned formula (M0) plus unassigned/reagent peaks;
+// iso_child satellites are folded away (they surface in the inspector), which
+// also keeps this a flat, fixed-height list compatible with virtual scrolling.
+// Filtered by the active chips, then ordered by confidence (identified first)
+// and fit descending. tierRank lets the tier column sort by confidence too.
 const rows = computed(() => {
   const list = assignments.value.list
+    .filter((row) => row.role !== 'iso_child')
     .filter((row) => activeTiers.size === 0 || activeTiers.has(bucketOf(row)))
     .map((row) => ({ ...row, tierRank: TIER_RANK[row.tier] ?? 3 }))
   list.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
