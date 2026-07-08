@@ -37,6 +37,13 @@ Every peak is assigned in a two-stage engine:
 Peaks that neither stage explains are recorded as *unassigned*, so a run is a complete,
 queryable ledger: one row per observed peak.
 
+**Single owner, within tolerance.** Each peak has exactly one owner per run, and a peak is
+only owned by an isotopologue whose measured m/z is *within tolerance* of the prediction.
+A predicted isotopologue that has no real peak is left unmatched rather than being pinned to
+a nearby, out-of-tolerance peak — that peak is released to the untargeted stage (or left
+unassigned) so it can get its own correct assignment instead of being mislabelled as a
+poorly-fitting isotopologue of something else.
+
 ## The fit score — a pure measurement
 
 The **fit score** measures exactly one thing: *how well does the observed data fit the
@@ -50,7 +57,8 @@ per ion from its isotopologue peaks, and is deliberately:
 
 Rather than scoring the monoisotopic mass alone, the fit score scores the **whole isotope
 pattern**: each predicted isotopologue contributes a mass likelihood (a Gaussian in ppm,
-its width set by the instrument's *measured* mass accuracy, so the score is fair on both
+its width set by the instrument's *measured* mass accuracy — and widened for weak peaks,
+whose centroids are legitimately less precise — so the score is fair on both
 high-resolution Orbitrap and lower-resolution TOF instruments) and an intensity
 likelihood (its tolerance set by the peak's own signal-to-noise). A predicted peak that is
 **absent but should have been detectable** counts against the assignment; one that is

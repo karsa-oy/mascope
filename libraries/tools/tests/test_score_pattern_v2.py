@@ -53,6 +53,28 @@ def test_low_snr_isotopologue_gets_wide_tolerance():
     assert 0.85 < noisy < _perfect()
 
 
+def test_low_snr_mass_error_is_forgiven():
+    # A trace M+1 off by 0.6 ppm scores higher when it is NOISY than when it is clean:
+    # a weak peak's centroid is legitimately less precise, so the mass width scales with
+    # 1/SNR. Intensities are kept perfect (exact ratio) to isolate the mass term.
+    pred = np.array([1.0, 0.3])
+    ints = np.array([1000.0, 300.0])  # exact 0.3 ratio -> intensity term ~1
+    me = np.array([0.0, 0.6])
+    clean = score_pattern_v2(me, ints, np.array([500.0, 200.0]), pred, sigma_ppm=0.3)
+    noisy = score_pattern_v2(me, ints, np.array([500.0, 4.0]), pred, sigma_ppm=0.3)
+    assert noisy > clean
+
+
+def test_high_snr_mass_width_is_essentially_the_fixed_sigma():
+    # At high SNR the SNR term (MASS_SNR_K/SNR) is negligible, so a 0.6 ppm error on a
+    # trace peak is penalised against the tight fixed sigma (Br3--like: no free pass).
+    pred = np.array([1.0, 0.3])
+    ints = np.array([1000.0, 300.0])
+    me = np.array([0.0, 0.6])
+    s = score_pattern_v2(me, ints, np.array([5000.0, 5000.0]), pred, sigma_ppm=0.3)
+    assert s < 0.75  # ~0.63: the 2-sigma error is still penalised at high SNR
+
+
 def test_absent_monoisotopic_returns_zero():
     assert score_pattern_v2(ME, np.array([0.0, 0.0]), np.array([0.0, 0.0]), PRED) == 0.0
 

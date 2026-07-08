@@ -106,16 +106,26 @@ by descending predicted abundance):
 **Guard.** If the monoisotopic peak is absent ($o_0 \le 0$) the score is $0$ — without the
 base peak there is no assignment.
 
-### 3.1 Mass likelihood (Gaussian, resolution-aware)
+### 3.1 Mass likelihood (Gaussian, resolution- and SNR-aware)
 
-$$ L^{\text{mass}}_i = \exp\!\left(-\tfrac{1}{2}\left(\frac{e_i}{\sigma}\right)^2\right) $$
+$$ L^{\text{mass}}_i = \exp\!\left(-\tfrac{1}{2}\left(\frac{e_i}{\sigma_i}\right)^2\right),
+\qquad \sigma_i = \sqrt{\sigma^2 + \left(\frac{k}{s_i}\right)^2} $$
 
-A Gaussian in ppm, as in SIRIUS. The width $\sigma$ is the **instrument's measured mass
-accuracy**, fitted per sample from the matched peaks' mass errors (robust median/MAD) and
-combined in quadrature with a small prediction term. This makes the score
-**resolution-fair**: a 2 ppm error is near-perfect on a ~10 ppm TOF but poor on a ~1 ppm
-Orbitrap, and $\sigma$ scales accordingly. The fallback `FALLBACK_SIGMA_PPM = 2.0` is
-Orbitrap-appropriate and *wrong* for TOF — always pass the fitted $\sigma$.
+A Gaussian in ppm, as in SIRIUS, but with a **per-peak width**. The fixed part $\sigma$ is
+the **instrument's measured mass accuracy**, fitted per sample from the matched peaks' mass
+errors (robust median/MAD) and combined in quadrature with a small prediction term — this
+makes the score **resolution-fair** (a 2 ppm error is near-perfect on a ~10 ppm TOF but poor
+on a ~1 ppm Orbitrap). The second part is an **SNR-dependent centroiding term** $k/s_i$: a
+weak peak's centroid is *legitimately* less precise, so its mass error should not be judged
+against the tight high-SNR width. The demo goldens confirm this cleanly —
+$\sigma_{\text{mass}}^2 = \sigma_{\text{floor}}^2 + (k/\text{SNR})^2$ with
+$\sigma_{\text{floor}} \approx 0.23$ ppm and $k \approx 2.36$ ppm (`MASS_SNR_K`) — so mass σ
+falls from ~0.63 ppm at SNR≈4 to ~0.10 ppm at SNR>1000. High-SNR peaks are unchanged
+($k/s_i \to 0$). On the golden set this lifts ranking (top-1 contested 0.706→0.723) and,
+especially, the low tail of correct-assignment scores (p10 0.45→0.50) — the trace
+isotopologues that were over-penalised — while ROC-AUC and calibrated ECE hold. The fallback
+`FALLBACK_SIGMA_PPM = 2.0` is Orbitrap-appropriate and *wrong* for TOF — always pass the
+fitted $\sigma$.
 
 ### 3.2 Intensity likelihood (noise-propagated tolerance)
 
@@ -172,7 +182,8 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 
 | parameter | default | role |
 |---|---|---|
-| `sigma_ppm` | per-sample fitted (fallback `2.0`) | mass-term width; the instrument-resolution lever |
+| `sigma_ppm` | per-sample fitted (fallback `2.0`) | fixed mass-term width; the instrument-resolution lever |
+| `MASS_SNR_K` | `2.36` (ppm) | SNR-dependent mass width: $\sigma_i=\sqrt{\sigma^2+(k/s_i)^2}$; fit on the demo goldens |
 | `k_detect` | `3.0` | expected-SNR threshold above which an absent peak is penalised |
 | `miss_penalty` | `0.3` | likelihood assigned to a detectable-but-absent peak |
 | `PRED_SIGMA_PPM` | `0.5` (backend adapter) | prediction/centroiding term added to $\sigma$ in quadrature |
@@ -188,6 +199,25 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 
 ## 6. Limitations
 
+- **Mass term is unforgiving of individual mass-accuracy outliers (investigated; by
+  design).** The mass width $\sigma$ is fitted (robust MAD) from the sample's confident
+  matches, whose errors cluster tightly near 0, so it is small (Orbitrap ~0.2–0.3 ppm;
+  effective ~0.6 ppm after the `PRED_SIGMA_PPM` quadrature). An ion whose peaks carry
+  *genuinely larger* mass errors than the bulk — e.g. the demo's $\mathrm{Br_3^-}$ at
+  ~0.7–0.9 ppm (its intensity pattern is flawless) — sits at ~1.3–1.6 $\sigma$ and the
+  Gaussian mass term drops to ~0.3–0.7, pulling the fit to ~0.6 (candidate tier).
+  A golden-set investigation (see the handoff roadmap, B3) showed **no distribution-level
+  fix is warranted**: the mass-error core is m/z-flat (~0.13–0.18 ppm), there is **no
+  m/z-dependent $\sigma$ growth**, **no m/z-dependent offset** ($\mathrm{Br_3^-}$'s region
+  has signed mean ~0), and only a mild high-intensity (space-charge) uptick. A **Student-t**
+  mass term (heavier tails) actually scores $\mathrm{Br_3^-}$ *lower*, because its peaks are
+  at the *shoulder* (~1.4 $\sigma$), not the deep tail where a t-distribution helps. So
+  $\mathrm{Br_3^-}$ is a real **mass-accuracy outlier** and ~0.6 honestly reflects that its
+  mass fit is worse than a typical identified ion; the calibrated confidence (~0.57) conveys
+  the same. The one data-supported refinement that came out of the investigation is unrelated
+  to $\mathrm{Br_3^-}$ and is now **implemented**: the **SNR-aware mass $\sigma$** of §3.1 —
+  weak peaks have ~3× larger errors (0.22 vs 0.07 ppm) and are no longer scored against the
+  tight bulk $\sigma$. (It does not lift $\mathrm{Br_3^-}$, whose peaks are high-SNR.)
 - **Geometric-mean harshness (rare):** one badly-fitting high-abundance peak can dominate.
   On the demo this affects ~1 % of ions; revisit the aggregation (e.g. a soft floor or a
   robust mean) if it proves material.
