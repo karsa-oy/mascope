@@ -69,19 +69,28 @@ are formula-only + plausibility). So the inspector can rank and tooltip competit
 consistently across both stages. `p_correct` is **not** on alternatives — it is a
 winner-only, arbitrated quantity.
 
-## Coming soon: adduct corroboration
+## Adduct corroboration — now folded into `p_correct` (shipped)
 
-A real compound usually appears through several adducts (`[M+H]+`, `[M+NH4]+`, `[M+Na]+`,
-`[M+Br]-` ...). Their co-occurrence is independent corroborating evidence (the basis of CAMERA /
-IPA) and a strong indicator of a correct formula. The signal is already computed per compound
-(`corroboration = 1 - 2^-(n_adducts-1)`: 0 for a lone adduct, 0.5/0.75/0.875 for 2/3/4).
+A real compound usually appears through several adducts (`[M+H]+`, `[M+NH4]+`, `[M+Br]-` ...).
+Their co-occurrence is independent corroborating evidence (the basis of CAMERA / IPA) and a strong
+indicator of a correct formula. It is now **measured and folded directly into `p_correct`** — you do
+**not** compute anything. When a compound is assigned via several confident adducts, each winner's
+`p_correct` is raised by a measured, per-adduct, bounded amount (bromide lifts a lot; generic
+ammonium/protonation barely). For a winner that got a lift, provenance carries:
 
-**How it will reach you:** we are measuring the empirical lift on the golden set and folding it into
-`p_correct` as a Bayesian odds update, so **you should not need a new formula** — `p_correct` will
-already include it, and a `provenance.corroboration` / `n_adducts` field will be exposed for display.
-Until that lands, if you want to surface it early, show it as a **separate badge**
-("supported by 3 adducts") rather than mixing it into the number — that stays honest and avoids
-double-counting.
+```json
+"corroboration": { "adducts": ["+Br-", "-H+"], "n_adducts": 2, "boost": 0.46 }
+```
+
+- `adducts` — the distinct adducts the compound was seen via (notations).
+- `n_adducts` — how many.
+- `boost` — how much corroboration raised `p_correct` (the value already includes it).
+
+`provenance.corroboration` is **absent** when a compound had only one adduct (no co-occurrence). It
+is winner-only (M0), and only present on calibrated assignments (uncalibrated `p_correct: null`
+gets no boost). **Display idea:** show `p_correct` as the single number (it already reflects
+corroboration), and optionally a small "corroborated by N adducts" badge from
+`provenance.corroboration` — don't add the boost yourself, it's already in `p_correct`.
 
 ## TL;DR for the implementer
 
@@ -89,4 +98,5 @@ double-counting.
 - Gate on `provenance.calibrated`; show null rows as "uncalibrated", not 0%.
 - Flag provisional via `provenance.calibration.provisional`.
 - Alternatives now have `plausibility`; use it for competitor ranking.
-- Don't hand-roll corroboration math — it will arrive baked into `p_correct` plus a display field.
+- Corroboration is **already baked into `p_correct`**; `provenance.corroboration` (when present) is
+  just for an optional "N adducts" badge — never add its `boost` on top.
