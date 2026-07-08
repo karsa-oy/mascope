@@ -41,6 +41,7 @@ from mascope_match.params import (
     ORBI_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
     TOF_DEFAULT_ISOTOPE_ABUNDANCE_THRESHOLD,
     BaseMatchParams,
+    unmatched_isotope_params,
 )
 
 
@@ -278,20 +279,26 @@ async def _get_sample_match_isotope_records(
                 # Apply match_params for filtering and to calculate match_category
                 match_data = _apply_match_params(isotope_data, match_data, match_params)
             else:
+                # No stored row: this isotope had no matched peak. Unmatched
+                # isotopes are no longer persisted, so emit the same placeholder
+                # values that a stored unmatched row + _apply_match_params used to
+                # produce (score 0 -> "no match" category 0), reconstructed from
+                # the target isotope. sample_peak_mz mirrors the target m/z, as
+                # assign_defaults_to_unmatched does at compute time.
                 match_data = {
                     "match_isotope_id": None,
                     "sample_item_id": sample.sample_item_id,
-                    "sample_peak_id": None,
-                    "sample_peak_mz": None,
-                    "sample_peak_intensity": None,
-                    "sample_peak_intensity_relative": None,
-                    "sample_peak_tof": None,
-                    "match_abundance_error": None,
-                    "match_mz_error": None,
-                    "match_score": None,
+                    "sample_peak_id": unmatched_isotope_params.sample_peak_id,
+                    "sample_peak_mz": isotope_data["mz"],
+                    "sample_peak_intensity": unmatched_isotope_params.sample_peak_intensity,
+                    "sample_peak_intensity_relative": unmatched_isotope_params.sample_peak_intensity_relative,
+                    "sample_peak_tof": unmatched_isotope_params.sample_peak_tof,
+                    "match_abundance_error": unmatched_isotope_params.match_abundance_error,
+                    "match_mz_error": unmatched_isotope_params.match_mz_error,
+                    "match_score": unmatched_isotope_params.match_score,
                     "match_isotope_utc_created": None,
                     "match_isotope_utc_modified": None,
-                    "match_category": None,
+                    "match_category": 0,
                     "alarming": row.alarming,
                 }
 

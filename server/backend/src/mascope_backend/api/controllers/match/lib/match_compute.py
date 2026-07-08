@@ -69,12 +69,25 @@ async def compute_and_create_sample_match_isotope_data(
 
     if not match_isotope_df.empty:
         match_isotope_df["sample_item_id"] = sample.sample_item_id
-        # Convert the DataFrame to a list of Pydantic models
-        match_isotopes = [
-            MatchIsotopeBase(**row)
-            for row in match_isotope_df.to_dict(orient="records")
+        # Persist only matched isotopes. Unmatched isotopes (no peak within the
+        # match window) carry only constant/derivable placeholder values -
+        # historically ~80% of match_isotope rows for zero information - and are
+        # reconstructed on read from their target_isotope in
+        # aggregate_match_isotope_filtered_data, so they never need to be stored.
+        # An empty sample_peak_id (DEFAULT_UNMATCHED_SAMPLE_PEAK_ID) is the
+        # unambiguous marker of an unmatched row; matched rows always carry a
+        # real peak id.
+        matched_isotope_df = match_isotope_df[
+            match_isotope_df["sample_peak_id"].notna()
+            & (match_isotope_df["sample_peak_id"] != "")
         ]
-        await create_match_isotopes(match_isotopes)
+        if not matched_isotope_df.empty:
+            # Convert the DataFrame to a list of Pydantic models
+            match_isotopes = [
+                MatchIsotopeBase(**row)
+                for row in matched_isotope_df.to_dict(orient="records")
+            ]
+            await create_match_isotopes(match_isotopes)
 
     # Send progress user notification indicating completion of compute_and_create_sample_match_isotope_data process
     if notification:

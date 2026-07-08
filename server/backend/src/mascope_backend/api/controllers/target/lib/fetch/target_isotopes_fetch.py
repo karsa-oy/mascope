@@ -40,6 +40,12 @@ async def fetch_existing_main_isotope_references(
     For each target_ion_id that has existing matches, retrieves the main isotope's
     (highest relative_abundance) sample_peak_intensity and relative_abundance values.
 
+    Only matched isotopes (a real, non-empty sample_peak_id) are considered: an
+    unmatched isotope has zero intensity and makes a degenerate reference, and
+    unmatched rows are no longer stored. The explicit filter keeps the reference
+    deterministic for legacy samples that may still carry unmatched rows until the
+    backfill removes them.
+
     :param sample_item_id: Sample item ID to query matches for
     :type sample_item_id: str
     :param target_ion_ids: List of target ion IDs to find references for
@@ -64,6 +70,7 @@ async def fetch_existing_main_isotope_references(
             .where(
                 MatchIsotope.sample_item_id == sample_item_id,
                 TargetIsotope.target_ion_id.in_(target_ion_ids),
+                MatchIsotope.sample_peak_id != "",
             )
             .group_by(TargetIsotope.target_ion_id)
             .subquery()
@@ -88,7 +95,10 @@ async def fetch_existing_main_isotope_references(
                     == max_abundance_subquery.c.max_abundance
                 ),
             )
-            .where(MatchIsotope.sample_item_id == sample_item_id)
+            .where(
+                MatchIsotope.sample_item_id == sample_item_id,
+                MatchIsotope.sample_peak_id != "",
+            )
         )
 
         rows = (await session.execute(stmt)).all()

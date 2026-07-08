@@ -13,11 +13,13 @@ from mascope_backend.api.controllers.match.ions.match_ions_controller import (
     create_match_ions,
 )
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
+    MATCH_ISOTOPE_VALUE_COLUMNS,
     aggregate_match_collections,
     aggregate_match_compounds,
     aggregate_match_ions,
     aggregate_match_isotopes,
     aggregate_match_samples,
+    reconstruct_full_isotope_frame,
 )
 from mascope_backend.api.controllers.match.lib.match_remove import remove_matches
 from mascope_backend.api.controllers.match.samples.match_samples_controller import (
@@ -243,6 +245,22 @@ async def aggregate_match_isotope_filtered_data(
 
         match_isotopes_result = await session.execute(match_isotopes_query)
         match_isotopes_df = pd.DataFrame(match_isotopes_result.fetchall())
+        if match_isotopes_df.empty:
+            # No stored (matched) isotopes for these samples. Seed the expected
+            # columns so unmatched reconstruction can still populate every expected
+            # isotope (all unmatched) - matching the old behavior where fully
+            # unmatched samples/ions produced score-0 rows and aggregates.
+            match_isotopes_df = pd.DataFrame(
+                columns=["sample_item_id", "target_isotope_id"]
+                + MATCH_ISOTOPE_VALUE_COLUMNS
+            )
+
+        # Reconstruct the unmatched isotopes that are no longer stored, so the
+        # isotope table and all higher-level aggregates match the pre-change
+        # behavior (unmatched rows contribute 0 to every aggregate).
+        match_isotopes_df = reconstruct_full_isotope_frame(
+            match_isotopes_df, samples_df, targets_df
+        )
         if match_isotopes_df.empty:
             runtime.logger.info(
                 f"No match isotopes found for the sample batch '{sample_batch.sample_batch_name}'"
