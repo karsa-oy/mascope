@@ -468,11 +468,17 @@ def untargeted_matches_to_peak_assignments(
             else None
         )
 
-        provenance = {
-            key: _float_or_none(row.get(key))
-            for key in ("neutral_mass", "unsaturation")
-            if _float_or_none(row.get(key)) is not None
-        }
+        # Chemical plausibility (Seven Golden Rules) is stage-agnostic and the
+        # headline provenance metric, so the untargeted winner reports it on the
+        # same footing as a database winner (engine.py Stage A). Confidence and
+        # P(correct) stay database-arbitration concepts: they need the peak's
+        # full scored candidate set, which the untargeted search does not expose
+        # here (other_candidates carries formulas only, no per-candidate fit).
+        provenance = {"plausibility": round(float(formula_plausibility(formula)), 4)}
+        for key in ("neutral_mass", "unsaturation"):
+            value = _float_or_none(row.get(key))
+            if value is not None:
+                provenance[key] = value
 
         assignment = {
             "peak_assignment_id": gen_id(32),

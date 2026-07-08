@@ -597,6 +597,10 @@ class TestUntargetedMatches:
             "C6H14N",
         ]
         assert m0["provenance"]["neutral_mass"] == pytest.approx(102.068)
+        # Chemical plausibility now rides on untargeted winners too (previously
+        # database-stage only), so an identified de-novo formula reports it and
+        # the inspector shows it consistently across stages.
+        assert 0.0 <= m0["provenance"]["plausibility"] <= 1.0
 
     def test_isotopic_pattern_fit_score_is_used_when_present(self):
         # When assign_compositions scored the whole envelope, Stage B uses that
