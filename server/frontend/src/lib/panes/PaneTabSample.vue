@@ -6,7 +6,7 @@ import { useWindowSize } from '@vueuse/core'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 
-import { PanePeakAssign } from '@/lib/panes'
+import { PanePeakAssign, PanePeakSearch } from '@/lib/panes'
 import { ChartSampleSpectrum, ChartAssignmentTimeseries } from '@/lib/charts'
 
 const { height } = useWindowSize()
@@ -21,9 +21,13 @@ const bottomSplit = ref(initBottom)
 
 // Pixel heights of the two rows, used to nudge the Plotly charts to resize when
 // the splitter moves. The top row is split horizontally (inspector | spectrum);
-// the bottom row (time series) spans both.
+// the bottom row spans both.
 const topHeight = computed(() => ((height.value - padding) * topSplit.value) / 100)
 const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.value) / 100)
+
+// The bottom pane shows the assignment time series by default; "Re-search" in
+// the inspector flips it to the composition search for the focused peak.
+const showSearch = ref(false)
 </script>
 
 <template>
@@ -43,7 +47,7 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
       <SplitterPanel :size="55">
         <Splitter class="top-splitter">
           <SplitterPanel :size="42" class="inspector-panel">
-            <PanePeakAssign :height="topHeight - 3" />
+            <PanePeakAssign v-model:showSearch="showSearch" />
           </SplitterPanel>
           <SplitterPanel :size="58">
             <ChartSampleSpectrum :height="topHeight" />
@@ -51,7 +55,12 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
         </Splitter>
       </SplitterPanel>
       <SplitterPanel :size="45">
-        <ChartAssignmentTimeseries :height="bottomHeight" />
+        <PanePeakSearch
+          v-if="showSearch"
+          :height="bottomHeight"
+          @close="showSearch = false"
+        />
+        <ChartAssignmentTimeseries v-else :height="bottomHeight" />
       </SplitterPanel>
     </Splitter>
   </div>
