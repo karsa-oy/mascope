@@ -5,6 +5,13 @@ import { useMouseInElement, watchDebounced } from '@vueuse/core'
 
 import { genId } from '@/lib/utils'
 
+// Base path where the bundled MkDocs user documentation is served (nginx serves
+// the static site at /docs/ -- see server/frontend/nginx.conf). Build a link
+// into it with docUrl('how-it-works/matching/') and pass the result as the
+// `doc` option of a help card to add a "Learn more" link to its popover.
+export const DOCS_BASE = '/docs/'
+export const docUrl = (path = '') => DOCS_BASE + String(path).replace(/^\/+/, '')
+
 export const useHelp = defineStore('app.ui.help', () => {
   const active = ref(false)
   const layer = ref(null)
@@ -70,8 +77,12 @@ export const useHelp = defineStore('app.ui.help', () => {
     alignments.forEach((alignment) => {
       // create an API that combines position and alignment
       const placement = [position, alignment].filter((x) => x !== null).join('_')
-      ptApi[placement] = (message, options = { layer: 'default' }) =>
-        pt({ placement, message, ...options })
+      // layer defaults to 'default' *before* the spread, so callers can pass
+      // extra options (e.g. { doc }) without having to restate the layer -- a
+      // card with layer undefined never matches the active layer and so never
+      // shows.
+      ptApi[placement] = (message, options = {}) =>
+        pt({ placement, message, layer: 'default', ...options })
     })
   })
 
@@ -104,6 +115,7 @@ export const useHelp = defineStore('app.ui.help', () => {
     toggle,
     set,
     layer,
+    docUrl,
     // hooks
     directive,
     pt,

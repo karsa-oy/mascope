@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watchEffect } from 'vue'
 
-import { useMagicKeys, watchDebounced } from '@vueuse/core'
+import { useMagicKeys, watchDebounced, useElementHover } from '@vueuse/core'
 import { useFloating, arrow, offset } from '@floating-ui/vue'
 
 import { useApp } from '@/stores'
@@ -22,13 +22,19 @@ const { floatingStyles, x, y, middlewareData } = useFloating(targetEl, popoverEl
 
 const visible = ref(false)
 
+// Keep the popover open while the pointer is over it, so its "Learn more" link
+// stays reachable: the source card clears shortly after the pointer leaves the
+// element it annotates, which would otherwise hide the popover before it can be
+// clicked.
+const hoveringPopover = useElementHover(popoverEl)
+
 watchEffect(() => {
   const card = app.ui.help.current
   if (card && app.ui.help.active) {
     placement.value = card?.placement.replace('_', '-') ?? 'bottom'
     visible.value = true
     targetEl.value = card.element
-  } else {
+  } else if (!hoveringPopover.value) {
     visible.value = false
   }
 })
