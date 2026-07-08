@@ -385,6 +385,7 @@ class FrontendConfig(ModuleConfig):
 
     acquisition_filter: DatetimeRange | str | None = None
     container_name: str = "frontend"  # base name
+    port: int = 5173  # Vite dev-server listen port (dev mode only)
     sample_table_defaults: SampleTableDefaults = SampleTableDefaults()
 
     def get_frontend_container_name(self, mode: str) -> str:
@@ -534,6 +535,7 @@ class RuntimeConfigLoader:
         config = self._load_tomls()
         config = self._resolve_paths(config)
         config = self._resolve_loglevels(config)
+        config = self._resolve_env_ports(config)
         config = self._validate_options(config)
         self._resolved = config
 
@@ -701,6 +703,43 @@ class RuntimeConfigLoader:
                 or fallback  # and worst case fall back to info
             )
         return resolved
+
+    def _resolve_env_ports(self, unresolved: dict) -> dict:
+        """
+        Apply per-process port overrides from the environment.
+
+        ``MASCOPE_API_PORT`` overrides ``meta.api_port`` (the backend bind
+        port, which the frontend and file-converter also target) and
+        ``MASCOPE_FRONTEND_PORT`` overrides ``frontend.port`` (the Vite
+        dev-server listen port). This mirrors the ``MASCOPE_ENV`` /
+        ``MASCOPE_LOGLEVEL`` overrides: it lets several checkouts on one
+        machine run their own stack on distinct ports without editing config
+        files or clobbering shared state. Absent or non-integer values are
+        ignored, falling back to the config defaults.
+
+        :param unresolved: Config dictionary after log-level resolution.
+        :type unresolved: dict
+        :return: Config dictionary with env port overrides applied.
+        :rtype: dict
+        """
+        overrides = (
+            ("MASCOPE_API_PORT", "meta", "api_port"),
+            ("MASCOPE_FRONTEND_PORT", "frontend", "port"),
+        )
+        for env_var, section, key in overrides:
+            raw = os.environ.get(env_var)
+            if not raw:
+                continue
+            try:
+                port = int(raw)
+            except ValueError:
+                self.runtime.logger.warning(
+                    f"Ignoring {env_var}={raw!r}: not a valid port number"
+                )
+                continue
+            if section in unresolved and isinstance(unresolved[section], dict):
+                unresolved[section][key] = port
+        return unresolved
 
     def _validate_options(self, unvalidated: dict) -> RuntimeConfig:
         """
