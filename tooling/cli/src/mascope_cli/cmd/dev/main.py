@@ -109,6 +109,33 @@ def _resolve_modules(module_names: List[str]) -> List[dict]:
     return resolved
 
 
+def _activate_instance() -> None:
+    """
+    Resolve this worktree's instance and switch the runtime onto it.
+
+    Allocates (or reuses) the worktree's slot, ensures its env directory
+    exists, publishes the derived ports via env vars (honoured by the runtime
+    config and inherited by the backend/frontend subprocesses), and points the
+    runtime at the instance env. Env selection goes through ``MASCOPE_ENV`` /
+    ``use_env`` — never persisted state — so concurrent worktrees sharing one
+    ``MASCOPE_PATH`` do not clobber each other.
+    """
+    from mascope_cli.instance import provision, resolve_or_allocate
+
+    inst = resolve_or_allocate()
+    provision(inst)
+
+    # Set port overrides before use_env: its config reload reads them.
+    os.environ["MASCOPE_API_PORT"] = str(inst.api_port)
+    os.environ["MASCOPE_FRONTEND_PORT"] = str(inst.frontend_port)
+    runtime.use_env(inst.env)
+
+    runtime.logger.info(
+        f"Instance slot {inst.slot}: env '{inst.env}', "
+        f"backend :{inst.api_port}, frontend :{inst.frontend_port}"
+    )
+
+
 def _run_dev_compose(args: list[str]):
     """
     Execute docker-compose command for dev environment.
@@ -347,6 +374,19 @@ def run(
             help="Skip database migrations",
         ),
     ] = False,
+    instance: Annotated[
+        bool,
+        typer.Option(
+            "--instance",
+            "-i",
+            help=(
+                "Run an isolated per-worktree instance: derive a dedicated env "
+                "and app ports from this checkout so several worktrees can run "
+                "at once against the shared Postgres/Redis. Also enabled by "
+                "setting MASCOPE_INSTANCE=1."
+            ),
+        ),
+    ] = False,
 ):
     """
     \b
@@ -383,6 +423,10 @@ def run(
             f"No configured modules found for: {', '.join(selected_modules)}"
         )
         raise typer.Exit(1)
+
+    # --- per-worktree instance (isolated env + app ports on shared infra) ---
+    if instance or os.environ.get("MASCOPE_INSTANCE"):
+        _activate_instance()
 
     # --- Check if backend is selected (for migration logic) ---
     backend_selected = any(mod["name"] == "backend" for mod in resolved_modules)

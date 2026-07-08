@@ -1,6 +1,6 @@
 [project]
 name = "mascope_cli"
-version = "2026.7.7"
+version = "2026.7.8"
 description = "Mascope's operations CLI: install, launch and back up a Mascope deployment."
 classifiers = [
     "Topic :: Scientific/Engineering :: Atmospheric Science",
@@ -17,7 +17,7 @@ requires-python = ">=3.12,<3.13"
 # commands live behind the `dev` extra and a source-checkout gate in main.py.
 dependencies = [
     "mascope_runtime[logs]>=2026.7.7",
-    "typer>=0.15.2,<0.16",
+    "typer>=0.26.8,<0.27",
     "rich>=13.7.1,<14",
 ]
 

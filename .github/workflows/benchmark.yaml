@@ -1,0 +1,84 @@
+name: Benchmark (read-path performance)
+run-name: API benchmark on ${{ github.ref_name }}
+
+# Scales the demo dataset to thousands of samples and exercises the hot read
+# endpoints, asserting per-request latency and payload budgets. Latency on a
+# shared runner is noisy, so this is a nightly canary (catches order-of-
+# magnitude regressions and payload-shape changes), not a per-PR merge gate.
+on:
+  workflow_dispatch:
+    inputs:
+      sample_mult:
+        description: "Sample clone generations to add"
+        default: "25"
+      ion_mult:
+        description: "Collection-ion clone generations to add"
+        default: "2"
+  schedule:
+    - cron: "42 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.2"
+
+      - name: Build application images from this ref
+        run: |
+          export MASCOPE_PATH=$GITHUB_WORKSPACE
+          uv run mascope prod build
+
+      - name: Start the demo stack
+        run: |
+          VERSION=$(docker images "ghcr.io/${{ github.repository }}/backend" --format '{{.Tag}}' | head -1)
+          echo "Built image tag: $VERSION"
+          # Normal mode (not rebuild): the restored snapshot already contains
+          # the match rows the benchmark clones to scale.
+          MASCOPE_VERSION=$VERSION docker compose -f docker-compose.demo.yaml up -d
+
+      - name: Install test dependencies
+        run: |
+          # The build step above already created and synced .venv via `uv run`,
+          # so `uv sync` here just reconciles it (adding the dev group). A bare
+          # `uv venv` would fail on the pre-existing environment.
+          uv sync --group dev
+
+      - name: Wait for the stack to come up
+        run: |
+          # demo_init downloads the bundle and restores the snapshot on first
+          # start, so allow generous time before the frontend answers.
+          for i in $(seq 1 120); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8080; then
+              echo "Stack is up."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Stack did not come up in time." >&2
+          docker compose -f docker-compose.demo.yaml logs --tail 100
+          exit 1
+
+      - name: Run the benchmark
+        env:
+          MASCOPE_BENCH_TEST: "1"
+          MASCOPE_PATH: ${{ github.workspace }}
+          MASCOPE_BENCH_SAMPLE_MULT: ${{ github.event.inputs.sample_mult || '25' }}
+          MASCOPE_BENCH_ION_MULT: ${{ github.event.inputs.ion_mult || '2' }}
+        run: |
+          uv run pytest server/backend/tests/system/benchmark/ -v -s
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.demo.yaml logs --tail 300

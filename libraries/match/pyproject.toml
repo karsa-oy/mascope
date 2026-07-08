@@ -15,7 +15,7 @@ dependencies = [
     "scipy~=1.13",
     "xarray>=2025.06.1",
     "nanoid~=2.0.0",
-    "pydantic>=2.8.2,<3",
+    "pydantic>=2.13.4,<3",
 ]
 
 [build-system]

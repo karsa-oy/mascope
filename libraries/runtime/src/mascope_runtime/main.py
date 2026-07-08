@@ -133,6 +133,24 @@ class Runtime:
         """
         self._full_config = load_config(self)
 
+    def use_env(self, name: str) -> None:
+        """
+        Switch the active env for this runtime to ``name``.
+
+        Sets ``MASCOPE_ENV`` (so subprocesses and any later re-resolution
+        agree), rebuilds the env interface — whose ``name`` is captured once
+        at construction — and reloads config so env-derived values (database
+        name, filestore path, per-env overlays) reflect the new env. Uses the
+        ``MASCOPE_ENV`` env var rather than persisted state so concurrent
+        runtimes sharing one ``MASCOPE_PATH`` never clobber each other.
+
+        :param name: Env name to activate.
+        :type name: str
+        """
+        os.environ["MASCOPE_ENV"] = name
+        self.env = RuntimeEnv(self)
+        self.reload_config()
+
     @property
     def logger(self):
         """
