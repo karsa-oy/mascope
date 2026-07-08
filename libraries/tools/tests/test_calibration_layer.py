@@ -21,6 +21,7 @@ from mascope_tools.composition.calibration import (
     calibration_error,
     calibration_for,
     fit_calibration,
+    recalibrate,
 )
 
 
@@ -142,3 +143,53 @@ def test_provisional_orbitrap_carries_corroboration_weights():
     cal = calibration_for("orbi")
     assert cal.corroboration_weights is not None
     assert cal.corroboration_weights["+Br-"] > cal.corroboration_weights["+NH4+"] > 0
+
+
+# --- recalibrate (V2 loop: labels -> new calibration) ---------------------------------
+
+
+def test_recalibrate_fits_and_reports_change():
+    scores, labels = _separated_labels(n=400, seed=1)
+    current = Calibration(a=1.0, b=0.0, instrument="orbi",
+                          corroboration_weights={"+Br-": 2.28})
+    out = recalibrate(scores, labels, instrument="orbi", source="user verifications",
+                      current=current)
+    assert out["calibration"].instrument == "orbi"
+    assert 0.0 <= out["after_ece"] <= 1.0
+    assert out["before_ece"] is not None  # current curve scored on these labels
+    # a curve fit on the labels should calibrate them at least as well as an arbitrary prior
+    assert out["after_ece"] <= out["before_ece"] + 1e-6
+    # corroboration weights are carried forward (refit separately, not from verdicts)
+    assert out["calibration"].corroboration_weights == {"+Br-": 2.28}
+
+
+def test_recalibrate_stays_provisional_without_strong_evidence():
+    scores, labels = _separated_labels(n=400, seed=2)
+    levels = ["visual"] * len(labels)  # eyeball-only -> cannot graduate the curve
+    out = recalibrate(scores, labels, levels, instrument="orbi", source="s")
+    assert out["provisional"] is True
+    assert out["n_strong_positives"] == 0
+    assert out["calibration"].provisional is True
+
+
+def test_recalibrate_graduates_with_enough_strong_positives():
+    scores, labels = _separated_labels(n=400, seed=3)
+    # give the positives reference-standard evidence; negatives carry none
+    levels = ["reference_standard" if y == 1 else None for y in labels]
+    out = recalibrate(scores, labels, levels, instrument="orbi", source="s",
+                      provisional_min_strong=5)
+    assert out["n_strong_positives"] >= 5
+    assert out["provisional"] is False
+    assert out["calibration"].provisional is False
+
+
+def test_recalibrate_refuses_too_few_labels():
+    with pytest.raises(InsufficientCalibrationData):
+        recalibrate([0.9, 0.1, 0.8], [1, 0, 1], instrument="orbi", source="s")
+
+
+def test_recalibrate_no_current_curve_has_no_before_ece():
+    scores, labels = _separated_labels(n=200, seed=4)
+    out = recalibrate(scores, labels, instrument="tof", source="s", current=None)
+    assert out["before_ece"] is None
+    assert out["calibration"].corroboration_weights is None

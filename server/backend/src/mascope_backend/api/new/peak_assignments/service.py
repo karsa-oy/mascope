@@ -42,7 +42,10 @@ from mascope_backend.api.new.match.params.lib import (
     apply_match_params,
     isotope_abundance_threshold_expr,
 )
-from mascope_backend.api.new.peak_assignments.calibration_store import load_calibration
+from mascope_backend.api.new.peak_assignments.calibration_store import (
+    load_calibration,
+    save_calibration,
+)
 from mascope_backend.api.new.peak_assignments.config import (
     PEAK_ASSIGNMENT_ENGINE_VERSION,
     PeakAssignmentConfig,
@@ -75,6 +78,10 @@ from mascope_backend.socket.notifications import (
 from mascope_file.name import get_instrument_type
 from mascope_match import compute_match_isotopes
 from mascope_tools.composition import CompositionSearchConfig
+from mascope_tools.composition.calibration import (
+    InsufficientCalibrationData,
+    recalibrate,
+)
 from mascope_tools.composition.finder import assign_compositions
 from mascope_tools.composition.heuristic_filter import SCORE_VERSION
 
@@ -309,6 +316,94 @@ async def get_verifications(sample_item_id: str) -> dict:
         ),
         "results": len(data),
         "data": data,
+    }
+
+
+@api_controller()
+async def recalibrate_instrument(
+    instrument: str,
+    score_version: int = SCORE_VERSION,
+) -> dict:
+    """Refit an instrument's confidence calibration from the verification labels (V2 loop).
+
+    Gathers every ``confirmed`` / ``rejected`` verification for samples on this instrument, uses the
+    arbitration ``evidence`` snapshotted at verification time as the score and the verdict as the
+    label, fits a new Platt curve, and writes it as the new active row in the calibration store
+    (carrying the corroboration weights forward). The curve stays **provisional** unless enough
+    positives carry strong (reference-standard / MS-MS) evidence -- a pile of visual confirmations
+    can't graduate it. Reports before/after held-out ECE so the change is auditable.
+
+    :param instrument: Instrument class to recalibrate (e.g. "orbi").
+    :param score_version: Fit-score version the labels were scored under (defaults to current).
+    :return: Status envelope with whether it recalibrated and the before/after ECE + label counts.
+    """
+    inst = str(instrument).lower()
+    async with async_session() as session:
+        rows = (
+            await session.execute(
+                select(
+                    AssignmentVerification.verdict,
+                    AssignmentVerification.evidence,
+                    AssignmentVerification.evidence_level,
+                    Sample.filename,
+                ).join(
+                    Sample,
+                    Sample.sample_item_id == AssignmentVerification.sample_item_id,
+                ).where(
+                    AssignmentVerification.verdict.in_(["confirmed", "rejected"]),
+                    AssignmentVerification.evidence.is_not(None),
+                )
+            )
+        ).all()
+
+    scores, labels, levels = [], [], []
+    for verdict, evidence, evidence_level, filename in rows:
+        if get_instrument_type(filename) != inst:
+            continue
+        scores.append(float(evidence))
+        labels.append(1 if verdict == "confirmed" else 0)
+        levels.append(evidence_level)
+
+    current = await load_calibration(inst, score_version)
+    try:
+        result = recalibrate(
+            scores,
+            labels,
+            levels,
+            instrument=inst,
+            source=f"user verifications ({len(scores)} labels)",
+            current=current,
+        )
+    except InsufficientCalibrationData as exc:
+        return {
+            "status": "success",
+            "message": (
+                f"Not enough verification labels to recalibrate '{inst}' "
+                f"(need both confirmed and rejected): {exc}"
+            ),
+            "recalibrated": False,
+            "instrument": inst,
+            "n_pos": sum(labels),
+            "n_neg": len(labels) - sum(labels),
+        }
+
+    await save_calibration(result["calibration"], score_version)
+    return {
+        "status": "success",
+        "message": (
+            f"Recalibrated '{inst}' from {result['n_pos'] + result['n_neg']} "
+            f"verification labels (held-out ECE "
+            f"{result['before_ece']} -> {result['after_ece']}"
+            f"{'; provisional' if result['provisional'] else ''})"
+        ),
+        "recalibrated": True,
+        "instrument": inst,
+        "before_ece": result["before_ece"],
+        "after_ece": result["after_ece"],
+        "n_pos": result["n_pos"],
+        "n_neg": result["n_neg"],
+        "n_strong_positives": result["n_strong_positives"],
+        "provisional": result["provisional"],
     }
 
 
