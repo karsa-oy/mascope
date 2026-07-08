@@ -311,6 +311,14 @@ watch(
 // P(correct), and an honest tie flag.
 const provenance = computed(() => focusedAssignment.value?.provenance ?? null)
 
+// Visualize the focused assignment's isotope envelope + time series in the Fit
+// view (composition-driven, so it works for untargeted winners too).
+async function verifyFit() {
+  // Await so `visualized.ion` is set (enabling the Fit tab) before we switch.
+  await app.data.match.visualized.verifyAssignment(focusedAssignment.value)
+  app.ui.tab.active = 'match'
+}
+
 const fitPercent = new Intl.NumberFormat('en-US', {
   style: 'percent',
   minimumFractionDigits: 0,
@@ -529,6 +537,15 @@ const isPoorMatch = (iso) => {
           </div>
         </div>
         <div class="insp-actions">
+          <Button
+            v-if="focusedAssignment.assigned_formula && focusedAssignment.ionization_mechanism_id"
+            label="Verify fit"
+            size="small"
+            text
+            icon="pi ph ph-wave-sine"
+            v-tooltip.top="'Visualize the isotope envelope & time series in the Fit view'"
+            @click="verifyFit"
+          />
           <Button
             :label="showSearch ? 'Hide search' : 'Re-search'"
             size="small"
@@ -873,6 +890,7 @@ const isPoorMatch = (iso) => {
 .insp-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 /* Isotopologue envelope of the focused assignment (M0 + M+1, M+2 ...). */
