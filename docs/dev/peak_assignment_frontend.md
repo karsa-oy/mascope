@@ -40,6 +40,11 @@ owner_peak_assignment_id                   (an iso_child points at its M0)
 alternatives (JSON list) · provenance (JSON)
 ```
 
+> **Confidence fields.** `provenance` carries the confidence story — including the calibrated
+> **probability** `provenance.p_correct`. How to surface fit / plausibility / probability (and the
+> upcoming adduct-corroboration signal) honestly is written up in
+> [`peak_assignment_confidence_frontend.md`](peak_assignment_confidence_frontend.md).
+
 ### 1.1 Two facts that drive the wiring
 
 1. **Join key.** The peak list (`GET /samples/{id}/peaks`) returns `peak_id`; the engine stringifies
