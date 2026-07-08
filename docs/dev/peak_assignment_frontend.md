@@ -262,8 +262,21 @@ compile-checked, backend suite needs Postgres):
 | **F6** composition Fit wiring | ⏳ blocked on **B2** | — |
 | **B2** composition Fit visualization | ⏳ not started (needs a live stack) | — |
 
-Not yet verified end-to-end against a running demo stack (the reads, the reload event, the launch
-flow). That needs `docker compose -f docker-compose.demo.yaml up -d` + a peak-assignment run.
+**Live verification (run `mascope dev run backend frontend --skip-migrations` against the dev
+`mascope_demo` DB, already at epic head):**
+- Backend serves this worktree's code — `/api/peak-assignments/*` routes registered, auth-gated.
+- Read contract confirmed on a real run: `/runs` and `/sample` return the exact shape the stores
+  consume (run metadata + config incl. `identified_threshold`/`candidate_threshold`; 1864
+  assignments with tier/role/source/fit_score/mz_error_ppm/isotope_label/ion_formula/alternatives).
+- **Join key confirmed live**: `/samples/{id}/peaks` `peak_id` (str) ↔ `sample_peak_id` (str), 1:1
+  (1864 peaks == 1864 assignments), a sampled id matches. This is the linchpin of F2/F4/F5.
+- Launch path confirmed: `POST …/assign` → new run created → `completed` (Stage A only), config
+  persisted. The B1 `success_reload` runs in that same success path (emit verified by code, not on
+  the wire).
+- Vite serves the updated components (BaseTierTag, PaneBrowserAssignment, the stores) transformed OK.
+- **Not yet observed in a browser** (no Chrome connected in the agent env): the Vue components'
+  visual render and B1's socket event driving F5's live run-refresh. View at `http://localhost:5173`
+  (login `demo@mascope.app` / `mascope-demo`) to confirm visually.
 
 ### Full task list
 
