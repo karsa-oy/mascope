@@ -96,6 +96,43 @@ function focusPeak(assignment) {
     app.ui.tab.active = 'sample'
   }
 }
+
+// --- Tier ordering & filtering ----------------------------------------------
+
+// Confidence order: identified first, unassigned last. Drives the default sort
+// and makes the sortable tier column order by confidence rather than
+// alphabetically (which otherwise put "unassigned" above "identified").
+const TIER_RANK = {
+  identified: 0,
+  candidate: 1,
+  below_assignability: 2,
+  unassigned: 3
+}
+
+// Histogram bucket for a row: reagent/artifact roles are their own bucket,
+// matching the counts strip and the spectrum coloring.
+function bucketOf(row) {
+  if (row.role === 'reagent' || row.role === 'artifact') return 'reagent'
+  return row.tier in TIER_RANK ? row.tier : 'unassigned'
+}
+
+// Active tier filters (empty = show all); clicking a histogram chip toggles it.
+const activeTiers = reactive(new Set())
+function toggleTier(key) {
+  if (activeTiers.has(key)) activeTiers.delete(key)
+  else activeTiers.add(key)
+}
+
+// Table rows: filtered by the active chips, then ordered by confidence
+// (identified first) and fit descending. tierRank lets the tier column sort by
+// confidence too.
+const rows = computed(() => {
+  const list = assignments.value.list
+    .filter((row) => activeTiers.size === 0 || activeTiers.has(bucketOf(row)))
+    .map((row) => ({ ...row, tierRank: TIER_RANK[row.tier] ?? 3 }))
+  list.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
+  return list
+})
 </script>
 
 <template>
@@ -141,30 +178,40 @@ function focusPeak(assignment) {
 
     <div v-else class="col" style="gap: 0.6rem; align-items: stretch">
       <div class="tier-strip">
-        <span class="tier-stat identified"
-          ><b>{{ tierCounts.identified }}</b> identified</span
+        <button
+          v-for="t in [
+            { key: 'identified', label: 'identified', count: tierCounts.identified },
+            { key: 'candidate', label: 'candidate', count: tierCounts.candidate },
+            { key: 'reagent', label: 'reagent', count: tierCounts.reagent },
+            { key: 'below_assignability', label: 'below', count: tierCounts.below_assignability },
+            { key: 'unassigned', label: 'unassigned', count: tierCounts.unassigned }
+          ]"
+          :key="t.key"
+          type="button"
+          class="tier-stat"
+          :class="[
+            t.key === 'below_assignability' ? 'below' : t.key,
+            {
+              active: activeTiers.has(t.key),
+              dim: activeTiers.size && !activeTiers.has(t.key)
+            }
+          ]"
+          v-tooltip.top="activeTiers.has(t.key) ? `Showing only ${t.label}` : `Filter to ${t.label}`"
+          @click="toggleTier(t.key)"
         >
-        <span class="tier-stat candidate"
-          ><b>{{ tierCounts.candidate }}</b> candidate</span
-        >
-        <span class="tier-stat reagent"
-          ><b>{{ tierCounts.reagent }}</b> reagent</span
-        >
-        <span class="tier-stat below"
-          ><b>{{ tierCounts.below_assignability }}</b> below</span
-        >
-        <span class="tier-stat unassigned"
-          ><b>{{ tierCounts.unassigned }}</b> unassigned</span
-        >
+          <b>{{ t.count }}</b> {{ t.label }}
+        </button>
       </div>
 
       <DataTable
-        :value="assignments.list"
+        :value="rows"
         dataKey="sample_peak_id"
         size="small"
         scrollable
         :scrollHeight="`${tableHeight - 60}px`"
         :virtualScrollerOptions="{ itemSize: 35.5 }"
+        sortField="tierRank"
+        :sortOrder="1"
         selectionMode="single"
         :metaKeySelection="false"
         @row-click="({ data }) => focusPeak(data)"
@@ -177,7 +224,7 @@ function focusPeak(assignment) {
             <span class="formula">{{ data.assigned_formula || '—' }}</span>
           </template>
         </Column>
-        <Column field="tier" header="tier" sortable style="min-width: 7rem">
+        <Column field="tierRank" header="tier" sortable style="min-width: 7rem">
           <template #body="{ data }">
             <BaseTierTag
               :tier="data.tier"
@@ -272,6 +319,22 @@ function focusPeak(assignment) {
   border-radius: 100px;
   border: 1px solid var(--p-content-border-color, #e3e6ec);
   font-variant-numeric: tabular-nums;
+  /* button reset */
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.12s, border-color 0.12s, background 0.12s;
+}
+.tier-stat:hover {
+  border-color: var(--p-primary-color, #6366f1);
+}
+.tier-stat.active {
+  border-color: var(--p-primary-color, #6366f1);
+  background: color-mix(in srgb, var(--p-primary-color, #6366f1) 12%, transparent);
+}
+.tier-stat.dim {
+  opacity: 0.4;
 }
 .tier-stat b {
   font-weight: 700;
