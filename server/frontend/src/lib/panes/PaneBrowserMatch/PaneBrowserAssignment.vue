@@ -12,7 +12,7 @@ import InputNumber from 'primevue/inputnumber'
 import ToggleSwitch from 'primevue/toggleswitch'
 import FloatLabel from 'primevue/floatlabel'
 
-import { BaseTabbedPanel, BaseTierTag } from '@/lib/base'
+import { BaseTabbedPanel, BaseTierTag, BaseVerdictBadge } from '@/lib/base'
 import { num } from '@/lib/formatters'
 import { formatIsotopeFormula } from '@/lib/chem'
 import { api } from '@/api'
@@ -34,6 +34,19 @@ const mechById = computed(() => {
   }
   return map
 })
+
+// Current verification verdict for a ledger row (by stable identity).
+const verdictFor = (row) => app.data.peakAssignment.verification.forAssignment(row)
+
+// Verdict filter (single-select). "unverified" = no current verdict.
+const VERDICT_FILTERS = [
+  { value: 'all', label: 'All verdicts' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'unsure', label: 'Unsure' },
+  { value: 'unverified', label: 'Unverified' }
+]
+const verdictFilter = ref('all')
 
 // --- Run selector -----------------------------------------------------------
 
@@ -150,6 +163,11 @@ const rows = computed(() => {
   const parents = assignments.value.list
     .filter((row) => row.role !== 'iso_child')
     .filter((row) => activeTiers.size === 0 || activeTiers.has(bucketOf(row)))
+    .filter(
+      (row) =>
+        verdictFilter.value === 'all' ||
+        (verdictFor(row)?.verdict ?? 'unverified') === verdictFilter.value
+    )
     .map((row) => ({
       ...row,
       tierRank: TIER_RANK[row.tier] ?? 3,
@@ -276,6 +294,16 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
           <ToggleSwitch v-model="showIsotopologues" inputId="unfold-iso" />
           <label for="unfold-iso">Isotopologues</label>
         </div>
+        <Select
+          v-if="runs.list.length"
+          v-model="verdictFilter"
+          :options="VERDICT_FILTERS"
+          optionLabel="label"
+          optionValue="value"
+          size="small"
+          style="min-width: 9rem"
+          v-tooltip.top="'Filter by verification verdict'"
+        />
         <Button
           label="Assign peaks"
           icon="pi ph ph-magic-wand"
@@ -450,6 +478,14 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
                 data.provenance.corroboration.n_adducts
               }}</span
             >
+          </template>
+        </Column>
+        <Column style="min-width: 3rem">
+          <template #header>
+            <span class="pi ph ph-seal-check" v-tooltip.top="'Verification verdict'" />
+          </template>
+          <template #body="{ data }">
+            <BaseVerdictBadge :record="verdictFor(data)" compact />
           </template>
         </Column>
       </DataTable>

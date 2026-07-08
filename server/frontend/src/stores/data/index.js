@@ -9,7 +9,11 @@ import {
   useMatchVisualized
 } from './modules/match'
 import { usePeak } from './modules/peak'
-import { usePeakAssignment, usePeakAssignmentRun } from './modules/peakAssignment'
+import {
+  usePeakAssignment,
+  usePeakAssignmentRun,
+  usePeakAssignmentVerification
+} from './modules/peakAssignment'
 import { useSample } from './modules/sample'
 import { useTargetCollection, useTargetCompound } from './modules/target'
 import { useTemplate } from './modules/template'
@@ -31,7 +35,8 @@ export const useData = () => ({
   peak: usePeak(),
   peakAssignment: {
     run: usePeakAssignmentRun(),
-    peak: usePeakAssignment()
+    peak: usePeakAssignment(),
+    verification: usePeakAssignmentVerification()
   },
   target: {
     collection: useTargetCollection(),

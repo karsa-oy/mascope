@@ -1,12 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import Button from 'primevue/button'
+import Select from 'primevue/select'
+import InputText from 'primevue/inputtext'
 
 import { useApp } from '@/stores'
-import { BaseTierTag } from '@/lib/base'
+import { BaseTierTag, BaseVerdictBadge } from '@/lib/base'
 import { num } from '@/lib/formatters'
 import { formatIsotopeFormula } from '@/lib/chem'
+import { EVIDENCE_LEVELS } from '@/lib/verification'
 
 const app = useApp()
 
@@ -18,6 +21,69 @@ const showSearch = defineModel('showSearch', { type: Boolean, default: false })
 // The committed assignment for the focused peak (from the latest run).
 const focusedAssignment = computed(() =>
   app.data.peakAssignment.peak.forPeak(app.data.peak.focused?.peak_id)
+)
+
+// --- Verification (labelling) capture -------------------------------------
+// The current verdict for the focused assignment (by stable identity), plus a
+// small confirm/reject/unsure form. See docs/dev/verification_capture_frontend.md.
+const verification = computed(() =>
+  app.data.peakAssignment.verification.forAssignment(focusedAssignment.value)
+)
+
+const editing = ref(false) // form open despite an existing verdict (re-verify)
+const evidenceLevel = ref(null)
+const note = ref('')
+const submitting = ref(false)
+const pendingVerdict = ref(null) // which button is mid-submit
+const denied = ref(false) // 403: not an editor on this sample
+
+// Show the capture form when there is no verdict yet, or the user chose to edit.
+const showVerifyForm = computed(() => !denied.value && (!verification.value || editing.value))
+
+function startEdit() {
+  evidenceLevel.value = verification.value?.evidence_level ?? null
+  note.value = verification.value?.note ?? ''
+  editing.value = true
+}
+
+async function submitVerdict(verdict) {
+  // Confirm requires an evidence level (also enforced server-side).
+  if (verdict === 'confirmed' && !evidenceLevel.value) return
+  submitting.value = true
+  pendingVerdict.value = verdict
+  try {
+    await app.data.peakAssignment.verification.verify({
+      peak_assignment_id: focusedAssignment.value.peak_assignment_id,
+      verdict,
+      evidence_level: evidenceLevel.value || null,
+      note: note.value?.trim() || null
+    })
+    editing.value = false
+    note.value = ''
+  } catch (error) {
+    // The http layer already toasts; only 403 changes the UI (hide the control).
+    if (error?.response?.status === 403) denied.value = true
+  } finally {
+    submitting.value = false
+    pendingVerdict.value = null
+  }
+}
+
+// Fresh form per peak (each judgment is independent); re-evaluate editor access
+// per sample.
+watch(
+  () => app.data.peak.focused?.peak_id,
+  () => {
+    editing.value = false
+    evidenceLevel.value = null
+    note.value = ''
+  }
+)
+watch(
+  () => app.data.sample.focusedId,
+  () => {
+    denied.value = false
+  }
 )
 
 // Arbitration / chemistry provenance: chemical plausibility (Seven Golden
@@ -281,6 +347,77 @@ const altTooltip = (alt) => {
             </div>
           </div>
         </div>
+        <div class="verify">
+          <div class="alts-label">Verification</div>
+          <div v-if="verification && !editing" class="verify-current">
+            <BaseVerdictBadge :record="verification" />
+            <Button
+              v-if="!denied"
+              label="edit"
+              size="small"
+              text
+              severity="secondary"
+              icon="pi ph ph-pencil-simple"
+              v-tooltip.top="'Change the verdict'"
+              @click="startEdit"
+            />
+          </div>
+          <template v-else-if="showVerifyForm">
+            <div class="verify-buttons">
+              <Button
+                label="Confirm"
+                icon="pi ph ph-check-circle"
+                size="small"
+                severity="success"
+                :disabled="submitting || !evidenceLevel"
+                :loading="submitting && pendingVerdict === 'confirmed'"
+                v-tooltip.top="!evidenceLevel ? 'Pick an evidence level to confirm' : ''"
+                @click="submitVerdict('confirmed')"
+              />
+              <Button
+                label="Reject"
+                icon="pi ph ph-x-circle"
+                size="small"
+                severity="danger"
+                :disabled="submitting"
+                :loading="submitting && pendingVerdict === 'rejected'"
+                @click="submitVerdict('rejected')"
+              />
+              <Button
+                label="Unsure"
+                icon="pi ph ph-question"
+                size="small"
+                severity="secondary"
+                :disabled="submitting"
+                :loading="submitting && pendingVerdict === 'unsure'"
+                @click="submitVerdict('unsure')"
+              />
+            </div>
+            <Select
+              v-model="evidenceLevel"
+              :options="EVIDENCE_LEVELS"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Evidence level (required to confirm)"
+              size="small"
+              showClear
+              fluid
+            />
+            <InputText v-model="note" placeholder="Note (optional)" size="small" fluid />
+            <div v-if="editing" class="verify-edit-actions">
+              <Button
+                label="Cancel"
+                size="small"
+                text
+                severity="secondary"
+                @click="editing = false"
+              />
+            </div>
+          </template>
+          <div v-else-if="denied" class="verify-denied">
+            <span class="pi ph ph-lock-simple" /> Editor access is required to verify.
+          </div>
+        </div>
         <div class="insp-actions">
           <Button
             :label="showSearch ? 'Hide search' : 'Re-search'"
@@ -414,6 +551,38 @@ const altTooltip = (alt) => {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+/* Verification (labelling) capture. Confirm / Reject / Unsure share equal width
+   -> equal prominence (reject is a first-class negative label, not an
+   afterthought). */
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.verify-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.verify-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
+.verify-buttons > :deep(.p-button) {
+  flex: 1;
+}
+.verify-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.verify-denied {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  opacity: 0.7;
 }
 
 /* Isotopologue envelope of the focused assignment (M0 + M+1, M+2 ...). */
