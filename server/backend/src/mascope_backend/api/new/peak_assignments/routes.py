@@ -12,7 +12,10 @@ from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
 )
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_route
-from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.auth.dependencies import (
+    current_active_user,
+    current_superuser,
+)
 from mascope_backend.api.new.peak_assignments.batch import assign_sample_batch_peaks
 from mascope_backend.api.new.peak_assignments.schemas import (
     AssignSamplePeaksBody,
@@ -22,6 +25,7 @@ from mascope_backend.api.new.peak_assignments.schemas import (
     PeakAssignmentQueryParams,
     PeakAssignmentRunsResponse,
     PeakAssignmentsResponse,
+    RecalibrateResponse,
     VerifyAssignmentBody,
 )
 from mascope_backend.api.new.peak_assignments.service import (
@@ -30,6 +34,7 @@ from mascope_backend.api.new.peak_assignments.service import (
     get_peak_assignment_runs,
     get_peak_assignments,
     get_verifications,
+    recalibrate_instrument,
 )
 from mascope_backend.api.new.peak_assignments.visualization import (
     aggregate_composition_fit,
@@ -154,6 +159,29 @@ async def verify_assignment_route(
         user_id=user.id,
     )
     return AssignmentVerificationsResponse.model_validate(result)
+
+
+@peak_assignments_router.post(
+    "/calibration/{instrument}/recalibrate", response_model=RecalibrateResponse
+)
+@api_route(token_access=True)
+async def recalibrate_instrument_route(
+    instrument: str,
+    user: User = Depends(current_superuser),
+) -> RecalibrateResponse:
+    """
+    Refit an instrument's confidence calibration from the accumulated verification labels (V2).
+
+    Instrument-wide: it rewrites the active calibration curve that every assignment's P(correct)
+    reads, so it is restricted to superusers. The curve stays provisional unless enough
+    reference-grade labels back it. No-op (``recalibrated: false``) when there are too few labels.
+
+    :param instrument: Instrument class to recalibrate (e.g. "orbi").
+    :param user: The current authenticated user. Requires superuser.
+    :return: Whether it recalibrated, with before/after ECE and label counts.
+    """
+    result = await recalibrate_instrument(instrument=instrument)
+    return RecalibrateResponse.model_validate(result)
 
 
 @peak_assignments_router.post("/sample/{sample_item_id}/assign")
