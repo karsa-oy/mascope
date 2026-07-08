@@ -11,6 +11,8 @@ import pytest
 from mascope_tools.composition.arbitration import (
     DEFAULT_TIE_TOL,
     arbitrate_candidates,
+    fdr_curve,
+    threshold_at_fdr,
 )
 
 
@@ -121,3 +123,46 @@ def test_deterministic_order_on_equal_evidence():
 
 def test_default_tie_tol_exported():
     assert 0.0 < DEFAULT_TIE_TOL < 1.0
+
+
+# --- FDR helpers -----------------------------------------------------------
+
+
+def test_fdr_curve_perfect_ranking():
+    # all correct above all wrong -> FDR stays 0 while only corrects are accepted
+    conf = [0.9, 0.8, 0.7, 0.4, 0.3]
+    correct = [True, True, True, False, False]
+    pts = fdr_curve(conf, correct)
+    assert [p.n_accepted for p in pts] == [1, 2, 3, 4, 5]
+    assert pts[2].fdr == pytest.approx(0.0)  # top-3 all correct
+    assert pts[4].fdr == pytest.approx(2 / 5)  # all accepted -> 2 wrong of 5
+    # q-values are monotone non-decreasing as acceptance grows
+    qs = [p.q_value for p in pts]
+    assert qs == sorted(qs)
+
+
+def test_fdr_curve_length_mismatch_raises():
+    with pytest.raises(ValueError):
+        fdr_curve([0.9, 0.8], [True])
+
+
+def test_threshold_at_fdr_picks_permissive_cut():
+    conf = [0.9, 0.8, 0.7, 0.4, 0.3]
+    correct = [True, True, True, False, False]
+    # 0% FDR -> accept the three corrects, cut at 0.7
+    assert threshold_at_fdr(conf, correct, 0.0) == pytest.approx(0.7)
+    # allow 25% -> can also take the first wrong one (1/4 = 0.25), cut at 0.4
+    assert threshold_at_fdr(conf, correct, 0.25) == pytest.approx(0.4)
+
+
+def test_threshold_at_fdr_unreachable_returns_none():
+    # a wrong winner at the very top makes every cut's FDR >= 0.5
+    assert threshold_at_fdr([0.9, 0.8], [False, True], 0.1) is None
+
+
+def test_fdr_curve_tie_is_conservative():
+    # a correct and a wrong winner tie at 0.8; the tie's FDR must count the wrong one
+    pts = fdr_curve([0.8, 0.8], [True, False])
+    # wrong ordered first within the tie -> after 1 accepted, FDR 1.0
+    assert pts[0].fdr == pytest.approx(1.0)
+    assert pts[1].fdr == pytest.approx(0.5)
