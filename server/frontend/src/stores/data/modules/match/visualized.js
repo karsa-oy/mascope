@@ -180,6 +180,10 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
     if (!sample_item_id || !assignment?.assigned_formula || !assignment?.ionization_mechanism_id) {
       return
     }
+    // Initialize the UI match params (peak_min_intensity, tolerances) the Fit
+    // charts read; the targeted path does this during its ion load, the
+    // composition path otherwise leaves matchParams.ui undefined.
+    matchParams.set()
     const body = {
       assigned_formula: assignment.assigned_formula,
       ionization_mechanism_id: assignment.ionization_mechanism_id
