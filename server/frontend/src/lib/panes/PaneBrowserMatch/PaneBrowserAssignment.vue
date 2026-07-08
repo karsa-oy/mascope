@@ -14,6 +14,7 @@ import FloatLabel from 'primevue/floatlabel'
 
 import { BaseTabbedPanel, BaseTierTag } from '@/lib/base'
 import { num } from '@/lib/formatters'
+import { formatIsotopeFormula } from '@/lib/chem'
 import { api } from '@/api'
 import { useApp } from '@/stores'
 
@@ -124,19 +125,57 @@ function toggleTier(key) {
   else activeTiers.add(key)
 }
 
-// Table rows: one per assigned formula (M0) plus unassigned/reagent peaks;
-// iso_child satellites are folded away (they surface in the inspector), which
-// also keeps this a flat, fixed-height list compatible with virtual scrolling.
-// Filtered by the active chips, then ordered by confidence (identified first)
-// and fit descending. tierRank lets the tier column sort by confidence too.
+// Fold isotopologue satellites by default: one row per assigned formula (M0)
+// plus unassigned/reagent peaks, which keeps this a flat, fixed-height list
+// compatible with virtual scrolling. Toggle to unfold (see below).
+const showIsotopologues = ref(false)
+
+// Table rows. Parents (M0 + unassigned/reagent) are filtered by the active
+// chips, then ordered by confidence (identified first) and fit descending;
+// tierRank lets the tier column sort by confidence too. When unfolded, each
+// parent's iso_child satellites are inserted right after it (ordered by m/z)
+// and inherit the parent's tierRank, so the table's stable tier sort keeps
+// families together instead of scattering children across tiers.
 const rows = computed(() => {
-  const list = assignments.value.list
+  const parents = assignments.value.list
     .filter((row) => row.role !== 'iso_child')
     .filter((row) => activeTiers.size === 0 || activeTiers.has(bucketOf(row)))
-    .map((row) => ({ ...row, tierRank: TIER_RANK[row.tier] ?? 3 }))
-  list.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
-  return list
+    .map((row) => ({
+      ...row,
+      tierRank: TIER_RANK[row.tier] ?? 3,
+      // Flatten the calibrated probability for the sortable P(correct) column;
+      // null for untargeted / uncalibrated (rendered as "-", never 0%).
+      pCorrect: row.provenance?.p_correct ?? null,
+      isChild: false
+    }))
+  parents.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
+  if (!showIsotopologues.value) return parents
+
+  const result = []
+  for (const parent of parents) {
+    result.push(parent)
+    const children = assignments.value
+      .childrenOf(parent.peak_assignment_id)
+      .slice()
+      .sort((a, b) => (a.sample_peak_mz ?? 0) - (b.sample_peak_mz ?? 0))
+      .map((child) => ({
+        ...child,
+        tierRank: parent.tierRank,
+        pCorrect: child.provenance?.p_correct ?? null,
+        isChild: true
+      }))
+    result.push(...children)
+  }
+  return result
 })
+
+// Label for an unfolded isotopologue child row (compact substitution label,
+// falling back to the offset label).
+const childLabel = (row) =>
+  row.isotope_formula ? formatIsotopeFormula(row.isotope_formula) : row.isotope_label || 'iso'
+
+// Calibrated probability formatter for the P(correct) column.
+const pctFmt = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 })
 
 // Two-way selection tied to the focused peak: clicking a row focuses its peak,
 // and focusing a peak elsewhere (spectrum click, inspector) highlights its row.
@@ -145,13 +184,15 @@ const selectedRow = computed({
   get: () => {
     const focused = app.data.peak.focused
     if (!focused) return null
+    // Prefer the exact row for the focused peak (present for M0/standalone rows,
+    // and for isotopologue children when unfolded).
+    const exact = rows.value.find((r) => String(r.sample_peak_id) === String(focused.peak_id))
+    if (exact) return exact
+    // Folded: a focused isotopologue child maps to its M0 row.
     const assignment = assignments.value.forPeak(focused.peak_id)
     const ownerId =
-      assignment?.role === 'iso_child'
-        ? assignment.owner_peak_assignment_id
-        : assignment?.peak_assignment_id
-    if (ownerId != null) return rows.value.find((r) => r.peak_assignment_id === ownerId) ?? null
-    return rows.value.find((r) => String(r.sample_peak_id) === String(focused.peak_id)) ?? null
+      assignment?.role === 'iso_child' ? assignment.owner_peak_assignment_id : null
+    return ownerId != null ? (rows.value.find((r) => r.peak_assignment_id === ownerId) ?? null) : null
   },
   set: (row) => {
     if (row) focusPeak(row)
@@ -176,6 +217,14 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
           placeholder="Select run"
           style="min-width: 12rem"
         />
+        <div
+          v-if="runs.list.length"
+          class="unfold-toggle"
+          v-tooltip.top="'Show isotopologue peaks as indented rows under their compound'"
+        >
+          <ToggleSwitch v-model="showIsotopologues" inputId="unfold-iso" />
+          <label for="unfold-iso">Isotopologues</label>
+        </div>
         <Button
           label="Assign peaks"
           icon="pi ph ph-magic-wand"
@@ -273,13 +322,23 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
         </Column>
         <Column field="assigned_formula" header="formula" sortable style="min-width: 6rem">
           <template #body="{ data }">
-            <span class="formula">{{ data.assigned_formula || '—' }}</span>
-            <span
-              v-if="isoCount(data)"
-              class="iso-count"
-              v-tooltip.top="`${isoCount(data)} isotopologue peak${isoCount(data) === 1 ? '' : 's'}`"
-              >+{{ isoCount(data) }}</span
-            >
+            <span v-if="data.isChild" class="child-cell">
+              <span class="child-caret">&#8627;</span>
+              <span class="child-label" v-tooltip.top="data.isotope_formula || data.isotope_label">{{
+                childLabel(data)
+              }}</span>
+            </span>
+            <span v-else>
+              <span class="formula">{{ data.assigned_formula || '—' }}</span>
+              <span
+                v-if="isoCount(data)"
+                class="iso-count"
+                v-tooltip.top="
+                  `${isoCount(data)} isotopologue peak${isoCount(data) === 1 ? '' : 's'}`
+                "
+                >+{{ isoCount(data) }}</span
+              >
+            </span>
           </template>
         </Column>
         <Column field="tierRank" header="tier" sortable style="min-width: 7rem">
@@ -290,6 +349,37 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
               :role="data.role"
               :source="data.source"
             />
+          </template>
+        </Column>
+        <Column field="pCorrect" sortable style="min-width: 6.5rem">
+          <template #header>
+            <span
+              v-tooltip.top="
+                'Calibrated probability the assignment is correct. Database-stage, calibrated instruments only; untargeted / uncalibrated show —.'
+              "
+              >P(correct)</span
+            >
+          </template>
+          <template #body="{ data }">
+            <span v-if="data.provenance?.p_correct != null" class="pcorrect">
+              {{ pctFmt.format(data.provenance.p_correct)
+              }}<span
+                v-if="data.provenance.calibration?.provisional"
+                class="prov"
+                v-tooltip.top="'Provisional calibration curve'"
+                >*</span
+              >
+            </span>
+            <span
+              v-else
+              class="pcorrect uncal"
+              v-tooltip.top="
+                data.source === 'untargeted'
+                  ? 'Untargeted assignment - no calibrated probability'
+                  : 'No calibration curve for this instrument'
+              "
+              >&mdash;</span
+            >
           </template>
         </Column>
       </DataTable>
@@ -417,7 +507,7 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
 
 .formula {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 .iso-count {
   margin-left: 0.35rem;
@@ -427,10 +517,48 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
   vertical-align: super;
 }
 
+.pcorrect {
+  font-variant-numeric: tabular-nums;
+}
+.pcorrect.uncal {
+  opacity: 0.45;
+}
+.pcorrect .prov {
+  color: var(--p-orange-500, #f59e0b);
+  margin-left: 0.05rem;
+}
+
 .menu-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+.unfold-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.unfold-toggle label {
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+/* Unfolded isotopologue child row: indented substitution label under its M0. */
+.child-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding-left: 0.9rem;
+}
+.child-caret {
+  opacity: 0.4;
+}
+.child-label {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.86rem;
+  opacity: 0.8;
 }
 
 .toggle-row {

@@ -39,14 +39,20 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
     () => data.list.value.find((run) => run.status === 'completed') ?? null
   )
 
-  // Default the view to the latest completed run when nothing is focused yet
-  // (initial load / sample switch). A user's explicit selection is left alone;
-  // the "new run available" affordance on live completion belongs to the
-  // Assignments browser (F5), not here.
+  // Default the view to the latest completed run on initial load and on sample
+  // switch. The run list holds only the focused sample's runs, so a focused id
+  // that is absent from it is either empty or a stale carry-over from the
+  // previous sample (selection persists) -- in both cases re-focus the latest.
+  // An explicit pick of an older run of the SAME sample stays in the list, so it
+  // is left alone; live completion of a new run is likewise not yanked into
+  // focus (that affordance belongs to the Assignments browser).
   watch(
-    latestCompleted,
-    (run) => {
-      if (run && !data.focusedId.value) data.focus(run)
+    [latestCompleted, () => data.list.value],
+    ([run]) => {
+      const focusedInList = data.list.value.some(
+        (r) => r.peak_assignment_run_id === data.focusedId.value
+      )
+      if (run && !focusedInList) data.focus(run)
     },
     { immediate: true }
   )
