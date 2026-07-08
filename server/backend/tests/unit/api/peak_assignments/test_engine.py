@@ -218,6 +218,58 @@ class TestInvertMatches:
         assert json.loads(json.dumps(a["provenance"]))["is_tie"] is False
         assert isinstance(a["provenance"]["is_tie"], bool)
 
+    def test_calibrated_p_correct_for_known_instrument(self):
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                )
+            ]
+        )
+        [a] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE, instrument="orbi"
+        )
+        prov = a["provenance"]
+        assert prov["calibrated"] is True
+        assert 0.0 <= prov["p_correct"] <= 1.0
+        assert prov["calibration"]["instrument"] == "orbi"
+        assert prov["calibration"]["provisional"] is True
+        # fully JSON-serializable
+        json.dumps(prov)
+
+    def test_uncalibrated_instrument_reports_no_probability(self):
+        # TOF has no calibration yet -> p_correct null, calibrated False (never a
+        # borrowed Orbitrap number).
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                )
+            ]
+        )
+        [a] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE, instrument="tof"
+        )
+        assert a["provenance"]["calibrated"] is False
+        assert a["provenance"]["p_correct"] is None
+        assert a["provenance"]["calibration"] is None
+
     def test_isotope_child_points_at_its_ions_m0_assignment(self):
         match_df = pd.DataFrame(
             [

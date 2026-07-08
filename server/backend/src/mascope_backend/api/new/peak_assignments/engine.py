@@ -21,6 +21,7 @@ from mascope_backend.api.controllers.match.lib.match_score_v2 import (
 )
 from mascope_backend.db.id import gen_id
 from mascope_tools.composition.arbitration import DEFAULT_TIE_TOL
+from mascope_tools.composition.calibration import apply_calibration, calibration_for
 from mascope_tools.composition.heuristic_filter import formula_plausibility
 
 
@@ -170,6 +171,7 @@ def invert_matches_to_peak_assignments(
     possible_threshold: float,
     probable_threshold: float,
     max_alternatives: int = 5,
+    instrument: str | None = None,
 ) -> list[dict]:
     """Invert target-first match results into per-peak assignments (Stage A).
 
@@ -218,6 +220,10 @@ def invert_matches_to_peak_assignments(
     formulas = matched["target_compound_formula"].astype(str)
     plaus_by_formula = {f: formula_plausibility(f) for f in formulas.unique()}
     matched["_plaus"] = formulas.map(plaus_by_formula)
+    # Calibration maps the winner's evidence to P(correct) for this instrument. None
+    # when the instrument has no curated calibration (e.g. TOF) -> the assignment is
+    # reported uncalibrated rather than borrowing another instrument's curve.
+    calibration = calibration_for(instrument)
     matched["_fit"] = matched["match_score"].map(lambda v: _score_or_none(v) or 0.0)
     matched["_evidence"] = matched["_fit"] * matched["_plaus"]
     matched["_abs_mz_error"] = matched["match_mz_error"].abs()
@@ -249,6 +255,19 @@ def invert_matches_to_peak_assignments(
             # bool() so provenance stays JSON-serializable (evid is a numpy array,
             # whose comparisons yield numpy.bool_, which the JSON column rejects).
             is_tie = bool(len(group) > 1 and (evid[0] - evid[1]) <= DEFAULT_TIE_TOL)
+
+        # Calibrated P(correct) for the winner's evidence — only when this instrument
+        # has a calibration; otherwise the assignment is honestly left uncalibrated.
+        if calibration is not None:
+            p_correct = round(float(apply_calibration(evid[0], calibration)), 4)
+            calibration_meta = {
+                "instrument": calibration.instrument,
+                "provisional": calibration.provisional,
+                "source": calibration.source,
+            }
+        else:
+            p_correct = None
+            calibration_meta = None
         alternatives = [
             {
                 "assigned_formula": _str_or_none(row.get("target_compound_formula")),
@@ -304,6 +323,11 @@ def invert_matches_to_peak_assignments(
                 "plausibility": round(float(winner["_plaus"]), 4),
                 "evidence": round(float(winner["_evidence"]), 4),
                 "is_tie": is_tie,
+                # P(correct) is the calibrated probability; null when uncalibrated,
+                # so the UI can show "uncalibrated" instead of a fabricated number.
+                "p_correct": p_correct,
+                "calibrated": calibration is not None,
+                "calibration": calibration_meta,
             },
         }
         assignments.append(assignment)

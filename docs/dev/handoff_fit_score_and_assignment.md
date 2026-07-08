@@ -100,26 +100,43 @@ Validated `rule_senior` against the 92 demo target compounds:
    `mascope_tools.composition.arbitration.arbitrate_candidates`: competes a peak's
    candidates by **fit × plausibility**, emits a normalised confidence, flags ties
    (Schymanski L5). Unit-tested; `assignment_confidence.md` §4 (P2 progress).
-6. ✅ **Live end-to-end on real demo spectra.** Migrated `mascope_demo` to head, booted the
-   backend from worktree source, and ran `assign_sample_peaks` over the demo samples via the
-   API. Result per sample: `fit_score` median ≈ 0.95 / max 1.0; tiers band cleanly
-   (identified full-envelope ≈ 0.94–0.97, below-assignability = the lone mass-only matches
-   at ≈ 0.01). Data now sits in `mascope_demo.peak_assignment` for the UI.
+6. ✅ **Live end-to-end on real demo spectra.** Migrated `mascope_demo` to head and ran
+   `assign_sample_peaks` over all 161 demo samples. `fit_score` median ≈ 0.95; tiers band
+   cleanly; Stage A winners chosen by fit × plausibility with confidence/tie in
+   `provenance`. Data sits in `mascope_demo.peak_assignment` for the UI.
+7. ✅ **P2 confidence calibration (pipeline; data provisional).**
+   `mascope_tools.composition.calibration`: `Calibration` (provenance-carrying),
+   `fit_calibration` (Platt + held-out ECE, refuses too-little data), `apply_calibration`,
+   `calibration_error`, per-instrument `calibration_for`. **Honest fallback:** no curve for
+   an instrument → `p_correct=null, calibrated=false` (TOF today); one **provisional
+   Orbitrap** curve (a=5.74, b=-3.36, held-out ECE 0.029) fit from the demo bundle via
+   `arbitration_eval.py --fit-calibration`. Wired into the engine → `provenance.p_correct /
+   calibrated / calibration`. Labels = reference-confirmed identities (Schymanski L1) vs
+   decoys — the reference-dataset link + basis for future user self-calibration. See
+   `assignment_confidence.md` §4 + `how-it-works/peak_assignment.md`.
+8. ✅ **How-it-works docs** — new user-facing `how-it-works/peak_assignment.md` (fit score,
+   plausibility, arbitration, calibration, tiers) with citations; `matching.md` TODO
+   resolved.
 
 **Open (need a human / a decision):**
 
-7. **Run the rename migration in prod/CI** and the migration test suite
-   (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). NOTE: the CLI
-   migration check (`mascope dev migrate`) runs alembic from the *main* checkout's venv, so
-   it cannot see this branch's `b2e9d7c14a05` — a worktree/main alembic split to resolve
-   (locally the migration was applied via alembic run directly against the worktree code).
-8. **Refine the fit-scale tier bands.** 0.8/0.5 are DESIGN.md estimates; recalibrate per
-   instrument. Changes *what users see* → a product decision.
-9. **Finish Phase 3 P2:** calibrate the arbitration confidence to `P(correct)` per instrument
-   and estimate **target-decoy FDR** with the `tooling/score_eval` harness (does
-   fit × plausibility rank truth above the *plausible* decoys?).
-10. **Rewrite the how-it-works user docs** (`docs/user/how-it-works/matching.md` TODO) once
-    the pipeline settles.
+- **Isolated stacks:** use `mascope dev run --instance` / `mascope instance show --export`
+  to run a decoupled per-worktree stack (own env DB + ports) instead of the shared demo
+  stack (developer_guide.md §"Running multiple instances").
+
+- **Run the rename migration in prod/CI** and the migration test suite
+  (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). NOTE: the CLI
+  migration check (`mascope dev migrate`) runs alembic from the *main* checkout's venv, so
+  it cannot see this branch's `b2e9d7c14a05` — a worktree/main alembic split to resolve
+  (locally the migration was applied via alembic run directly against the worktree code).
+- **Refine the fit-scale tier bands.** 0.8/0.5 are DESIGN.md estimates; recalibrate per
+  instrument. Changes *what users see* → a product decision.
+- **Replace the provisional calibration with curated data** — a curated reference set for
+  the Orbitrap curve and a **TOF golden set** for a TOF curve (TOF is uncalibrated today);
+  then the **persisted, user-refittable per-instrument calibration store** (a DB table —
+  deliberately deferred) and the user-facing "calibrate my instrument" flow.
+- **Extend arbitration/calibration to Stage B** once untargeted candidates carry comparable
+  per-candidate fits; **P3** — spectral-neighbourhood corroboration (CAMERA/IPA).
 
 ## 7. Environment / ops notes
 
