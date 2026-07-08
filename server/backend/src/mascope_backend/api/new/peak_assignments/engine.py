@@ -285,6 +285,7 @@ def invert_matches_to_peak_assignments(
                 winner.get("ionization_mechanism_id")
             ),
             "isotope_label": isotope_label,
+            "isotope_formula": _str_or_none(winner.get("target_isotope_formula")),
             "source": SOURCE_DATABASE,
             "fit_score": _score_or_none(winner["match_score"]),
             "mz_error_ppm": _float_or_none(winner["match_mz_error"]),
@@ -450,6 +451,7 @@ def untargeted_matches_to_peak_assignments(
             "ion_formula": _str_or_none(row.get("ion")),
             "ionization_mechanism_id": mechanism_id_by_notation.get(notation),
             "isotope_label": isotope_label,
+            "isotope_formula": _str_or_none(row.get("isotope_formula")),
             "source": SOURCE_UNTARGETED,
             "fit_score": _score_or_none(score),
             "mz_error_ppm": mz_error_ppm,
@@ -503,6 +505,7 @@ def build_unassigned_assignments(
             "ion_formula": None,
             "ionization_mechanism_id": None,
             "isotope_label": None,
+            "isotope_formula": None,
             "source": None,
             "fit_score": None,
             "mz_error_ppm": None,

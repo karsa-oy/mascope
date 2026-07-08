@@ -18,6 +18,7 @@ import { api } from '@/api'
 import { BaseMatchTag, BaseTierTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
+import { formatIsotopeFormula } from '@/lib/chem'
 
 import { usePreview } from './preview.js'
 
@@ -323,6 +324,12 @@ const m0 = computed(
   () => family.value.find((f) => f.role === 'M0' || f.isotope_label === 'M0') ?? null
 )
 
+// Compact substitution label (e.g. "[15N]", "[81Br][2H]") from the full
+// isotopologue formula; falls back to the M0/M+1 offset label when the formula
+// isn't stored (untargeted satellites).
+const isoLabel = (iso) =>
+  iso.isotope_formula ? formatIsotopeFormula(iso.isotope_formula) : iso.isotope_label || '-'
+
 // Theoretical (predicted) relative abundance of an isotopologue as a fraction of
 // M0, recovered from the stored fields. The matcher defines
 //   abundance_error = observed_rel / theoretical_rel - 1,  observed_rel = I / I(M0)
@@ -462,9 +469,11 @@ const isPoorMatch = (iso) => {
               "
               @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
             >
-              <span class="iso-label"
+              <span
+                class="iso-label"
+                v-tooltip.left="iso.isotope_formula || iso.isotope_label"
                 ><span v-if="isPoorMatch(iso)" class="pi ph ph-warning poor-icon" />{{
-                  iso.isotope_label || '—'
+                  isoLabel(iso)
                 }}</span
               >
               <span class="iso-mz">{{ num.mz.format(iso.sample_peak_mz) }}</span>
@@ -854,7 +863,7 @@ const isPoorMatch = (iso) => {
 .iso-head,
 .iso-row {
   display: grid;
-  grid-template-columns: 3.4rem 1fr auto 3.4rem;
+  grid-template-columns: 5rem 1fr auto 3.4rem;
   gap: 0.5rem;
   align-items: baseline;
   font-family: var(--font-mono, ui-monospace, monospace);
