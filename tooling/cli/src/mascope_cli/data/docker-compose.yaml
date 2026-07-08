@@ -178,7 +178,10 @@ services:
     restart: unless-stopped
     logging: *default-logging
     build:
-      context: server/frontend
+      # Repo root so the image can bake in both the frontend (server/frontend)
+      # and the rendered user docs (docs/ + mkdocs.yml, served at /docs/).
+      context: .
+      dockerfile: server/frontend/Dockerfile
       args:
         - MASCOPE_RUNTIME
     depends_on:

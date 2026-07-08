@@ -8,3 +8,6 @@
 .claude
 .runtime/**
 runtime/env/*
+# Build outputs (regenerated inside the image): mkdocs site and vite dist.
+/site/
+/server/frontend/dist/
