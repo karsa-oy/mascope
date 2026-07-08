@@ -32,6 +32,20 @@ const fitPercent = new Intl.NumberFormat('en-US', {
 const formatFit = (value) =>
   value != null && !Number.isNaN(value) ? fitPercent.format(value) : '-'
 
+// Adduct-corroboration signal (P3): present only when the compound was seen via
+// several adducts (co-occurrence) -- winner-only, calibrated assignments. The
+// boost is already folded into p_correct, so the badge is purely informational.
+const corroboration = computed(() => provenance.value?.corroboration ?? null)
+const corroborationTooltip = computed(() => {
+  const c = corroboration.value
+  if (!c) return ''
+  const adducts = (c.adducts ?? []).join(', ')
+  return (
+    `Seen via ${c.n_adducts} adducts${adducts ? ` (${adducts})` : ''}. ` +
+    'Independent corroborating evidence, already folded into P(correct).'
+  )
+})
+
 // The isotopologue family (M0 + M+1, M+2 ...) of the focused assignment.
 const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssignment.value))
 
@@ -197,6 +211,14 @@ const altTooltip = (alt) => {
               >uncalibrated</span
             >
           </div>
+        </div>
+        <div
+          v-if="corroboration && corroboration.n_adducts > 1"
+          class="corroboration"
+          v-tooltip.top="corroborationTooltip"
+        >
+          <span class="pi ph ph-link-simple" />
+          Supported by {{ corroboration.n_adducts }} adducts
         </div>
         <div v-if="family.length > 1" class="isotopologues">
           <div class="alts-label">Isotopologues</div>
@@ -468,6 +490,23 @@ const altTooltip = (alt) => {
 .prov-flag {
   color: var(--p-orange-500, #f59e0b);
   font-size: 0.66rem;
+}
+/* Adduct-corroboration badge: a real compound seen via several adducts. */
+.corroboration {
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 100px;
+  color: var(--p-teal-600, #0d9488);
+  background: color-mix(in srgb, var(--p-teal-500, #14b8a6) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p-teal-500, #14b8a6) 32%, transparent);
+  cursor: default;
+}
+.corroboration .pi {
+  font-size: 0.8rem;
 }
 .ev .v.uncal {
   opacity: 0.55;
