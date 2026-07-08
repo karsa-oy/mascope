@@ -163,8 +163,12 @@ Validated `rule_senior` against the 92 demo target compounds:
   comparable per-candidate fits.
 
 **D — product / data-gated decisions**
-- **D6. Persisted, user-refittable per-instrument calibration store** (the deferred DB
-  table) + the "calibrate my instrument" UX.
+- **D6. Persisted per-instrument calibration store — DONE.** `assignment_calibration` table
+  (migration `d1a2c3b4e5f6`) holds the Platt curve + per-adduct corroboration log-odds;
+  `calibration_store.load_calibration` reads the active row and falls back to the in-code
+  provisional curve. The service loads it and passes it to the engine, which folds adduct
+  corroboration into `p_correct`. *Remaining:* the "calibrate my instrument" UX (fit + write a
+  new active row from a user's standards+decoys run) is still open.
 - **D7. Recalibrate the fit-scale tier bands** (currently the 0.8/0.5 estimates) per
   instrument — a "what users see" decision.
 
