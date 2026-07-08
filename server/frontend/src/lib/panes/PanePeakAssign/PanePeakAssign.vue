@@ -199,13 +199,11 @@ const altTooltip = (alt) => {
           </div>
         </div>
         <div v-if="family.length > 1" class="isotopologues">
-          <div class="alts-label">
-            Isotopologues
-            <span class="alts-count" v-tooltip.top="'Predicted relative abundance (fraction of M0)'"
-              >theo. abu.</span
-            >
+          <div class="alts-label">Isotopologues</div>
+          <div class="iso-head">
+            <span>iso</span><span>m/z</span><span>ppm</span
+            ><span v-tooltip.top="'Theoretical relative abundance (fraction of M0)'">abu.</span>
           </div>
-          <div class="iso-head"><span>iso</span><span>m/z</span><span>ppm</span><span>abu.</span></div>
           <div class="iso-rows">
             <div
               v-for="iso in family"
@@ -404,7 +402,9 @@ const altTooltip = (alt) => {
 .iso-head,
 .iso-row {
   display: grid;
-  grid-template-columns: 5rem 1fr auto 3.4rem;
+  /* Fixed content tracks + a trailing spacer so the numeric columns stay snug
+     instead of the m/z column stretching across the full-width card. */
+  grid-template-columns: 4.5rem 6rem 3.5rem 3.5rem 1fr;
   gap: 0.5rem;
   align-items: baseline;
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -443,6 +443,12 @@ const altTooltip = (alt) => {
 .iso-row .iso-err,
 .iso-row .iso-rel {
   opacity: 0.7;
+  text-align: right;
+}
+/* Right-align the numeric columns (m/z, ppm, abu.) and their headers so the
+   values form a tidy block instead of drifting apart. */
+.iso-row .iso-mz,
+.iso-head span:not(:first-child) {
   text-align: right;
 }
 .iso-row.poor {
