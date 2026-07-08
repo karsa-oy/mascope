@@ -4,6 +4,48 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Changed
+
+- `match_isotope` no longer stores non-matching isotopes, cutting the largest
+  table in the database by the majority of its rows (on one production instance
+  it was 209 GB / 93% of the database, ~80%+ of it placeholder rows). Matching
+  scores every candidate isotopologue against the sample peaks, but only those
+  that score above zero are a real match; the rest - no peak within the match
+  window, or a peak whose m/z error (>= 100 ppm) or abundance error (>= 100%) is
+  so large it can never become a match at any read-time tolerance - are now
+  dropped on write and **reconstructed on read** from their target isotope. The
+  Match-tab isotope table still lists every expected isotope, and all
+  higher-level aggregates (`match_ion` / `match_compound` / `match_collection` /
+  `match_sample`) are unchanged because a non-matching isotope contributes zero
+  to every aggregate. Read-time tolerance loosening is preserved in full: the
+  persist threshold coincides exactly with the UI slider ceilings (m/z tolerance
+  100 ppm, isotope ratio tolerance 1.0), so every record reachable as a nonzero
+  match is still stored. Going forward, matching also writes far fewer rows,
+  bounding the growth rate rather than only reclaiming once.
+- The Match-tab isotope table shows a match tag only for actual matches
+  (possible/probable). Isotopes that are not a match under the current
+  tolerances - never detected, or scored zero - now show no tag instead of a
+  misleading 0%.
+
+### Added
+
+- `remove_unmatched_match_isotopes` maintenance script (`mascope prod db script
+  run remove_unmatched_match_isotopes`) reclaims the historical non-matching
+  rows from existing databases. It deletes `match_isotope` rows with
+  `match_score = 0` in bounded batches (configurable `BATCH_SIZE`, `DRY_RUN=1`
+  to preview) so a multi-hundred-million-row table can be cleaned without one
+  giant transaction; the delete is lossless for aggregates. Run `VACUUM FULL
+  match_isotope` (or pg_repack) afterwards to return the freed space to the OS.
+
+### Fixed
+
+- `mascope prod db script run` no longer fails with exit 127 on images built
+  from source. It resolved the in-container Python from a single hardcoded path
+  (`/root/.local/share/uv/tools/...`) that only matched older published images;
+  current images install the tool under `/opt/uv/tools`. The runner now probes
+  the known tool locations (and falls back to a `python` on `PATH` that can
+  import `mascope_backend`), so it works regardless of how the image was built.
+
 ## [2026.07.08]
 
 ### Added
