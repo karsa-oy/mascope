@@ -300,7 +300,8 @@ const altTooltip = (alt) => {
 
 <style scoped>
 .assign-root {
-  padding: 0;
+  /* Breathing room from the splitter gutter on the right. */
+  padding: 0 0.75rem 0 0;
 }
 
 /* Peak inspector: the committed assignment for the focused peak. */
@@ -327,7 +328,7 @@ const altTooltip = (alt) => {
 }
 .insp-sub {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   opacity: 0.7;
 }
 .insp-sub .src {
@@ -344,13 +345,13 @@ const altTooltip = (alt) => {
   font-family: var(--font-mono, ui-monospace, monospace);
 }
 .ev .k {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.55;
 }
 .ev .v {
-  font-size: 0.85rem;
+  font-size: 0.98rem;
   font-variant-numeric: tabular-nums;
 }
 .alts {
@@ -359,7 +360,7 @@ const altTooltip = (alt) => {
   gap: 0.2rem;
 }
 .alts-label {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.55;
@@ -370,7 +371,7 @@ const altTooltip = (alt) => {
   justify-content: space-between;
   gap: 0.6rem;
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   padding: 0.15rem 0.2rem;
   border-bottom: 1px solid var(--p-content-border-color, #eef0f4);
   border-radius: 3px;
@@ -408,11 +409,11 @@ const altTooltip = (alt) => {
   gap: 0.5rem;
   align-items: baseline;
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.76rem;
+  font-size: 0.85rem;
   padding: 0.15rem 0.3rem;
 }
 .iso-head {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.5;
