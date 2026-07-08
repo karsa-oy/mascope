@@ -17,6 +17,7 @@ describe('location URL codec', () => {
       peak: 'p1',
       collection: 'c1',
       ions: ['i1', 'i2'],
+      visualizedIon: 'i2',
       isotope: 'iso1',
       tab: 'match'
     }

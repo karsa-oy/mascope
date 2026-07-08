@@ -5,10 +5,11 @@ import { useData } from '../data'
 
 const DEFAULT_TAB = 'raw files'
 
-// How long automatic tab switching stays suppressed after a location restore,
-// so the restored tab survives the data-driven tab moves that fire as the
-// chain streams in (e.g. samples loading forces the 'batch' tab).
-const HYDRATE_SETTLE_MS = 2500
+// Safety cap on how long automatic tab switching stays suppressed after a
+// location restore. Normally the location store lifts the suppression itself
+// via endHydrate() once the restored chain settles; this only bounds the case
+// where that never happens (e.g. the chain never fully converges).
+const HYDRATE_MAX_MS = 20000
 
 export const useTab = defineStore('app.ui.tab', () => {
   const active = ref(DEFAULT_TAB)
@@ -16,6 +17,7 @@ export const useTab = defineStore('app.ui.tab', () => {
   // While hydrating a restored location, the automatic tab watchers below stand
   // down so the tab we are restoring is the final word.
   const hydrating = ref(false)
+  let hydrateTimer = null
 
   const data = useData()
 
@@ -75,17 +77,24 @@ export const useTab = defineStore('app.ui.tab', () => {
       active.value = DEFAULT_TAB
     },
     /**
-     * Restore a tab as part of a location apply. Suppresses automatic tab
-     * switching for a short settle window so the restored data streaming in
-     * does not move the tab away from the one we are restoring.
+     * Restore a tab as part of a location apply: set it and suppress automatic
+     * tab switching so streaming data does not move it away. The location store
+     * calls endHydrate() once the chain settles; the timer is only a safety cap.
      */
     hydrate: (tab) => {
       if (!tab) return
       hydrating.value = true
       active.value = tab
-      setTimeout(() => {
+      clearTimeout(hydrateTimer)
+      hydrateTimer = setTimeout(() => {
         hydrating.value = false
-      }, HYDRATE_SETTLE_MS)
+      }, HYDRATE_MAX_MS)
+    },
+
+    /** Lift the hydrate suppression (chain settled). */
+    endHydrate: () => {
+      clearTimeout(hydrateTimer)
+      hydrating.value = false
     }
   }
 })

@@ -34,6 +34,10 @@ export const emptyLocation = () => ({
   peak: null,
   collection: null,
   ions: [],
+  // The ion whose match visualization is open, if any. Distinct from `ions`
+  // (the multi-select table selection): selecting ions does not open the
+  // visualization, so only this drives the visualization restore.
+  visualizedIon: null,
   isotope: null,
   tab: null
 })
@@ -59,6 +63,7 @@ export const normalizeLocation = (raw) => {
     peak: asId(raw.peak),
     collection: asId(raw.collection),
     ions: asIds(raw.ions),
+    visualizedIon: asId(raw.visualizedIon),
     isotope: asId(raw.isotope),
     tab: VALID_TABS.includes(raw.tab) ? raw.tab : null
   }
@@ -75,6 +80,7 @@ export const isEmptyLocation = (loc) => {
     !n.peak &&
     !n.collection &&
     n.ions.length === 0 &&
+    !n.visualizedIon &&
     !n.isotope &&
     !n.tab
   )

@@ -32,10 +32,10 @@ const makeApp = () => ({
     match: {
       collection: makeStore(),
       ion: makeStore(),
-      visualized: { isotopeSelected: null, set: vi.fn() }
+      visualized: { ion: null, isotopeSelected: null, set: vi.fn() }
     }
   },
-  ui: { tab: { active: 'raw files', hydrate: vi.fn() } }
+  ui: { tab: { active: 'raw files', hydrate: vi.fn(), endHydrate: vi.fn() } }
 })
 
 describe('useLocation.read', () => {
@@ -48,7 +48,8 @@ describe('useLocation.read', () => {
     Object.assign(app.current.data.batch, { focusedId: 'b1' })
     Object.assign(app.current.data.sample, { selectedIds: ['s1', 's2'] })
     Object.assign(app.current.data.match.collection, { focusedId: 'c1' })
-    Object.assign(app.current.data.match.ion, { selectedIds: ['i1'] })
+    Object.assign(app.current.data.match.ion, { selectedIds: ['i1', 'i2'] })
+    app.current.data.match.visualized.ion = { target_ion_id: 'i2' }
     app.current.data.match.visualized.isotopeSelected = { target_isotope_id: 'iso1' }
     app.current.ui.tab.active = 'match'
 
@@ -60,7 +61,8 @@ describe('useLocation.read', () => {
       batch: 'b1',
       samples: ['s1', 's2'],
       collection: 'c1',
-      ions: ['i1'],
+      ions: ['i1', 'i2'],
+      visualizedIon: 'i2', // the visualized ion, distinct from the table selection
       isotope: 'iso1',
       tab: 'match'
     })
@@ -122,27 +124,41 @@ describe('useLocation.apply', () => {
     expect(data.batch.unfocus).toHaveBeenCalled()
   })
 
-  it('restores the visualization once the ion context is focused', () => {
+  it('restores the visualization for the visualized ion once its context is ready', () => {
     app.current = makeApp()
     const { data } = app.current
     // Pretend the whole context is already resident and focused.
     data.sample.focusedId = 's1'
     data.match.collection.focusedId = 'c1'
-    data.match.ion.selectedIds = ['i1']
+    data.match.ion.list = [{ target_ion_id: 'i2' }]
 
     useLocation().apply({
       samples: ['s1'],
       collection: 'c1',
-      ions: ['i1'],
+      ions: ['i1', 'i2'],
+      visualizedIon: 'i2',
       isotope: 'iso1'
     })
 
     expect(data.match.visualized.set).toHaveBeenCalledWith({
       sampleId: 's1',
       collectionId: 'c1',
-      ionId: 'i1',
+      ionId: 'i2',
       isotopeId: 'iso1'
     })
+  })
+
+  it('does not open a visualization when ions are only selected, not visualized', () => {
+    app.current = makeApp()
+    const { data } = app.current
+    data.sample.focusedId = 's1'
+    data.match.collection.focusedId = 'c1'
+    data.match.ion.list = [{ target_ion_id: 'i1' }, { target_ion_id: 'i2' }]
+
+    // Ions selected in the table, but no visualization was open.
+    useLocation().apply({ samples: ['s1'], collection: 'c1', ions: ['i1', 'i2'] })
+
+    expect(data.match.visualized.set).not.toHaveBeenCalled()
   })
 
   it('hydrates a non-match tab and leaves match to the visualization', () => {
