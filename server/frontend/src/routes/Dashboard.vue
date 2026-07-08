@@ -20,7 +20,7 @@ import {
   PaneTabSample,
   PaneTabBatch
 } from '@/lib/panes'
-import { HelpButton, HelpPopover } from '@/lib/help'
+import { HelpButton, HelpPopover, DocsButton } from '@/lib/help'
 
 import { useApp } from '@/stores'
 
@@ -44,6 +44,7 @@ const tabs = computed(() => [
     label: 'Batch',
     icon: 'pi pi-hashtag',
     disabled: !app.data.batch.focused || app.data.sample.list.length === 0,
+    doc: app.ui.help.docUrl('concepts/'),
     help: `
       <h1>Batch View</h1>
 
@@ -68,6 +69,7 @@ const tabs = computed(() => [
     label: 'Sample',
     icon: 'pi pi-chart-bar',
     disabled: !app.data.sample.focused,
+    doc: app.ui.help.docUrl('how-it-works/peak_detection/'),
     help: `
       <h1>Sample View</h1>
 
@@ -80,6 +82,7 @@ const tabs = computed(() => [
     label: 'Match',
     icon: 'pi pi-verified',
     disabled: !app.data.match.visualized.ion,
+    doc: app.ui.help.docUrl('how-it-works/matching/'),
     help: `
       <h1>Match View</h1>
       <p>
@@ -101,8 +104,9 @@ const tabs = computed(() => [
     <menu id="filters">
       <ToolbarAppFilters />
     </menu>
-    <div style="position: absolute; top: 80px; right: 1rem; z-index: 100">
+    <div class="help-dock" style="position: absolute; top: 80px; right: 1rem; z-index: 100">
       <HelpButton />
+      <DocsButton />
     </div>
     <Splitter
       style="grid-area: dashboard; height: 100%"
@@ -140,11 +144,11 @@ const tabs = computed(() => [
           <Tabs v-model:value="app.ui.tab.active">
             <TabList>
               <Tab
-                v-for="{ icon, label, disabled, help } in tabs"
+                v-for="{ icon, label, disabled, help, doc } in tabs"
                 :value="label.toLowerCase()"
                 :key="label"
                 :disabled="disabled"
-                :pt="app.ui.help.bottom(help)"
+                :pt="app.ui.help.bottom(help, doc ? { doc } : undefined)"
               >
                 <div class="row">
                   <span :class="icon" /><span>{{ label }}</span>
@@ -194,6 +198,12 @@ article {
 
 #filters {
   grid-area: filters;
+}
+.help-dock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
 }
 #charts {
   grid-area: charts;
