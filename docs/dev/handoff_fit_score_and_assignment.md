@@ -146,13 +146,13 @@ Validated `rule_senior` against the 92 demo target compounds:
   signed-mean ~0), and only a mild high-intensity (space-charge) uptick; a **Student-t** term
   scores Br3- *lower* (its peaks are at the ~1.4 σ shoulder, not the deep tail). Br3- is a
   genuine **mass-accuracy outlier** and ~0.6 is honest (calibrated confidence ~0.57 agrees).
-  The one **data-supported** refinement (unrelated to Br3-): **SNR-aware mass σ** — weak
-  peaks have ~3× larger errors (0.22 vs 0.07 ppm) but are scored against the tight bulk σ;
-  loosen the per-peak mass σ with 1/SNR (as the intensity term already does). *Decision
-  needed:* implement the SNR-aware mass σ (a real improvement, does not lift Br3-), accept
-  Br3- as honest, or treat "perfect pattern should offset moderate mass error" as a
-  product-level mass-vs-pattern re-weighting (a deeper tradeoff). See `fit_score.md`
-  §Limitations.
+  ✅ **SNR-aware mass σ implemented** (the one data-supported refinement; does not lift
+  Br3-). Per-peak mass width `σ_i = sqrt(σ² + (MASS_SNR_K/SNR)²)`, `MASS_SNR_K=2.36` fit on
+  the goldens (σ_mass 0.63 ppm @ SNR≈4 → 0.10 @ SNR>1000). Clean golden-set A/B (K=0 vs
+  2.36): top-1 contested **0.706→0.723**, true-score **p10 0.45→0.50** (the over-penalised
+  weak isotopologues), ROC-AUC/calibrated-ECE flat. Br3- accepted as an honest outlier
+  (option 1). See `fit_score.md` §3.1/§Limitations. *(A follow-up: the stored score_eval
+  baseline JSONs were stale — regenerate after a clean golden re-export.)*
 
 **C — finish Phase 3 P2 (science)**
 - **C4. Curated calibration data** — a proper Orbitrap reference set to replace the

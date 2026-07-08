@@ -57,7 +57,8 @@ per ion from its isotopologue peaks, and is deliberately:
 
 Rather than scoring the monoisotopic mass alone, the fit score scores the **whole isotope
 pattern**: each predicted isotopologue contributes a mass likelihood (a Gaussian in ppm,
-its width set by the instrument's *measured* mass accuracy, so the score is fair on both
+its width set by the instrument's *measured* mass accuracy — and widened for weak peaks,
+whose centroids are legitimately less precise — so the score is fair on both
 high-resolution Orbitrap and lower-resolution TOF instruments) and an intensity
 likelihood (its tolerance set by the peak's own signal-to-noise). A predicted peak that is
 **absent but should have been detectable** counts against the assignment; one that is
