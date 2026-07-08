@@ -11,11 +11,13 @@ import numpy as np
 import pytest
 
 from mascope_tools.composition.calibration import (
+    DEFAULT_CORROBORATION_CAP,
     INSTRUMENT_CALIBRATIONS,
     MIN_CALIBRATION_LABELS,
     Calibration,
     InsufficientCalibrationData,
     apply_calibration,
+    apply_corroboration,
     calibration_error,
     calibration_for,
     fit_calibration,
@@ -94,3 +96,49 @@ def test_calibration_for_uncalibrated_instrument_is_none():
 
 def test_registry_only_ships_orbitrap():
     assert set(INSTRUMENT_CALIBRATIONS) == {"orbi"}
+
+
+# --- adduct corroboration odds-update -------------------------------------------------
+
+WEIGHTS = {"+Br-": 2.28, "+NH4+": 0.83, "+(CH4N2O)H+": 0.70, "+H+": 0.0, "-H+": 0.0}
+
+
+def test_corroboration_raises_probability_with_a_strong_adduct():
+    # a weak-ish 0.6 assignment corroborated by a bromide adduct should rise
+    p = apply_corroboration(0.6, ["+Br-"], WEIGHTS)
+    assert p > 0.6
+    # matches the closed-form odds update: logit(0.6) + 2.28
+    z = np.log(0.6 / 0.4) + 2.28
+    assert p == pytest.approx(1 / (1 + np.exp(-z)))
+
+
+def test_corroboration_generic_adduct_barely_moves_it():
+    # deprotonation carries ~0 log-odds -> essentially unchanged
+    assert apply_corroboration(0.6, ["-H+"], WEIGHTS) == pytest.approx(0.6, abs=1e-9)
+
+
+def test_corroboration_sums_multiple_adducts():
+    p1 = apply_corroboration(0.5, ["+NH4+"], WEIGHTS)
+    p2 = apply_corroboration(0.5, ["+NH4+", "+(CH4N2O)H+"], WEIGHTS)
+    assert p2 > p1  # two corroborating adducts lift more than one
+
+
+def test_corroboration_is_capped():
+    # a pile of strong adducts can't exceed the cap on the log-odds shift
+    big = {f"a{i}": 5.0 for i in range(10)}
+    p = apply_corroboration(0.5, list(big), big, cap=DEFAULT_CORROBORATION_CAP)
+    z = np.log(0.5 / 0.5) + DEFAULT_CORROBORATION_CAP
+    assert p == pytest.approx(1 / (1 + np.exp(-z)))
+
+
+def test_corroboration_noops_when_uncalibrated_or_empty():
+    assert apply_corroboration(None, ["+Br-"], WEIGHTS) is None  # uncalibrated stays None
+    assert apply_corroboration(0.7, [], WEIGHTS) == 0.7  # nothing corroborating
+    assert apply_corroboration(0.7, ["+Br-"], None) == 0.7  # no weights configured
+    assert apply_corroboration(0.7, ["unknown"], WEIGHTS) == 0.7  # unweighted adduct
+
+
+def test_provisional_orbitrap_carries_corroboration_weights():
+    cal = calibration_for("orbi")
+    assert cal.corroboration_weights is not None
+    assert cal.corroboration_weights["+Br-"] > cal.corroboration_weights["+NH4+"] > 0

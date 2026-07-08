@@ -32,8 +32,8 @@ today the registry ships one provisional Orbitrap curve).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence
+from dataclasses import dataclass, field
+from typing import Mapping, Sequence
 
 import numpy as np
 
@@ -44,6 +44,12 @@ class Calibration:
 
     ``a``/``b`` are the Platt parameters (``P = sigmoid(a*score + b)``). The rest is
     provenance so a calibrated number is auditable and its trust level is explicit.
+
+    ``corroboration_weights`` are the per-adduct log-odds by which co-occurring adducts of
+    the same compound update ``p_correct`` (see :func:`apply_corroboration`), measured on the
+    golden set (``tooling/score_eval/corroboration_benchmark.py``). They ride on the same
+    per-instrument object because, like the Platt curve, they encode this instrument's reagent
+    chemistry and are refit alongside it. ``None``/empty means no corroboration adjustment.
     """
 
     a: float
@@ -55,9 +61,43 @@ class Calibration:
     fit_utc: str | None = None  # when it was fit (ISO-8601)
     source: str | None = None  # dataset / reference provenance it was fit from
     provisional: bool = True  # True until fit on a curated, sufficient dataset
+    # {adduct notation -> log-odds boost}; e.g. {"+Br-": 2.28, "+NH4+": 0.83}
+    corroboration_weights: Mapping[str, float] | None = field(default=None)
 
     def params(self) -> tuple[float, float]:
         return (self.a, self.b)
+
+
+# A corroboration boost is capped so a compound seen via many adducts can't drive p_correct
+# arbitrarily to 1 (the per-adduct LRs assume rough independence, which weakens as they stack).
+DEFAULT_CORROBORATION_CAP = 3.0
+
+
+def apply_corroboration(
+    p_correct: float | None,
+    observed_adducts: Sequence[str],
+    weights: Mapping[str, float] | None,
+    *,
+    cap: float = DEFAULT_CORROBORATION_CAP,
+) -> float | None:
+    """Update a calibrated probability with adduct co-occurrence, as a bounded Bayesian odds
+    update: ``logit(p') = logit(p) + clamp(sum(weights[a] for a in observed_adducts), -cap, cap)``.
+
+    ``observed_adducts`` are the OTHER adducts (beyond the winner's own) via which the same
+    compound was independently assigned; each contributes its measured log-odds. Generic adducts
+    (protonation/deprotonation) carry ~0, distinctive ones (e.g. bromide) carry more, so a strong
+    corroborator lifts a weak assignment while a generic one barely moves a strong one. Returns
+    ``p_correct`` unchanged when it is ``None`` (uncalibrated), or when there are no weights or no
+    observed corroborating adducts."""
+    if p_correct is None or not weights or not observed_adducts:
+        return p_correct
+    delta = float(sum(weights.get(a, 0.0) for a in observed_adducts))
+    if delta == 0.0:
+        return p_correct
+    delta = max(-cap, min(cap, delta))
+    p = min(max(float(p_correct), 1e-9), 1 - 1e-9)
+    z = np.log(p / (1.0 - p)) + delta
+    return float(1.0 / (1.0 + np.exp(-z)))
 
 
 def apply_calibration(score, calibration: "Calibration | tuple[float, float]"):
@@ -182,6 +222,19 @@ def fit_calibration(
 # (true vs decoy). PRELIMINARY -- a placeholder until a curated reference dataset replaces
 # it; refit with `fit_calibration` and update here (or, later, the per-instrument store).
 # Held-out ECE 0.029; e.g. evidence 0.3 -> P 0.16, 0.6 -> 0.52, 0.9 -> 0.86.
+# Per-adduct corroboration log-odds, measured on the same demo goldens via the offset-decoy
+# benchmark (real adduct offset vs anchor-swap null; tooling/score_eval/corroboration_benchmark.py
+# and _corroboration_metrics.json). Distinctive reagent adducts corroborate strongly, generic
+# protonation/deprotonation ~0. PROVISIONAL, instrument+library specific -- refit per deployment.
+PROVISIONAL_ORBITRAP_CORROBORATION = {
+    "+Br-": 2.28,
+    "+NH4+": 0.83,
+    "+(CH4N2O)H+": 0.70,
+    "+H+": 0.0,
+    "-H+": 0.0,
+    "-H-": 0.0,
+}
+
 PROVISIONAL_ORBITRAP = Calibration(
     a=5.7380,
     b=-3.3625,
@@ -192,6 +245,7 @@ PROVISIONAL_ORBITRAP = Calibration(
     fit_utc=None,
     source="demo goldens (Br/Ur, preliminary)",
     provisional=True,
+    corroboration_weights=PROVISIONAL_ORBITRAP_CORROBORATION,
 )
 
 INSTRUMENT_CALIBRATIONS: dict[str, Calibration] = {"orbi": PROVISIONAL_ORBITRAP}
