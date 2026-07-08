@@ -55,8 +55,10 @@ nested (not spread) under `app.data.peakAssignment.{run,peak}`.
 **Confidence.** fit, plausibility and calibrated P(correct) are surfaced (see
 [`peak_assignment_confidence_frontend.md`](peak_assignment_confidence_frontend.md)). Untargeted winners
 carry `plausibility` too; alternatives carry `plausibility` (database ones also fit + m/z error). Adduct
-**corroboration** now exists on the record (`provenance.corroboration` / `n_adducts`, folded into
-`p_correct` by the backend) — a "supported by N adducts" badge is still a **TODO**.
+**corroboration** exists on the record (`provenance.corroboration` / `n_adducts`, folded into
+`p_correct` by the backend) and is surfaced as a **"Supported by N adducts" badge** — a teal pill in the
+inspector (adduct list on hover) and a compact link-icon + count beside `P(correct)` in the ledger, shown
+only when `n_adducts > 1`. (The demo dataset has no multi-adduct co-occurrence, so it stays hidden there.)
 
 **Open threads.** (1) **Tier is fit-based** (`tier_for_score(fit_score, …)`); moving it onto
 `p_correct` needs universal calibration coverage (untargeted + all instruments) — backend/science, still

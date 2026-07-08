@@ -101,5 +101,6 @@ corroboration), and optionally a small "corroborated by N adducts" badge from
   ledger (gated on `provenance.calibrated`, null → "uncalibrated", provisional-flagged).
 - Alternatives now have `plausibility` and it is shown (inline + on hover); use it for competitor
   ranking.
-- Corroboration is **already baked into `p_correct`**; `provenance.corroboration` (when present) is
-  just for an optional "N adducts" badge — never add its `boost` on top. **Badge still TODO.**
+- Corroboration is **already baked into `p_correct`**; `provenance.corroboration` (when present) drives
+  the **"Supported by N adducts" badge** (inspector pill + ledger marker, shown when `n_adducts > 1`) —
+  never add its `boost` on top.
