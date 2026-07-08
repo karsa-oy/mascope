@@ -78,6 +78,14 @@ async def compute_and_create_sample_match_isotope_data(
         # reconstructed on read from their target_isotope in
         # aggregate_match_isotope_filtered_data. This matches the "found peak"
         # definition used by export_goldens (match_score > 0).
+        #
+        # INVARIANT: this preserves read-time tolerance loosening only because the
+        # UI sliders cap at exactly the scoring's zero points - m/z tolerance <=
+        # 100 ppm (mz_term = 0 at 100 ppm) and isotope ratio tolerance <= 1.0
+        # (abundance_term = 0 at 100%). Every record reachable as a nonzero match
+        # at any slider setting has score > 0 and is kept. If those slider maxima
+        # are ever raised (see SidebarMatchParams.vue), 100+ ppm records would
+        # become reachable-but-unstored - revisit this threshold in lockstep.
         matched_isotope_df = match_isotope_df[match_isotope_df["match_score"] > 0]
         if not matched_isotope_df.empty:
             # Convert the DataFrame to a list of Pydantic models
