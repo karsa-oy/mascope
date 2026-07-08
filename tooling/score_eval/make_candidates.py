@@ -31,9 +31,13 @@ from mascope_tools.composition.finder import find_compositions
 from mascope_tools.composition.heuristic_filter import apply_heuristic_rules
 from mascope_tools.composition import utils
 
-# Ionization channels + grid element ranges per polarity (mirrors peaky's Br/Ur
-# reagent profiles). '-H-' is deprotonation as a charge-−1 anion (mascope_tools
-# notation), '+Br-' bromide adduct, etc.
+# Ionization channels + grid element ranges per polarity. '-H-' is deprotonation as a
+# charge-−1 anion (mascope_tools notation), '+Br-' bromide adduct, etc.
+# NB (2026-07): these were NOT verified against the real ionization_mechanism library. The
+# mechanisms actually assigned in the demo are +H+/+NH4+/+(CH4N2O)H+ (pos) and -H+/+Br- (neg);
+# '+HBrBr-' is not a real mechanism (~1 Da off the real '+Br2-') and '+CO3-' is defined but never
+# assigned. They only widen the DECOY pool here so are harmless to fit-ranking, but do not treat
+# this list as the reagent profile -- see corroboration_benchmark.py for the operative panel.
 CHANNELS = {
     "neg": {
         "ionizations": ["-H-", "+Br-", "+HBrBr-", "+CO3-"],
