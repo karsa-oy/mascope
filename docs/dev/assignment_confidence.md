@@ -278,10 +278,43 @@ no backend or DB, only `mascope_tools` + tests.
   `provenance` (no schema change; the `fit_score` column stays the pure measurement and the
   tier stays on the fit scale). Unit-tested (the over-saturated `C6H17NO4` loses its peak to
   glucose). Re-ran on the live demo dataset so the stored assignments reflect it.
-- **Remaining P2:** calibrate the arbitration confidence to an absolute **P(correct)** per
-  instrument (the `calibrate_score` Platt curve is the single-candidate seed; a per-instrument
-  refit over the fit×plausibility evidence is the next step), then Stage B arbitration once
-  its candidates carry comparable per-candidate fits.
+- **Confidence calibration landed (pipeline; data provisional).**
+  `mascope_tools.composition.calibration` turns the arbitration evidence into a calibrated
+  **P(correct)** via Platt scaling ([Platt 1999][platt]): `P = sigmoid(a·evidence + b)`, a
+  logistic map fit on labelled `(evidence, is_correct)` pairs. The design has two
+  commitments that make it safe to ship before the datasets are final:
+
+  1. **A calibration is a provenance-carrying object, not a bare constant.** `Calibration`
+     records the instrument, the label counts, its **held-out ECE** (expected calibration
+     error — the average gap between predicted probability and observed correctness), when
+     and from what dataset it was fit, and a `provisional` flag. "We don't have curated data
+     yet" becomes *metadata*, not hidden risk.
+  2. **Never fabricate a probability we can't back up.** `calibration_for(instrument)`
+     returns `None` when an instrument has no calibration (**TOF today**); the engine then
+     stores `p_correct = null`, `calibrated = false` so the UI shows *uncalibrated* rather
+     than a borrowed Orbitrap number. `fit_calibration` refuses to fit on too little /
+     single-class data (`InsufficientCalibrationData`).
+
+  **The label sourcing — why this is tied to the reference dataset.** The positives are
+  *confident identifications*, most strongly compounds confirmed by a **reference standard**
+  (Schymanski Level 1) — exactly what the reference dataset encodes; the negatives are
+  near-mass **decoys** (`tooling/score_eval`). So a per-instrument calibration is literally
+  "how well the score predicts reference-confirmed identity **on this instrument**". This is
+  also the basis of **user self-calibration**: a user runs their known standards, Mascope
+  scores them + decoys and fits *their* instrument's curve. Per-instrument because the
+  score's ingredients — mass accuracy, resolution, noise — differ by instrument, so the same
+  raw evidence means different confidence on an Orbitrap vs a TOF.
+
+  **Status.** One **provisional Orbitrap** curve, fit from the demo bundle via
+  `arbitration_eval.py --fit-calibration` (evidence → P(correct) over all candidates,
+  true vs decoy). It is a placeholder pending a curated dataset; no TOF curve exists.
+  `invert_matches_to_peak_assignments` stores `p_correct` / `calibrated` / `calibration`
+  in the assignment `provenance`. Unit-tested (`test_calibration_layer.py`, engine tests).
+
+- **Remaining P2 / next:** replace the provisional Orbitrap curve with a curated fit and add
+  a TOF curve once a TOF golden set exists; the **persisted, user-refittable per-instrument
+  store** (a DB table — deferred); then Stage B arbitration once its candidates carry
+  comparable per-candidate fits.
 
 ## 5. References
 
@@ -315,6 +348,8 @@ no backend or DB, only `mascope_tools` + tests.
   [link](https://pubs.acs.org/doi/10.1021/es5002105)
 - Sumner, L. W. et al. *Proposed minimum reporting standards for chemical analysis (MSI).*
   Metabolomics 2007, 3:211–221. [link](https://doi.org/10.1007/s11306-007-0082-2)
-- Platt, J. *Probabilistic outputs for SVMs and comparisons to regularized likelihood
-  methods.* Advances in Large Margin Classifiers, 1999.
+- <a id="platt"></a>Platt, J. *Probabilistic outputs for SVMs and comparisons to
+  regularized likelihood methods.* Advances in Large Margin Classifiers, 1999.
   [link](https://en.wikipedia.org/wiki/Platt_scaling)
+
+[platt]: https://en.wikipedia.org/wiki/Platt_scaling

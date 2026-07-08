@@ -494,6 +494,8 @@ async def assign_sample_peaks(
                 possible_threshold=config.candidate_threshold,
                 probable_threshold=config.identified_threshold,
                 max_alternatives=config.max_alternatives,
+                # instrument selects the P(correct) calibration (None -> uncalibrated).
+                instrument=get_instrument_type(sample.filename),
             )
         runtime.logger.info(
             f"Stage A assigned {len(stage_a_assignments)} of {len(peaks_df)} "
