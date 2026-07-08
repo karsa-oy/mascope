@@ -117,26 +117,60 @@ Validated `rule_senior` against the 92 demo target compounds:
 8. ✅ **How-it-works docs** — new user-facing `how-it-works/peak_assignment.md` (fit score,
    plausibility, arbitration, calibration, tiers) with citations; `matching.md` TODO
    resolved.
+9. ✅ **Peak-ownership tolerance fix** — a peak is only OWNED by an isotopologue whose
+   pairing is within tolerance (`invert_matches_to_peak_assignments` requires a positive
+   gated intensity). The targeted matcher pairs within a wide 0.5 Da window; without this a
+   trace isotopologue grabbed an out-of-tolerance peak (up to ~1500 ppm off on the demo,
+   ~71% of Stage A rows), inherited its ion's tier, and blocked that peak's correct
+   assignment. Out-of-tolerance pairings now fall through to Stage B / unassigned.
+   Unit-tested.
 
-**Open (need a human / a decision):**
+## 6a. Roadmap / next steps (priority order)
 
-- **Isolated stacks:** use `mascope dev run --instance` / `mascope instance show --export`
-  to run a decoupled per-worktree stack (own env DB + ports) instead of the shared demo
-  stack (developer_guide.md §"Running multiple instances").
+**A — correctness / verification (near-term)**
+- **A1. Verify the ownership fix (#9) end-to-end on the demo.** Apply the `isotope_formula`
+  migration to the run DB, re-run assignments, confirm Stage A drops ~108k → ~31k real
+  assignments with freed peaks flowing to Stage B / unassigned. Prefer an isolated env
+  (`mascope dev run --instance`) over the shared demo stack.
+- **A2. (optional) Two-tier claim tolerance** — a looser "claim" tolerance (~3–5 ppm) so
+  genuinely borderline real isotopes are not released while the strict tolerance still gates
+  the score. Only if borderline isotopes are seen dropping.
 
-- **Run the rename migration in prod/CI** and the migration test suite
-  (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). NOTE: the CLI
-  migration check (`mascope dev migrate`) runs alembic from the *main* checkout's venv, so
-  it cannot see this branch's `b2e9d7c14a05` — a worktree/main alembic split to resolve
-  (locally the migration was applied via alembic run directly against the worktree code).
-- **Refine the fit-scale tier bands.** 0.8/0.5 are DESIGN.md estimates; recalibrate per
-  instrument. Changes *what users see* → a product decision.
-- **Replace the provisional calibration with curated data** — a curated reference set for
-  the Orbitrap curve and a **TOF golden set** for a TOF curve (TOF is uncalibrated today);
-  then the **persisted, user-refittable per-instrument calibration store** (a DB table —
-  deliberately deferred) and the user-facing "calibrate my instrument" flow.
-- **Extend arbitration/calibration to Stage B** once untargeted candidates carry comparable
-  per-candidate fits; **P3** — spectral-neighbourhood corroboration (CAMERA/IPA).
+**B — fit-score model**
+- **B3. m/z-dependent mass sigma.** The v2 mass term over-penalizes heavy/high-m/z ions
+  (e.g. `Br3-` scores ~0.6 despite a near-perfect pattern; the fitted sigma is very tight).
+  Orbitrap dm/m ≈ constant, so make the mass-term sigma m/z-dependent (or add a per-peak
+  floor); re-measure ranking/calibration on the golden set. See `fit_score.md` §Limitations.
+
+**C — finish Phase 3 P2 (science)**
+- **C4. Curated calibration data** — a proper Orbitrap reference set to replace the
+  provisional curve, and a **TOF golden set** so TOF stops being uncalibrated. Positives =
+  reference-standard identities (Schymanski L1); negatives = decoys — tightly tied to the
+  reference dataset.
+- **C5. Extend arbitration + calibration to Stage B** once untargeted candidates carry
+  comparable per-candidate fits.
+
+**D — product / data-gated decisions**
+- **D6. Persisted, user-refittable per-instrument calibration store** (the deferred DB
+  table) + the "calibrate my instrument" UX.
+- **D7. Recalibrate the fit-scale tier bands** (currently the 0.8/0.5 estimates) per
+  instrument — a "what users see" decision.
+
+**E — ops**
+- **E8. Run the rename migration in prod/CI** and the migration test suite
+  (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). Resolve the
+  **worktree/main alembic split**: the CLI migration check (`mascope dev migrate`) runs
+  alembic from the *main* checkout's venv, so it cannot see this branch's migrations
+  (locally applied via a direct alembic run against the worktree code).
+
+**F — later phases**
+- **F9. P3 — spectral-neighbourhood corroboration** (adduct/isotope/in-source-fragment
+  grouping; CAMERA/IPA) — the biggest untapped confidence source.
+- **F10. P4 — context & levels** — retention-time / ionization priors + a reported
+  Schymanski/MSI identification **level** alongside the confidence.
+
+*Doc discipline:* record the plan here as it evolves; document each **implemented** feature
+in `docs/user/how-it-works/` with its literature citations.
 
 ## 7. Environment / ops notes
 

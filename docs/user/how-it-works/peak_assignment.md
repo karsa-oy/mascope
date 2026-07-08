@@ -37,6 +37,13 @@ Every peak is assigned in a two-stage engine:
 Peaks that neither stage explains are recorded as *unassigned*, so a run is a complete,
 queryable ledger: one row per observed peak.
 
+**Single owner, within tolerance.** Each peak has exactly one owner per run, and a peak is
+only owned by an isotopologue whose measured m/z is *within tolerance* of the prediction.
+A predicted isotopologue that has no real peak is left unmatched rather than being pinned to
+a nearby, out-of-tolerance peak — that peak is released to the untargeted stage (or left
+unassigned) so it can get its own correct assignment instead of being mislabelled as a
+poorly-fitting isotopologue of something else.
+
 ## The fit score — a pure measurement
 
 The **fit score** measures exactly one thing: *how well does the observed data fit the
