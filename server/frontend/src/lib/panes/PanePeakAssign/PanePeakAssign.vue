@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 
-import Panel from 'primevue/panel'
 import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
@@ -24,13 +23,6 @@ const focusedAssignment = computed(() =>
 // Arbitration / chemistry provenance: chemical plausibility (Seven Golden
 // Rules), arbitration confidence, calibrated P(correct), and a tie flag.
 const provenance = computed(() => focusedAssignment.value?.provenance ?? null)
-
-// Visualize the focused assignment's isotope envelope + time series in the Fit
-// view (composition-driven, so it works for untargeted winners too).
-async function verifyFit() {
-  await app.data.match.visualized.verifyAssignment(focusedAssignment.value)
-  app.ui.tab.active = 'match'
-}
 
 const fitPercent = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -79,44 +71,41 @@ const isPoorMatch = (iso) => {
 }
 
 // Stats for a close alternative (runner-up), surfaced on hover. Database-stage
-// runner-ups carry fit + m/z error (and plausibility when the engine stores
-// it); untargeted runner-ups are formula-only -- the untargeted search returns
-// competitor names without per-candidate scores.
+// runner-ups carry fit + m/z error + plausibility; untargeted runner-ups are
+// formula-only (the untargeted search returns competitor names without
+// per-candidate fit), so fit reads "not scored" for them.
 const altTooltip = (alt) => {
-  const parts = []
-  if (alt.fit_score != null) parts.push(`fit ${formatFit(alt.fit_score)}`)
-  if (alt.mz_error_ppm != null) parts.push(`m/z error ${num.mzError.format(alt.mz_error_ppm)} ppm`)
-  if (alt.plausibility != null) parts.push(`plausibility ${formatFit(alt.plausibility)}`)
-  if (alt.source) parts.push(`source: ${alt.source}`)
-  return parts.length ? parts.join('\n') : 'Untargeted competitor - no per-candidate stats'
+  const lines = [
+    `fit: ${alt.fit_score != null ? formatFit(alt.fit_score) : '— not scored (untargeted)'}`
+  ]
+  if (alt.mz_error_ppm != null) {
+    lines.push(`m/z error: ${num.mzError.format(alt.mz_error_ppm)} ppm`)
+  }
+  lines.push(`plausibility: ${alt.plausibility != null ? formatFit(alt.plausibility) : '—'}`)
+  if (alt.source) lines.push(`source: ${alt.source}`)
+  return lines.join('\n')
 }
 </script>
 
 <template>
-  <Panel
+  <div
     v-if="app.data.peak.list.length > 0"
-    header="Peak assignment"
-    class="browser"
-    style="border: none; flex-grow: 1; width: 100%"
-    :pt="
-      ({ content: { style: { padding: 0 } } },
-      app.ui.help.top(`
+    class="assign-root col"
+    style="gap: 1rem; align-items: stretch; width: 100%"
+    v-help.top="{
+      message: `
         <h1>Peak Assignment</h1>
-
         <p>
         The committed assignment for the selected peak: its fitted composition,
         confidence tier, evidence, isotopologue family and close alternatives.
         </p>
-
         <p>
         Select peaks by clicking rows in the ledger, or the vertical grey peak
         lines in the spectrum chart. Use <b>Re-search</b> to search compositions
         for the peak on demand.
-        </p>
-      `))
-    "
+        </p>`
+    }"
   >
-    <div class="col" style="gap: 1rem; align-items: stretch">
       <section v-if="focusedAssignment" class="inspector">
         <div class="insp-head">
           <div class="insp-formula">
@@ -186,11 +175,27 @@ const altTooltip = (alt) => {
               ></span
             >
           </div>
-          <div class="ev" v-if="provenance?.p_correct != null">
-            <span class="k" v-tooltip.top="'Calibrated probability the assignment is correct'"
+          <div class="ev" v-if="provenance && provenance.calibrated !== undefined">
+            <span
+              class="k"
+              v-tooltip.top="'Calibrated probability the assignment is correct'"
               >P(correct)</span
             >
-            <span class="v">{{ formatFit(provenance.p_correct) }}</span>
+            <span class="v" v-if="provenance.p_correct != null">
+              {{ formatFit(provenance.p_correct)
+              }}<span
+                v-if="provenance.calibration?.provisional"
+                class="prov-flag"
+                v-tooltip.top="'Provisional calibration curve - directionally right, not hardened'"
+                >&nbsp;prov.</span
+              ></span
+            >
+            <span
+              class="v uncal"
+              v-else
+              v-tooltip.top="'No calibration curve for this instrument'"
+              >uncalibrated</span
+            >
           </div>
         </div>
         <div v-if="family.length > 1" class="isotopologues">
@@ -258,15 +263,6 @@ const altTooltip = (alt) => {
         </div>
         <div class="insp-actions">
           <Button
-            v-if="focusedAssignment.assigned_formula && focusedAssignment.ionization_mechanism_id"
-            label="Verify fit"
-            size="small"
-            text
-            icon="pi ph ph-wave-sine"
-            v-tooltip.top="'Visualize the isotope envelope & time series in the Fit view'"
-            @click="verifyFit"
-          />
-          <Button
             :label="showSearch ? 'Hide search' : 'Re-search'"
             size="small"
             text
@@ -302,12 +298,11 @@ const altTooltip = (alt) => {
         </div>
       </div>
     </div>
-  </Panel>
 </template>
 
 <style scoped>
-:deep(.p-panel-header) {
-  display: flex !important;
+.assign-root {
+  padding: 0;
 }
 
 /* Peak inspector: the committed assignment for the focused peak. */
@@ -462,6 +457,14 @@ const altTooltip = (alt) => {
   color: var(--p-orange-500, #f59e0b);
   font-weight: 600;
   font-size: 0.72rem;
+}
+.prov-flag {
+  color: var(--p-orange-500, #f59e0b);
+  font-size: 0.66rem;
+}
+.ev .v.uncal {
+  opacity: 0.55;
+  font-style: italic;
 }
 .alts-list {
   display: flex;
