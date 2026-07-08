@@ -77,6 +77,10 @@ reports).
    `db_init` creates the database and applies migrations before the app starts.
    Open `https://<host>` and register the first owner account (with `server_owner_secret_key`).
 
+   The deployment serves the user documentation from the same host at
+   `https://<host>/docs/` - it is bundled into the frontend image, so no extra
+   setup is needed.
+
 #### Update to a new release
 
 ```sh
