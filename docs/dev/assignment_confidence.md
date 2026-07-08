@@ -237,6 +237,52 @@ no backend or DB, only `mascope_tools` + tests.
   that chemistry never re-imports the measurement. Per-instrument calibration of how
   plausibility combines with fit is P2 (arbitration + FDR).
 
+### P2 progress
+
+- **Candidate arbitration landed** (`mascope_tools.composition.arbitration`,
+  `arbitrate_candidates`). For a single peak it competes the candidates by
+  **evidence = fit × plausibility** (the fit score `score_pattern_v2` × the graded
+  Seven Golden Rules plausibility), ranks them, reports a per-candidate **confidence**
+  (evidence normalised across the peak's candidates), and is **honest about ties** —
+  candidates within `tie_tol` of the best evidence are flagged rather than forced into a
+  false winner (Schymanski L5). Deterministic; unit-tested (`test_arbitration.py`),
+  including the key property that a spectrally-good but chemically-impossible formula
+  (e.g. over-saturated `C6H17NO4`) loses to a plausible one.
+- **Dependency direction preserved (§3):** arbitration imports the fit score's *values*
+  and the chemistry plausibility; neither imports arbitration. The fit score stays pure.
+- **FDR helpers landed** (`arbitration.fdr_curve`, `threshold_at_fdr`). Given arbitrated
+  winners' confidences and whether each was correct (a labelled golden set, or a
+  target-decoy search where a decoy winning = wrong), they report FDR vs acceptance and
+  pick a confidence cut for a tolerated FDR, with q-values so the threshold is unambiguous
+  (Scheubert 2017). Ties in confidence are ordered conservatively. Unit-tested.
+- **Measured on the full demo decoy pools** (`tooling/score_eval/arbitration_eval.py`,
+  scratch; 16,386 anchors / 9,313 contested / 152 files, real-SNR full spectrum). Ranking
+  by **fit × plausibility** beats **fit alone** decisively on the hard *contested* anchors:
+
+  | metric | fit only | **fit × plausibility** |
+  |---|---|---|
+  | top-1 all | 0.833 | **0.880** |
+  | top-1 **contested** | 0.706 | **0.789** |
+  | false-winner rate (accept-all FDR) | 0.167 | **0.120** |
+  | winners kept at ≤5% FDR | 12,263 | **13,301** |
+
+  This is exactly the fit-score study's thesis, now quantified: the fit score's contested
+  ceiling (~0.71) comes from mass-degenerate decoys it is (by design) blind to; **chemistry
+  breaks those ties** — +0.083 contested top-1, a third fewer false winners, and ~1,000 more
+  assignments surviving at the same FDR. The fit score stays the pure measurement; the
+  arbitration layer adds the chemistry.
+- **Wired into the peak-centric engine (Stage A).** `invert_matches_to_peak_assignments`
+  now selects a peak's winner by **evidence = fit × plausibility** (not fit alone), so a
+  chemically implausible formula cannot win a peak on mass fit, and stores the winner's
+  arbitration **confidence**, **plausibility** and an **is_tie** flag in the assignment's
+  `provenance` (no schema change; the `fit_score` column stays the pure measurement and the
+  tier stays on the fit scale). Unit-tested (the over-saturated `C6H17NO4` loses its peak to
+  glucose). Re-ran on the live demo dataset so the stored assignments reflect it.
+- **Remaining P2:** calibrate the arbitration confidence to an absolute **P(correct)** per
+  instrument (the `calibrate_score` Platt curve is the single-candidate seed; a per-instrument
+  refit over the fit×plausibility evidence is the next step), then Stage B arbitration once
+  its candidates carry comparable per-candidate fits.
+
 ## 5. References
 
 - Kind, T.; Fiehn, O. *Mass accuracy is insufficient even at less than 1 ppm.* BMC

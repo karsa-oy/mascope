@@ -7,6 +7,8 @@ untargeted composition results onto assignment rows (Stage B). Pure
 DataFrame/dict logic - no database access.
 """
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -150,6 +152,71 @@ class TestInvertMatches:
         assert winner["alternatives"][0]["target_ion_id"] == "ion2"
         assert winner["alternatives"][0]["assigned_formula"] == "C7H16O5"
         assert winner["alternatives"][0]["fit_score"] == pytest.approx(0.75)
+
+    def test_arbitration_demotes_implausible_higher_fit_winner(self):
+        # C6H17NO4 is over-saturated (plausibility 0): despite the higher fit it must
+        # lose the peak to the plausible glucose formula (evidence = fit x plausibility).
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="isoX",
+                    target_ion_id="ionX",
+                    target_compound_id="cmpX",
+                    compound_formula="C6H17NO4",
+                    ion_formula="C6H18NO4+",
+                    mz=180.1,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.95,
+                ),
+                _isotope_row(
+                    target_isotope_id="isoG",
+                    target_ion_id="ionG",
+                    target_compound_id="cmpG",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=180.1,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.85,
+                ),
+            ]
+        )
+        [winner] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE
+        )
+        assert winner["assigned_formula"] == "C6H12O6"
+        assert winner["fit_score"] == pytest.approx(0.85)  # its own pure fit
+        assert winner["provenance"]["plausibility"] == pytest.approx(1.0)
+        assert winner["provenance"]["confidence"] == pytest.approx(1.0)
+        # the implausible formula survives as a runner-up
+        assert winner["alternatives"][0]["assigned_formula"] == "C6H17NO4"
+
+    def test_provenance_carries_confidence_and_tie_flag(self):
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                )
+            ]
+        )
+        [a] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE
+        )
+        assert a["provenance"]["confidence"] == pytest.approx(1.0)
+        assert a["provenance"]["is_tie"] is False
+        # provenance must be JSON-serializable (it lands in a JSON column) — guards
+        # against numpy scalars (e.g. numpy.bool_) leaking in.
+        assert json.loads(json.dumps(a["provenance"]))["is_tie"] is False
+        assert isinstance(a["provenance"]["is_tie"], bool)
 
     def test_isotope_child_points_at_its_ions_m0_assignment(self):
         match_df = pd.DataFrame(
