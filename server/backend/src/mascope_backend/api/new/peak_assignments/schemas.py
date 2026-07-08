@@ -100,3 +100,20 @@ class AssignSamplePeaksBody(BaseModel):
             "Optional run configuration; engine defaults are used when omitted."
         ),
     )
+
+
+class CompositionFitBody(BaseModel):
+    """Fit-view aggregate for an assigned composition (isotope table)."""
+
+    assigned_formula: str
+    ionization_mechanism_id: str
+
+
+class CompositionVisualizeBody(BaseModel):
+    """Fit-view visualization (sum spectrum + time series) for a composition."""
+
+    assigned_formula: str
+    ionization_mechanism_id: str
+    peak_min_intensity: float = 0.0
+    mz_tolerance: float = 10.0
+    isotope_ratio_tolerance: float = 0.5
