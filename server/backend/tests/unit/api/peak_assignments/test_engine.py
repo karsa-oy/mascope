@@ -49,6 +49,7 @@ def _isotope_row(
     match_score: float = 0.9,
     match_mz_error: float = 1.0,
     match_abundance_error: float = 0.05,
+    ionization: str = "+H+",
 ) -> dict:
     """One row of the targeted matcher's output enriched with target metadata."""
     return {
@@ -59,7 +60,8 @@ def _isotope_row(
         "relative_abundance": relative_abundance,
         "resolution": "HIGH",
         "target_ion_formula": ion_formula,
-        "ionization_mechanism_id": "mech1",
+        "ionization_mechanism_id": ionization,
+        "ionization_mechanism": ionization,
         "target_compound_id": target_compound_id,
         "target_compound_formula": compound_formula,
         "sample_peak_id": sample_peak_id,
@@ -245,6 +247,75 @@ class TestInvertMatches:
         assert prov["calibration"]["provisional"] is True
         # fully JSON-serializable
         json.dumps(prov)
+
+    def test_adduct_corroboration_lifts_p_correct(self):
+        # Same compound assigned via two adducts (+H+ and the distinctive +Br-): the +H+
+        # winner is corroborated by the +Br- (weight ~2.28) and should get a p_correct boost
+        # + corroboration provenance; the +Br- winner is corroborated only by the generic +H+
+        # (weight 0), so it gets no lift. Both share evidence (same fit + formula).
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="isoA", target_ion_id="ionA",
+                    target_compound_id="cmp1", compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
+                    sample_peak_id="p1", match_score=0.9, ionization="+H+",
+                ),
+                _isotope_row(
+                    target_isotope_id="isoB", target_ion_id="ionB",
+                    target_compound_id="cmp1", compound_formula="C6H12O6",
+                    ion_formula="C6H12BrO6-", mz=258.9823, relative_abundance=1.0,
+                    sample_peak_id="p2", match_score=0.9, ionization="+Br-",
+                ),
+            ]
+        )
+        out = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE, instrument="orbi"
+        )
+        by_peak = {a["sample_peak_id"]: a for a in out}
+        prot, brom = by_peak["p1"], by_peak["p2"]
+        # the protonated winner is lifted by the co-occurring bromide
+        assert prot["provenance"]["corroboration"]["n_adducts"] == 2
+        assert set(prot["provenance"]["corroboration"]["adducts"]) == {"+H+", "+Br-"}
+        assert prot["provenance"]["corroboration"]["boost"] > 0
+        assert prot["provenance"]["p_correct"] > brom["provenance"]["p_correct"]
+        json.dumps(prot["provenance"])  # still serializable
+
+    def test_no_corroboration_for_single_adduct_compound(self):
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1", target_ion_id="ion1",
+                    target_compound_id="cmp1", compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
+                    sample_peak_id="p1", match_score=0.9, ionization="+H+",
+                )
+            ]
+        )
+        [a] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE, instrument="orbi"
+        )
+        assert "corroboration" not in a["provenance"]
+
+    def test_explicit_calibration_overrides_the_registry(self):
+        # the service passes a calibration from the D6 store; passing None forces uncalibrated
+        # even for an instrument the in-code registry would calibrate.
+        match_df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1", target_ion_id="ion1",
+                    target_compound_id="cmp1", compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
+                    sample_peak_id="p1", match_score=0.9,
+                )
+            ]
+        )
+        [a] = invert_matches_to_peak_assignments(
+            match_df, "sample1", "run1", POSSIBLE, PROBABLE,
+            instrument="orbi", calibration=None,
+        )
+        assert a["provenance"]["calibrated"] is False
+        assert a["provenance"]["p_correct"] is None
 
     def test_uncalibrated_instrument_reports_no_probability(self):
         # TOF has no calibration yet -> p_correct null, calibrated False (never a
