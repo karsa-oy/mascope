@@ -14,7 +14,9 @@ knows about the DB table.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime, timezone
+
+from sqlalchemy import select, update
 
 from mascope_backend.db import AssignmentCalibration, async_session
 from mascope_tools.composition.calibration import Calibration, calibration_for
@@ -68,3 +70,42 @@ async def load_calibration(
     if row is not None:
         return _to_calibration(row)
     return calibration_for(inst)
+
+
+async def save_calibration(calibration: Calibration, score_version: int) -> None:
+    """Persist ``calibration`` as the new **active** row for its instrument + ``score_version``,
+    deactivating any previously active row (the V2 recalibration write). Append-only: old rows are
+    kept (``is_active=False``) as history, so a bad refit can be traced and rolled back."""
+    inst = (calibration.instrument or "").lower()
+    async with async_session() as session:
+        await session.execute(
+            update(AssignmentCalibration)
+            .where(
+                AssignmentCalibration.instrument == inst,
+                AssignmentCalibration.score_version == score_version,
+                AssignmentCalibration.is_active.is_(True),
+            )
+            .values(is_active=False)
+        )
+        session.add(
+            AssignmentCalibration(
+                instrument=inst,
+                score_version=score_version,
+                a=calibration.a,
+                b=calibration.b,
+                n_pos=calibration.n_pos,
+                n_neg=calibration.n_neg,
+                ece=calibration.ece,
+                source=calibration.source,
+                provisional=calibration.provisional,
+                corroboration_weights=(
+                    dict(calibration.corroboration_weights)
+                    if calibration.corroboration_weights
+                    else None
+                ),
+                is_active=True,
+                fit_utc=datetime.now(timezone.utc),
+                created_utc=datetime.now(timezone.utc),
+            )
+        )
+        await session.commit()

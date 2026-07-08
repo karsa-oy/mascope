@@ -32,7 +32,7 @@ today the registry ships one provisional Orbitrap curve).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -204,6 +204,72 @@ def fit_calibration(
         source=source,
         provisional=provisional,
     )
+
+
+# Evidence levels trusted enough to declare a calibration non-provisional (the confirmation-bias
+# guardrail: a visual eyeball shouldn't graduate a curve from "provisional" to "real").
+STRONG_EVIDENCE = ("reference_standard", "msms")
+
+
+def recalibrate(
+    scores: Sequence[float],
+    labels: Sequence[int],
+    evidence_levels: Sequence[str | None] | None = None,
+    *,
+    instrument: str,
+    source: str,
+    current: "Calibration | None" = None,
+    strong_evidence: Sequence[str] = STRONG_EVIDENCE,
+    provisional_min_strong: int = MIN_CALIBRATION_LABELS,
+) -> dict:
+    """Fit a fresh calibration from labelled ``(score, is_correct)`` pairs and report the change.
+
+    The V2 refit of the verification-calibration loop: turns a batch of user verdicts (positives =
+    confirmed, negatives = rejected; ``score`` is the arbitration evidence snapshotted at
+    verification) into a new :class:`Calibration`, carrying the corroboration weights forward from
+    ``current`` (those are refit separately, from the offset-decoy benchmark).
+
+    The ``provisional`` gate is the honest part: the curve stays provisional unless at least
+    ``provisional_min_strong`` positives carry *strong* evidence (``strong_evidence`` — reference
+    standard / MS-MS by default), so a pile of visual-only confirmations can't graduate it to "real".
+
+    :returns: ``{calibration, before_ece, after_ece, n_pos, n_neg, n_strong_positives, provisional}``
+        where ``before_ece`` is ``current`` applied to *these* labels (None if no current curve).
+    :raises InsufficientCalibrationData: fewer than ``MIN_CALIBRATION_LABELS`` labels of each class.
+    """
+    s = np.asarray(scores, float)
+    y = np.asarray(labels, int)
+    before_ece = None
+    if current is not None:
+        finite = np.isfinite(s)
+        if finite.any():
+            before_ece = calibration_error(
+                apply_calibration(s[finite], current), y[finite]
+            )
+    cal = fit_calibration(s, y, instrument=instrument, source=source, provisional=True)
+    n_strong = 0
+    if evidence_levels is not None:
+        strong = set(strong_evidence)
+        n_strong = sum(
+            1 for lvl, lab in zip(evidence_levels, y) if lab == 1 and lvl in strong
+        )
+    provisional = n_strong < provisional_min_strong
+    cal = replace(
+        cal,
+        provisional=provisional,
+        corroboration_weights=(
+            current.corroboration_weights if current is not None else None
+        ),
+    )
+    return {
+        "calibration": cal,
+        "before_ece": round(float(before_ece), 4) if before_ece is not None else None,
+        "after_ece": cal.ece,
+        "n_pos": cal.n_pos,
+        "n_neg": cal.n_neg,
+        "n_strong_positives": n_strong,
+        "provisional": provisional,
+    }
 
 
 # ---------------------------------------------------------------------------
