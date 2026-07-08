@@ -185,9 +185,6 @@ async def aggregate_sample_match_ion(
                     "match_mz_error": row["match_mz_error"],
                     "match_score": row["match_score"],
                     "match_category": row["match_category"],
-                    # False for reconstructed unmatched isotopes (no stored
-                    # match_isotope row); the UI hides the match tag for these.
-                    "has_record": bool(row["has_record"]),
                     "alarming": row["alarming"],
                 },
             }

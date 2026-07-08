@@ -309,9 +309,6 @@ async def aggregate_match_isotope_filtered_data(
             "sample_peak_mz",
             "sample_peak_tof",
             "match_score",
-            # True for real stored matches, False for reconstructed unmatched
-            # placeholders (no match_isotope row) - lets the UI hide the tag.
-            "has_record",
         ]
 
         # Reorder the columns according to the defined order and sort the DataFrame by 'mz'

@@ -69,18 +69,16 @@ async def compute_and_create_sample_match_isotope_data(
 
     if not match_isotope_df.empty:
         match_isotope_df["sample_item_id"] = sample.sample_item_id
-        # Persist only matched isotopes. Unmatched isotopes (no peak within the
-        # match window) carry only constant/derivable placeholder values -
-        # historically ~80% of match_isotope rows for zero information - and are
+        # Persist only isotopes that scored above zero: a real, in-window match.
+        # A score of 0 means either no peak within the match window, or a peak
+        # whose m/z error (>= 100 ppm) or abundance error (>= 100%) is so large it
+        # can never become a match at any read-time tolerance - apply_match_params
+        # only ever zeroes scores, never raises them. Such rows carry no analytical
+        # value (they only ever render 0%), so they are dropped here and
         # reconstructed on read from their target_isotope in
-        # aggregate_match_isotope_filtered_data, so they never need to be stored.
-        # An empty sample_peak_id (DEFAULT_UNMATCHED_SAMPLE_PEAK_ID) is the
-        # unambiguous marker of an unmatched row; matched rows always carry a
-        # real peak id.
-        matched_isotope_df = match_isotope_df[
-            match_isotope_df["sample_peak_id"].notna()
-            & (match_isotope_df["sample_peak_id"] != "")
-        ]
+        # aggregate_match_isotope_filtered_data. This matches the "found peak"
+        # definition used by export_goldens (match_score > 0).
+        matched_isotope_df = match_isotope_df[match_isotope_df["match_score"] > 0]
         if not matched_isotope_df.empty:
             # Convert the DataFrame to a list of Pydantic models
             match_isotopes = [

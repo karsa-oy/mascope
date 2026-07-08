@@ -64,8 +64,7 @@ def reconstruct_full_isotope_frame(
         columns; reconstructed rows' sample_peak_mz set to the target m/z).
     """
     if samples_df.empty or targets_df.empty:
-        # Nothing to reconstruct against: every row here is a stored (real) record.
-        return match_isotopes_df.assign(has_record=True)
+        return match_isotopes_df
 
     key_cols = ["sample_item_id", "target_isotope_id"]
     value_columns = [c for c in match_isotopes_df.columns if c not in key_cols]
@@ -110,8 +109,7 @@ def reconstruct_full_isotope_frame(
         )
 
     if not expected_frames:
-        # No expected isotopes to reconstruct; existing rows are all real records.
-        return match_isotopes_df.assign(has_record=True)
+        return match_isotopes_df
 
     # One row per (sample, isotope); the same isotope can appear in targets_df
     # multiple times (shared across collections), so drop duplicate keys.
@@ -132,9 +130,6 @@ def reconstruct_full_isotope_frame(
     # A stored row always has a non-null match_score (NOT NULL column); a
     # reconstructed unmatched row is missing every value column after the merge.
     unmatched_mask = full_df["match_score"].isna()
-    # has_record distinguishes real stored matches from reconstructed placeholders
-    # so the UI can hide the match tag for isotopes that were never detected.
-    full_df["has_record"] = ~unmatched_mask
     defaults = unmatched_isotope_params.model_dump()
     for column in value_columns:
         if column == "sample_peak_mz":
