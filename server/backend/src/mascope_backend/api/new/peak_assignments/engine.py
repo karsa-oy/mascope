@@ -246,7 +246,9 @@ def invert_matches_to_peak_assignments(
         if total_evidence <= 0:
             is_tie = len(group) > 1
         else:
-            is_tie = len(group) > 1 and (evid[0] - evid[1]) <= DEFAULT_TIE_TOL
+            # bool() so provenance stays JSON-serializable (evid is a numpy array,
+            # whose comparisons yield numpy.bool_, which the JSON column rejects).
+            is_tie = bool(len(group) > 1 and (evid[0] - evid[1]) <= DEFAULT_TIE_TOL)
         alternatives = [
             {
                 "assigned_formula": _str_or_none(row.get("target_compound_formula")),

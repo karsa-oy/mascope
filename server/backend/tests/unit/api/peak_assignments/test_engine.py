@@ -7,6 +7,8 @@ untargeted composition results onto assignment rows (Stage B). Pure
 DataFrame/dict logic - no database access.
 """
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -211,6 +213,10 @@ class TestInvertMatches:
         )
         assert a["provenance"]["confidence"] == pytest.approx(1.0)
         assert a["provenance"]["is_tie"] is False
+        # provenance must be JSON-serializable (it lands in a JSON column) — guards
+        # against numpy scalars (e.g. numpy.bool_) leaking in.
+        assert json.loads(json.dumps(a["provenance"]))["is_tie"] is False
+        assert isinstance(a["provenance"]["is_tie"], bool)
 
     def test_isotope_child_points_at_its_ions_m0_assignment(self):
         match_df = pd.DataFrame(
