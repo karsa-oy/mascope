@@ -128,10 +128,13 @@ Validated `rule_senior` against the 92 demo target compounds:
 ## 6a. Roadmap / next steps (priority order)
 
 **A — correctness / verification (near-term)**
-- **A1. Verify the ownership fix (#9) end-to-end on the demo.** Apply the `isotope_formula`
-  migration to the run DB, re-run assignments, confirm Stage A drops ~108k → ~31k real
-  assignments with freed peaks flowing to Stage B / unassigned. Prefer an isolated env
-  (`mascope dev run --instance`) over the shared demo stack.
+- **A1. Verify the ownership fix (#9).** ✅ *Verified read-only on the demo* (no DB writes,
+  no interference): running the real matcher → gating → `invert` on 8 samples (both
+  polarities), Stage A ownership drops **5078 → 1519 peaks — 70.1% were out-of-tolerance
+  steals**, now released to Stage B / unassigned (matches the 71% dataset-wide finding).
+  Remaining: a **persisted** re-run so the corrected data is UI-browsable — needs the
+  `isotope_formula` migration applied to the run DB; prefer an isolated env
+  (`mascope dev run --instance`; note the per-env filestore) over the shared demo stack.
 - **A2. (optional) Two-tier claim tolerance** — a looser "claim" tolerance (~3–5 ppm) so
   genuinely borderline real isotopes are not released while the strict tolerance still gates
   the score. Only if borderline isotopes are seen dropping.
