@@ -192,7 +192,66 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
       : []
   )
 
-  const traces = computed(() => [...mainTraces.value, ...focusTrace.value, ...previewTrace.value])
+  // Theoretical isotopologue envelope of the focused assignment, for visual
+  // verification against the measured peaks. Position and expected height are
+  // recovered from the stored errors: theoretical m/z = measured / (1 + ppm/1e6)
+  // and expected height = intensity / (1 + abundance_error) (= M0 intensity x
+  // predicted relative abundance). Named "…Peak" so the intensity-scale toggle
+  // scales it like the measured peaks.
+  const envelopeTrace = computed(() => {
+    const focused = app.data.peak.focused
+    if (!focused) return []
+    const assignments = app.data.peakAssignment.peak
+    const assignment = assignments.forPeak(focused.peak_id)
+    if (!assignment) return []
+    const familyMembers = assignments.familyOf(assignment)
+    if (familyMembers.length < 2) return []
+
+    const points = familyMembers
+      .map((iso) => {
+        if (iso.sample_peak_intensity == null) return null
+        const theoreticalMz =
+          iso.mz_error_ppm != null
+            ? iso.sample_peak_mz / (1 + iso.mz_error_ppm / 1e6)
+            : iso.sample_peak_mz
+        const denom = 1 + (iso.abundance_error ?? 0)
+        if (denom <= 0) return null
+        return { mz: theoreticalMz, height: iso.sample_peak_intensity / denom }
+      })
+      .filter(Boolean)
+    if (!points.length) return []
+
+    return [
+      {
+        name: 'Theoretical Peak',
+        type: 'scatter' + gl,
+        mode: 'lines+markers',
+        line: { color: '#d1345b', width: 1.5 },
+        marker: { color: '#d1345b', size: 6, symbol: 'circle-open' },
+        x: points.map(({ mz }) => [mz, mz, null]).flat(),
+        y: points.map(({ height }) => [0, height, null]).flat(),
+        customdata: points
+          .map(({ height, mz }) => {
+            const point = [height, height, mz]
+            return [point, point, null]
+          })
+          .flat(),
+        hovertemplate:
+          [
+            '<i>Theoretical</i>',
+            'mz: <b>%{customdata[2]:.4f}</b>',
+            'expected height: <b>%{customdata[0]:.3e}</b>'
+          ].join('<br>') + '<extra></extra>'
+      }
+    ]
+  })
+
+  const traces = computed(() => [
+    ...mainTraces.value,
+    ...focusTrace.value,
+    ...previewTrace.value,
+    ...envelopeTrace.value
+  ])
 
   // unload data and switch tab if necessary
   function unload() {
