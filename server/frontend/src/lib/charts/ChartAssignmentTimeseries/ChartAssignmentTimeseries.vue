@@ -48,11 +48,19 @@ const isoLabel = (iso) =>
 // The peaks to plot: the assignment family if there is one (so the whole
 // envelope's time course shows), otherwise just the focused peak (so even an
 // unassigned peak still gets its trace).
+//
+// Guarded against the sample-switch race: on a sample switch `sample.focusedId`
+// flips immediately but the focused peak / family still belong to the previous
+// sample until the peak store reloads, so fetching their ids against the new
+// sample 404s. Wait for the peak store to settle (`!pending`) and only include
+// peaks that exist in the current sample's peak list.
 const members = computed(() => {
+  if (app.data.peak.pending) return []
+  const inSample = new Set(app.data.peak.list.map((peak) => String(peak.peak_id)))
   const fam = family.value
   if (fam.length) {
     return fam
-      .filter((iso) => iso.sample_peak_id != null)
+      .filter((iso) => iso.sample_peak_id != null && inSample.has(String(iso.sample_peak_id)))
       .map((iso) => ({
         peakId: iso.sample_peak_id,
         mz: iso.sample_peak_mz,
@@ -62,7 +70,7 @@ const members = computed(() => {
       }))
   }
   const peak = app.data.peak.focused
-  return peak
+  return peak && inSample.has(String(peak.peak_id))
     ? [{ peakId: peak.peak_id, mz: peak.mz, label: num.mz.format(peak.mz) }]
     : []
 })
