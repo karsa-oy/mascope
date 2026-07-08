@@ -133,10 +133,19 @@ const rows = computed(() => {
   const list = assignments.value.list
     .filter((row) => row.role !== 'iso_child')
     .filter((row) => activeTiers.size === 0 || activeTiers.has(bucketOf(row)))
-    .map((row) => ({ ...row, tierRank: TIER_RANK[row.tier] ?? 3 }))
+    .map((row) => ({
+      ...row,
+      tierRank: TIER_RANK[row.tier] ?? 3,
+      // Flatten the calibrated probability for the sortable P(correct) column;
+      // null for untargeted / uncalibrated (rendered as "-", never 0%).
+      pCorrect: row.provenance?.p_correct ?? null
+    }))
   list.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
   return list
 })
+
+// Calibrated probability formatter for the P(correct) column.
+const pctFmt = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 })
 
 // Two-way selection tied to the focused peak: clicking a row focuses its peak,
 // and focusing a peak elsewhere (spectrum click, inspector) highlights its row.
@@ -292,6 +301,37 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
             />
           </template>
         </Column>
+        <Column field="pCorrect" sortable style="min-width: 6.5rem">
+          <template #header>
+            <span
+              v-tooltip.top="
+                'Calibrated probability the assignment is correct. Database-stage, calibrated instruments only; untargeted / uncalibrated show —.'
+              "
+              >P(correct)</span
+            >
+          </template>
+          <template #body="{ data }">
+            <span v-if="data.provenance?.p_correct != null" class="pcorrect">
+              {{ pctFmt.format(data.provenance.p_correct)
+              }}<span
+                v-if="data.provenance.calibration?.provisional"
+                class="prov"
+                v-tooltip.top="'Provisional calibration curve'"
+                >*</span
+              >
+            </span>
+            <span
+              v-else
+              class="pcorrect uncal"
+              v-tooltip.top="
+                data.source === 'untargeted'
+                  ? 'Untargeted assignment - no calibrated probability'
+                  : 'No calibration curve for this instrument'
+              "
+              >&mdash;</span
+            >
+          </template>
+        </Column>
       </DataTable>
     </div>
 
@@ -425,6 +465,17 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
   font-size: 0.62rem;
   opacity: 0.55;
   vertical-align: super;
+}
+
+.pcorrect {
+  font-variant-numeric: tabular-nums;
+}
+.pcorrect.uncal {
+  opacity: 0.45;
+}
+.pcorrect .prov {
+  color: var(--p-orange-500, #f59e0b);
+  margin-left: 0.05rem;
 }
 
 .menu-row {
