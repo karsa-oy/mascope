@@ -140,10 +140,19 @@ Validated `rule_senior` against the 92 demo target compounds:
   the score. Only if borderline isotopes are seen dropping.
 
 **B — fit-score model**
-- **B3. m/z-dependent mass sigma.** The v2 mass term over-penalizes heavy/high-m/z ions
-  (e.g. `Br3-` scores ~0.6 despite a near-perfect pattern; the fitted sigma is very tight).
-  Orbitrap dm/m ≈ constant, so make the mass-term sigma m/z-dependent (or add a per-peak
-  floor); re-measure ranking/calibration on the golden set. See `fit_score.md` §Limitations.
+- **B3. Mass-term over-penalty — investigated (golden set).** Conclusion: **no
+  distribution-level fix is warranted for `Br3-`.** Empirically the mass-error core is
+  m/z-flat (~0.13–0.18 ppm), with **no m/z σ growth**, **no m/z offset** (Br3-'s region
+  signed-mean ~0), and only a mild high-intensity (space-charge) uptick; a **Student-t** term
+  scores Br3- *lower* (its peaks are at the ~1.4 σ shoulder, not the deep tail). Br3- is a
+  genuine **mass-accuracy outlier** and ~0.6 is honest (calibrated confidence ~0.57 agrees).
+  The one **data-supported** refinement (unrelated to Br3-): **SNR-aware mass σ** — weak
+  peaks have ~3× larger errors (0.22 vs 0.07 ppm) but are scored against the tight bulk σ;
+  loosen the per-peak mass σ with 1/SNR (as the intensity term already does). *Decision
+  needed:* implement the SNR-aware mass σ (a real improvement, does not lift Br3-), accept
+  Br3- as honest, or treat "perfect pattern should offset moderate mass error" as a
+  product-level mass-vs-pattern re-weighting (a deeper tradeoff). See `fit_score.md`
+  §Limitations.
 
 **C — finish Phase 3 P2 (science)**
 - **C4. Curated calibration data** — a proper Orbitrap reference set to replace the

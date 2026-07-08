@@ -188,16 +188,26 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 
 ## 6. Limitations
 
-- **Mass term too strict for heavy / high-m/z ions (open; fix planned).** The mass width
-  $\sigma$ is fitted from the sample's confident matches, whose errors cluster near 0, so it
-  can be very tight (Orbitrap ~0.3 ppm; effective ~0.6 ppm after the `PRED_SIGMA_PPM`
-  quadrature). Heavy clusters at high m/z (e.g. the demo's $\mathrm{Br_3^-}$) calibrate a
-  little worse than the light analyte bulk that anchors $\sigma$, so their sub-ppm errors
-  (~0.7–0.9 ppm) sit at ~1.3–1.6 $\sigma$ and the Gaussian mass term drops to ~0.3–0.7 —
-  pulling an otherwise near-perfect 4-isotope match down to ~0.6 (candidate tier) even
-  though the intensity pattern is flawless. Planned fix: an **m/z-dependent $\sigma$**
-  (Orbitrap $\Delta m/m$ is roughly constant) or a per-peak mass-$\sigma$ floor, re-measured
-  on the golden set. See the handoff roadmap (B3).
+- **Mass term is unforgiving of individual mass-accuracy outliers (investigated; by
+  design).** The mass width $\sigma$ is fitted (robust MAD) from the sample's confident
+  matches, whose errors cluster tightly near 0, so it is small (Orbitrap ~0.2–0.3 ppm;
+  effective ~0.6 ppm after the `PRED_SIGMA_PPM` quadrature). An ion whose peaks carry
+  *genuinely larger* mass errors than the bulk — e.g. the demo's $\mathrm{Br_3^-}$ at
+  ~0.7–0.9 ppm (its intensity pattern is flawless) — sits at ~1.3–1.6 $\sigma$ and the
+  Gaussian mass term drops to ~0.3–0.7, pulling the fit to ~0.6 (candidate tier).
+  A golden-set investigation (see the handoff roadmap, B3) showed **no distribution-level
+  fix is warranted**: the mass-error core is m/z-flat (~0.13–0.18 ppm), there is **no
+  m/z-dependent $\sigma$ growth**, **no m/z-dependent offset** ($\mathrm{Br_3^-}$'s region
+  has signed mean ~0), and only a mild high-intensity (space-charge) uptick. A **Student-t**
+  mass term (heavier tails) actually scores $\mathrm{Br_3^-}$ *lower*, because its peaks are
+  at the *shoulder* (~1.4 $\sigma$), not the deep tail where a t-distribution helps. So
+  $\mathrm{Br_3^-}$ is a real **mass-accuracy outlier** and ~0.6 honestly reflects that its
+  mass fit is worse than a typical identified ion; the calibrated confidence (~0.57) conveys
+  the same. The one data-supported refinement is unrelated to $\mathrm{Br_3^-}$: **SNR-aware
+  mass $\sigma$** — weak peaks have ~3× larger errors (0.22 vs 0.07 ppm) yet are scored
+  against the tight bulk $\sigma$, so a per-peak $\sigma$ that loosens with $1/\text{SNR}$
+  (as the intensity term already does) would stop over-penalising legitimate trace
+  isotopologues.
 - **Geometric-mean harshness (rare):** one badly-fitting high-abundance peak can dominate.
   On the demo this affects ~1 % of ions; revisit the aggregation (e.g. a soft floor or a
   robust mean) if it proves material.
