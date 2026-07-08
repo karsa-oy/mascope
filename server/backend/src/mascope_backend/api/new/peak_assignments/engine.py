@@ -21,8 +21,18 @@ from mascope_backend.api.controllers.match.lib.match_score_v2 import (
 )
 from mascope_backend.db.id import gen_id
 from mascope_tools.composition.arbitration import DEFAULT_TIE_TOL
-from mascope_tools.composition.calibration import apply_calibration, calibration_for
+from mascope_tools.composition.calibration import (
+    Calibration,
+    apply_calibration,
+    apply_corroboration,
+    calibration_for,
+)
 from mascope_tools.composition.heuristic_filter import formula_plausibility
+
+
+# Sentinel so a caller can pass calibration=None (explicitly uncalibrated) distinctly from
+# "not provided" (fall back to the in-code registry via calibration_for).
+_CALIBRATION_UNSET = object()
 
 
 # Confidence tiers (a richer replacement for match_category 0/1/2)
@@ -172,6 +182,7 @@ def invert_matches_to_peak_assignments(
     probable_threshold: float,
     max_alternatives: int = 5,
     instrument: str | None = None,
+    calibration: "Calibration | None | object" = _CALIBRATION_UNSET,
 ) -> list[dict]:
     """Invert target-first match results into per-peak assignments (Stage A).
 
@@ -193,6 +204,12 @@ def invert_matches_to_peak_assignments(
     :param possible_threshold: Score threshold for the 'candidate' tier.
     :param probable_threshold: Score threshold for the 'identified' tier.
     :param max_alternatives: Cap on stored runner-up candidates per peak.
+    :param instrument: Instrument class; selects the in-code calibration when ``calibration``
+        is not passed. ``None`` -> uncalibrated.
+    :param calibration: The confidence calibration to apply (from the D6 store). If omitted,
+        falls back to the in-code registry via ``calibration_for(instrument)``; pass ``None``
+        explicitly to force uncalibrated. Its ``corroboration_weights`` drive the P3 adduct
+        co-occurrence fold-in on ``p_correct``.
     :return: One assignment dict per matched peak, ready for bulk insert.
     """
     if match_isotope_df.empty:
@@ -232,8 +249,11 @@ def invert_matches_to_peak_assignments(
     matched["_plaus"] = formulas.map(plaus_by_formula)
     # Calibration maps the winner's evidence to P(correct) for this instrument. None
     # when the instrument has no curated calibration (e.g. TOF) -> the assignment is
-    # reported uncalibrated rather than borrowing another instrument's curve.
-    calibration = calibration_for(instrument)
+    # reported uncalibrated rather than borrowing another instrument's curve. The service
+    # passes the calibration from the D6 store; falling back to the in-code registry keeps
+    # direct callers (and unit tests) working unchanged.
+    if calibration is _CALIBRATION_UNSET:
+        calibration = calibration_for(instrument)
     matched["_fit"] = matched["match_score"].map(lambda v: _score_or_none(v) or 0.0)
     matched["_evidence"] = matched["_fit"] * matched["_plaus"]
     matched["_abs_mz_error"] = matched["match_mz_error"].abs()
@@ -245,6 +265,9 @@ def invert_matches_to_peak_assignments(
     assignments: list[dict] = []
     m0_assignment_by_ion: dict[str, str] = {}
     child_assignments: list[tuple[dict, str]] = []
+    # (assignment, compound_id, adduct notation) for M0 winners, for the P3 corroboration
+    # post-pass (a compound seen via several adducts lifts each one's p_correct).
+    m0_corroboration: list[tuple[dict, str, str]] = []
 
     for sample_peak_id, group in matched.groupby("sample_peak_id", sort=False):
         winner = group.iloc[0]
@@ -345,6 +368,10 @@ def invert_matches_to_peak_assignments(
 
         if is_main and ion_id is not None:
             m0_assignment_by_ion[ion_id] = assignment["peak_assignment_id"]
+            compound_id = _str_or_none(winner.get("target_compound_id"))
+            notation = _str_or_none(winner.get("ionization_mechanism"))
+            if compound_id and notation:
+                m0_corroboration.append((assignment, compound_id, notation))
         else:
             child_assignments.append((assignment, ion_id))
 
@@ -353,7 +380,44 @@ def invert_matches_to_peak_assignments(
     for assignment, ion_id in child_assignments:
         assignment["owner_peak_assignment_id"] = m0_assignment_by_ion.get(ion_id)
 
+    # P3 corroboration: fold co-occurring adducts of the same compound into p_correct.
+    if calibration is not None:
+        _fold_adduct_corroboration(m0_corroboration, calibration.corroboration_weights)
+
     return assignments
+
+
+def _fold_adduct_corroboration(
+    m0_items: list[tuple[dict, str, str]],
+    weights: "dict | None",
+) -> None:
+    """Fold adduct co-occurrence into each M0 winner's ``p_correct`` in place (P3).
+
+    A compound assigned via several confident adducts corroborates each of them: for each winner
+    we add the measured log-odds of the OTHER adducts its compound was seen via (see
+    ``apply_corroboration``). Only confident (identified/candidate) winners count toward the
+    co-occurrence set, so a low-confidence sibling can't manufacture corroboration. No-op when the
+    calibration carries no weights. Records the co-occurrence + boost in provenance for the UI."""
+    if not weights or not m0_items:
+        return
+    adducts_by_compound: dict[str, set[str]] = {}
+    for assignment, compound_id, notation in m0_items:
+        if assignment["tier"] in (TIER_IDENTIFIED, TIER_CANDIDATE):
+            adducts_by_compound.setdefault(compound_id, set()).add(notation)
+    for assignment, compound_id, notation in m0_items:
+        all_adducts = adducts_by_compound.get(compound_id, set())
+        others = all_adducts - {notation}
+        if not others:
+            continue
+        prov = assignment["provenance"]
+        p0 = prov.get("p_correct")
+        p1 = apply_corroboration(p0, sorted(others), weights)
+        prov["p_correct"] = round(p1, 4) if p1 is not None else None
+        prov["corroboration"] = {
+            "adducts": sorted(all_adducts),
+            "n_adducts": len(all_adducts),
+            "boost": round(p1 - p0, 4) if (p0 is not None and p1 is not None) else None,
+        }
 
 
 def untargeted_matches_to_peak_assignments(
