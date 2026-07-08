@@ -364,6 +364,7 @@ def untargeted_matches_to_peak_assignments(
     probable_threshold: float,
     mechanism_id_by_notation: dict[str, str] | None = None,
     formula_formatter=None,
+    max_alternatives: int = 5,
 ) -> list[dict]:
     """Map untargeted composition results onto peak assignments (Stage B).
 
@@ -461,7 +462,8 @@ def untargeted_matches_to_peak_assignments(
                 }
                 for alt in other_candidates.split(",")
                 if alt.strip()
-            ]
+            ][: max_alternatives or 0]
+            or None
             if other_candidates
             else None
         )

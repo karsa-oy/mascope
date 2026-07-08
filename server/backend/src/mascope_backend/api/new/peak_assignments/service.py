@@ -563,6 +563,7 @@ async def assign_sample_peaks(
                     probable_threshold=config.identified_threshold,
                     mechanism_id_by_notation=mechanism_id_by_notation,
                     formula_formatter=to_custom_element_format,
+                    max_alternatives=config.max_alternatives,
                 )
                 runtime.logger.info(
                     f"Stage B assigned {len(stage_b_assignments)} of "
