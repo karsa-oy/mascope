@@ -245,6 +245,20 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
         <Column field="sample_peak_mz" header="m/z" sortable style="min-width: 6rem">
           <template #body="{ data }">{{ num.mz.format(data.sample_peak_mz) }}</template>
         </Column>
+        <Column
+          field="sample_peak_intensity"
+          header="intensity"
+          sortable
+          style="min-width: 5rem"
+        >
+          <template #body="{ data }">
+            {{
+              data.sample_peak_intensity != null
+                ? num.peakIntensity.format(data.sample_peak_intensity)
+                : '—'
+            }}
+          </template>
+        </Column>
         <Column field="assigned_formula" header="formula" sortable style="min-width: 6rem">
           <template #body="{ data }">
             <span class="formula">{{ data.assigned_formula || '—' }}</span>
