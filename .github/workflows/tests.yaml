@@ -79,6 +79,10 @@ jobs:
         # --only-group installs just mkdocs-material, not the whole workspace.
         run: uv run --only-group docs mkdocs build --strict
 
+      - name: Render the in-app help snippets
+        # The same step the image runs; catches a broken help snippet here.
+        run: uv run --only-group docs python tooling/docs/build_help_content.py
+
   frontend-unit:
     name: Frontend unit tests
     runs-on: ubuntu-latest
