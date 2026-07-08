@@ -5,6 +5,67 @@ The backend inverts the unit of result from target to observed peak; this docume
 Vue/PrimeVue frontend consumes that. It is weighted toward the technical wiring — stores, API,
 socket/notification, join keys — and keeps net-new UI deliberately small.*
 
+## Current state (2026-07-09) — shipped
+
+> This section is the authoritative description of what is on the branch. The original plan (§0
+> onward) is kept below as design record; where they disagree, this wins. The work went past the
+> "keep a separate Fit view" plan and **consolidated everything onto the Sample view**.
+
+**The Sample tab is the single workspace.** [`PaneTabSample.vue`](../../server/frontend/src/lib/panes/PaneTabSample.vue)
+is a 3-pane nested splitter:
+
+- **top-left — inspector** ([`PanePeakAssign.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakAssign.vue)):
+  a compact committed-assignment card for the focused peak — formula, `BaseTierTag`, evidence grid
+  (fit, m/z error, abundance error), chemical **plausibility**, arbitration **confidence** + tie flag,
+  and calibrated **P(correct)** (shown only for database-stage winners with `provenance.calibrated`;
+  renders null as "uncalibrated", flags a provisional curve). Below: the isotopologue **family** table
+  (M0 + children, theoretical rel. abundance, poor-match flag) and **close alternatives** (each with
+  fit / m/z error / plausibility inline + on hover). No panel header; no "Verify fit" button. An
+  Unassigned peak shows a minimal card with a Re-search button.
+- **top-right — annotated spectrum** ([`ChartSampleSpectrum`](../../server/frontend/src/lib/charts/ChartSampleSpectrum/data.js)):
+  one Plotly trace per confidence tier (+ reagent/artifact), the focused-peak and preview traces, and
+  a **theoretical isotopologue envelope** overlay recovered from the stored errors. Clicking focuses
+  the nearest peak; focus zooms to an **instrument-aware** m/z window (±0.05 Th orbi, ±0.3 Th tof).
+- **bottom (spans both) — assignment time series**
+  ([`ChartAssignmentTimeseries.vue`](../../server/frontend/src/lib/charts/ChartAssignmentTimeseries/ChartAssignmentTimeseries.vue)):
+  the focused assignment's family (M0 + children), or the bare focused peak, plotted per member + a
+  summed trace. Data comes from the **existing per-peak REST endpoint**
+  `POST /samples/{id}/peaks/timeseries` (`{peak_id}` → `{peak_id, mz, height, time}`), fetched once per
+  member — **not** the old HTTP-request → socket-event path. Guarded against the sample-switch race
+  (waits for `peak.pending` to settle; only plots peaks in the current sample's list). The **Re-search**
+  button in the inspector flips this pane to the composition search
+  ([`PanePeakSearch.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakSearch.vue),
+  mounted only while active), replacing the earlier modal-dialog attempt.
+
+**The ledger** is the Match browser's **"Assignments"** tab
+([`PaneBrowserAssignment.vue`](../../server/frontend/src/lib/panes/PaneBrowserMatch/PaneBrowserAssignment.vue)):
+a run selector that **auto-selects the latest completed run** (on load and sample switch), a clickable
+tier-histogram filter strip, and a virtual-scrolled table (m/z · intensity · formula `+N` · tier ·
+**P(correct)**). An **"Isotopologues" toggle** unfolds each compound's `iso_child` satellites as indented
+rows (children inherit the parent's tier rank so the stable sort keeps families grouped; rows stay
+fixed-height so virtual scrolling holds). Row↔peak selection is two-way. The old
+[`PaneBrowserPeak.vue`](../../server/frontend/src/lib/panes/PaneBrowserPeak/PaneBrowserPeak.vue) ledger
+is **unmounted dead code** now.
+
+**Stores** ([`peakAssignment/`](../../server/frontend/src/stores/data/modules/peakAssignment/)):
+`run` (auto-focus latest completed via a list-membership watcher; `peak_assignment_reload` event) and
+`peak` (`byPeakId`/`forPeak`, `childrenOf`/`familyOf`, `tierCounts` excluding iso_child). Registered
+nested (not spread) under `app.data.peakAssignment.{run,peak}`.
+
+**Confidence.** fit, plausibility and calibrated P(correct) are surfaced (see
+[`peak_assignment_confidence_frontend.md`](peak_assignment_confidence_frontend.md)). Untargeted winners
+carry `plausibility` too; alternatives carry `plausibility` (database ones also fit + m/z error). Adduct
+**corroboration** now exists on the record (`provenance.corroboration` / `n_adducts`, folded into
+`p_correct` by the backend) — a "supported by N adducts" badge is still a **TODO**.
+
+**Open threads.** (1) **Tier is fit-based** (`tier_for_score(fit_score, …)`); moving it onto
+`p_correct` needs universal calibration coverage (untargeted + all instruments) — backend/science, still
+deferred. Both `tier` and `P(correct)` are now shown side-by-side so the discrepancy is inspectable.
+(2) **Retire the Fit view / "Fit" tab** — redundant now that the spectrum envelope + time series live in
+the Sample view; its composition-fit entry point (`useMatchVisualized.verifyAssignment` + the B2
+`/fit/aggregate` and `/fit/visualize` endpoints) is **dead code** on the UI side. The B2 endpoints still
+work and could power an inline verify later.
+
 ## 0. Decisions settled
 
 | Question | Decision |
@@ -333,36 +394,28 @@ returns the same `{ match_ions, match_isotopes }` shape they consume today.
 
 ### Implementation status
 
-Landed on `design/peak-centric-frontend` (build + lint + 82 unit tests green; backend change
-compile-checked, backend suite needs Postgres):
+All F1–F6, B1, B2 landed and **merged to `epic`** (build + lint + 119 frontend unit tests + 32 backend
+engine tests green). See the **Current state** section at the top for the shipped behaviour; the table
+below records the original plan items plus the consolidation that followed.
 
-| ID | Status | Commit |
+| ID | Status | Notes |
 |---|---|---|
-| **F1** store spine + tier tag | ✅ done | `feat(frontend): peak-assignment stores and tier tag (F1)` |
-| **F2** peak ledger | ✅ done | `feat(frontend): reframe peak browser as the assignment ledger (F2)` |
-| **F3** peak inspector | ✅ done | `feat(frontend): peak inspector shows the committed assignment (F3)` |
-| **F4** annotated spectrum | ✅ done | `feat(frontend): color the spectrum by assignment tier (F4)` |
-| **F5** assignments browser + config dialog | ✅ done | `feat(frontend): assignments browser with run selector and config dialog (F5)` |
-| **F6** Fit-view rename | ✅ done (rename only) | `feat(frontend): rename the Match tab to Fit view (F6)` |
-| **B1** `peak_assignment_reload` event | ✅ done | `feat(peak-assignments): emit peak_assignment_reload on run finalize (B1)` |
-| **F6** composition Fit wiring | ⏳ blocked on **B2** | — |
-| **B2** composition Fit visualization | ⏳ not started (needs a live stack) | — |
+| **F1** store spine + tier tag | ✅ done | `peakAssignment/{run,assignment}.js` + `BaseTierTag`. |
+| **F2** peak ledger | ✅ done, then **relocated** | The ledger now lives in the Assignments tab (`PaneBrowserAssignment`); the original `PaneBrowserPeak` is dead code. |
+| **F3** peak inspector | ✅ done, since trimmed | `PanePeakAssign` is a compact card (no header, no Verify-fit); Re-search is a bottom-pane takeover. |
+| **F4** annotated spectrum | ✅ done | Per-tier traces + theoretical envelope; instrument-aware focus zoom. |
+| **F5** assignments browser + config dialog | ✅ done | + auto-select latest run, P(correct) column, unfold-isotopologues toggle. |
+| **F6** Fit-view rename + composition wiring | ✅ done, now **superseded** | Renamed + wired to B2, but the Fit view is redundant post-consolidation and slated for removal. |
+| **B1** `peak_assignment_reload` event | ✅ done | `success_reload=[("peak_assignment","sample_batch_id")]`. |
+| **B2** composition Fit visualization | ✅ done | `visualization.py`: `aggregate_composition_fit` + `visualize_composition_focus`; currently unused by the UI. |
+| **Consolidation** onto the Sample view | ✅ done | Time series via REST, 3-pane layout, Re-search takeover, inspector trim, ledger unfold, sample-switch race fix. |
 
-**Live verification (run `mascope dev run backend frontend --skip-migrations` against the dev
-`mascope_demo` DB, already at epic head):**
-- Backend serves this worktree's code — `/api/peak-assignments/*` routes registered, auth-gated.
-- Read contract confirmed on a real run: `/runs` and `/sample` return the exact shape the stores
-  consume (run metadata + config incl. `identified_threshold`/`candidate_threshold`; 1864
-  assignments with tier/role/source/fit_score/mz_error_ppm/isotope_label/ion_formula/alternatives).
-- **Join key confirmed live**: `/samples/{id}/peaks` `peak_id` (str) ↔ `sample_peak_id` (str), 1:1
-  (1864 peaks == 1864 assignments), a sampled id matches. This is the linchpin of F2/F4/F5.
-- Launch path confirmed: `POST …/assign` → new run created → `completed` (Stage A only), config
-  persisted. The B1 `success_reload` runs in that same success path (emit verified by code, not on
-  the wire).
-- Vite serves the updated components (BaseTierTag, PaneBrowserAssignment, the stores) transformed OK.
-- **Not yet observed in a browser** (no Chrome connected in the agent env): the Vue components'
-  visual render and B1's socket event driving F5's live run-refresh. View at `http://localhost:5173`
-  (login `demo@mascope.app` / `mascope-demo`) to confirm visually.
+**Verified live** against the isolated instance stack (`mascope dev run backend frontend --instance
+--skip-migrations`; env `wt-…`, backend :8090, frontend :5173, seeded from the demo DB): read contract
+and the `String(peak_id) === sample_peak_id` join (1:1); `POST …/assign` creating a run through to
+`completed`; the REST timeseries shape; and the provenance/plausibility/alternatives fields on a fresh
+run. Note: uvicorn `--reload` is unreliable in this setup — hard-restart the backend after engine
+changes before trusting a live run.
 
 ### Full task list
 

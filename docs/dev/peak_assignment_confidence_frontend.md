@@ -1,9 +1,9 @@
 # Surfacing assignment confidence in the UI
 
-*A short guide for the frontend work on the peak-centric assignment views. The backend now
-produces four related confidence quantities per peak; the current UI shows two of them. This
-explains what each one is, where it lives on the record, and how to surface the probability and
-(soon) the adduct-corroboration signal honestly. Backend science lives in
+*A short guide for the frontend work on the peak-centric assignment views. The backend produces four
+related confidence quantities per peak; the UI now surfaces three of them (all but `evidence`). This
+explains what each one is, where it lives on the record, and how the probability and the
+adduct-corroboration signal are surfaced honestly. Backend science lives in
 [`assignment_confidence.md`](assignment_confidence.md); this is the consumer's-eye view. See also
 the wiring plan in [`peak_assignment_frontend.md`](peak_assignment_frontend.md).*
 
@@ -17,11 +17,12 @@ Two are top-level; the rest ride inside the `provenance` JSON blob.
 | **fit_score** | How well the *measurement* matches this ion — mass error + intensity + isotope envelope. Pure signal. | 0–1 | `fit_score` (top-level) | ✅ Fit column / tier tag |
 | **plausibility** | Chemistry sanity of the formula — the Seven Golden Rules (Kind & Fiehn 2007). Independent of the measurement. | 0–1 | `provenance.plausibility` | ✅ Plausibility column |
 | **evidence** | `fit x plausibility` — the score arbitration ranks candidates by. Rarely worth showing on its own. | 0–1 | `provenance.evidence` | ❌ |
-| **p_correct** | **Calibrated probability the assignment is correct.** `evidence` mapped through a Platt curve to a real probability. | 0–1 | `provenance.p_correct` | ❌ — *this is the "probability"* |
+| **p_correct** | **Calibrated probability the assignment is correct.** `evidence` mapped through a Platt curve to a real probability. | 0–1 | `provenance.p_correct` | ✅ inspector `P(correct)` + ledger column |
 
 So the answer to "do we have the probability?" is **yes** — it is `provenance.p_correct`, already
-computed and stored. The UI just isn't reading it yet. Example provenance blob from a database
-assignment on the demo:
+computed and stored. The inspector and the assignments ledger now read it (gated on
+`provenance.calibrated`, null shown as "uncalibrated", provisional-flagged). Example provenance blob
+from a database assignment on the demo:
 
 ```json
 {
@@ -52,14 +53,16 @@ it will mislead:
    directionally right (ECE ~= 0.03) but should not be presented as a hardened figure. When
    `provisional`, label it — e.g. `~86% correct (provisional)` — so users don't over-trust it.
 
-### Suggested display
+### Display (implemented)
 
-- A stat like **"~86% likely correct (provisional)"** next to fit/plausibility, that
-  reads `provenance.p_correct`, formats null as "uncalibrated", and appends "(provisional)" while
-  `provenance.calibration.provisional` is true.
-- It slots in exactly where `plausibility` does. Note the store currently returns records raw
-  (no provenance flattening); read `record.provenance?.p_correct` directly, or add a thin flatten in
-  `usePeakAssignment` mirroring how you'd expose `plausibility`.
+- The inspector ([`PanePeakAssign.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakAssign.vue))
+  shows a `P(correct)` stat that reads `provenance.p_correct`, renders null as "uncalibrated" (gated on
+  `provenance.calibrated`), and appends "prov." while `provenance.calibration.provisional` is true. It
+  sits in the evidence grid beside fit / plausibility / confidence.
+- The assignments ledger ([`PaneBrowserAssignment.vue`](../../server/frontend/src/lib/panes/PaneBrowserMatch/PaneBrowserAssignment.vue))
+  has a sortable `P(correct)` column with the same null / provisional handling.
+- The store returns records raw (no provenance flattening); both read `record.provenance?.p_correct`
+  directly, and the ledger flattens it to a `pCorrect` field purely so the column can sort.
 
 ## Alternatives now carry plausibility too
 
@@ -94,9 +97,9 @@ corroboration), and optionally a small "corroborated by N adducts" badge from
 
 ## TL;DR for the implementer
 
-- The probability exists: **`provenance.p_correct`**. Wire it in.
-- Gate on `provenance.calibrated`; show null rows as "uncalibrated", not 0%.
-- Flag provisional via `provenance.calibration.provisional`.
-- Alternatives now have `plausibility`; use it for competitor ranking.
+- The probability exists and is **wired in**: `provenance.p_correct` shows in the inspector and the
+  ledger (gated on `provenance.calibrated`, null → "uncalibrated", provisional-flagged).
+- Alternatives now have `plausibility` and it is shown (inline + on hover); use it for competitor
+  ranking.
 - Corroboration is **already baked into `p_correct`**; `provenance.corroboration` (when present) is
-  just for an optional "N adducts" badge — never add its `boost` on top.
+  just for an optional "N adducts" badge — never add its `boost` on top. **Badge still TODO.**
