@@ -208,6 +208,82 @@ Layout is unchanged. Most work is reframing three existing panes + one new tag +
 The **inspector reads from the focused peak**, not its own selection: `app.data.peakAssignment.byPeakId
 .get(String(app.data.peak.focused?.peak_id))`. No new selection wiring needed for the common path.
 
+## 4b. B2 — composition-driven Fit visualization: endpoint contract
+
+The Fit view makes **two** calls today, both keyed on `target_ion_id`
+([`visualized.js`](../../server/frontend/src/stores/data/modules/match/visualized.js)): a synchronous
+**aggregate** (isotope-table data) and a **background visualization** (spectra + timeseries pushed over
+the socket). B2 adds a **composition** variant of each — keyed on `assigned_formula` +
+`ionization_mechanism_id` instead of a persisted ion — so untargeted winners can be verified.
+
+**Do not reuse `POST /match/aggregate/sample/{id}/compound`.** It calls `create_target_ions`, which
+**persists** ions to the DB (verified live: it returns `400 "Failed to create target ions"` for an
+ephemeral formula). B2 must be **non-persisting**: build ions/isotopes in memory with
+`generate_target_ions_from_composition(TargetCompound(gen_id(), formula), [mechanism])`
+([`target_ions_compute.py`](../../server/backend/src/mascope_backend/api/controllers/target/lib/compute/target_ions_compute.py)),
+never `session.add` them.
+
+### B2a — composition aggregate (isotope table)
+
+```
+POST /api/peak-assignments/aggregate/sample/{sample_item_id}
+body: { assigned_formula: str, ionization_mechanism_id: str, match_params?: BaseMatchParams }
+→ { match_ions: [ion], match_isotopes: [isotope] }   # NESTED shape, see below
+```
+
+Implementation (new controller; mirrors `aggregate_sample_match_ion`'s **nested** output, NOT
+`aggregate_sample_match_compound`'s flat `to_dict("records")`):
+1. `sample = fetch_sample(id)`; fetch the one `IonizationMechanism` by `ionization_mechanism_id`.
+2. `ions, isotopes = generate_target_ions_from_composition(TargetCompound(gen_id(), norm(formula)), [mech])`
+   — in memory, no persistence.
+3. `target_isotopes_df = DataFrame([iso.to_dict() for iso in isotopes])`, filtered to the sample's
+   resolution (`HIGH` for orbi, `LOW` for tof — `get_instrument_type(sample.filename)`).
+4. `match_isotope_df = await compute_match_isotopes(sample.filename, target_isotopes_df, match_params, sample.polarity)`
+   then `apply_match_params(...)`. `match_params` defaults via `default_match_params(id)`.
+5. Emit the **nested** shape the Fit view consumes (copy the row-building from
+   `aggregate_sample_match_ion`, lines ~139–206): `match_ions[0]` = the synthetic ion
+   (`target_ion_id` = the generated id, `target_ion_formula`, `ionization_mechanism`, `match:{match_score,
+   match_category, sample_peak_intensity_sum}`); each `match_isotopes[i]` = `{target_ion_id,
+   target_isotope_id, target_isotope_formula, mz, relative_abundance, resolution, match:{sample_peak_mz,
+   sample_peak_intensity, match_mz_error, match_abundance_error, match_score, match_category}}`. Carry the
+   generated `target_isotope_id`s through so the frontend has stable keys and color-sync.
+
+### B2b — composition visualization (spectra + timeseries)
+
+```
+POST /api/peak-assignments/visualize/sample/{sample_item_id}
+body: { assigned_formula, ionization_mechanism_id, peak_min_intensity, mz_tolerance, isotope_ratio_tolerance }
+→ 202 (background); emits `visualization_signal_sum_spectrum` + `visualization_signal_timeseries`
+  (same socket events + trace shape ChartMatchSpectra/ChartMatchTimeseries already consume)
+```
+
+Reuse the visualization internals verbatim
+([`visualization_controller.py`](../../server/backend/src/mascope_backend/api/controllers/visualization/visualization_controller.py)):
+`_load_peaks_and_averaged_signal`, `_process_isotope`, the sum-timeseries logic, and the two
+`sio.emit`s. The **only** change is the isotope source: instead of `_fetch_isotopes` (DB by
+`target_ion_id`), build the same `list[SimpleNamespace]` from steps 2–4 above, sorted by
+`relative_abundance` desc (main isotope first). Each SimpleNamespace must carry the fields
+`_process_isotope` reads: `mz`, `relative_abundance`, `target_isotope_id` (the generated id, or `None`),
+plus the matched fields from `compute_match_isotopes` — `sample_peak_mz`, `sample_peak_intensity`,
+`match_score`, `match_mz_error`, `match_abundance_error` (`sample_peak_mz = None` for unmatched
+isotopes). Recommended: extract the isotope-building (steps 2–4) into a shared helper used by both
+B2a and B2b. Consider factoring `visualize_ion_focus`'s body into a
+`_visualize_isotopes(sample, isotopes, …)` that both the target-ion and composition entry points call.
+
+### F6 — frontend wiring (blocked on B2)
+
+In `useMatchVisualized.set(...)`, branch on whether the focused assignment has a `target_ion_id`:
+present → today's path; absent (untargeted) → call B2a for the isotope table (`ion`/`isotopes`) and B2b
+for the charts, passing `assigned_formula` + `ionization_mechanism_id` from the `PeakAssignment` row.
+Add a **"Verify fit"** action (assignments browser row / inspector) that calls
+`app.data.match.visualized.set({ assignment })` and switches to the Fit tab. The chart components need
+no change — B2 returns the same shapes.
+
+**Status:** contract only. Not implemented — B2 is a self-contained backend feature (two non-persisting
+controllers + routes, plus F6 wiring). The building blocks (`generate_target_ions_from_composition`,
+`compute_match_isotopes`, `_process_isotope`, `_load_peaks_and_averaged_signal`) all exist and are
+traced above; the work is composing them non-persistently and matching the nested response shape.
+
 ## 4. The Fit view rename & composition-driven visualization (decided)
 
 Renaming the tab is cosmetic. The **functional** change: the Fit view
