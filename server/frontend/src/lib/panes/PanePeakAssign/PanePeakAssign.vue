@@ -306,6 +306,11 @@ watch(
   { immediate: true }
 )
 
+// Arbitration / chemistry provenance (database-stage assignments): chemical
+// plausibility (Seven Golden Rules), arbitration confidence, calibrated
+// P(correct), and an honest tie flag.
+const provenance = computed(() => focusedAssignment.value?.provenance ?? null)
+
 const fitPercent = new Intl.NumberFormat('en-US', {
   style: 'percent',
   minimumFractionDigits: 0,
@@ -441,6 +446,29 @@ const isPoorMatch = (iso) => {
           <div class="ev" v-if="focusedAssignment.isotope_label">
             <span class="k">isotope</span>
             <span class="v">{{ focusedAssignment.isotope_label }}</span>
+          </div>
+          <div class="ev" v-if="provenance?.plausibility != null">
+            <span class="k" v-tooltip.top="'Chemical plausibility (Seven Golden Rules)'"
+              >plausibility</span
+            >
+            <span class="v">{{ formatFit(provenance.plausibility) }}</span>
+          </div>
+          <div class="ev" v-if="provenance?.confidence != null">
+            <span class="k" v-tooltip.top="'Arbitration confidence: winner share of fit x plausibility'"
+              >confidence</span
+            >
+            <span class="v"
+              >{{ formatFit(provenance.confidence)
+              }}<span v-if="provenance.is_tie" class="tie-flag" v-tooltip.top="'Runner-up too close to call'"
+                >&nbsp;tie</span
+              ></span
+            >
+          </div>
+          <div class="ev" v-if="provenance?.p_correct != null">
+            <span class="k" v-tooltip.top="'Calibrated probability the assignment is correct'"
+              >P(correct)</span
+            >
+            <span class="v">{{ formatFit(provenance.p_correct) }}</span>
           </div>
         </div>
         <div v-if="family.length > 1" class="isotopologues">
@@ -913,6 +941,11 @@ const isPoorMatch = (iso) => {
   color: var(--p-orange-500, #f59e0b);
   font-size: 0.68rem;
   margin-right: 0.2rem;
+}
+.tie-flag {
+  color: var(--p-orange-500, #f59e0b);
+  font-weight: 600;
+  font-size: 0.72rem;
 }
 
 /* Close alternatives can be dozens of candidates: cap the height and scroll. */

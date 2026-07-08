@@ -186,7 +186,15 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
       </div>
     </template>
 
-    <div v-if="!runs.list.length" class="center empty">
+    <div v-if="!app.data.sample.focused" class="center empty">
+      <div class="col" style="gap: 0.5rem; text-align: center; max-width: 40ch">
+        <strong><span class="pi ph ph-hand-pointing" /> No sample selected</strong>
+        <i style="opacity: 0.6">
+          Select a sample to view or run its peak assignments.
+        </i>
+      </div>
+    </div>
+    <div v-else-if="!runs.list.length" class="center empty">
       <div class="col" style="gap: 0.75rem; text-align: center; max-width: 40ch">
         <strong><span class="pi ph ph-info" /> No assignment runs</strong>
         <i style="opacity: 0.6">
@@ -197,7 +205,6 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
           label="Assign peaks"
           icon="pi ph ph-magic-wand"
           size="small"
-          :disabled="!app.data.sample.focused"
           @click="configVisible = true"
         />
       </div>
