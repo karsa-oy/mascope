@@ -635,3 +635,42 @@ async def assign_sample_peaks(
             f"Peak assignment run '{run.peak_assignment_run_id}' failed: {e}"
         )
         raise
+
+
+async def auto_assign_sample_peaks(
+    sample_item_id: str,
+    user_id: int | None = None,
+    parent_id: str | None = None,
+) -> None:
+    """Run Stage-A-only peak assignment as part of sample auto-processing.
+
+    The auto-processing pipeline runs the assignment engine database-first
+    (`run_untargeted=False`) only: Stage A reuses the matcher that already ran
+    for the sample and is cheap on the small ACQUISITION target collections,
+    whereas Stage B (untargeted composition enumeration) is the documented
+    scaling risk and stays opt-in via an explicit sample/batch run.
+
+    A failure here must never fail auto-processing - the sample is created,
+    calibrated, and matched regardless - so any error is logged and swallowed.
+    Called with ``independent_transaction=False`` so its progress nests under
+    the parent process and no per-sample success toast is emitted; the parent
+    orchestrator owns the ``peak_assignment_reload`` UI refresh.
+
+    :param sample_item_id: ID of the sample item to assign
+    :param user_id: Current user triggered operation (for user notifications)
+    :param parent_id: Parent process identifier for progress nesting
+    """
+    try:
+        await assign_sample_peaks(
+            sample_item_id=sample_item_id,
+            config=PeakAssignmentConfig(run_untargeted=False),
+            independent_transaction=False,
+            user_id=user_id,
+            process_id=gen_id(8),
+            parent_id=parent_id,
+        )
+    except Exception as e:
+        # Isolate assignment failures from the processing lifecycle.
+        runtime.logger.warning(
+            f"Auto peak assignment failed for sample '{sample_item_id}': {e}"
+        )

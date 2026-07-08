@@ -217,6 +217,16 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
             })
           },
           visible: row.value !== null
+        },
+        {
+          label: `Assign peaks`,
+          icon: 'pi ph ph-atom',
+          command: async () => {
+            await app.data.batch.assign({
+              sample_batch_id: row.value.sample_batch_id
+            })
+          },
+          visible: row.value !== null
         }
       ]
     }
