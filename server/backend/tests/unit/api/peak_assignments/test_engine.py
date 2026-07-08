@@ -189,8 +189,9 @@ class TestInvertMatches:
         assert winner["fit_score"] == pytest.approx(0.85)  # its own pure fit
         assert winner["provenance"]["plausibility"] == pytest.approx(1.0)
         assert winner["provenance"]["confidence"] == pytest.approx(1.0)
-        # the implausible formula survives as a runner-up
+        # the implausible formula survives as a runner-up, carrying its plausibility
         assert winner["alternatives"][0]["assigned_formula"] == "C6H17NO4"
+        assert winner["alternatives"][0]["plausibility"] == pytest.approx(0.0)
 
     def test_provenance_carries_confidence_and_tie_flag(self):
         match_df = pd.DataFrame(
@@ -596,6 +597,8 @@ class TestUntargetedMatches:
             "C4H8N2O",
             "C6H14N",
         ]
+        # untargeted runner-ups are formula-only, but still carry plausibility
+        assert all(alt["plausibility"] is not None for alt in m0["alternatives"])
         assert m0["provenance"]["neutral_mass"] == pytest.approx(102.068)
         # Chemical plausibility now rides on untargeted winners too (previously
         # database-stage only), so an identified de-novo formula reports it and
