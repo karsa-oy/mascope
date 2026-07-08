@@ -21,6 +21,7 @@ const shareable = computed(() => !isEmptyLocation(location.read()))
     text
     rounded
     aria-label="Copy link to this view"
+    v-tooltip.bottom="'Copy link to this view'"
     :pt="
       app.ui.help.bottom(`
         <h1>Share this view</h1>
