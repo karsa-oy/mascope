@@ -43,8 +43,9 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          uv venv
-          uv pip install -e .
+          # The build step above already created and synced .venv via `uv run`,
+          # so `uv sync` here just reconciles it (adding the dev group). A bare
+          # `uv venv` would fail on the pre-existing environment.
           uv sync --group dev
 
       - name: Wait for the stack to come up
