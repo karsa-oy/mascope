@@ -250,12 +250,22 @@ no backend or DB, only `mascope_tools` + tests.
   (e.g. over-saturated `C6H17NO4`) loses to a plausible one.
 - **Dependency direction preserved (§3):** arbitration imports the fit score's *values*
   and the chemistry plausibility; neither imports arbitration. The fit score stays pure.
-- **Remaining P2:** calibrate the confidence to a true **P(correct)** per instrument
-  (the `calibrate_score` Platt curve is the single-candidate seed), and a **target-decoy
-  FDR** over a run using the `tooling/score_eval` decoy harness (does `fit × plausibility`
-  rank true formulas above the *plausible* mass-degenerate decoys, and what is the
-  false-discovery rate at a confidence cut?). The arbitration ranking + honest-tie report
-  are the landed core; the calibrated confidence number and FDR are the next increment.
+- **FDR helpers landed** (`arbitration.fdr_curve`, `threshold_at_fdr`). Given arbitrated
+  winners' confidences and whether each was correct (a labelled golden set, or a
+  target-decoy search where a decoy winning = wrong), they report FDR vs acceptance and
+  pick a confidence cut for a tolerated FDR, with q-values so the threshold is unambiguous
+  (Scheubert 2017). Ties in confidence are ordered conservatively. Unit-tested.
+- **Measured on the demo decoy pools** (`tooling/score_eval/arbitration_eval.py`, scratch):
+  ranking by **fit × plausibility** beats **fit alone** on the hard *contested* anchors —
+  e.g. top-1 contested **0.70 → 0.72**, accept-all FDR **0.134 → 0.123** — confirming the
+  layer's value: chemistry demotes the implausible mass-degenerate decoys the fit score is
+  (by design) blind to. The gain is modest because most surviving decoys are already
+  plausible (the genuinely hard ties), exactly as the fit-score study predicted (DESIGN.md:
+  the score's job is calibrated *fit*, chemistry/arbitration breaks the plausible ties).
+- **Remaining P2:** calibrate the arbitration confidence to an absolute **P(correct)** per
+  instrument (the `calibrate_score` Platt curve is the single-candidate seed; a per-run /
+  per-instrument refit over the fit×plausibility evidence is the next step), and wire the
+  arbitration confidence into the peak-centric engine as a stored field alongside the tier.
 
 ## 5. References
 
