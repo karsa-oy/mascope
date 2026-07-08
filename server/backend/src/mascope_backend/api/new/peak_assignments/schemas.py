@@ -179,3 +179,18 @@ class AssignmentVerificationsResponse(BaseModel):
     message: str
     results: int
     data: list[AssignmentVerificationRecord]
+
+
+class RecalibrateResponse(BaseModel):
+    """Outcome of refitting an instrument's calibration from verification labels (V2)."""
+
+    status: str = "success"
+    message: str
+    recalibrated: bool
+    instrument: str
+    before_ece: float | None = None
+    after_ece: float | None = None
+    n_pos: int = 0
+    n_neg: int = 0
+    n_strong_positives: int | None = None
+    provisional: bool | None = None
