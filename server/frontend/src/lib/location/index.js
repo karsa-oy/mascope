@@ -18,9 +18,24 @@ const logger = makeLogger({ prefix: 'location', icon: '🧭' })
 // deferred visualization restore.
 const CONVERGE_TIMEOUT_MS = 30000
 
-// How long to let a shared location converge before checking which levels
-// actually resolved, so we can warn about anything the viewer cannot access.
-const VERIFY_DELAY_MS = 4000
+// Poll interval and overall budget for confirming a shared location resolved.
+// The chain converges asynchronously (one API round trip per level) and can
+// take well over a few seconds on a cold backend, so we poll until it settles
+// rather than snapshotting once - otherwise a slow-but-successful restore looks
+// like a failure. A genuinely inaccessible level is detected sooner (see below).
+const VERIFY_POLL_MS = 700
+const VERIFY_TIMEOUT_MS = 15000
+
+// Friendly singular labels for the warning message, keyed by location field.
+const LEVEL_LABELS = {
+  workspace: 'workspace',
+  dataset: 'dataset',
+  batch: 'batch',
+  samples: 'sample',
+  peak: 'peak',
+  collection: 'collection',
+  ions: 'ion'
+}
 
 // Debounce for mirroring the location into the address bar; collapses the burst
 // of intermediate changes while a chain converges into a single URL write.
@@ -140,29 +155,57 @@ export const useLocation = defineStore('app.location', () => {
   }
 
   /**
-   * After a shared location has had time to converge, warn about any requested
-   * level that did not resolve - typically because the viewer lacks access to
-   * that workspace/dataset or the record was deleted.
+   * Confirm a shared location actually resolved, and warn only if it genuinely
+   * could not - typically because the viewer lacks access to a workspace/dataset
+   * or the record was deleted. The chain converges asynchronously, so we poll
+   * until it settles (no warning) instead of snapshotting once. A level is
+   * reported as soon as it is provably inaccessible (its records have loaded yet
+   * still lack the target), or, failing that, after the overall timeout; only
+   * the shallowest unresolved level - the chain-break point - is named.
    */
   const verifyApplied = (requested) => {
-    setTimeout(() => {
+    const deadline = Date.now() + VERIFY_TIMEOUT_MS
+
+    // The shallowest requested level whose target ids are not all focused yet.
+    const firstUnresolved = () => {
       const current = read()
-      const missing = LOCATION_LEVELS.filter((level) => {
+      return LOCATION_LEVELS.find((level) => {
         const want = levelIds(requested, level)
         if (want.length === 0) return false
         const have = levelIds(current, level)
         return want.some((id) => !have.includes(id))
-      }).map((level) => level.field)
+      })
+    }
 
-      if (missing.length > 0) {
-        logger.warn('shared location partially unresolved', { data: { missing } })
-        useApp().ui.notification.push({
-          type: 'shared_link',
-          status: 'warning',
-          message: `Part of the shared view could not be opened (${missing.join(', ')}); you may not have access to it.`
-        })
+    const warn = (level) => {
+      const label = LEVEL_LABELS[level.field] ?? level.field
+      logger.warn('shared location unresolved', { data: { level: level.field } })
+      useApp().ui.notification.push({
+        type: 'shared_link',
+        status: 'warning',
+        message: `Could not open the shared ${label}; you may not have access to it.`
+      })
+    }
+
+    const poll = () => {
+      const level = firstUnresolved()
+      if (!level) return // chain settled - nothing to warn about
+
+      // Provably inaccessible: this level's records have loaded but none of the
+      // requested ids are among them, so waiting longer will not help.
+      const store = resolveStore(useApp().data, level.path)
+      const want = levelIds(requested, level)
+      const confirmedAbsent =
+        store?.list.length > 0 && want.every((id) => !store.list.some((r) => r[level.key] === id))
+
+      if (confirmedAbsent || Date.now() >= deadline) {
+        warn(level)
+        return
       }
-    }, VERIFY_DELAY_MS)
+      setTimeout(poll, VERIFY_POLL_MS)
+    }
+
+    setTimeout(poll, VERIFY_POLL_MS)
   }
 
   /** Full shareable URL for the current location. */
