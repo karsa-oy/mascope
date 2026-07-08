@@ -332,10 +332,31 @@ no backend or DB, only `mascope_tools` + tests.
 - **Validated on the refreshed demo** (read-only): of the confident (identified/candidate)
   compound-instances, **~66% are seen via ≥2 adducts** (2,108 via two, 3,017 via three;
   2,620 lone) — the signal is both abundant and discriminating.
-- **Remaining P3:** fold the corroboration into the reported confidence (a modeling/product
-  decision on how much a co-occurring adduct set should lift confidence — done as a run-level
-  post-pass over the assignments, not per-peak); then intensity-consistency across adducts and
-  in-source-fragment grouping (the deeper CAMERA/IPA model).
+- **Weighting the corroboration — measurement attempted, blocked by the data.** The intended
+  next step was to *measure* the lift rather than hand-pick a weight: estimate the likelihood
+  ratio `P(correct | n_adducts) / P(correct | 1 adduct)` on the labelled decoy set and fold it
+  into `p_correct` as a Bayesian odds update (`tooling/score_eval/corroboration_eval.py`). The
+  measurement is **not possible on the current benchmark**: the labelled set
+  (`mascope-demo-dataset-v1/expected/candidates.parquet`) predates the adduct-rich v1.2 library
+  and has essentially no true multi-adduct chemistry — of 17,253 true (file, neutral) groups only
+  **76 span ≥2 adducts**, and among 16,386 score-picked winners only 60 are multi-adduct (all
+  spurious decoy collisions, `P(correct)=0`). A logistic on the winners gives a corroboration
+  coefficient of ≈ **−0.045** (no signal). So the demo presents a **fork with no clean answer**:
+  - the *labelled* decoy set has trustworthy per-peak correctness but no multi-adduct chemistry;
+  - the *live* v1.2 assignments have rich co-occurrence (~66% multi-adduct, above) but no
+    independent correctness label — "truth" there is the engine's own pick, and since library
+    compounds carry multiple adducts *by construction*, a decoy-vs-library measurement would be
+    self-fulfilling and **overstate** the LR.
+
+  **Decision:** do **not** bake an unmeasured (or demo-inflated) weight into `p_correct` yet. Keep
+  corroboration a **separate, inspectable signal** (already exposed; the frontend surfaces it as a
+  badge, see `peak_assignment_confidence_frontend.md`). Fold it into the probability only once a
+  clean multi-adduct labelled benchmark exists — a spiked/curated set where true presence is known
+  independently of the library (the Br/Ur standards give the true-positive side but no
+  false-positive contrast, so they alone can't set the LR). `corroboration_eval.py` will produce
+  the LR immediately against such a set.
+- **Then:** intensity-consistency across adducts and in-source-fragment grouping (the deeper
+  CAMERA/IPA model).
 
 ## 5. References
 
