@@ -1343,6 +1343,77 @@ class AssignmentCalibration(Base):
     )
 
 
+class AssignmentVerification(Base):
+    """A user's verdict on a peak-centric assignment (verification-calibration loop, V1).
+
+    Human-in-the-loop confirmation/rejection of an identification: the honest source of the
+    labelled golden set that later refits the confidence calibration
+    (``docs/dev/verification_calibration_loop.md``). Append-only (keep every verdict for audit;
+    the current one is the latest by ``verified_utc``).
+
+    Keyed to the **stable identity** of what was judged -- ``sample_item_id`` + ``sample_peak_id``
+    (an observed-peak id, stable across assignment runs) + ``assigned_formula`` +
+    ``ionization_mechanism_id`` -- so a label survives re-runs that churn run-scoped rows. The
+    run-scoped ``peak_assignment_id`` / ``peak_assignment_run_id`` are provenance (the row deletes to
+    NULL on a re-run). ``fit_score`` / ``evidence`` / ``p_correct`` are **snapshotted at verification
+    time**: the calibration pair must be pinned to the score the user actually judged.
+
+    ``evidence_level`` records *why* the user is confident (the guardrail against a
+    confirmation-bias loop): a reference-standard confirmation is weighted far above a visual guess.
+    """
+
+    __tablename__ = "assignment_verification"
+
+    assignment_verification_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    sample_item_id: Mapped[str] = mapped_column(
+        String(16),
+        ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
+        index=True,
+    )
+    # Provenance link to the judged assignment row; SET NULL so the label outlives a re-run.
+    peak_assignment_id: Mapped[Optional[str]] = mapped_column(
+        String(32),
+        ForeignKey("peak_assignment.peak_assignment_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    peak_assignment_run_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    # Stable identity (survives re-runs): observed peak + judged formula/adduct.
+    sample_peak_id: Mapped[str] = mapped_column(String(20), index=True)
+    assigned_formula: Mapped[Optional[str]] = mapped_column(String(256))
+    ionization_mechanism_id: Mapped[Optional[str]] = mapped_column(String(16))
+    verdict: Mapped[str] = mapped_column(String(16))
+    evidence_level: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    # Score snapshot at verification time (p_correct null when uncalibrated).
+    fit_score: Mapped[Optional[float]] = mapped_column(Float)
+    evidence: Mapped[Optional[float]] = mapped_column(Float)
+    p_correct: Mapped[Optional[float]] = mapped_column(Float)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    context: Mapped[Optional[dict]] = mapped_column(JSON)
+    verified_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("user.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    verified_utc: Mapped[dt] = mapped_column(
+        TIMESTAMP(timezone=True), default=lambda: dt.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "verdict IN ('confirmed', 'rejected', 'unsure')", name="verdict_valid"
+        ),
+        CheckConstraint(
+            "evidence_level IS NULL OR evidence_level IN "
+            "('reference_standard', 'msms', 'orthogonal', 'pattern', 'visual')",
+            name="evidence_level_valid",
+        ),
+        Index(
+            "ix_assignment_verification_identity",
+            "sample_item_id",
+            "sample_peak_id",
+        ),
+    )
+
+
 __all__ = [
     "Base",
     "Workspace",
@@ -1375,4 +1446,5 @@ __all__ = [
     "ReferenceSource",
     "ReferenceCompound",
     "AssignmentCalibration",
+    "AssignmentVerification",
 ]
