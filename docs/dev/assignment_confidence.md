@@ -340,25 +340,33 @@ no backend or DB, only `mascope_tools` + tests.
   **target-decoy design on the real demo spectra**: for each true detection (its primary
   `[M+H]+`/`[M-H]-` envelope fits a real peak at m/z `p`), check whether a peak sits at each of the
   compound's *other* adduct m/z's, versus two nulls. Choice of null is everything:
-  - **random offset** (a peak at `p + random Δ`): P = 0.008 → an inflated **~78×** LR.
-  - **anchor-swap** (the *same* real adduct offset re-anchored on a random real peak): P = 0.204 →
+  - **random offset** (a peak at `p + random Δ`): P = 0.008 → an inflated **~104×** LR.
+  - **anchor-swap** (the *same* real adduct offset re-anchored on a random real peak): P = 0.251 →
     a defensible **~2.5×** LR. Adduct offsets like +NH₃ (17.027 Da) are generic mass differences
     that recur throughout a spectrum, so the random null is far too easy. The anchor-swap null is
     the honest one.
 
-  Full run (152 files, 13,270 detections, 29,584 real adduct slots). The weight is strongly
-  **adduct-specific** — distinctive reagent adducts corroborate, generic ones barely:
+  **Adduct panel — use the operative one.** The panel must be the mechanisms actually assigned in
+  the data, verified against the `ionization_mechanism` library — **not** the guessed `CHANNELS`
+  in `make_candidates.py`. Only five mechanisms are ever assigned in the demo: `+H+`, `+NH4+`,
+  `+(CH4N2O)H+` (pos) and `-H+`, `+Br-` (neg). An earlier run wrongly included `+HBrBr-` (**not a
+  real mechanism** — a scratch-script invention, ~1 Da off the real `+Br2-`) and `+CO3-` (defined
+  but **never assigned** here); both are excluded below. `+Br2-`/`+Br3-`/`+NO3-`/`+CO3-` are defined
+  but unused in this dataset. `+NH4+` is real — in fact the *most common* positive adduct.
+
+  Full run (152 files, 13,270 detections). The weight is strongly **adduct-specific** — the
+  chemically distinctive bromide corroborates strongly, the generic pos adducts barely:
 
   | adduct | P(real) | P(swap) | LR | log-odds |
   |---|---|---|---|---|
-  | `+Br-`        | 0.535 | 0.112 | **9.1×** | +2.21 |
-  | `+HBrBr-`     | 0.114 | 0.016 | **7.7×** | +2.04 |
-  | `+CO3-`       | 0.119 | 0.036 | 3.6× | +1.29 |
-  | `+NH4+`       | 0.513 | 0.311 | 2.3× | +0.85 |
-  | `+(CH4N2O)H+` | 0.379 | 0.229 | 2.0× | +0.72 |
+  | `+Br-`        | 0.535 | 0.105 | **9.8×** | +2.28 |
+  | `+NH4+`       | 0.513 | 0.314 | 2.3× | +0.83 |
+  | `+(CH4N2O)H+` | 0.379 | 0.232 | 2.0× | +0.70 |
 
-  By polarity: neg **5.9×**, pos **2.2×**. So corroboration is a **real but modest, adduct-specific**
-  signal — not the dominant factor the naive 78× implied.
+  By polarity: neg **9.8×** (bromide is chemically distinctive — mass defect + 1:1 ⁷⁹/⁸¹Br isotope
+  pair), pos **2.1×** (the +NH₃/+urea offsets are generic mass differences). So corroboration is a
+  **real but modest, adduct-specific** signal — not the dominant factor the naive random-null 104×
+  implied.
 
   **Recommendation for the fold-in.** Replace the adduct-agnostic count heuristic
   (`corroboration = 1 − 2^-(n−1)`, kept only for display/summary) with an **additive per-adduct
