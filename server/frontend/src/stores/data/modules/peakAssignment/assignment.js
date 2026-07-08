@@ -29,10 +29,18 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
     },
     {
       key,
-      deps: () => ({
-        sample_item_id: useSample().focusedId,
-        peak_assignment_run_id: usePeakAssignmentRun().focusedId ?? null
-      }),
+      deps: () => {
+        const sample_item_id = useSample().focusedId
+        const run = usePeakAssignmentRun().focused
+        // Guard against a stale run from the previously focused sample: only
+        // fetch with a run id that belongs to the current sample. On a sample
+        // switch the run store briefly still holds the old sample's run; using
+        // it would 404. Null here (skip the fetch) until the run store
+        // re-focuses this sample's latest run, then deps update and we load.
+        const peak_assignment_run_id =
+          run && run.sample_item_id === sample_item_id ? run.peak_assignment_run_id : null
+        return { sample_item_id, peak_assignment_run_id }
+      },
       selection: true
     }
   )
