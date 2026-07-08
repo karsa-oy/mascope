@@ -6,7 +6,7 @@ import { useWindowSize } from '@vueuse/core'
 import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 
-import { PaneBrowserPeak, PanePeakAssign } from '@/lib/panes'
+import { PanePeakAssign } from '@/lib/panes'
 import { ChartSampleSpectrum } from '@/lib/charts'
 
 const { height } = useWindowSize()
@@ -41,7 +41,6 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
       </SplitterPanel>
       <SplitterPanel>
         <div class="row">
-          <PaneBrowserPeak :height="bottomHeight - 3" />
           <PanePeakAssign :height="bottomHeight - 3" />
         </div>
       </SplitterPanel>

@@ -44,7 +44,7 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
 
   // Peak-join map keyed by String(sample_peak_id): the peak list keys peaks by
   // `peak_id`, which the engine stringifies into `sample_peak_id`. Consumed by
-  // PaneBrowserPeak (the ledger) and ChartSampleSpectrum (tier coloring).
+  // ChartSampleSpectrum (tier coloring) and the peak inspector.
   const byPeakId = computed(() => {
     const map = new Map()
     for (const record of data.list.value) {
@@ -57,8 +57,48 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
   const forPeak = (peakId) =>
     peakId == null ? null : (byPeakId.value.get(String(peakId)) ?? null)
 
-  // Confidence-tier histogram for the ledger header and the run summary. Roles
-  // reagent/artifact are counted separately (orthogonal to tier).
+  // Map peak_assignment_id -> record, for owner/child lookups.
+  const byId = computed(() => {
+    const map = new Map()
+    for (const record of data.list.value) map.set(record.peak_assignment_id, record)
+    return map
+  })
+
+  // iso_child rows (M+1, M+2 ...) grouped by their M0 owner's peak_assignment_id.
+  const childrenByOwner = computed(() => {
+    const map = new Map()
+    for (const record of data.list.value) {
+      if (record.role === 'iso_child' && record.owner_peak_assignment_id != null) {
+        const siblings = map.get(record.owner_peak_assignment_id) ?? []
+        siblings.push(record)
+        map.set(record.owner_peak_assignment_id, siblings)
+      }
+    }
+    return map
+  })
+
+  // Isotopologue children of an M0 assignment (by its peak_assignment_id).
+  const childrenOf = (peakAssignmentId) =>
+    peakAssignmentId == null ? [] : (childrenByOwner.value.get(peakAssignmentId) ?? [])
+
+  // The full isotopologue family (M0 + its children), ordered by m/z, for any
+  // member of the family. Consumed by the peak inspector.
+  const familyOf = (assignment) => {
+    if (!assignment) return []
+    const m0 =
+      assignment.role === 'iso_child'
+        ? byId.value.get(assignment.owner_peak_assignment_id)
+        : assignment
+    if (!m0) return [assignment]
+    return [m0, ...childrenOf(m0.peak_assignment_id)].sort(
+      (a, b) => a.sample_peak_mz - b.sample_peak_mz
+    )
+  }
+
+  // Confidence-tier histogram for the run summary. iso_child satellites are
+  // folded into their M0 and NOT counted, so the tiers count assigned formulas
+  // (and unassigned peaks), not every isotopologue peak. Roles reagent/artifact
+  // are counted separately (orthogonal to tier).
   const tierCounts = computed(() => {
     const counts = {
       identified: 0,
@@ -68,6 +108,7 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
       reagent: 0
     }
     for (const record of data.list.value) {
+      if (record.role === 'iso_child') continue
       if (record.role === 'reagent' || record.role === 'artifact') {
         counts.reagent += 1
       } else {
@@ -82,6 +123,9 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
     run,
     byPeakId,
     forPeak,
+    byId,
+    childrenOf,
+    familyOf,
     tierCounts
   }
 })
