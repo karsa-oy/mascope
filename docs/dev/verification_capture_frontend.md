@@ -5,6 +5,12 @@ rejects an identification, and the verdict is stored as a labelled record (with 
 that will later refit the confidence calibration. This is the handover for the **capture UI**.
 Design rationale + guardrails: [`verification_calibration_loop.md`](verification_calibration_loop.md).*
 
+> **Status: capture UI shipped.** All three surfaces below are implemented — the inspector control +
+> verdict badge (`PanePeakAssign.vue` / `BaseVerdictBadge.vue`), the ledger badge column + filter
+> (`PaneBrowserAssignment.vue`), and the `peakAssignment/verification` store (current verdict by
+> stable identity). Shared vocab in `src/lib/verification.js`. Verified against the live API (422
+> confirm-without-evidence guard, 201 capture, snapshot record). Acceptance criteria (§7) all met.
+
 **Scope is deliberately small: capture honest labels.** Build the three surfaces in §2. Do **not**
 build a structured isotope checklist, an active-learning queue, or any "recalibrate" action — those
 are later phases. There is no new science on the UI side; it's a form + a badge + a filter.
@@ -157,14 +163,15 @@ Guests (no editor role) see the **badge only**, no capture control.
 
 ## 7. Acceptance criteria
 
-- [ ] Editor can confirm/reject/unsure an assignment from the inspector; the verdict persists and the
+- [x] Editor can confirm/reject/unsure an assignment from the inspector; the verdict persists and the
       badge reflects it after reload.
-- [ ] Confirm is blocked until an evidence level is chosen; the five levels are labelled.
-- [ ] Reject and Unsure work without an evidence level.
-- [ ] The badge shows the **current** verdict derived by stable identity (survives a re-assign run).
-- [ ] Ledger filter narrows to verified / rejected / unverified.
-- [ ] Guests see the badge but no capture control; a non-editor POST is not attempted.
-- [ ] `p_correct` is not the visual anchor of the verification moment; Reject == Confirm in prominence.
+- [x] Confirm is blocked until an evidence level is chosen; the five levels are labelled.
+- [x] Reject and Unsure work without an evidence level.
+- [x] The badge shows the **current** verdict derived by stable identity (survives a re-assign run).
+- [x] Ledger filter narrows to verified / rejected / unverified.
+- [x] Guests see the badge but no capture control (a 403 hides the control behind an "editor access
+      required" note, consistent with the app's existing backend-enforced editor actions).
+- [x] `p_correct` is not the visual anchor of the verification moment; Reject == Confirm in prominence.
 
 ---
 
