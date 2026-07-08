@@ -380,6 +380,16 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
               "
               >&mdash;</span
             >
+            <span
+              v-if="data.provenance?.corroboration?.n_adducts > 1"
+              class="corrob-mark"
+              v-tooltip.top="
+                `Supported by ${data.provenance.corroboration.n_adducts} adducts (already folded into P(correct))`
+              "
+              ><span class="pi ph ph-link-simple" />{{
+                data.provenance.corroboration.n_adducts
+              }}</span
+            >
           </template>
         </Column>
       </DataTable>
@@ -526,6 +536,19 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
 .pcorrect .prov {
   color: var(--p-orange-500, #f59e0b);
   margin-left: 0.05rem;
+}
+/* Adduct-corroboration marker beside P(correct). */
+.corrob-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-teal-600, #0d9488);
+}
+.corrob-mark .pi {
+  font-size: 0.75rem;
 }
 
 .menu-row {
