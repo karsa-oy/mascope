@@ -198,9 +198,19 @@ def invert_matches_to_peak_assignments(
     if match_isotope_df.empty:
         return []
 
+    # A peak may only be OWNED by a target isotopologue whose pairing is within
+    # tolerance. The targeted matcher pairs each target isotope to the nearest peak in a
+    # wide 0.5 Da search window (for the legacy Match tab's ppm-error display), then
+    # `apply_match_params` zeroes `sample_peak_intensity` for pairings outside the m/z /
+    # abundance tolerance. Without this guard a trace isotopologue whose real peak is
+    # absent claims whatever peak sits in that window - tens to hundreds of ppm off, and
+    # actually belonging to another compound - inheriting its ion's tier and blocking that
+    # peak's correct assignment (Stage B or another target). Requiring a positive gated
+    # intensity releases those peaks to the untargeted stage instead.
     matched = match_isotope_df[
         match_isotope_df["sample_peak_id"].notna()
         & (match_isotope_df["sample_peak_id"] != "")
+        & (match_isotope_df["sample_peak_intensity"].fillna(0) > 0)
     ].copy()
     if matched.empty:
         return []
