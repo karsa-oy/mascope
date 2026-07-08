@@ -91,6 +91,7 @@ def upgrade() -> None:
         sa.Column("ion_formula", sa.String(length=4096), nullable=True),
         sa.Column("ionization_mechanism_id", sa.String(length=16), nullable=True),
         sa.Column("isotope_label", sa.String(length=64), nullable=True),
+        sa.Column("isotope_formula", sa.String(length=256), nullable=True),
         sa.Column("source", sa.String(length=16), nullable=True),
         sa.Column("match_score", sa.Float(), nullable=True),
         sa.Column("mz_error_ppm", sa.Float(), nullable=True),

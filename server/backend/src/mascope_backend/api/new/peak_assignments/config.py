@@ -7,7 +7,7 @@ from mascope_backend.api.new.cheminfo.config import cheminfo_config
 
 # Bump when the assignment algorithm changes in a way that affects results.
 # Stored on every PeakAssignmentRun so runs stay reproducible and comparable.
-PEAK_ASSIGNMENT_ENGINE_VERSION = "0.1.0"
+PEAK_ASSIGNMENT_ENGINE_VERSION = "0.2.0"
 
 
 class PeakAssignmentConfig(BaseModel):

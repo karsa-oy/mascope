@@ -1147,6 +1147,11 @@ class PeakAssignment(Base):
         index=True,
     )
     isotope_label: Mapped[Optional[str]] = mapped_column(String(64))
+    # Full isotopologue formula of the matched isotope (e.g. "[15N]CH5BrNO+"),
+    # from which the UI renders the compact substitution label ("[15N]").
+    # NULL for untargeted satellites without a predicted formula and for
+    # unassigned peaks. Mirrors target_isotope.target_isotope_formula.
+    isotope_formula: Mapped[Optional[str]] = mapped_column(String(256))
     source: Mapped[Optional[str]] = mapped_column(String(16))
     # The fit score (mascope_tools score_pattern_v2): how well the observed data
     # fit this assignment's predicted pattern. [0, 1], 1.0 = perfect; NULL for an
