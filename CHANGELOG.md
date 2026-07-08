@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [2026.07.08]
+
 ### Added
 
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
@@ -21,9 +23,16 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   health check, and applies a migration update once its grace period elapses
   (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator runs `mascope prod
   update --confirm`; `mascope prod update --snooze N` postpones it. A failed
-  health check alerts and stops without rolling back automatically. Requires the
-  server to be pinned to a release tag with read access to the repository
-  releases.
+  health check alerts and stops without rolling back automatically. Release
+  discovery uses the public GitHub API over plain HTTPS, so no token is needed.
+  `tooling/ubuntu.sh` installs the systemd units (the update timer left disabled
+  until you opt in), and `docs/maintaining.md` is the operator runbook covering
+  provisioning, updates, backups, and troubleshooting.
+- The web UI now survives a full page reload. The active selection chain
+  (workspace -> dataset -> batch -> sample -> collection -> ion) is persisted to
+  browser storage and restored on load, so a reload - whether from an
+  auto-update restarting the backend, a transient network failure, or pressing
+  F5 - lands you back where you were instead of near the top of the navigation.
 
 ### Changed
 
