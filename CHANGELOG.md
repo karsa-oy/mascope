@@ -33,6 +33,14 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   browser storage and restored on load, so a reload - whether from an
   auto-update restarting the backend, a transient network failure, or pressing
   F5 - lands you back where you were instead of near the top of the navigation.
+- You can now share a link to a specific view. A "Copy link to this view" action
+  in the toolbar copies a URL that reopens Mascope at your current selection
+  (workspace -> dataset -> batch -> sample, plus the focused peak or match ion);
+  opening the link restores that view for the recipient, provided they can access
+  the same data. The address bar stays clean during normal use - sharing is
+  explicit - and if part of a shared view can't be opened (for example no access
+  to a workspace), the app opens as much as it can and says what it could not.
+  When a newer build has been deployed, a dismissible banner offers to reload.
 
 ### Changed
 
