@@ -318,22 +318,39 @@ const formatFit = (value) =>
 // the envelope is shown in full.
 const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssignment.value))
 
-// Observed relative abundance of each isotopologue = its peak intensity over
-// the M0 peak's intensity (M0 = 100%).
-const m0Intensity = computed(() => {
-  const m0 = family.value.find((f) => f.role === 'M0' || f.isotope_label === 'M0')
-  return m0?.sample_peak_intensity ?? null
-})
+// Main isotope (M0) of the family; theoretical abundances are relative to it.
+const m0 = computed(
+  () => family.value.find((f) => f.role === 'M0' || f.isotope_label === 'M0') ?? null
+)
+
+// Theoretical (predicted) relative abundance of an isotopologue as a fraction of
+// M0, recovered from the stored fields. The matcher defines
+//   abundance_error = observed_rel / theoretical_rel - 1,  observed_rel = I / I(M0)
+// so theoretical_rel = observed_rel / (1 + abundance_error). Exact where M0 is
+// the main isotope (all CHNO species); persisting the predicted abundance would
+// remove that caveat.
+const theoreticalRel = (iso) => {
+  const base = m0.value?.sample_peak_intensity
+  if (!base || base <= 0 || iso.sample_peak_intensity == null) return null
+  const observed = iso.sample_peak_intensity / base
+  const denom = 1 + (iso.abundance_error ?? 0)
+  return denom > 0 ? observed / denom : null
+}
 const relAbuFmt = new Intl.NumberFormat('en-US', {
   style: 'percent',
   minimumFractionDigits: 0,
   maximumFractionDigits: 1
 })
-const relAbundance = (iso) => {
-  const base = m0Intensity.value
-  return base && base > 0 && iso.sample_peak_intensity != null
-    ? relAbuFmt.format(iso.sample_peak_intensity / base)
-    : '-'
+const formatRel = (value) => (value != null ? relAbuFmt.format(value) : '-')
+
+// Per-isotopologue match quality, mirroring the matcher's abundance x mz terms,
+// to flag poorly-matched satellites (coincidental peaks in the window). M0 is
+// the reference and never "poor".
+const isPoorMatch = (iso) => {
+  if (iso.role === 'M0' || iso.isotope_label === 'M0') return false
+  const ab = iso.abundance_error != null ? 1 - Math.min(1, Math.abs(iso.abundance_error)) : 1
+  const mz = iso.mz_error_ppm != null ? Math.max(0, 1 - 0.01 * Math.abs(iso.mz_error_ppm)) : 1
+  return ab * mz < 0.5
 }
 </script>
 
@@ -420,26 +437,41 @@ const relAbundance = (iso) => {
           </div>
         </div>
         <div v-if="family.length > 1" class="isotopologues">
-          <div class="alts-label">Isotopologues</div>
+          <div class="alts-label">
+            Isotopologues
+            <span class="alts-count" v-tooltip.top="'Predicted relative abundance (fraction of M0)'"
+              >theo. abu.</span
+            >
+          </div>
           <div class="iso-head">
-            <span>iso</span><span>m/z</span><span>error</span><span>rel.</span><span>fit</span>
+            <span>iso</span><span>m/z</span><span>ppm</span><span>abu.</span>
           </div>
           <div class="iso-rows">
             <div
               v-for="iso in family"
               :key="iso.peak_assignment_id"
               class="iso-row"
-              :class="{ current: iso.sample_peak_id === focusedAssignment.sample_peak_id }"
-              v-tooltip.left="'Focus this isotopologue peak'"
+              :class="{
+                current: iso.sample_peak_id === focusedAssignment.sample_peak_id,
+                poor: isPoorMatch(iso)
+              }"
+              v-tooltip.left="
+                isPoorMatch(iso)
+                  ? 'Poorly matched isotopologue (abundance / m/z off) - click to focus'
+                  : 'Focus this isotopologue peak'
+              "
               @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
             >
-              <span class="iso-label">{{ iso.isotope_label || '—' }}</span>
+              <span class="iso-label"
+                ><span v-if="isPoorMatch(iso)" class="pi ph ph-warning poor-icon" />{{
+                  iso.isotope_label || '—'
+                }}</span
+              >
               <span class="iso-mz">{{ num.mz.format(iso.sample_peak_mz) }}</span>
               <span class="iso-err">{{
                 iso.mz_error_ppm != null ? `${num.mzError.format(iso.mz_error_ppm)}` : '—'
               }}</span>
-              <span class="iso-rel">{{ relAbundance(iso) }}</span>
-              <span class="iso-fit">{{ formatFit(iso.fit_score) }}</span>
+              <span class="iso-rel">{{ formatRel(theoreticalRel(iso)) }}</span>
             </div>
           </div>
         </div>
@@ -729,7 +761,8 @@ const relAbundance = (iso) => {
   text-overflow: ellipsis;
 }
 
-/* Peak inspector: the committed assignment for the focused peak. */
+/* Peak inspector: the committed assignment for the focused peak. Capped width
+   so the isotopologue/alternatives tables don't stretch across the full pane. */
 .inspector {
   display: flex;
   flex-direction: column;
@@ -738,6 +771,9 @@ const relAbundance = (iso) => {
   border: 1px solid var(--p-content-border-color, #e3e6ec);
   border-radius: 8px;
   background: var(--p-content-background, transparent);
+  max-width: 34rem;
+  align-self: start;
+  width: 100%;
 }
 .insp-head {
   display: flex;
@@ -818,7 +854,7 @@ const relAbundance = (iso) => {
 .iso-head,
 .iso-row {
   display: grid;
-  grid-template-columns: 2.6rem 1fr auto 3rem 2.8rem;
+  grid-template-columns: 3.4rem 1fr auto 3.4rem;
   gap: 0.5rem;
   align-items: baseline;
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -851,12 +887,23 @@ const relAbundance = (iso) => {
 }
 .iso-row .iso-label {
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
 }
 .iso-row .iso-err,
-.iso-row .iso-rel,
-.iso-row .iso-fit {
+.iso-row .iso-rel {
   opacity: 0.7;
   text-align: right;
+}
+/* Poorly-matched satellites: muted text + a warning marker, so a well-matched
+   envelope reads at a glance. The current-row highlight still shows through. */
+.iso-row.poor {
+  color: var(--p-surface-400, #9aa2b1);
+}
+.poor-icon {
+  color: var(--p-orange-500, #f59e0b);
+  font-size: 0.68rem;
+  margin-right: 0.2rem;
 }
 
 /* Close alternatives can be dozens of candidates: cap the height and scroll. */
