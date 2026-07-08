@@ -1,8 +1,7 @@
-import { computed, watch } from 'vue'
+import { watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { makeLogger } from '@/lib/logging'
-import { debounce } from '@/lib/utils'
 import { useApp } from '@/stores'
 import { useAuth } from '@/stores/auth'
 
@@ -41,10 +40,6 @@ const LEVEL_LABELS = {
   collection: 'collection',
   ions: 'ion'
 }
-
-// Debounce for mirroring the location into the address bar; collapses the burst
-// of intermediate changes while a chain converges into a single URL write.
-const MIRROR_DEBOUNCE_MS = 400
 
 // Resolve a dotted store path (e.g. 'match.collection') against app.data.
 const resolveStore = (data, path) => path.split('.').reduce((node, part) => node?.[part], data)
@@ -294,10 +289,9 @@ export const useLocation = defineStore('app.location', () => {
 
   /**
    * If the current URL carries a shared location, apply it (winning over the
-   * personal snapshot) and schedule an access check. When mirroring is off the
-   * query is stripped so a later manual reload falls through to the personal
-   * snapshot; when mirroring is on the mirror keeps the address bar in sync, so
-   * the query is left for it to manage.
+   * personal snapshot) and schedule an access check, then strip the query so the
+   * address bar stays clean. The applied location is written to the personal
+   * snapshot as the chain focuses, so a later manual reload restores it.
    */
   const importFromUrl = () => {
     const search = window.location.search
@@ -306,39 +300,14 @@ export const useLocation = defineStore('app.location', () => {
     const loc = locationFromQuery(search)
     logger.log('opening shared location from URL')
     apply(loc)
-    if (!mirroring) window.history.replaceState({}, '', window.location.pathname)
+    window.history.replaceState({}, '', window.location.pathname)
     verifyApplied(loc)
     return true
-  }
-
-  // --- URL mirroring ---
-  // Continuously reflect the current location into the address bar so it is
-  // always bookmarkable/shareable, using replaceState (not pushState) so we do
-  // not flood browser history.
-  let mirroring = false
-
-  const writeUrl = (loc) => {
-    const url = locationToUrl(loc, {
-      origin: window.location.origin,
-      pathname: window.location.pathname
-    })
-    const target = url.slice(window.location.origin.length)
-    if (target !== window.location.pathname + window.location.search) {
-      window.history.replaceState({}, '', url)
-    }
-  }
-
-  const enableMirroring = () => {
-    if (mirroring) return
-    mirroring = true
-    const current = computed(read)
-    const mirror = debounce((loc) => writeUrl(loc), MIRROR_DEBOUNCE_MS)
-    watch(current, (loc) => mirror(loc))
   }
 
   // Import a shared location once the user is authenticated and the stores
   // start loading; the lazy targets set by apply() win the ensuing refocus.
   useAuth().onLogin(() => importFromUrl())
 
-  return { read, apply, shareUrl, copyShareLink, importFromUrl, enableMirroring }
+  return { read, apply, shareUrl, copyShareLink, importFromUrl }
 })

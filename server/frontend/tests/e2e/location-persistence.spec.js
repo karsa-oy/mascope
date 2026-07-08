@@ -57,20 +57,16 @@ test.describe('UI location persistence', () => {
       .poll(() => copyLink(page), { timeout: 20_000 })
       .toContain(`b=${batch.sample_batch_id}`)
 
-    // Mirroring keeps the address bar in sync with the restored location, so
-    // the query reflects the batch rather than being stripped.
-    await expect
-      .poll(() => page.evaluate(() => window.location.search))
-      .toContain(`b=${batch.sample_batch_id}`)
+    // The query is stripped after import so the address bar stays clean; the
+    // applied location lives on in the personal snapshot for a later reload.
+    await expect.poll(() => page.evaluate(() => window.location.search)).toBe('')
   })
 
-  test('mirrors the focused batch into the address bar', async ({ page, scratch }) => {
-    const batch = await scratch.createBatch(`e2e-mirror-${scratch.id}`)
+  test('keeps the address bar clean during normal navigation', async ({ page, scratch }) => {
+    const batch = await scratch.createBatch(`e2e-clean-${scratch.id}`)
     await focusBatch(page, scratch, batch)
 
-    // Focusing a batch is reflected in the URL without any explicit share action.
-    await expect
-      .poll(() => page.evaluate(() => window.location.search), { timeout: 10_000 })
-      .toContain(`b=${batch.sample_batch_id}`)
+    // Focusing data does not write the URL; sharing is explicit (copy link).
+    expect(await page.evaluate(() => window.location.search)).toBe('')
   })
 })

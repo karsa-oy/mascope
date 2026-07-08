@@ -22,11 +22,9 @@ const { connected } = api
 const app = useApp()
 const toast = useToast()
 
-// Instantiate the location store so it registers its shared-link import hook
-// (runs once the user authenticates), and mirror the location into the address
-// bar so the current view is always bookmarkable and shareable.
-const location = useLocation()
-location.enableMirroring()
+// Instantiate the location store so it registers its shared-link import hook,
+// which runs once the user authenticates.
+useLocation()
 
 // Watch for a newer frontend build shipped while the tab is open.
 useUpdate().start()
