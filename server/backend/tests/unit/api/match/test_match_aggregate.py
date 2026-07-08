@@ -345,6 +345,10 @@ class TestReconstructFullIsotopeFrame:
         assert result.loc["iB", "sample_peak_tof"] == -1.0
         assert result.loc["iB", "sample_peak_mz"] == 101.0  # target m/z
 
+        # has_record marks the stored match vs. the reconstructed placeholder.
+        assert bool(result.loc["iA", "has_record"]) is True
+        assert bool(result.loc["iB", "has_record"]) is False
+
         # Below-threshold and wrong-resolution isotopes are not reconstructed.
         assert "iC" not in result.index
         assert "iD" not in result.index
@@ -402,6 +406,8 @@ class TestReconstructFullIsotopeFrame:
 
         assert set(result["target_isotope_id"]) == {"iA", "iB"}
         assert (result["match_score"] == 0.0).all()
+        # Nothing was stored, so no isotope has a record (all tags hidden).
+        assert (~result["has_record"]).all()
 
     def test_aggregate_score_matches_matched_only(self):
         # Reconstructed unmatched rows (score 0, intensity 0) must not change the
