@@ -136,6 +136,29 @@ const rows = computed(() => {
   list.sort((a, b) => a.tierRank - b.tierRank || (b.fit_score ?? -1) - (a.fit_score ?? -1))
   return list
 })
+
+// Two-way selection tied to the focused peak: clicking a row focuses its peak,
+// and focusing a peak elsewhere (spectrum click, inspector) highlights its row.
+// When a folded-out isotopologue is focused, highlight its M0 row.
+const selectedRow = computed({
+  get: () => {
+    const focused = app.data.peak.focused
+    if (!focused) return null
+    const assignment = assignments.value.forPeak(focused.peak_id)
+    const ownerId =
+      assignment?.role === 'iso_child'
+        ? assignment.owner_peak_assignment_id
+        : assignment?.peak_assignment_id
+    if (ownerId != null) return rows.value.find((r) => r.peak_assignment_id === ownerId) ?? null
+    return rows.value.find((r) => String(r.sample_peak_id) === String(focused.peak_id)) ?? null
+  },
+  set: (row) => {
+    if (row) focusPeak(row)
+  }
+})
+
+// Isotopologue satellites folded under a formula's M0.
+const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).length
 </script>
 
 <template>
@@ -217,7 +240,7 @@ const rows = computed(() => {
         :sortOrder="1"
         selectionMode="single"
         :metaKeySelection="false"
-        @row-click="({ data }) => focusPeak(data)"
+        v-model:selection="selectedRow"
       >
         <Column field="sample_peak_mz" header="m/z" sortable style="min-width: 6rem">
           <template #body="{ data }">{{ num.mz.format(data.sample_peak_mz) }}</template>
@@ -225,6 +248,12 @@ const rows = computed(() => {
         <Column field="assigned_formula" header="formula" sortable style="min-width: 6rem">
           <template #body="{ data }">
             <span class="formula">{{ data.assigned_formula || '—' }}</span>
+            <span
+              v-if="isoCount(data)"
+              class="iso-count"
+              v-tooltip.top="`${isoCount(data)} isotopologue peak${isoCount(data) === 1 ? '' : 's'}`"
+              >+{{ isoCount(data) }}</span
+            >
           </template>
         </Column>
         <Column field="tierRank" header="tier" sortable style="min-width: 7rem">
@@ -359,6 +388,13 @@ const rows = computed(() => {
 .formula {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.82rem;
+}
+.iso-count {
+  margin-left: 0.35rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  opacity: 0.55;
+  vertical-align: super;
 }
 
 .menu-row {

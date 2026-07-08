@@ -183,6 +183,7 @@ watchDebounced(
     if (!chemConfig.value) return {}
 
     return {
+      searchEnabled: showSearch.value,
       peakFocused: app.data.peak.focused ? app.data.peak.focused.mz : null,
       sampleId: app.data.sample.focusedId,
       mzPrecision: params.mzPrecision,
@@ -192,6 +193,15 @@ watchDebounced(
   },
   // The callback function that runs 800ms after dependencies stop changing
   async (deps) => {
+    // Only search when the user has explicitly opened it (Re-search). Otherwise
+    // the inspector shows the committed assignment and we must not fire a
+    // background composition search on every focused peak or isotopologue.
+    if (!deps.searchEnabled) {
+      results.value = []
+      loading.value = false
+      lastRequestParams.value = null
+      return
+    }
     // Skip if config not loaded or no peak selected
     if (!chemConfig.value || !deps.peakFocused || !deps.mzPrecision || !deps.formulaRange) {
       results.value = []
@@ -307,6 +317,24 @@ const formatFit = (value) =>
 // satellites are folded out of the assignments table; the inspector is where
 // the envelope is shown in full.
 const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssignment.value))
+
+// Observed relative abundance of each isotopologue = its peak intensity over
+// the M0 peak's intensity (M0 = 100%).
+const m0Intensity = computed(() => {
+  const m0 = family.value.find((f) => f.role === 'M0' || f.isotope_label === 'M0')
+  return m0?.sample_peak_intensity ?? null
+})
+const relAbuFmt = new Intl.NumberFormat('en-US', {
+  style: 'percent',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1
+})
+const relAbundance = (iso) => {
+  const base = m0Intensity.value
+  return base && base > 0 && iso.sample_peak_intensity != null
+    ? relAbuFmt.format(iso.sample_peak_intensity / base)
+    : '-'
+}
 </script>
 
 <template>
@@ -394,34 +422,41 @@ const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssig
         <div v-if="family.length > 1" class="isotopologues">
           <div class="alts-label">Isotopologues</div>
           <div class="iso-head">
-            <span>iso</span><span>m/z</span><span>error</span><span>fit</span>
+            <span>iso</span><span>m/z</span><span>error</span><span>rel.</span><span>fit</span>
           </div>
-          <div
-            v-for="iso in family"
-            :key="iso.peak_assignment_id"
-            class="iso-row"
-            :class="{ current: iso.sample_peak_id === focusedAssignment.sample_peak_id }"
-            v-tooltip.left="'Focus this isotopologue peak'"
-            @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
-          >
-            <span class="iso-label">{{ iso.isotope_label || '—' }}</span>
-            <span class="iso-mz">{{ num.mz.format(iso.sample_peak_mz) }}</span>
-            <span class="iso-err">{{
-              iso.mz_error_ppm != null ? `${num.mzError.format(iso.mz_error_ppm)}` : '—'
-            }}</span>
-            <span class="iso-fit">{{ formatFit(iso.fit_score) }}</span>
+          <div class="iso-rows">
+            <div
+              v-for="iso in family"
+              :key="iso.peak_assignment_id"
+              class="iso-row"
+              :class="{ current: iso.sample_peak_id === focusedAssignment.sample_peak_id }"
+              v-tooltip.left="'Focus this isotopologue peak'"
+              @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
+            >
+              <span class="iso-label">{{ iso.isotope_label || '—' }}</span>
+              <span class="iso-mz">{{ num.mz.format(iso.sample_peak_mz) }}</span>
+              <span class="iso-err">{{
+                iso.mz_error_ppm != null ? `${num.mzError.format(iso.mz_error_ppm)}` : '—'
+              }}</span>
+              <span class="iso-rel">{{ relAbundance(iso) }}</span>
+              <span class="iso-fit">{{ formatFit(iso.fit_score) }}</span>
+            </div>
           </div>
         </div>
         <div v-if="focusedAssignment.alternatives?.length" class="alts">
-          <div class="alts-label">Close alternatives</div>
-          <div v-for="(alt, i) in focusedAssignment.alternatives" :key="i" class="alt">
-            <span class="f">{{ alt.assigned_formula || alt.ion_formula || '?' }}</span>
-            <span class="s" v-if="alt.fit_score != null">
-              fit {{ formatFit(alt.fit_score)
-              }}<span v-if="alt.mz_error_ppm != null">
-                &middot; {{ num.mzError.format(alt.mz_error_ppm) }} ppm</span
-              >
-            </span>
+          <div class="alts-label">
+            Close alternatives <span class="alts-count">{{ focusedAssignment.alternatives.length }}</span>
+          </div>
+          <div class="alts-list">
+            <div v-for="(alt, i) in focusedAssignment.alternatives" :key="i" class="alt">
+              <span class="f">{{ alt.assigned_formula || alt.ion_formula || '?' }}</span>
+              <span class="s" v-if="alt.fit_score != null">
+                fit {{ formatFit(alt.fit_score)
+                }}<span v-if="alt.mz_error_ppm != null">
+                  &middot; {{ num.mzError.format(alt.mz_error_ppm) }} ppm</span
+                >
+              </span>
+            </div>
           </div>
         </div>
         <div class="insp-actions">
@@ -783,7 +818,7 @@ const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssig
 .iso-head,
 .iso-row {
   display: grid;
-  grid-template-columns: 3rem 1fr auto 3rem;
+  grid-template-columns: 2.6rem 1fr auto 3rem 2.8rem;
   gap: 0.5rem;
   align-items: baseline;
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -795,6 +830,13 @@ const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssig
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.5;
+}
+.iso-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: 12rem;
+  overflow-y: auto;
 }
 .iso-row {
   border-radius: 4px;
@@ -811,8 +853,26 @@ const family = computed(() => app.data.peakAssignment.peak.familyOf(focusedAssig
   font-weight: 600;
 }
 .iso-row .iso-err,
+.iso-row .iso-rel,
 .iso-row .iso-fit {
   opacity: 0.7;
   text-align: right;
+}
+
+/* Close alternatives can be dozens of candidates: cap the height and scroll. */
+.alts-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+.alts-count {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6rem;
+  opacity: 0.6;
+  border: 1px solid var(--p-content-border-color, #e3e6ec);
+  border-radius: 100px;
+  padding: 0 0.35rem;
+  margin-left: 0.2rem;
 }
 </style>
