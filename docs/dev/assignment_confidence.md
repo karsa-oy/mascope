@@ -304,7 +304,10 @@ no backend or DB, only `mascope_tools` + tests.
   also the basis of **user self-calibration**: a user runs their known standards, Mascope
   scores them + decoys and fits *their* instrument's curve. Per-instrument because the
   score's ingredients — mass accuracy, resolution, noise — differ by instrument, so the same
-  raw evidence means different confidence on an Orbitrap vs a TOF.
+  raw evidence means different confidence on an Orbitrap vs a TOF. The interactive
+  verification-driven version of this — users confirm/reject identifications in the UI to build
+  the golden set — is designed in
+  [`verification_calibration_loop.md`](verification_calibration_loop.md).
 
   **Status.** One **provisional Orbitrap** curve, fit from the demo bundle via
   `arbitration_eval.py --fit-calibration` (evidence → P(correct) over all candidates,

@@ -168,9 +168,15 @@ Validated `rule_senior` against the 92 demo target compounds:
   `calibration_store.load_calibration` reads the active row and falls back to the in-code
   provisional curve. The service loads it and passes it to the engine, which folds adduct
   corroboration into `p_correct`. *Remaining:* the "calibrate my instrument" UX (fit + write a
-  new active row from a user's standards+decoys run) is still open.
+  new active row from a user's standards+decoys run) is still open — designed in
+  [`verification_calibration_loop.md`](verification_calibration_loop.md) (interactive verification
+  → golden labels → refit), which is that UX's label source.
 - **D7. Recalibrate the fit-scale tier bands** (currently the 0.8/0.5 estimates) per
   instrument — a "what users see" decision.
+- **D9. Interactive verification → calibration golden set.** Human-in-the-loop confirm/reject in
+  the UI feeding `fit_calibration` per instrument. Designed in
+  [`verification_calibration_loop.md`](verification_calibration_loop.md); the central risk is the
+  confirmation-bias loop (guardrails recorded there).
 
 **E — ops**
 - **E8. Run the rename migration in prod/CI** and the migration test suite
