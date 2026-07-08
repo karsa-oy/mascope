@@ -22,6 +22,9 @@ from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
 )
+from mascope_backend.api.new.peak_assignments.service import (
+    auto_assign_sample_peaks,
+)
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     create_sample_batch,
     get_sample_batches,
@@ -72,9 +75,15 @@ CALIBRATION_ITERATIONS = 7
 
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
-    success_reload=[("match", "affected_sample_batch_ids")],
+    success_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
     error_notification_rooms=["instrument"],
-    error_reload=[("match", "affected_sample_batch_ids")],
+    error_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
 )
 async def auto_process_sample_file(
     sample_file_id: str,
@@ -194,6 +203,15 @@ async def auto_process_sample_file(
             parent_id=process_id,
         )
 
+        # Assign peaks (Stage A / database-first only) for the new sample. Runs
+        # after matching, isolates its own failures, and lets the parent emit the
+        # peak_assignment_reload below.
+        await auto_assign_sample_peaks(
+            sample_item_id=sample_item_id,
+            user_id=user_id,
+            parent_id=process_id,
+        )
+
     # --- Schedule rematch tasks for other affected samples --- #
     acquisition_sample_item_ids = {
         sample["sample_item_id"] for sample in acquisition_samples
@@ -244,9 +262,15 @@ async def auto_process_sample_file(
 
 @api_controller_background_task(
     success_notification_rooms=["user_id"],
-    success_reload=[("match", "affected_sample_batch_ids")],
+    success_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
     error_notification_rooms=["user_id"],
-    error_reload=[("match", "affected_sample_batch_ids")],
+    error_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
 )
 async def re_process_sample_files(
     sample_file_ids: list[str],

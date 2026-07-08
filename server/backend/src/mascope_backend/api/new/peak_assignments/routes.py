@@ -7,9 +7,13 @@ formula and confidence") and the endpoint that launches an assignment run.
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
+from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
+    fetch_sample_batch,
+)
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.lib.api_features import api_route
 from mascope_backend.api.new.auth.dependencies import current_active_user
+from mascope_backend.api.new.peak_assignments.batch import assign_sample_batch_peaks
 from mascope_backend.api.new.peak_assignments.schemas import (
     AssignSamplePeaksBody,
     CompositionFitBody,
@@ -29,6 +33,7 @@ from mascope_backend.api.new.peak_assignments.visualization import (
 )
 from mascope_backend.api.new.workspaces.dependencies import (
     check_sample_access,
+    require_batch_role,
     require_sample_role,
 )
 from mascope_backend.db import User
@@ -126,6 +131,52 @@ async def assign_sample_peaks_route(
     return {
         "message": (
             f"Assigning peaks for sample '{sample.sample_item_name}', please wait."
+        ),
+        "process_id": process_id,
+    }
+
+
+@peak_assignments_router.post("/batch/{sample_batch_id}/assign")
+@api_route(status_code=202, token_access=True)
+async def assign_sample_batch_peaks_route(
+    sample_batch_id: str,
+    background_tasks: BackgroundTasks,
+    body: AssignSamplePeaksBody | None = None,
+    user: User = Depends(current_active_user),
+    membership=Depends(require_batch_role("editor")),
+) -> dict:
+    """
+    Launch a peak assignment run for every sample in a sample batch.
+
+    Assigns a composition to every observed peak of each sample: first from the
+    known target library (Stage A), then via untargeted composition search for
+    the remainder (Stage B, configurable). Each sample gets its own
+    PeakAssignmentRun, readable via the sample GET endpoints. A batch run is a
+    deliberate, potentially heavy operation, so it defaults to the full two-stage
+    engine unless the body narrows the config.
+
+    :param sample_batch_id: The unique identifier of the sample batch.
+    :param body: Optional run configuration overrides applied to every sample.
+    :param user: The current authenticated user. Requires workspace editor role.
+    :param membership: Workspace membership with editor role on the batch.
+    :return: Acknowledgement message with the background process id.
+    """
+    # Verify the existence of the sample batch before queueing the task
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+
+    process_id = gen_id(8)
+    background_tasks.add_task(
+        assign_sample_batch_peaks,
+        sample_batch_id=sample_batch_id,
+        config=body.config if body else None,
+        independent_transaction=True,
+        user_id=user.id,
+        process_id=process_id,
+    )
+    return {
+        "message": (
+            f"Assigning peaks for sample batch '{sample_batch.sample_batch_name}', "
+            "please wait."
         ),
         "process_id": process_id,
     }

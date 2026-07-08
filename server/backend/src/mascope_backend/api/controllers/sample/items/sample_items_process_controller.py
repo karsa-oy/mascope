@@ -11,6 +11,9 @@ from mascope_backend.api.controllers.samples.samples_controller import get_sampl
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
+from mascope_backend.api.new.peak_assignments.service import (
+    auto_assign_sample_peaks,
+)
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
 )
@@ -23,9 +26,15 @@ from mascope_backend.socket.notifications import (
 
 @api_controller_background_task(
     success_notification_rooms=["user_id"],
-    success_reload=[("match", "affected_sample_batch_ids")],
+    success_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
     error_notification_rooms=["user_id"],
-    error_reload=[("match", "affected_sample_batch_ids")],
+    error_reload=[
+        ("match", "affected_sample_batch_ids"),
+        ("peak_assignment", "affected_sample_batch_ids"),
+    ],
 )
 async def process_sample_item(
     sample_item: SampleItemCreate,
@@ -96,6 +105,13 @@ async def process_sample_item(
         independent_transaction=False,
         user_id=user_id,
         process_id=gen_id(8),
+        parent_id=process_id,
+    )
+
+    # --- Assign peaks (Stage A / database-first only) for the sample item --- #
+    await auto_assign_sample_peaks(
+        sample_item_id=created_sample_item_id,
+        user_id=user_id,
         parent_id=process_id,
     )
 
