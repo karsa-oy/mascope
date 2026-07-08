@@ -9,7 +9,10 @@ instrument's confidence calibration. This closes the loop opened by the P2 calib
 **Status.** V1 (capture) backend is **shipped**: the `assignment_verification` table (migration
 `e4f2a7c9d3b1`), the `POST …/verify` + `GET …/verifications` API, and the frontend contract
 ([`verification_capture_frontend.md`](verification_capture_frontend.md), design branch). The V1 UI
-is being built from that contract. V2 (close the loop) and V3 (quality) are still design (below).
+is being built from that contract. V2 (close the loop) is **built** — `mascope_tools.recalibrate` +
+`calibration_store.save_calibration` + `recalibrate_instrument` + `POST /calibration/{instrument}/recalibrate`
+(superuser), verified on synthetic labels and live on the demo; it just waits on real V1-UI labels
+to switch on. V3 (quality) is still design (below).
 
 ## 1. Why
 
@@ -157,9 +160,14 @@ prophecy. Everything else here is secondary to getting this right.
   verified/rejected ledger filter — is handed to the frontend in
   [`verification_capture_frontend.md`](verification_capture_frontend.md) (guardrails 1, 2, 4, 5 baked
   in server-side + UX). No auto-calibration yet — just accumulate honest labels.
-- **V2 — close the loop.** Per-instrument aggregation + "recalibrate this instrument" →
-  `fit_calibration` → new active D6 row, with before/after ECE. Finishes the D6 "calibrate my
-  instrument" UX. *Buildable now on synthetic labels; real value waits on V1-UI labels accumulating.*
+- **V2 — close the loop. Built.** `mascope_tools.recalibrate` turns confirmed/rejected verdicts
+  (evidence snapshot = score) into a new Platt curve, carries the corroboration weights forward, and
+  reports before/after ECE; `calibration_store.save_calibration` writes it as the new active D6 row
+  (old rows kept as history); `recalibrate_instrument` gathers an instrument's labels and fits;
+  `POST /calibration/{instrument}/recalibrate` (superuser) drives it. The **provisional gate** is the
+  guardrail: the curve stays provisional unless ≥ `MIN_CALIBRATION_LABELS` positives carry strong
+  (reference-standard/MS-MS) evidence — visual-only confirmations can't graduate it. Verified on
+  synthetic labels + live on the demo. *Real value waits on V1-UI labels accumulating.*
 - **V3 — quality & scale.** Active-learning queue (guardrail 3), evidence-level weighting in the fit,
   refit of the corroboration weights, Schymanski-level surfacing on the assignment, and (optionally)
   cross-linking confirmations to `reference_compound` standards.
