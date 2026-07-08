@@ -7,19 +7,23 @@ import Splitter from 'primevue/splitter'
 import SplitterPanel from 'primevue/splitterpanel'
 
 import { PanePeakAssign } from '@/lib/panes'
-import { ChartSampleSpectrum } from '@/lib/charts'
+import { ChartSampleSpectrum, ChartAssignmentTimeseries } from '@/lib/charts'
 
 const { height } = useWindowSize()
 
 const padding = 180
 
 const storedState = localStorage.getItem('sample-tab-split')
-const [initTop, initBottom] = JSON.parse(storedState ?? '[50, 50]')
+const [initTop, initBottom] = JSON.parse(storedState ?? '[55, 45]')
 
 const topSplit = ref(initTop)
 const bottomSplit = ref(initBottom)
-const topHeight = computed(() => topSplit.value)
-const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.value) / 100 - 50)
+
+// Pixel heights of the two rows, used to nudge the Plotly charts to resize when
+// the splitter moves. The top row is split horizontally (inspector | spectrum);
+// the bottom row (time series) spans both.
+const topHeight = computed(() => ((height.value - padding) * topSplit.value) / 100)
+const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.value) / 100)
 </script>
 
 <template>
@@ -36,13 +40,18 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
         }
       "
     >
-      <SplitterPanel>
-        <ChartSampleSpectrum :height="topHeight" />
+      <SplitterPanel :size="55">
+        <Splitter class="top-splitter">
+          <SplitterPanel :size="42" class="inspector-panel">
+            <PanePeakAssign :height="topHeight - 3" />
+          </SplitterPanel>
+          <SplitterPanel :size="58">
+            <ChartSampleSpectrum :height="topHeight" />
+          </SplitterPanel>
+        </Splitter>
       </SplitterPanel>
-      <SplitterPanel>
-        <div class="row">
-          <PanePeakAssign :height="bottomHeight - 3" />
-        </div>
+      <SplitterPanel :size="45">
+        <ChartAssignmentTimeseries :height="bottomHeight" />
       </SplitterPanel>
     </Splitter>
   </div>
@@ -54,21 +63,16 @@ const bottomHeight = computed(() => ((height.value - padding) * bottomSplit.valu
   width: 100%;
 }
 
-.row {
-  display: flex;
-  flex-flow: row wrap;
+.top-splitter {
   height: 100%;
   width: 100%;
-  max-width: 100%;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  border: none;
 }
 
-.row > :deep(*) {
-  flex: 1 1 300px;
-  min-width: 0;
-  max-width: 100%;
+/* The inspector column scrolls on its own when the assignment card is tall,
+   so it never pushes the spectrum out of the top row. */
+.inspector-panel {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

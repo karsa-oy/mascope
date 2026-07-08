@@ -12,6 +12,7 @@ import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
 import MultiSelect from 'primevue/multiselect'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 
 import { useApp } from '@/stores'
 import { api } from '@/api'
@@ -297,14 +298,10 @@ const expanded = ref({})
 const focusedAssignment = computed(() =>
   app.data.peakAssignment.peak.forPeak(app.data.peak.focused?.peak_id)
 )
+// Re-search opens on demand in a modal (see template). It is never auto-opened
+// -- focusing an unassigned peak shows a compact "Unassigned" card with a
+// Re-search button instead of popping a dialog in the user's face.
 const showSearch = ref(false)
-watch(
-  focusedAssignment,
-  (assignment) => {
-    showSearch.value = !assignment
-  },
-  { immediate: true }
-)
 
 // Arbitration / chemistry provenance (database-stage assignments): chemical
 // plausibility (Seven Golden Rules), arbitration confidence, calibrated
@@ -547,20 +544,47 @@ const isPoorMatch = (iso) => {
             @click="verifyFit"
           />
           <Button
-            :label="showSearch ? 'Hide search' : 'Re-search'"
+            label="Re-search"
             size="small"
             text
             severity="secondary"
             icon="pi ph ph-magnifying-glass"
-            @click="showSearch = !showSearch"
+            v-tooltip.top="'Search compositions for this peak in a dialog'"
+            @click="showSearch = true"
           />
         </div>
       </section>
-      <div
-        v-show="showSearch"
-        class="col search-region"
-        style="gap: 1rem; align-items: stretch; width: 100%"
+      <section v-else-if="app.data.peak.focused" class="inspector">
+        <div class="insp-head">
+          <div class="insp-formula">Unassigned</div>
+          <BaseTierTag tier="unassigned" />
+        </div>
+        <div class="insp-sub">m/z {{ num.mz.format(app.data.peak.focused.mz) }}</div>
+        <div class="insp-actions">
+          <Button
+            label="Re-search"
+            size="small"
+            text
+            severity="secondary"
+            icon="pi ph ph-magnifying-glass"
+            v-tooltip.top="'Search compositions for this peak in a dialog'"
+            @click="showSearch = true"
+          />
+        </div>
+      </section>
+      <Dialog
+        v-model:visible="showSearch"
+        modal
+        maximizable
+        dismissableMask
+        :style="{ width: '82vw' }"
+        :header="
+          app.data.peak.focused
+            ? `Re-search peak ${num.mz.format(app.data.peak.focused.mz)}`
+            : 'Re-search peak'
+        "
       >
+      <div class="col search-region" style="gap: 1rem; align-items: stretch; width: 100%">
       <menu class="topbar">
         <FloatLabel style="flex: 0 0 80px">
           <InputNumber v-model="params.mzPrecision" id="mzPrecision" :min="1" :max="100" fluid />
@@ -600,7 +624,7 @@ const isPoorMatch = (iso) => {
         sortField="fit_score"
         :sortOrder="-1"
         scrollable
-        :scrollHeight="`${height - 100}px`"
+        scrollHeight="55vh"
         size="small"
         v-model:expandedRows="expanded"
         :virtualScrollerOptions="{ itemSize: 35.5 }"
@@ -778,6 +802,7 @@ const isPoorMatch = (iso) => {
         </div>
       </div>
       </div>
+      </Dialog>
     </div>
   </Panel>
 </template>
