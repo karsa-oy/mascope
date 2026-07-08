@@ -176,7 +176,11 @@ Validated `rule_senior` against the 92 demo target compounds:
 - **D9. Interactive verification → calibration golden set.** Human-in-the-loop confirm/reject in
   the UI feeding `fit_calibration` per instrument. Designed in
   [`verification_calibration_loop.md`](verification_calibration_loop.md); the central risk is the
-  confirmation-bias loop (guardrails recorded there).
+  confirmation-bias loop (guardrails recorded there). **V1 capture backend shipped** (the
+  `assignment_verification` table, migration `e4f2a7c9d3b1`, + verify/verifications API); the V1
+  UI is handed to the frontend ([`verification_capture_frontend.md`](verification_capture_frontend.md)).
+  **V2 next:** aggregate labels per instrument → `fit_calibration` → new active D6 row (the
+  "recalibrate this instrument" UX) — buildable now on synthetic labels.
 
 **E — ops**
 - **E8. Run the rename migration in prod/CI** and the migration test suite

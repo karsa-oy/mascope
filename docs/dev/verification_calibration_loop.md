@@ -4,8 +4,12 @@
 identifications in the UI, and those verdicts become the labelled golden set that fits each
 instrument's confidence calibration. This closes the loop opened by the P2 calibration pipeline
 ([`assignment_confidence.md`](assignment_confidence.md)) and the D6 calibration store
-([`handoff_fit_score_and_assignment.md`](handoff_fit_score_and_assignment.md)). Status: design only —
-nothing here is built yet.*
+([`handoff_fit_score_and_assignment.md`](handoff_fit_score_and_assignment.md)).*
+
+**Status.** V1 (capture) backend is **shipped**: the `assignment_verification` table (migration
+`e4f2a7c9d3b1`), the `POST …/verify` + `GET …/verifications` API, and the frontend contract
+([`verification_capture_frontend.md`](verification_capture_frontend.md), design branch). The V1 UI
+is being built from that contract. V2 (close the loop) and V3 (quality) are still design (below).
 
 ## 1. Why
 
@@ -76,34 +80,41 @@ and records:
 - **checklist** JSON (reuse the Match dialog's structure), `verified_by`, `verified_utc`, and the
   `peak_assignment_run_id` for provenance.
 
-### 4.2 Data model — `assignment_verification`
+### 4.2 Data model — `assignment_verification` (shipped)
 
-A new table (mirrors `MatchRating`, but keyed to the peak-centric result so it also covers
-untargeted/Stage-B formulas that have no `target_ion`):
+The table (migration `e4f2a7c9d3b1`; mirrors `MatchRating` but keyed to the peak-centric result so
+it also covers untargeted/Stage-B formulas that have no `target_ion`):
 
 ```
-assignment_verification_id (pk)
-sample_item_id            (fk, index)
-peak_assignment_id        (fk, index) — the assignment verified
+assignment_verification_id (pk, str32)
+sample_item_id            (fk sample_item CASCADE, index)
+peak_assignment_id        (fk peak_assignment SET NULL, index) — provenance link; SET NULL so the
+                            label outlives a re-run that deletes the row
 peak_assignment_run_id    — provenance of the snapshot
-assigned_formula          — the compound/ion judged (survives re-runs, unlike a run-scoped id)
-ionization_mechanism_id   — the adduct
-verdict                   — confirmed | rejected | unsure
-evidence_level            — enum (reference_standard | msms | corroborated | visual | ...)
+sample_peak_id            (index) — STABLE identity (an observed-peak id, survives re-runs)
+assigned_formula, ionization_mechanism_id  — the judged formula + adduct (also stable)
+verdict                   — confirmed | rejected | unsure           (check constraint)
+evidence_level            — reference_standard | msms | orthogonal | pattern | visual (check, nullable)
 fit_score, evidence, p_correct  — snapshot at verification time
-checklist (JSON), environment (JSON)
-verified_by (fk user), verified_utc
+note (text), context (JSON, reserved)
+verified_by (fk user SET NULL, index), verified_utc
 ```
 
-Keep every verdict (append-only, audit trail); the "current" verdict for an assignment is the
-latest by `verified_utc`.
+Append-only (keep every verdict for audit); the **current** verdict for an assignment is the latest
+by `verified_utc` among rows matching its stable identity (`sample_item_id` + `sample_peak_id` +
+`assigned_formula` + `ionization_mechanism_id`).
 
-### 4.3 UI
+**API** (`/api/peak-assignments`): `POST /sample/{id}/verify` (editor; body
+`{peak_assignment_id, verdict, evidence_level?, note?}`; `confirmed` requires an `evidence_level` —
+enforced in the schema) and `GET /sample/{id}/verifications` (newest first).
 
-A confirm / reject / unsure control in the peak-assignment inspector (design branch), opening the
-existing checklist flow, prefilled with the assignment's isotopes + now the co-occurring adducts.
-Surface the evidence-level choice explicitly. A batch/queue view ("assignments awaiting
-verification", ranked to be useful — see §5 active learning) makes labelling efficient.
+### 4.3 UI — minimal capture (V1)
+
+Settled on a **minimal** control (no full checklist in V1): confirm / reject / unsure + an
+evidence-level dropdown + optional note, in the peak-assignment inspector; a verdict badge on the
+assignment; and a verified/rejected ledger filter. Full spec + guardrails in the handover
+([`verification_capture_frontend.md`](verification_capture_frontend.md)). The structured checklist
+and the active-learning queue (§5) are V3.
 
 ### 4.4 Feeding the calibration
 
@@ -139,12 +150,16 @@ prophecy. Everything else here is secondary to getting this right.
 
 ## 6. Phased plan
 
-- **V1 — capture.** `assignment_verification` table + migration; confirm/reject/unsure control in the
-  inspector with evidence level + score snapshot; read-only "my verifications" view. No auto-calibration
-  yet — just start accumulating honest labels. (Guardrails 1, 2, 4, 5.)
+- **V1 — capture. Backend DONE; UI in progress.** `assignment_verification` table (migration
+  `e4f2a7c9d3b1`) + `POST …/verify` (editor, `confirmed` requires an evidence level) / `GET …/verifications`,
+  with the score snapshot and the Schymanski-aligned evidence levels. The **minimal** capture UI —
+  confirm/reject/unsure + evidence dropdown + note in the inspector, a verdict badge, and a
+  verified/rejected ledger filter — is handed to the frontend in
+  [`verification_capture_frontend.md`](verification_capture_frontend.md) (guardrails 1, 2, 4, 5 baked
+  in server-side + UX). No auto-calibration yet — just accumulate honest labels.
 - **V2 — close the loop.** Per-instrument aggregation + "recalibrate this instrument" →
   `fit_calibration` → new active D6 row, with before/after ECE. Finishes the D6 "calibrate my
-  instrument" UX.
+  instrument" UX. *Buildable now on synthetic labels; real value waits on V1-UI labels accumulating.*
 - **V3 — quality & scale.** Active-learning queue (guardrail 3), evidence-level weighting in the fit,
   refit of the corroboration weights, Schymanski-level surfacing on the assignment, and (optionally)
   cross-linking confirmations to `reference_compound` standards.
