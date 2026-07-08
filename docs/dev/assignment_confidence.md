@@ -332,29 +332,44 @@ no backend or DB, only `mascope_tools` + tests.
 - **Validated on the refreshed demo** (read-only): of the confident (identified/candidate)
   compound-instances, **~66% are seen via ≥2 adducts** (2,108 via two, 3,017 via three;
   2,620 lone) — the signal is both abundant and discriminating.
-- **Weighting the corroboration — measurement attempted, blocked by the data.** The intended
-  next step was to *measure* the lift rather than hand-pick a weight: estimate the likelihood
-  ratio `P(correct | n_adducts) / P(correct | 1 adduct)` on the labelled decoy set and fold it
-  into `p_correct` as a Bayesian odds update (`tooling/score_eval/corroboration_eval.py`). The
-  measurement is **not possible on the current benchmark**: the labelled set
-  (`mascope-demo-dataset-v1/expected/candidates.parquet`) predates the adduct-rich v1.2 library
-  and has essentially no true multi-adduct chemistry — of 17,253 true (file, neutral) groups only
-  **76 span ≥2 adducts**, and among 16,386 score-picked winners only 60 are multi-adduct (all
-  spurious decoy collisions, `P(correct)=0`). A logistic on the winners gives a corroboration
-  coefficient of ≈ **−0.045** (no signal). So the demo presents a **fork with no clean answer**:
-  - the *labelled* decoy set has trustworthy per-peak correctness but no multi-adduct chemistry;
-  - the *live* v1.2 assignments have rich co-occurrence (~66% multi-adduct, above) but no
-    independent correctness label — "truth" there is the engine's own pick, and since library
-    compounds carry multiple adducts *by construction*, a decoy-vs-library measurement would be
-    self-fulfilling and **overstate** the LR.
+- **Weighting the corroboration — measured (offset-decoy benchmark).** The first attempt, on the
+  labelled decoy set (`corroboration_eval.py`), was **inconclusive**: `candidates.parquet` predates
+  the adduct-rich v1.2 library and has almost no true multi-adduct chemistry (76/17,253 true
+  (file, neutral) groups span ≥2 adducts; corroboration logistic coef ≈ **−0.045**). So a second,
+  purpose-built instrument was written — `tooling/score_eval/corroboration_benchmark.py` — using a
+  **target-decoy design on the real demo spectra**: for each true detection (its primary
+  `[M+H]+`/`[M-H]-` envelope fits a real peak at m/z `p`), check whether a peak sits at each of the
+  compound's *other* adduct m/z's, versus two nulls. Choice of null is everything:
+  - **random offset** (a peak at `p + random Δ`): P = 0.008 → an inflated **~78×** LR.
+  - **anchor-swap** (the *same* real adduct offset re-anchored on a random real peak): P = 0.204 →
+    a defensible **~2.5×** LR. Adduct offsets like +NH₃ (17.027 Da) are generic mass differences
+    that recur throughout a spectrum, so the random null is far too easy. The anchor-swap null is
+    the honest one.
 
-  **Decision:** do **not** bake an unmeasured (or demo-inflated) weight into `p_correct` yet. Keep
-  corroboration a **separate, inspectable signal** (already exposed; the frontend surfaces it as a
-  badge, see `peak_assignment_confidence_frontend.md`). Fold it into the probability only once a
-  clean multi-adduct labelled benchmark exists — a spiked/curated set where true presence is known
-  independently of the library (the Br/Ur standards give the true-positive side but no
-  false-positive contrast, so they alone can't set the LR). `corroboration_eval.py` will produce
-  the LR immediately against such a set.
+  Full run (152 files, 13,270 detections, 29,584 real adduct slots). The weight is strongly
+  **adduct-specific** — distinctive reagent adducts corroborate, generic ones barely:
+
+  | adduct | P(real) | P(swap) | LR | log-odds |
+  |---|---|---|---|---|
+  | `+Br-`        | 0.535 | 0.112 | **9.1×** | +2.21 |
+  | `+HBrBr-`     | 0.114 | 0.016 | **7.7×** | +2.04 |
+  | `+CO3-`       | 0.119 | 0.036 | 3.6× | +1.29 |
+  | `+NH4+`       | 0.513 | 0.311 | 2.3× | +0.85 |
+  | `+(CH4N2O)H+` | 0.379 | 0.229 | 2.0× | +0.72 |
+
+  By polarity: neg **5.9×**, pos **2.2×**. So corroboration is a **real but modest, adduct-specific**
+  signal — not the dominant factor the naive 78× implied.
+
+  **Recommendation for the fold-in.** Replace the adduct-agnostic count heuristic
+  (`corroboration = 1 − 2^-(n−1)`, kept only for display/summary) with an **additive per-adduct
+  log-odds update** on the calibrated probability:
+  `logit(p_correct') = logit(p_correct) + Σ_{observed adducts a} w_a`, capped (e.g. ≤ +3 total) and
+  shrunk for robustness, where `w_a` is the measured per-adduct log-odds above. Caveats: (1) the
+  weights are **instrument/library-specific** (they encode the Br/Ur reagent chemistry) and belong
+  in the **calibration store** alongside the Platt curve (D6), fit per instrument + adduct panel,
+  not hardcoded; (2) "present" here is monoisotopic-only, so these LRs are a **conservative lower
+  bound** — a fit-gated corroboration (full adduct envelope) will be a bit stronger; (3) the
+  anchor-swap pool includes real primaries, also conservative. Numbers: `_corroboration_metrics.json`.
 - **Then:** intensity-consistency across adducts and in-source-fragment grouping (the deeper
   CAMERA/IPA model).
 
