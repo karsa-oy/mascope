@@ -19,7 +19,7 @@ describe('help docUrl', () => {
   })
 })
 
-describe('help currentMessage', () => {
+describe('help resolveMessage', () => {
   let store
 
   beforeEach(async () => {
@@ -33,17 +33,22 @@ describe('help currentMessage', () => {
   })
 
   it('renders a docs-sourced card as title + snippet body', () => {
-    store.current = { helpKey: 'matching', title: 'Match view' }
-    expect(store.currentMessage).toBe('<h1>Match view</h1><p>matching body</p>')
+    expect(store.resolveMessage({ helpKey: 'matching', title: 'Match view' })).toBe(
+      '<h1>Match view</h1><p>matching body</p>'
+    )
   })
 
   it('prefers an inline message when present (legacy cards)', () => {
-    store.current = { message: '<h1>Inline</h1>' }
-    expect(store.currentMessage).toBe('<h1>Inline</h1>')
+    expect(store.resolveMessage({ message: '<h1>Inline</h1>' })).toBe('<h1>Inline</h1>')
   })
 
   it('falls back to the title alone when the snippet is missing (e.g. dev)', () => {
-    store.current = { helpKey: 'absent', title: 'Match view' }
-    expect(store.currentMessage).toBe('<h1>Match view</h1>')
+    expect(store.resolveMessage({ helpKey: 'absent', title: 'Match view' })).toBe(
+      '<h1>Match view</h1>'
+    )
+  })
+
+  it('is empty for no card', () => {
+    expect(store.resolveMessage(null)).toBe('')
   })
 })

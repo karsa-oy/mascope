@@ -1,7 +1,7 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
-import { useMagicKeys, watchDebounced, useElementHover } from '@vueuse/core'
+import { useMagicKeys, watchDebounced } from '@vueuse/core'
 import { useFloating, arrow, offset } from '@floating-ui/vue'
 
 import { useApp } from '@/stores'
@@ -22,20 +22,34 @@ const { floatingStyles, x, y, middlewareData } = useFloating(targetEl, popoverEl
 
 const visible = ref(false)
 
+// The card the popover is currently showing. Held locally (rather than reading
+// app.ui.help.current directly) so that when the pointer moves onto the popover
+// -- which clears the store's `current` ~300ms later -- the body and the "Learn
+// more" link stay put instead of blanking out.
+const displayed = ref(null)
+const displayedMessage = computed(() => app.ui.help.resolveMessage(displayed.value))
+
 // Keep the popover open while the pointer is over it, so its "Learn more" link
-// stays reachable: the source card clears shortly after the pointer leaves the
-// element it annotates, which would otherwise hide the popover before it can be
-// clicked.
-const hoveringPopover = useElementHover(popoverEl)
+// stays reachable. `pinned` is driven by the popover's own enter/leave events.
+const pinned = ref(false)
+const onPopoverLeave = () => {
+  pinned.value = false
+  if (!(app.ui.help.current && app.ui.help.active)) {
+    visible.value = false
+    displayed.value = null
+  }
+}
 
 watchEffect(() => {
   const card = app.ui.help.current
   if (card && app.ui.help.active) {
     placement.value = card?.placement.replace('_', '-') ?? 'bottom'
-    visible.value = true
+    displayed.value = card
     targetEl.value = card.element
-  } else if (!hoveringPopover.value) {
+    visible.value = true
+  } else if (!pinned.value) {
     visible.value = false
+    displayed.value = null
   }
 })
 
@@ -112,12 +126,19 @@ watchDebounced(
 </script>
 
 <template>
-  <div ref="popoverEl" v-if="visible" :style="floatingStyles" class="help-popover">
-    <div class="help-content" v-html="app.ui.help.currentMessage" />
+  <div
+    ref="popoverEl"
+    v-if="visible"
+    :style="floatingStyles"
+    class="help-popover"
+    @mouseenter="pinned = true"
+    @mouseleave="onPopoverLeave"
+  >
+    <div class="help-content" v-html="displayedMessage" />
     <a
-      v-if="app.ui.help.current?.doc"
+      v-if="displayed?.doc"
       class="help-learn-more"
-      :href="app.ui.help.current.doc"
+      :href="displayed.doc"
       target="_blank"
       rel="noopener"
     >
