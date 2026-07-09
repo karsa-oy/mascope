@@ -193,7 +193,7 @@ article {
 }
 .help-dock {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 0.25rem;
 }
