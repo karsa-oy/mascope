@@ -33,6 +33,8 @@ def build(src: Path, out: Path) -> dict[str, str]:
 
 if __name__ == "__main__":
     src_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("docs/user/_help")
-    out_file = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("site/help-content.json")
+    out_file = (
+        Path(sys.argv[2]) if len(sys.argv) > 2 else Path("site/help-content.json")
+    )
     result = build(src_dir, out_file)
     print(f"wrote {out_file} ({len(result)} snippet(s): {', '.join(result) or 'none'})")
