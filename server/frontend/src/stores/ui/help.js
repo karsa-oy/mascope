@@ -129,23 +129,23 @@ export const useHelp = defineStore('app.ui.help', () => {
     { debounce: 300 }
   )
 
-  // Resolve the popover body for the active card: an inline message wins (legacy
-  // cards); otherwise render the card's title plus the docs snippet named by
-  // helpKey.
-  const currentMessage = computed(() => {
-    const card = current.value
+  // Render a card's popover body: an inline message wins (legacy cards);
+  // otherwise the card's title plus the docs snippet named by helpKey. A
+  // function (not a computed on `current`) so the popover can keep rendering a
+  // card it has "pinned" open even after the store's `current` has cleared.
+  const resolveMessage = (card) => {
     if (!card) return ''
     if (card.message) return card.message
     const title = card.title ? `<h1>${card.title}</h1>` : ''
     const body = card.helpKey ? (content.value[card.helpKey] ?? '') : ''
     return title + body
-  })
+  }
 
   return {
     active,
     cards,
     current,
-    currentMessage,
+    resolveMessage,
     event,
     toggle,
     set,
