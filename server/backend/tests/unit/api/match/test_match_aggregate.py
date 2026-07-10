@@ -19,11 +19,13 @@ import pandas as pd
 import pytest
 
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
+    MATCH_ISOTOPE_VALUE_COLUMNS,
     aggregate_match_collections,
     aggregate_match_compounds_light,
     aggregate_match_ions_light,
     aggregate_match_samples,
     compile_samples_df,
+    reconstruct_full_isotope_frame,
     set_alarm_mode,
     set_ions_match_category,
 )
@@ -269,3 +271,176 @@ class TestCompileSamplesDf:
         assert s2["match_score"] == 0.0
         assert s2["match_category"] == 0.0
         assert s2["tic"] == 0.0
+
+
+# Orbitrap: resolution HIGH, default isotope_abundance_threshold 1e-5.
+def _orbi_samples() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "sample_item_id": ["s1"],
+            "instrument": ["orbi"],
+            "filename": ["orbi_2024.01.01_10h00m00s.h5"],
+        }
+    )
+
+
+def _orbi_targets() -> pd.DataFrame:
+    # iA: main, high abundance; iB: minor but above threshold; iC: below the
+    # 1e-5 threshold; iD: wrong (LOW) resolution for an Orbitrap sample.
+    return pd.DataFrame(
+        {
+            "target_isotope_id": ["iA", "iB", "iC", "iD"],
+            "target_ion_id": ["ion1", "ion1", "ion1", "ion1"],
+            "relative_abundance": [1.0, 0.1, 1e-6, 0.5],
+            "resolution": ["HIGH", "HIGH", "HIGH", "LOW"],
+            "filter_params": [None, None, None, None],
+            "mz": [100.0, 101.0, 102.0, 103.0],
+        }
+    )
+
+
+def _empty_stored() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=["sample_item_id", "target_isotope_id"] + MATCH_ISOTOPE_VALUE_COLUMNS
+    )
+
+
+class TestReconstructFullIsotopeFrame:
+    """Unmatched isotopes are no longer stored; reconstruct_full_isotope_frame
+    rebuilds them from the target isotopes so the isotope table and aggregates
+    stay identical to when they were persisted."""
+
+    def test_reconstructs_unmatched_in_population_and_preserves_matched(self):
+        stored = pd.DataFrame(
+            [
+                {
+                    "sample_item_id": "s1",
+                    "target_isotope_id": "iA",
+                    "match_mz_error": 0.5,
+                    "match_abundance_error": 0.05,
+                    "sample_peak_intensity": 1000.0,
+                    "sample_peak_intensity_relative": 1.0,
+                    "sample_peak_mz": 100.0001,
+                    "sample_peak_tof": 12.3,
+                    "match_score": 0.97,
+                }
+            ]
+        )
+
+        result = reconstruct_full_isotope_frame(
+            stored, _orbi_samples(), _orbi_targets()
+        ).set_index("target_isotope_id")
+
+        # Matched isotope preserved untouched.
+        assert result.loc["iA", "match_score"] == 0.97
+        assert result.loc["iA", "sample_peak_intensity"] == 1000.0
+
+        # Minor-but-above-threshold isotope reconstructed with unmatched defaults.
+        assert "iB" in result.index
+        assert result.loc["iB", "match_score"] == 0.0
+        assert result.loc["iB", "sample_peak_intensity"] == 0.0
+        assert result.loc["iB", "sample_peak_intensity_relative"] == 0.0
+        assert result.loc["iB", "match_abundance_error"] == 1.0
+        assert result.loc["iB", "match_mz_error"] == 0.0
+        assert result.loc["iB", "sample_peak_tof"] == -1.0
+        assert result.loc["iB", "sample_peak_mz"] == 101.0  # target m/z
+
+        # Below-threshold and wrong-resolution isotopes are not reconstructed.
+        assert "iC" not in result.index
+        assert "iD" not in result.index
+
+    def test_matched_row_with_zero_score_is_preserved(self):
+        # A real matched peak can score exactly 0; it must keep its peak data and
+        # not be mistaken for a reconstructed unmatched row.
+        stored = pd.DataFrame(
+            [
+                {
+                    "sample_item_id": "s1",
+                    "target_isotope_id": "iA",
+                    "match_mz_error": 9.0,
+                    "match_abundance_error": 1.0,
+                    "sample_peak_intensity": 500.0,
+                    "sample_peak_intensity_relative": 0.3,
+                    "sample_peak_mz": 100.02,
+                    "sample_peak_tof": 5.0,
+                    "match_score": 0.0,
+                }
+            ]
+        )
+        targets = _orbi_targets().iloc[[0]].copy()  # only iA
+
+        result = reconstruct_full_isotope_frame(
+            stored, _orbi_samples(), targets
+        ).set_index("target_isotope_id")
+
+        assert result.loc["iA", "sample_peak_intensity"] == 500.0
+        assert result.loc["iA", "sample_peak_mz"] == 100.02
+
+    def test_per_ion_threshold_override_excludes_isotope(self):
+        targets = _orbi_targets()
+        # Raise the ion's threshold above iB's abundance -> iB drops out.
+        targets["filter_params"] = [
+            {"orbi": {"isotope_abundance_threshold": 0.2}}
+        ] * len(targets)
+
+        result = reconstruct_full_isotope_frame(
+            _empty_stored(), _orbi_samples(), targets
+        )
+        ids = set(result["target_isotope_id"])
+
+        assert "iA" in ids  # 1.0 >= 0.2
+        assert "iB" not in ids  # 0.1 < 0.2
+        assert "iC" not in ids
+        assert "iD" not in ids
+
+    def test_fully_unmatched_sample_reconstructs_whole_population(self):
+        # With no stored rows, every above-threshold, right-resolution isotope
+        # comes back as unmatched (score 0) so the ion still aggregates.
+        result = reconstruct_full_isotope_frame(
+            _empty_stored(), _orbi_samples(), _orbi_targets()
+        )
+
+        assert set(result["target_isotope_id"]) == {"iA", "iB"}
+        assert (result["match_score"] == 0.0).all()
+
+    def test_aggregate_score_matches_matched_only(self):
+        # Reconstructed unmatched rows (score 0, intensity 0) must not change the
+        # ion aggregate vs. aggregating the matched rows alone.
+        stored = pd.DataFrame(
+            [
+                {
+                    "sample_item_id": "s1",
+                    "target_isotope_id": "iA",
+                    "match_mz_error": 0.5,
+                    "match_abundance_error": 0.05,
+                    "sample_peak_intensity": 1000.0,
+                    "sample_peak_intensity_relative": 1.0,
+                    "sample_peak_mz": 100.0001,
+                    "sample_peak_tof": 12.3,
+                    "match_score": 0.9,
+                }
+            ]
+        )
+        targets = _orbi_targets()
+
+        full = reconstruct_full_isotope_frame(stored, _orbi_samples(), targets)
+        full = full.merge(
+            targets[["target_isotope_id", "target_ion_id", "relative_abundance"]],
+            on="target_isotope_id",
+        )
+        matched_only = stored.merge(
+            targets[["target_isotope_id", "target_ion_id", "relative_abundance"]],
+            on="target_isotope_id",
+        )
+
+        full_ion = aggregate_match_ions_light(full).set_index("target_ion_id")
+        matched_ion = aggregate_match_ions_light(matched_only).set_index(
+            "target_ion_id"
+        )
+
+        assert full_ion.loc["ion1", "match_score"] == pytest.approx(
+            matched_ion.loc["ion1", "match_score"]
+        )
+        assert full_ion.loc["ion1", "sample_peak_intensity_sum"] == pytest.approx(
+            matched_ion.loc["ion1", "sample_peak_intensity_sum"]
+        )

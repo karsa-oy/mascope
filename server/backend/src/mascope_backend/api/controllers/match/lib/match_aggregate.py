@@ -5,11 +5,143 @@ import pandas as pd
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
+from mascope_backend.api.new.match.params.lib import (
+    instrument_default_match_params,
+)
+from mascope_file.name import get_instrument_type
 from mascope_match.params import (
     DEFAULT_POSSIBLE_MATCH_THRESHOLD,
     DEFAULT_PROBABLE_MATCH_THRESHOLD,
     BaseMatchParams,
+    unmatched_isotope_params,
 )
+
+
+# Value columns of a match_isotope row fetched for aggregation (everything except
+# the sample_item_id / target_isotope_id keys). Used to seed an empty stored frame
+# so unmatched reconstruction can run even when a sample has no matched isotopes.
+MATCH_ISOTOPE_VALUE_COLUMNS = [
+    "match_mz_error",
+    "match_abundance_error",
+    "sample_peak_intensity",
+    "sample_peak_intensity_relative",
+    "sample_peak_mz",
+    "sample_peak_tof",
+    "match_score",
+]
+
+
+def reconstruct_full_isotope_frame(
+    match_isotopes_df: pd.DataFrame,
+    samples_df: pd.DataFrame,
+    targets_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Re-add unmatched isotopes (match_score 0) that are no longer stored.
+
+    ``match_isotope`` persists only isotopes with a real peak match. Unmatched
+    isotopes (no peak within the match window) carry solely constant/derivable
+    placeholder values, so they are reconstructed here from the target isotopes
+    instead of being stored. This keeps two things identical to when the rows were
+    stored:
+
+    - the Match-tab isotope table shows every expected isotope, and
+    - higher-level aggregates are unchanged, since they sum
+      ``match_score * relative_abundance`` and peak intensity, to which an unmatched
+      row (score 0, intensity 0) contributes exactly 0.
+
+    The reconstructed population mirrors match computation: per sample, the target
+    isotopes of the correct instrument resolution whose ``relative_abundance`` is at
+    or above the effective abundance threshold (per-ion ``filter_params`` override,
+    else the instrument default).
+
+    :param match_isotopes_df: Stored (matched) match_isotope rows keyed by
+        (sample_item_id, target_isotope_id) with the match_* / sample_peak_* value
+        columns. May be empty (but must carry the expected columns).
+    :param samples_df: Samples in scope; needs sample_item_id, instrument, filename.
+    :param targets_df: Candidate target isotopes; needs target_isotope_id,
+        relative_abundance, resolution, filter_params, mz.
+    :return: match_isotopes_df with reconstructed unmatched rows appended (same
+        columns; reconstructed rows' sample_peak_mz set to the target m/z).
+    """
+    if samples_df.empty or targets_df.empty:
+        return match_isotopes_df
+
+    key_cols = ["sample_item_id", "target_isotope_id"]
+    value_columns = [c for c in match_isotopes_df.columns if c not in key_cols]
+
+    # Build the expected (sample_item_id, target_isotope_id) population, mirroring
+    # match computation's per-sample resolution + abundance-threshold filtering.
+    expected_frames = []
+    for sample in samples_df.itertuples(index=False):
+        instrument = sample.instrument
+        resolution = "LOW" if get_instrument_type(sample.filename) == "tof" else "HIGH"
+        default_threshold = instrument_default_match_params(
+            instrument
+        ).isotope_abundance_threshold
+
+        applicable = targets_df[targets_df["resolution"] == resolution]
+        if applicable.empty:
+            continue
+
+        def _effective_threshold(filter_params: object) -> float:
+            # Per-ion override for this instrument, else the instrument default.
+            if (
+                isinstance(filter_params, dict)
+                and isinstance(filter_params.get(instrument), dict)
+                and "isotope_abundance_threshold" in filter_params[instrument]
+            ):
+                return filter_params[instrument]["isotope_abundance_threshold"]
+            return default_threshold
+
+        thresholds = applicable["filter_params"].map(_effective_threshold)
+        applicable = applicable[applicable["relative_abundance"] >= thresholds]
+        if applicable.empty:
+            continue
+
+        expected_frames.append(
+            pd.DataFrame(
+                {
+                    "sample_item_id": sample.sample_item_id,
+                    "target_isotope_id": applicable["target_isotope_id"].to_numpy(),
+                    "_target_mz": applicable["mz"].to_numpy(),
+                }
+            )
+        )
+
+    if not expected_frames:
+        return match_isotopes_df
+
+    # One row per (sample, isotope); the same isotope can appear in targets_df
+    # multiple times (shared across collections), so drop duplicate keys.
+    expected_df = pd.concat(expected_frames, ignore_index=True).drop_duplicates(
+        subset=key_cols
+    )
+
+    # Union of stored and expected keys so no stored (matched) row is ever dropped,
+    # even one outside the recomputed expected population.
+    keys = (
+        pd.concat([match_isotopes_df[key_cols], expected_df[key_cols]])
+        .drop_duplicates()
+        .reset_index(drop=True)
+        .merge(expected_df, on=key_cols, how="left")
+    )
+    full_df = keys.merge(match_isotopes_df, on=key_cols, how="left")
+
+    # A stored row always has a non-null match_score (NOT NULL column); a
+    # reconstructed unmatched row is missing every value column after the merge.
+    unmatched_mask = full_df["match_score"].isna()
+    defaults = unmatched_isotope_params.model_dump()
+    for column in value_columns:
+        if column == "sample_peak_mz":
+            # Unmatched isotopes report the target m/z as the (absent) peak m/z,
+            # matching assign_defaults_to_unmatched at compute time.
+            full_df.loc[unmatched_mask, column] = full_df.loc[
+                unmatched_mask, "_target_mz"
+            ]
+        elif column in defaults:
+            full_df.loc[unmatched_mask, column] = defaults[column]
+
+    return full_df.drop(columns=["_target_mz"])
 
 
 async def set_ions_match_category(
