@@ -4,6 +4,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.3.1] - 2026.07.11
+
+### Fixed
+
+- Add write permission to Build release images workflow job
+- Fix match visualization for unmatched isotopes
+
 ## [v1.3.0] - 2026.07.10
 
 ### Changed
