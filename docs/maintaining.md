@@ -78,8 +78,20 @@ Outcome (also the exit code): `up-to-date` (0), `fast-update` (10),
 ### Manual update
 
 ```sh
-mascope prod update                  # move to the latest release
-mascope prod update --version v1.3.0 # move to a specific release
+mascope prod update                  # follow the rolling `latest` (master) build
+mascope prod update --version v1.3.0 # deploy a specific pinned release
+```
+
+`mascope prod update` on its own follows the rolling **`latest`** master build,
+whose version shows in the UI as a date+hash build id (e.g.
+`2026.07.08-ab12cd34`) - *not* the newest `vX.Y.Z` release. To run a pinned
+release, pass `--version vX.Y.Z`. To make a server track that release across
+future updates, check the tag out in the deployment (a pinned checkout reports
+its tag as the version):
+
+```sh
+git fetch --tags && git checkout v1.3.0
+mascope prod update          # deploys v1.3.0; the UI then shows v1.3.0
 ```
 
 This pulls the target images and does a rolling restart. Database migrations run
