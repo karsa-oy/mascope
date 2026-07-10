@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026.07.10
+
 ### Changed
 
 - `match_isotope` no longer stores non-matching isotopes, cutting the largest
@@ -30,12 +32,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - `remove_unmatched_match_isotopes` maintenance script (`mascope prod db script
-  run remove_unmatched_match_isotopes`) reclaims the historical non-matching
+run remove_unmatched_match_isotopes`) reclaims the historical non-matching
   rows from existing databases. It deletes `match_isotope` rows with
   `match_score = 0` in bounded batches (configurable `BATCH_SIZE`, `DRY_RUN=1`
   to preview) so a multi-hundred-million-row table can be cleaned without one
   giant transaction; the delete is lossless for aggregates. Run `VACUUM FULL
-  match_isotope` (or pg_repack) afterwards to return the freed space to the OS.
+match_isotope` (or pg_repack) afterwards to return the freed space to the OS.
 
 ### Fixed
 
@@ -53,8 +55,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - Read-path performance benchmark suite (`server/backend/tests/system/benchmark/`, opt-in with `MASCOPE_BENCH_TEST=1`): clones the demo dataset up to thousands of samples and collection ions, then exercises the hot batch-overview and sample-browser endpoints, asserting a per-request latency budget (default 20 s, the frontend timeout) and a response-size budget. A nightly workflow (`.github/workflows/benchmark.yaml`) runs it against a freshly built demo stack and publishes the timings, so a latency or payload-shape regression at scale surfaces before a user hits it.
 - Unattended, self-classifying updates for pinned deployments (`mascope-cli`
   2026.7.8). `mascope prod update --check` classifies a pending update as
-  up-to-date, a *fast* update (new images, no database migration, near-zero
-  downtime) or a *migration* update (a schema migration will run and cause
+  up-to-date, a _fast_ update (new images, no database migration, near-zero
+  downtime) or a _migration_ update (a schema migration will run and cause
   downtime) by reading the Alembic head the target release carries and comparing
   it to the live database, so a maintenance window is only scheduled when one is
   actually needed. Releases now publish a small `mascope-manifest.json` (a GitHub
@@ -64,7 +66,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   configurable maintenance window (`MASCOPE_UPDATE_WINDOW`) with a post-apply
   health check, and applies a migration update once its grace period elapses
   (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator runs `mascope prod
-  update --confirm`; `mascope prod update --snooze N` postpones it. A failed
+update --confirm`; `mascope prod update --snooze N` postpones it. A failed
   health check alerts and stops without rolling back automatically. Release
   discovery uses the public GitHub API over plain HTTPS, so no token is needed.
   `tooling/ubuntu.sh` installs the systemd units (the update timer left disabled
