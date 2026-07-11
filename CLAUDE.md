@@ -88,6 +88,9 @@ It comes preloaded with the published demo dataset and login `demo@mascope.app` 
 
 - Conventional Commits (`type(scope): description`); ASCII-only commit messages,
   no Co-Authored-By trailers.
-- CI (`.github/workflows/tests.yaml`) runs backend pytest, library pytest, CLI
-  pytest, frontend unit, and the demo-stack e2e suite on every PR; releases are
-  gated on `tooling/smoke-test.sh`.
+- **Lint Python before committing** - CI's "Lint and format" job runs
+  `ruff check .` and `ruff format --check .` and fails the PR on any violation.
+  Run `uv run ruff check --fix . && uv run ruff format .` before you commit.
+- CI (`.github/workflows/tests.yaml`) runs the "Lint and format" (ruff) job plus
+  backend pytest, library pytest, CLI pytest, frontend unit, and the demo-stack
+  e2e suite on every PR; releases are gated on `tooling/smoke-test.sh`.
