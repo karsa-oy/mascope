@@ -76,7 +76,13 @@ jobs:
           MASCOPE_PATH: ${{ github.workspace }}
           MASCOPE_BENCH_SAMPLE_MULT: ${{ github.event.inputs.sample_mult || '25' }}
           MASCOPE_BENCH_ION_MULT: ${{ github.event.inputs.ion_mult || '2' }}
+          # The shared backend conftest imports mascope_backend.db, which reads
+          # this secret at import time. The benchmark drives the demo stack over
+          # HTTP, never a host DB connection, so a throwaway value is enough to
+          # let collection succeed.
+          POSTGRES_PASSWORD_FILE: ${{ github.workspace }}/test_postgres_password.txt
         run: |
+          echo "test_postgres_password_for_testing_only" > "$POSTGRES_PASSWORD_FILE"
           uv run pytest server/backend/tests/system/benchmark/ -v -s
 
       - name: Dump stack logs on failure
