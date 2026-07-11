@@ -5,6 +5,41 @@ Vue 3 + PrimeVue frontend (`server/frontend`), shared Python libraries (`librari
 Typer CLI (`tooling/cli`, entry point `mascope`). Postgres + Redis run via docker
 compose. See `docs/dev/developer_guide.md` for the full picture.
 
+## Running your own instance (agents in worktrees)
+
+Several worktrees on one machine can each run the full app at once against a
+single shared Postgres/Redis. Use this when you need the stack up (backend
+tests, e2e, manual checks) without colliding with other worktrees on the ports
+or database.
+
+The shared runtime home (`MASCOPE_PATH`) holds the infra, database volumes, and
+secrets, and is shared by every worktree; `mascope dev run` still launches the
+app from *your* worktree's source. Leave `MASCOPE_PATH` at the machine's shared
+home — do not point it at your worktree, or you would spin up a second Postgres.
+
+```sh
+mascope dev up                 # shared Postgres + Redis (once per machine; idempotent)
+mascope dev run --instance     # YOUR isolated stack for this worktree
+```
+
+`--instance` (or `-i`, or `MASCOPE_INSTANCE=1`) binds this worktree to a slot and
+derives everything from it: a dedicated env with its own `mascope_<env>`
+database and filestore, backend on `8090 + slot`, frontend on `5173 + slot`. The
+binding is stable and recorded in `.runtime/instances.json`.
+
+```sh
+mascope instance list                  # all slots: env, ports, worktree
+mascope instance show [--export]       # this worktree's instance (allocates if needed)
+mascope instance rm <env> --purge      # release the slot + delete its filestore when done
+mascope dev db drop --env <env> --yes  # then drop its database
+```
+
+Gotcha (Windows): mascope's terminal logs contain a glyph that crashes when
+stdout is captured or piped under the default cp1252 encoding. When you capture
+CLI output (as agents do), run with `PYTHONUTF8=1`; interactive terminals are
+unaffected. See `docs/dev/developer_guide.md` →
+"Running multiple instances on one machine" for the full picture.
+
 ## Running tests
 
 | Suite | Command | Needs | Speed |
