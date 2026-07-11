@@ -25,6 +25,7 @@ import json
 import os
 import platform
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Annotated, Optional
@@ -33,6 +34,7 @@ import typer
 
 from mascope_cli.cmd import lib
 from mascope_cli.cmd.prod import auto_update, preflight, release_manifest
+from mascope_cli.cmd.prod import doctor as prod_doctor
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs, is_container_running
 from mascope_cli.runtime import runtime
@@ -255,6 +257,70 @@ def _run_compose(args: list[str], building: bool = False) -> None:
             f"docker compose exited with code {result.returncode} (command: {command})"
         )
         raise typer.Exit(result.returncode)
+
+
+def _abort_if_low_disk(*, auto: bool) -> None:
+    """
+    Refuse to pull update images when the docker image store is low on space.
+
+    A pull that fills the disk can wedge Postgres and take the whole stack down,
+    so stop before touching anything. Under ``--auto`` the shortfall is written
+    to the updater's status log (its audit trail, surfaced by the same tooling
+    an operator already watches) and exits ``AUTO_ERROR``; interactively it
+    exits 1. Never returns when disk is low - it raises ``typer.Exit``.
+    """
+    message = auto_update.disk_precheck()
+    if message is None:
+        return
+    runtime.logger.error(message)
+    if auto:
+        auto_update.record_status(
+            os.environ["MASCOPE_PATH"], f"Update aborted (low disk): {message}"
+        )
+        raise typer.Exit(auto_update.AUTO_ERROR)
+    raise typer.Exit(1)
+
+
+def _prune_images() -> None:
+    """
+    Remove unused images after a successful deploy.
+
+    An update pulls new backend/frontend images and leaves the previous
+    release's images behind - still tagged, no longer referenced by any
+    container - so over many (especially unattended) updates they silently
+    accumulate gigabytes. ``docker image prune -af`` drops every image no
+    existing container references; the running stack's images are referenced and
+    kept, and a rollback re-pulls (the documented flow already does, guarded by
+    the disk precheck). Best-effort: a prune failure must never fail an
+    otherwise healthy update, so it is logged and swallowed.
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "image", "prune", "-a", "-f"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        runtime.logger.warning(f"Skipped image prune (non-fatal): {exc}")
+        return
+    if result.returncode != 0:
+        runtime.logger.warning(
+            "Skipped image prune (non-fatal): "
+            f"{result.stderr.strip() or 'docker image prune failed'}"
+        )
+        return
+    # docker prints a trailing 'Total reclaimed space: <n>' summary line.
+    summary = next(
+        (
+            line.strip()
+            for line in reversed(result.stdout.splitlines())
+            if "reclaimed" in line.lower()
+        ),
+        "",
+    )
+    runtime.logger.success(f"Pruned unused images. {summary}".rstrip())
 
 
 # --- Commands ---
@@ -491,6 +557,7 @@ def _apply_update(
 
     if auto_update.wait_healthy(backend_container):
         auto_update.clear_pending(mascope_path)
+        _prune_images()  # reclaim the superseded release's images
         message = f"{kind.capitalize()} update to {target} applied; backend healthy."
         runtime.logger.success(message)
         auto_update.record_status(mascope_path, message)
@@ -594,6 +661,9 @@ def _auto(*, pull: bool) -> None:
     backend_cfg = runtime.full_config.backend
     frontend_cfg = runtime.full_config.frontend
     backend_container = backend_cfg.get_backend_container_name(mode=_MODE)
+
+    # Classifying the update pulls the target images; guard the disk first.
+    _abort_if_low_disk(auto=True)
 
     try:
         plan = preflight.build_plan(
@@ -783,9 +853,11 @@ def update(
         _preflight(target, pull=pull, as_json=as_json, manifest=manifest)
 
     check_data_dirs(_MODE)
+    _abort_if_low_disk(auto=False)
     runtime.logger.info(f"Updating the production stack to '{target}'")
     _run_compose(["pull"])
     _run_compose(["up", "--detach"])
+    _prune_images()  # reclaim the superseded release's images
     _run_compose(["ps"])
     runtime.logger.success(f"Production stack updated to '{target}'")
 
@@ -850,6 +922,66 @@ def restart(
     if service:
         args.append(service)
     _run_compose(args)
+
+
+@prod_app.command()
+def doctor(
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the report as JSON instead of text."),
+    ] = False,
+) -> None:
+    """
+    One-glance operational status of the deployment.
+
+    Gathers container health, free disk on the state and docker filesystems,
+    the recorded pending update, local backup freshness, and the docker image
+    footprint. Read-only and network-free - safe to run anytime or to poll.
+
+    Exits 0 when everything looks healthy, 1 when a container is not running or
+    a filesystem is below the free-space floor (MASCOPE_UPDATE_MIN_FREE_GB), so
+    it can double as a monitoring probe.
+
+    \b
+    Examples:
+        mascope prod doctor
+        mascope prod doctor --json
+    """
+    db_cfg = runtime.full_config.backend.database
+    backend_cfg = runtime.full_config.backend
+    file_converter_cfg = runtime.full_config.file_converter
+    frontend_cfg = runtime.full_config.frontend
+    redis_cfg = runtime.full_config.backend.redis
+
+    mascope_path = os.environ["MASCOPE_PATH"]
+    container_specs = [
+        ("backend", backend_cfg.get_backend_container_name(mode=_MODE)),
+        ("frontend", frontend_cfg.get_frontend_container_name(mode=_MODE)),
+        ("postgres", db_cfg.get_postgres_container_name(mode=_MODE)),
+        ("redis", redis_cfg.get_redis_container_name(mode=_MODE)),
+        (
+            "file_converter",
+            file_converter_cfg.get_file_converter_container_name(mode=_MODE),
+        ),
+    ]
+    disk_specs = [
+        ("state", Path(mascope_path) / ".runtime"),
+        ("docker", auto_update.docker_root()),
+    ]
+
+    report = prod_doctor.build_report(
+        mascope_path=mascope_path,
+        container_specs=container_specs,
+        disk_specs=disk_specs,
+        backups_dir=db_cfg.get_backups_dir(mode=_MODE),
+        min_free_gb=auto_update.min_free_gb(),
+    )
+
+    if as_json:
+        typer.echo(json.dumps(report.to_dict(), indent=2))
+    else:
+        typer.echo(prod_doctor.format_text(report))
+    raise typer.Exit(0 if report.ok else 1)
 
 
 @prod_app.command(

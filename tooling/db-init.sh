@@ -227,6 +227,27 @@ else
         exit 1
     fi
 
+    # --------- Prune old pre-migration dumps ---------
+    # Each migration update writes a pre-migration dump here; without pruning
+    # they accumulate unboundedly (the optional backup cron is otherwise the
+    # only pruner, so a server with auto-updates but no cron slowly fills its
+    # disk with old dumps). Keep the most recent MASCOPE_PREMIGRATION_KEEP and
+    # delete older ones. Only *_pre-migration.dump is matched, so cron/manual
+    # dumps (a different name) are never touched.
+    KEEP="${MASCOPE_PREMIGRATION_KEEP:-5}"
+    shopt -s nullglob
+    PRE_DUMPS=("${BACKUP_DIR}"/*_pre-migration.dump)
+    shopt -u nullglob
+    if (( ${#PRE_DUMPS[@]} > KEEP )); then
+        # Filenames embed a sortable %Y%m%d_%H%M%S stamp, so a lexical sort is
+        # chronological; delete all but the newest KEEP.
+        IFS=$'\n' SORTED=($(printf '%s\n' "${PRE_DUMPS[@]}" | sort))
+        unset IFS
+        REMOVE_COUNT=$(( ${#SORTED[@]} - KEEP ))
+        log_info "Pruning ${REMOVE_COUNT} old pre-migration dump(s), keeping ${KEEP}"
+        rm -f "${SORTED[@]:0:REMOVE_COUNT}"
+    fi
+
     log_info "Applying migrations..."
     
     if "$ALEMBIC_BIN" upgrade head 2>&1; then

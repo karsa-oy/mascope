@@ -153,6 +153,7 @@ class RuntimeLogging:
                 0, 0, 0, tzinfo=datetime.timezone.utc
             ),  # rotate daily at midnight UTC
             retention=datetime.timedelta(days=14),  # retain two weeks of files
+            compression="zip",  # compress rotated files (~10x smaller on disk)
         )
         terminal_handler = dict(
             sink=sys.stdout,

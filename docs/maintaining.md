@@ -16,12 +16,35 @@ Everything below assumes an Ubuntu host provisioned with
 | Find the deployment path | `mascope path` |
 | Start / stop the stack | `mascope prod up --detach` / `mascope prod down` |
 | Container status / logs | `mascope prod ps` / `mascope prod logs --follow` |
+| **Status at a glance** | `mascope prod doctor` (add `--json` to script it) |
 | **Check for an update (applies nothing)** | `mascope prod update --check` |
 | Update now | `mascope prod update` |
 | Approve / defer a pending migration update | `mascope prod update --confirm` / `--snooze 7` |
 | Enable unattended updates | edit `/etc/mascope/update.env`, then `sudo systemctl enable --now mascope-update.timer` |
 | Update history | `cat "$(mascope path)/.runtime/update/status.log"` |
 | Back up now | `mascope prod db backup create` |
+| **Disk monitor status / run now** | `systemctl list-timers mascope-disk-check.timer` / `sudo systemctl start mascope-disk-check.service` |
+| Disk monitor history | `journalctl -u mascope-disk-check.service` |
+
+## Health at a glance
+
+`mascope prod doctor` gathers the signals you would otherwise check across
+several commands into one read-only, network-free report - safe to run anytime
+or to poll:
+
+```
+$ mascope prod doctor
+[OK]
+Stack    backend healthy · frontend healthy · postgres healthy · redis healthy · file_converter running
+Disk     state 142 GiB / 61% free   ·   docker 38 GiB / 40% free
+Updates  no pending migration recorded
+Backups  5 local dump(s) · newest 8h ago
+Images   11 images · 6.2GB (2.1GB reclaimable)
+```
+
+It exits `0` when the stack is healthy and every filesystem is above the
+free-space floor (`MASCOPE_UPDATE_MIN_FREE_GB`), and `1` otherwise - so it
+doubles as a monitoring probe. `--json` emits the same data for scripting.
 
 ## Provisioning
 
@@ -174,12 +197,72 @@ mascope prod db backup list
 mascope prod db restore <dump-file> --yes    # or omit the file for the latest
 ```
 
+### Pre-migration dumps
+
+Separately from the backup cron, `db_init` takes a **pre-migration dump** into
+`.runtime/database/backups/prod/` whenever a migration update runs on startup.
+To keep these from piling up on a server that has auto-updates but no backup
+cron, `db_init` keeps only the most recent `MASCOPE_PREMIGRATION_KEEP` of them
+(default 5) and prunes older ones - it only ever touches `*_pre-migration.dump`
+files, never the cron/manual dumps. Raise the count (or set up the backup cron
+above) if you want a longer local history.
+
+## Disk space
+
+A full disk is the classic way to take the whole stack down: Postgres cannot
+write and wedges. Everything that grows lands on the host - the Postgres data,
+the filestore (uploaded raw files) and dumps under `.runtime/`, and docker's
+image store under `/var/lib/docker` - usually sharing one filesystem. Three
+guards keep it from filling silently.
+
+### The monitor (early warning)
+
+`tooling/ubuntu.sh` installs and **enables** `mascope-disk-check.timer`, which
+runs [`tooling/disk-check.sh`](../tooling/disk-check.sh) every 15 minutes. It is
+read-only - it only measures free space on the `.runtime` and docker
+filesystems and reports to the journal. When a filesystem drops below the floor
+it pings a healthchecks.io-style URL so you are alerted with lead time.
+
+Configure it in `/etc/mascope/disk-check.env` (chmod 600, template
+[`tooling/disk-check.env.example`](../tooling/disk-check.env.example)):
+
+- `MIN_FREE_GB` (default 10) - absolute floor; the "about to crash" signal.
+- `MIN_FREE_PCT` (default 10) - percentage floor; an earlier warning. Set to
+  `0` on a very large disk to avoid paging while tens of GiB are still free.
+- `HEALTHCHECK_URL` - **set this to actually get alerted.** On every OK run it
+  pings the URL (so a stalled monitor is itself flagged); when low it pings
+  `<url>/fail`. Use a check separate from the backup one.
+
+```sh
+sudo systemctl start mascope-disk-check.service   # run it now
+journalctl -u mascope-disk-check.service          # what it found
+```
+
+### The update disk guard
+
+`mascope prod update` (and the unattended `--auto`) refuse to pull new images
+when free space on the docker image store is below `MASCOPE_UPDATE_MIN_FREE_GB`
+(default 5 GiB) - a pull that fills the disk mid-flight is worse than a deferred
+update. Under `--auto` the shortfall is written to the update `status.log` and
+exits with the error code, so the timer surfaces it. Tune the floor in
+`/etc/mascope/update.env`.
+
+### Automatic image pruning
+
+After a **successful** update the tooling runs `docker image prune -af`, which
+removes the superseded release's images (new images are pulled on every update
+and the old ones are otherwise left behind, accumulating gigabytes over time -
+especially with unattended updates). The running stack's images are referenced
+and kept; a manual rollback re-pulls the previous release (guarded by the disk
+guard above), the same as the documented rollback flow.
+
 ## Files and secrets
 
 | Path | What |
 |---|---|
 | `/etc/environment` | `MASCOPE_PATH`, `LD_PRELOAD` (read by the systemd units) |
-| `/etc/mascope/update.env` | update window / grace / repo (chmod 600) |
+| `/etc/mascope/update.env` | update window / grace / repo, update disk floor (chmod 600) |
+| `/etc/mascope/disk-check.env` | disk-monitor thresholds + alert URL (chmod 600) |
 | `$MASCOPE_PATH/.runtime/secrets/` | `postgres_password.txt`, `jwt_secret_key.txt`, `server_owner_secret_key.txt`, TLS cert/key, `backup.env` |
 | `$MASCOPE_PATH/.runtime/database/backups/prod/` | database dumps (incl. pre-migration) |
 | `$MASCOPE_PATH/.runtime/update/` | `state.json` (pending update), `status.log` |

@@ -183,6 +183,10 @@ def auto_env(monkeypatch):
         prod_main.auto_update, "download_manifest", lambda *a, **k: None
     )
     monkeypatch.setattr(prod_main.auto_update, "record_status", lambda *a, **k: None)
+    # Disk guard and post-deploy prune shell out to docker; keep them inert here
+    # (they have their own tests) so the orchestration tests stay hermetic.
+    monkeypatch.setattr(prod_main.auto_update, "disk_precheck", lambda: None)
+    monkeypatch.setattr(prod_main, "_prune_images", lambda: None)
     monkeypatch.delenv("MASCOPE_UPDATE_WINDOW", raising=False)
     return monkeypatch
 
@@ -283,6 +287,22 @@ def test_auto_requires_running_postgres(auto_env):
 
 def test_auto_bad_window_errors(auto_env):
     auto_env.setenv("MASCOPE_UPDATE_WINDOW", "not-a-window")
+
+    with pytest.raises(typer.Exit) as e:
+        prod_main._auto(pull=True)
+    assert e.value.exit_code == au.AUTO_ERROR
+
+
+def test_auto_low_disk_aborts_before_pull(auto_env):
+    """A low disk stops --auto before build_plan pulls anything."""
+    auto_env.setattr(
+        prod_main.auto_update, "disk_precheck", lambda: "only 1.0 GiB free"
+    )
+
+    def _fail(**k):
+        raise AssertionError("must not pull/classify when disk is low")
+
+    auto_env.setattr(prod_main.preflight, "build_plan", _fail)
 
     with pytest.raises(typer.Exit) as e:
         prod_main._auto(pull=True)
