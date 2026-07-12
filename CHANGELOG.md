@@ -4,7 +4,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
-## [v1.3.2] - 2026.07.12
+### Added
+
+- Peak assignment Stage A now also matches against the reference mirror
+  (curated and public chemistry databases loaded via `mascope_reference`),
+  not just the curated target library. Reference formulas are bounded to
+  atmospheric compositions (elements in C/H/N/O/S, C <= 40, monoisotopic mass
+  <= 700 Da) and expanded through the existing ion / isotopologue path, so a
+  peak can be assigned a known composition even when no curated target covers
+  it. When a curated target wins a peak the reference identities ride alongside
+  it in `provenance.reference_identities`; when only the reference set matches,
+  the assignment carries the reference identities and null target linkage. One
+  formula can carry many identities (isomers), preserved as a one-to-many list.
+- `mascope_reference.iter_known_compositions` - a bulk provider that yields the
+  active, deduplicated known compositions (formula -> identities) for Stage A,
+  with license, element, carbon, mass, and per-formula identity-count bounds.
+- An example curated reference database,
+  `libraries/reference/examples/atmospheric_organics.csv` (79 atmospheric
+  organics with 17 shared-formula isomer sets), for exercising the reference
+  path end to end and as a template for hand-authored lists. Referenced from the
+  reference-data authoring guide.
 
 ### Fixed
 
