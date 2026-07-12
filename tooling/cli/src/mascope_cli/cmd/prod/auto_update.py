@@ -20,6 +20,7 @@ anonymous rate limit. Both calls go through small seams that tests stub.
 
 import datetime
 import json
+import os
 import shutil
 import subprocess
 import urllib.error
@@ -241,6 +242,85 @@ def _run(cmd: list[str], timeout: Optional[int] = 30) -> subprocess.CompletedPro
     return subprocess.run(
         cmd, capture_output=True, text=True, check=False, timeout=timeout
     )
+
+
+# --- Disk space guard ---
+#
+# An update that fills the disk while pulling image layers is worse than no
+# update: a full filesystem can wedge Postgres and take the whole stack down.
+# Before pulling, refuse when the filesystem backing the docker image store is
+# below a floor of free space. This is a guard, not a cleanup - the operator
+# frees space (old images are pruned automatically after a successful deploy).
+
+# Minimum free GiB required before pulling update images. Overridable via
+# MASCOPE_UPDATE_MIN_FREE_GB; the default clears a typical backend+frontend
+# image pair with headroom.
+DEFAULT_MIN_FREE_GB = 5.0
+
+
+def min_free_gb() -> float:
+    """Minimum free GiB required before an update may pull (env-overridable)."""
+    raw = os.environ.get("MASCOPE_UPDATE_MIN_FREE_GB")
+    if not raw:
+        return DEFAULT_MIN_FREE_GB
+    try:
+        return float(raw)
+    except ValueError:
+        return DEFAULT_MIN_FREE_GB
+
+
+def docker_root() -> Path:
+    """
+    Filesystem path where docker stores image layers (its data-root).
+
+    Pulled layers land here, so this is the partition an update can fill. Read
+    from ``docker info``; falls back to the stock ``/var/lib/docker`` when it
+    cannot be determined (docker unreachable), which is where layers live on a
+    default install anyway.
+    """
+    result = _run(["docker", "info", "--format", "{{.DockerRootDir}}"])
+    root = result.stdout.strip() if result.returncode == 0 else ""
+    return Path(root) if root else Path("/var/lib/docker")
+
+
+def free_gb(path: Path) -> Optional[float]:
+    """
+    Free space in GiB on the filesystem holding ``path``.
+
+    Walks up to the nearest existing ancestor so a data-root that does not exist
+    yet still resolves to its mount point. Returns None if it cannot be measured
+    (an unmeasurable disk must never block an update).
+    """
+    probe = path
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    try:
+        return shutil.disk_usage(probe).free / (1024**3)
+    except OSError:
+        return None
+
+
+def disk_precheck() -> Optional[str]:
+    """
+    Guard run before pulling update images.
+
+    Returns a human-readable error message when free space on the docker image
+    store is below the configured minimum, or None when there is enough room (or
+    it cannot be measured).
+    """
+    root = docker_root()
+    free = free_gb(root)
+    if free is None:
+        return None
+    threshold = min_free_gb()
+    if free < threshold:
+        return (
+            f"Only {free:.1f} GiB free on {root} (docker image store); need at "
+            f"least {threshold:.0f} GiB to pull update images safely. Free disk "
+            "space and retry (MASCOPE_UPDATE_MIN_FREE_GB tunes the floor; see "
+            "docs/maintaining.md)."
+        )
+    return None
 
 
 # --- GitHub release discovery (public, tokenless HTTPS) ---
