@@ -73,7 +73,8 @@ async def get_peak_assignments_route(
     :param sample_item_id: The unique identifier of the sample.
     :param query_params: Optional run id and tier/role/source filters.
     :param user: The current authenticated user. Requires workspace guest role.
-    :return: Run metadata and per-peak assignment records.
+    :return: Per-peak assignment records (one row per observed peak). Each row
+        carries its run id; run metadata is served by the runs endpoint.
     """
     await check_sample_access(sample_item_id, user, "guest")
     result = await get_peak_assignments(

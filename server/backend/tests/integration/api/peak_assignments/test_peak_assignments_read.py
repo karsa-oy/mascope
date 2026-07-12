@@ -34,9 +34,12 @@ async def test_get_assignments_defaults_to_latest_completed_run(
     assert response.status_code == 200
     body = response.json()
 
-    # The 'running' run is newer but not completed, so the completed run wins
-    assert body["run"]["peak_assignment_run_id"] == pa_test_data["completed_run_id"]
+    # The 'running' run is newer but not completed, so the completed run wins.
+    # The response carries no run object; run identity is on each row instead.
     assert body["results"] == 3
+    assert {row["peak_assignment_run_id"] for row in body["data"]} == {
+        pa_test_data["completed_run_id"]
+    }
 
     # One row per observed peak, ordered by m/z
     mzs = [row["sample_peak_mz"] for row in body["data"]]
@@ -91,8 +94,10 @@ async def test_get_assignments_with_explicit_run_id(guest_client, pa_test_data):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["run"]["peak_assignment_run_id"] == pa_test_data["running_run_id"]
+    # An explicit run id is accepted; the 'running' run has no assignments yet.
+    # The response echoes no run object (run metadata lives on the runs endpoint).
     assert body["results"] == 0
+    assert body["data"] == []
 
 
 @pytest.mark.asyncio
