@@ -1,0 +1,22 @@
+# Uptime Kuma (external uptime + TLS-expiry monitoring) for the Mascope fleet.
+#
+# Deploy on the internal backup box (192.168.1.88), LAN-only, plain HTTP.
+# Copy this directory to /opt/uptime-kuma on the box, then `docker compose up -d`
+# and open http://192.168.1.88:3001 to create the admin account. See ../README.md
+# for adding a monitor + TLS-expiry watch per Mascope server.
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:2 # pin a concrete 2.x.y before prod to freeze behavior
+    container_name: uptime-kuma
+    volumes:
+      # Local dir on this host, NEVER an NFS mount: the SQLite DB needs POSIX
+      # file locks. Backed up by ../backup-monitoring.sh (quiesced copy).
+      - ./data:/app/data
+    ports:
+      # LAN IP ONLY (see the note in ../glitchtip/compose.yaml). Change
+      # 192.168.1.88 if the box's LAN address differs.
+      - "192.168.1.88:3001:3001"
+    restart: unless-stopped
+    # A healthcheck (extra/healthcheck, 180s start period) is baked into the
+    # image, so no healthcheck block is needed here.
