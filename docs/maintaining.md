@@ -256,6 +256,38 @@ especially with unattended updates). The running stack's images are referenced
 and kept; a manual rollback re-pulls the previous release (guarded by the disk
 guard above), the same as the documented rollback flow.
 
+## Monitoring
+
+Beyond the healthchecks.io dead-man's-switch pings (backups, disk monitor), a
+small self-hosted stack gives error tracking and external uptime monitoring. It
+runs off the Mascope servers - typically on the internal backup box. See
+[`tooling/monitoring/`](../tooling/monitoring/README.md) for the full deploy
+runbook (GlitchTip + Uptime Kuma, LAN-only).
+
+### Error reporting to GlitchTip (opt-in)
+
+The backend can forward `WARNING`/`ERROR` log records (with tracebacks and
+request context) to a self-hosted [GlitchTip](https://glitchtip.com/) instance,
+so you stop grepping log files for problems. It is **off by default** and gated
+entirely on one environment variable:
+
+- Unset `MASCOPE_SENTRY_DSN` (the default) - no SDK import, no reporting, zero
+  behavior change.
+- Set it to a GlitchTip project DSN **on the backend service only** - the
+  backend installs a loguru sink that reports WARNING+ events.
+
+```sh
+# on each Mascope server, in the backend service environment:
+MASCOPE_SENTRY_DSN=http://<public_key>@192.168.1.88:8000/<project_id>
+```
+
+Requires the optional dependency (`mascope_runtime[sentry]`, i.e. `sentry-sdk`).
+The event `environment` is the runtime mode and `release` follows
+`MASCOPE_VERSION` when set, so events group by deployment. Keep the DSN set only
+on the backend to scope reporting to the API server. Full setup - creating the
+project, copying the DSN, and the Uptime Kuma monitors - is in the
+[monitoring runbook](../tooling/monitoring/README.md).
+
 ## Files and secrets
 
 | Path | What |
