@@ -4,6 +4,60 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [v1.3.2] - 2026.07.12
+
+### Fixed
+
+- Give nightly system-test jobs a postgres-password secret
+
+### Added
+
+- `mascope prod doctor` - a read-only, network-free command that reports the
+  deployment's status at a glance: container health, free disk on the state and
+  docker filesystems, the recorded pending update, local backup freshness, and
+  the docker image footprint. Exits 0 when healthy and 1 when a container is
+  down or a filesystem is below the free-space floor, so it doubles as a
+  monitoring probe; `--json` emits the same data for scripting.
+- Disk-space monitor (`tooling/disk-check.sh`) with a systemd timer
+  (`mascope-disk-check.timer`, installed **and enabled** by `tooling/ubuntu.sh`,
+  runs every 15 minutes). It measures free space on the `.runtime` and docker
+  filesystems and, when either drops below a floor (`MIN_FREE_GB` default 10, or
+  `MIN_FREE_PCT` default 10), pings a healthchecks.io-style `HEALTHCHECK_URL` so
+  an operator is alerted before a full disk wedges Postgres and takes the stack
+  down. Read-only - it never deletes anything. Configure in
+  `/etc/mascope/disk-check.env` (template `tooling/disk-check.env.example`); see
+  the "Disk space" section of the maintainer runbook.
+
+### Changed
+
+- `mascope prod update` (and unattended `--auto`) now refuse to pull new images
+  when free space on the docker image store is below `MASCOPE_UPDATE_MIN_FREE_GB`
+  (default 5 GiB), so a pull cannot fill the disk mid-flight. Under `--auto` the
+  shortfall is recorded to the update `status.log` and returns the error exit
+  code.
+- After a successful update the tooling prunes unused images
+  (`docker image prune -af`), reclaiming the superseded release's images that
+  were previously left behind on every update - a slow disk leak that unattended
+  updates would otherwise accumulate. The running stack's images are kept; a
+  rollback re-pulls the previous release as before.
+- `db_init` now prunes old pre-migration dumps, keeping the most recent
+  `MASCOPE_PREMIGRATION_KEEP` (default 5). Each migration update writes a full
+  pre-migration dump into the backups directory; previously these were pruned
+  only by the optional backup cron, so a server with auto-updates but no cron
+  slowly filled its disk with old dumps. Only `*_pre-migration.dump` files are
+  touched - cron/manual dumps are left alone.
+- Rotated application log files are now compressed (loguru `compression="zip"`),
+  roughly a 10x reduction on the two weeks of retained logs.
+
+## [v1.3.1] - 2026.07.11
+
+### Fixed
+
+- Add write permission to Build release images workflow job
+- Fix match visualization for unmatched isotopes
+
+## [v1.3.0] - 2026.07.10
+
 ### Changed
 
 - `match_isotope` no longer stores non-matching isotopes, cutting the largest
@@ -30,12 +84,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - `remove_unmatched_match_isotopes` maintenance script (`mascope prod db script
-  run remove_unmatched_match_isotopes`) reclaims the historical non-matching
+run remove_unmatched_match_isotopes`) reclaims the historical non-matching
   rows from existing databases. It deletes `match_isotope` rows with
   `match_score = 0` in bounded batches (configurable `BATCH_SIZE`, `DRY_RUN=1`
   to preview) so a multi-hundred-million-row table can be cleaned without one
   giant transaction; the delete is lossless for aggregates. Run `VACUUM FULL
-  match_isotope` (or pg_repack) afterwards to return the freed space to the OS.
+match_isotope` (or pg_repack) afterwards to return the freed space to the OS.
 
 ### Fixed
 
@@ -55,8 +109,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - Peak-centric assignment (first iteration): a sample's peaks can now each be assigned a chemical composition, inverting the target-first workflow. A new background engine matches every peak against the known target library (Stage A) and runs an untargeted composition search over the unexplained remainder (Stage B), then persists one row per observed peak with formula, adduct, isotope role, evidence, and a confidence tier (`identified` / `candidate` / `below_assignability` / `unassigned`). Results are stored in the new `peak_assignment_run` / `peak_assignment` tables (single-owner-per-peak enforced per run, full config recorded for reproducibility) and served by `/api/peak-assignments/sample/{id}` endpoints. Design and phased plan in `docs/dev/peak_assignment_paradigm.md`.
 - Unattended, self-classifying updates for pinned deployments (`mascope-cli`
   2026.7.8). `mascope prod update --check` classifies a pending update as
-  up-to-date, a *fast* update (new images, no database migration, near-zero
-  downtime) or a *migration* update (a schema migration will run and cause
+  up-to-date, a _fast_ update (new images, no database migration, near-zero
+  downtime) or a _migration_ update (a schema migration will run and cause
   downtime) by reading the Alembic head the target release carries and comparing
   it to the live database, so a maintenance window is only scheduled when one is
   actually needed. Releases now publish a small `mascope-manifest.json` (a GitHub
@@ -66,7 +120,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   configurable maintenance window (`MASCOPE_UPDATE_WINDOW`) with a post-apply
   health check, and applies a migration update once its grace period elapses
   (`MASCOPE_UPDATE_GRACE_DAYS`, default 7) or an operator runs `mascope prod
-  update --confirm`; `mascope prod update --snooze N` postpones it. A failed
+update --confirm`; `mascope prod update --snooze N` postpones it. A failed
   health check alerts and stops without rolling back automatically. Release
   discovery uses the public GitHub API over plain HTTPS, so no token is needed.
   `tooling/ubuntu.sh` installs the systemd units (the update timer left disabled
@@ -262,6 +316,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 - First public release
 
-[Unreleased]: https://github.com/karsa-oy/mascope/compare/v1.0.0...master
+[Unreleased]: https://github.com/karsa-oy/mascope/compare/v1.3.2...master
 [v1.0.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.0.0
 [v1.1.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.1.0
+[v1.1.1]: https://github.com/karsa-oy/mascope/releases/tag/v1.1.1
+[v1.2.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.2.0
+[v1.3.0]: https://github.com/karsa-oy/mascope/releases/tag/v1.3.0
+[v1.3.1]: https://github.com/karsa-oy/mascope/releases/tag/v1.3.1
+[v1.3.2]: https://github.com/karsa-oy/mascope/releases/tag/v1.3.2

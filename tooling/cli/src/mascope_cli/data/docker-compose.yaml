@@ -100,6 +100,9 @@ services:
       MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
       # pg_dump --compress for the pre-migration dump; empty = pg_dump default
       MASCOPE_DUMP_COMPRESSION: ${MASCOPE_DUMP_COMPRESSION:-}
+      # How many pre-migration dumps db_init keeps before pruning older ones,
+      # so they do not accumulate on servers without the backup cron.
+      MASCOPE_PREMIGRATION_KEEP: ${MASCOPE_PREMIGRATION_KEEP:-5}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - ./.runtime/env/${MASCOPE_ENV:-default}:/app/.runtime/env/${MASCOPE_ENV:-default}

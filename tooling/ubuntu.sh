@@ -238,8 +238,18 @@ function install_mascope() {
     sudo cp "${SYSTEMD_SRC}/mascope-update.timer" \
         /etc/systemd/system/mascope-update.timer
 
-    # Update config (window / grace / release token). Seed once with restricted
-    # permissions; never clobber an existing file - it may hold the token.
+    # Disk-space monitor service + timer. Read-only (it never deletes anything),
+    # so unlike the updater it is enabled by default below.
+    DISK_CHECK="${ROOT_PATH}/tooling/disk-check.sh"
+    sed -e "s|@@USER@@|${USER}|g" \
+        -e "s|@@DISK_CHECK@@|${DISK_CHECK}|g" \
+        "${SYSTEMD_SRC}/mascope-disk-check.service" \
+        | sudo tee /etc/systemd/system/mascope-disk-check.service > /dev/null
+    sudo cp "${SYSTEMD_SRC}/mascope-disk-check.timer" \
+        /etc/systemd/system/mascope-disk-check.timer
+
+    # Config (window / grace / release token; disk thresholds / alert URL).
+    # Seed once with restricted permissions; never clobber an existing file.
     sudo install -d -m 755 /etc/mascope
     if [[ ! -f /etc/mascope/update.env ]]; then
         sudo install -m 600 -o "${USER}" -g "${USER}" \
@@ -248,19 +258,29 @@ function install_mascope() {
     else
         write_line "kept existing /etc/mascope/update.env"
     fi
+    if [[ ! -f /etc/mascope/disk-check.env ]]; then
+        sudo install -m 600 -o "${USER}" -g "${USER}" \
+            "${ROOT_PATH}/tooling/disk-check.env.example" /etc/mascope/disk-check.env
+        write_line "seeded /etc/mascope/disk-check.env"
+    else
+        write_line "kept existing /etc/mascope/disk-check.env"
+    fi
 
     sudo systemctl daemon-reload
     sudo systemctl enable mascope.service
     write_line "mascope.service enabled for user '${USER}' (bin: ${MASCOPE_BIN})"
+    sudo systemctl enable --now mascope-disk-check.timer
+    write_line "Disk monitor ENABLED (mascope-disk-check.timer, every 15 min). Set HEALTHCHECK_URL in /etc/mascope/disk-check.env to get alerted. See docs/maintaining.md."
     write_line "Auto-updates are INSTALLED but DISABLED. To turn them on: 'sudo systemctl enable --now mascope-update.timer' (no token needed). See docs/maintaining.md."
 }
 
 function uninstall_mascope() {
     write_section "DISABLING SYSTEMD UNITS"
 
-    # Boot service and both auto-update units. /etc/mascope/update.env is left
-    # in place so a reinstall keeps the token and settings.
-    for unit in mascope-update.timer mascope-update.service mascope.service; do
+    # Boot service, auto-update units, and the disk monitor. Files under
+    # /etc/mascope/ are left in place so a reinstall keeps the settings/token.
+    for unit in mascope-disk-check.timer mascope-disk-check.service \
+        mascope-update.timer mascope-update.service mascope.service; do
         sudo systemctl stop "$unit" || true
         sudo systemctl disable "$unit" || true
         sudo rm -f "/etc/systemd/system/$unit"

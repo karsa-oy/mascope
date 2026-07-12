@@ -67,7 +67,13 @@ jobs:
         env:
           MASCOPE_REPRO_TEST: "1"
           MASCOPE_PATH: ${{ github.workspace }}
+          # The shared backend conftest imports mascope_backend.db, which reads
+          # this secret at import time. The test drives the demo stack over
+          # HTTP / `docker exec`, never a host DB connection, so a throwaway
+          # value is enough to let collection succeed.
+          POSTGRES_PASSWORD_FILE: ${{ github.workspace }}/test_postgres_password.txt
         run: |
+          echo "test_postgres_password_for_testing_only" > "$POSTGRES_PASSWORD_FILE"
           uv run pytest server/backend/tests/system/reproducibility/ -v
 
       - name: Dump stack logs on failure

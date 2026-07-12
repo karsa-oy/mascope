@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import xarray as xr
 from colorcet import glasbey_hv as colormap
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 import mascope_file.io as m_io
 import mascope_signal.compute as m_compute
@@ -15,6 +15,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.db import MatchIsotope, Sample, TargetIsotope, async_session
 from mascope_backend.socket import sio
 from mascope_file.name import get_instrument_type
+from mascope_match.params import unmatched_isotope_params
 from mascope_signal.peak import filter_peaks, get_peaks
 
 
@@ -296,15 +297,21 @@ async def _fetch_isotopes(sample_item_id, target_ion_id):
     :rtype: list
     """
     async with async_session() as session:
+        # LEFT OUTER join so every target isotope of the ion is visualized, not
+        # just those with a stored match_isotope row. Non-matching isotopes are no
+        # longer persisted (only match_score > 0 is stored), so an inner join would
+        # silently drop them and their spectrum could not be plotted on click.
         stmt = (
             select(TargetIsotope, MatchIsotope)
-            .select_from(MatchIsotope)
-            .join(
-                TargetIsotope,
-                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+            .select_from(TargetIsotope)
+            .outerjoin(
+                MatchIsotope,
+                and_(
+                    MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+                    MatchIsotope.sample_item_id == sample_item_id,
+                ),
             )
             .where(TargetIsotope.target_ion_id == target_ion_id)
-            .where(MatchIsotope.sample_item_id == sample_item_id)
             .order_by(TargetIsotope.relative_abundance.desc())
         )
         result = await session.execute(stmt)
@@ -316,11 +323,20 @@ async def _fetch_isotopes(sample_item_id, target_ion_id):
     def _model_to_dict(obj):
         return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
 
-    # Merge TargetIsotope and MatchIsotope data into a single list of isotopes
-    # use SimpleNamespace for easy attribute access with dot notation
-    isotopes = [
-        SimpleNamespace(**{**_model_to_dict(t), **_model_to_dict(m)}) for t, m in rows
-    ]
+    # Merge TargetIsotope and MatchIsotope data into a single list of isotopes;
+    # use SimpleNamespace for easy attribute access with dot notation.
+    isotopes = []
+    for target, match in rows:
+        data = _model_to_dict(target)
+        if match is not None:
+            data.update(_model_to_dict(match))
+        else:
+            # Reconstruct the unmatched placeholder (no stored row): the spectrum
+            # is drawn around the expected m/z, mirroring what a stored unmatched
+            # row used to provide (assign_defaults_to_unmatched at compute time).
+            data.update(unmatched_isotope_params.model_dump())
+            data["sample_peak_mz"] = target.mz
+        isotopes.append(SimpleNamespace(**data))
 
     return isotopes
 
