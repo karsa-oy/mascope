@@ -50,6 +50,13 @@ ROLE_UNASSIGNED = "unassigned"
 SOURCE_DATABASE = "database"
 SOURCE_UNTARGETED = "untargeted"
 
+# Carried DataFrame column: reference-database identities (a list of dicts) for
+# isotope rows that came from the reference mirror rather than the curated target
+# library. Present only on reference rows; the inversion drops it into provenance
+# and nulls the (synthetic) target FK ids so reference winners persist without a
+# dangling target_compound_id / target_ion_id.
+REFERENCE_IDENTITIES_COL = "reference_identities"
+
 # Placeholder used by the untargeted finder for unassigned peaks
 UNTARGETED_NO_MATCH = "---"
 # The finder emits "()" for ionization/reagent peaks (an adduct with no
@@ -172,6 +179,46 @@ def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
     return match_isotope_df
 
 
+def _row_reference_identities(row) -> list | None:
+    """Reference identities carried on a match row, else None.
+
+    Only reference-sourced isotope rows carry a non-empty list here; target and
+    untargeted rows have NaN. Used to null the synthetic target FKs and to attach
+    the one-to-many identities to the assignment's provenance.
+    """
+    value = row.get(REFERENCE_IDENTITIES_COL)
+    return value if isinstance(value, list) and value else None
+
+
+def _alternative_dict(row, reference_identities_by_formula: dict) -> dict:
+    """Build one runner-up candidate dict for a peak's ``alternatives`` list.
+
+    Null the target FKs when the runner-up is itself a reference row, and attach
+    the formula's reference identities (if any) so a runner-up known compound is
+    still named.
+    """
+    is_reference_row = _row_reference_identities(row) is not None
+    formula = _str_or_none(row.get("target_compound_formula"))
+    alternative = {
+        "assigned_formula": formula,
+        "ion_formula": _str_or_none(row.get("target_ion_formula")),
+        "target_compound_id": (
+            None if is_reference_row else _str_or_none(row.get("target_compound_id"))
+        ),
+        "target_ion_id": (
+            None if is_reference_row else _str_or_none(row.get("target_ion_id"))
+        ),
+        "fit_score": _score_or_none(row.get("match_score")),
+        "mz_error_ppm": _float_or_none(row.get("match_mz_error")),
+        "plausibility": _float_or_none(row.get("_plaus")),
+        "source": SOURCE_DATABASE,
+    }
+    formula_identities = reference_identities_by_formula.get(formula)
+    if formula_identities:
+        alternative["reference_identities"] = formula_identities
+    return alternative
+
+
 def invert_matches_to_peak_assignments(
     match_isotope_df: pd.DataFrame,
     sample_item_id: str,
@@ -229,6 +276,24 @@ def invert_matches_to_peak_assignments(
     ].copy()
     if matched.empty:
         return []
+
+    # Reference identities keyed by canonical formula, drawn from the reference
+    # rows in the frame. A peak's winner - target OR reference - inherits its
+    # formula's identities in provenance, so a curated target keeps its
+    # target_compound_id while still surfacing the known-compound name(s) that
+    # share its formula (the convergence precedence: target owns the FK, reference
+    # identity rides alongside).
+    reference_identities_by_formula: dict[str, list] = {}
+    if REFERENCE_IDENTITIES_COL in match_isotope_df.columns:
+        reference_rows = match_isotope_df[
+            match_isotope_df[REFERENCE_IDENTITIES_COL].apply(
+                lambda value: isinstance(value, list) and bool(value)
+            )
+        ]
+        for formula, group in reference_rows.groupby("target_compound_formula"):
+            reference_identities_by_formula[str(formula)] = group.iloc[0][
+                REFERENCE_IDENTITIES_COL
+            ]
 
     # Reference (most abundant) isotope per ion, used for role attribution
     # and isotope labelling. Computed over the full target set so an ion
@@ -300,20 +365,17 @@ def invert_matches_to_peak_assignments(
             p_correct = None
             calibration_meta = None
         alternatives = [
-            {
-                "assigned_formula": _str_or_none(row.get("target_compound_formula")),
-                "ion_formula": _str_or_none(row.get("target_ion_formula")),
-                "target_compound_id": _str_or_none(row.get("target_compound_id")),
-                "target_ion_id": _str_or_none(row.get("target_ion_id")),
-                "fit_score": _score_or_none(row.get("match_score")),
-                "mz_error_ppm": _float_or_none(row.get("match_mz_error")),
-                "plausibility": _float_or_none(row.get("_plaus")),
-                "source": SOURCE_DATABASE,
-            }
+            _alternative_dict(row, reference_identities_by_formula)
             for _, row in runners.iterrows()
         ]
 
         ion_id = _str_or_none(winner.get("target_ion_id"))
+        # A reference-*row* winner has synthetic target ids that must not persist as
+        # FKs. Separately, any winner (target or reference) whose *formula* is in the
+        # reference mirror inherits those identities in provenance.
+        winner_is_reference_row = _row_reference_identities(winner) is not None
+        winner_formula = _str_or_none(winner.get("target_compound_formula"))
+        formula_identities = reference_identities_by_formula.get(winner_formula)
         is_main = winner["target_isotope_id"] in main_isotope_ids
         isotope_label = (
             "M0"
@@ -347,7 +409,9 @@ def invert_matches_to_peak_assignments(
                 probable_threshold,
             ),
             "target_compound_id": _str_or_none(winner.get("target_compound_id")),
-            "target_ion_id": ion_id,
+            # A reference-row winner carries only a synthetic ion id (for in-run
+            # grouping), never persisted as a dangling FK; a target winner keeps its.
+            "target_ion_id": None if winner_is_reference_row else ion_id,
             "owner_peak_assignment_id": None,
             "alternatives": alternatives or None,
             "provenance": {
@@ -360,6 +424,14 @@ def invert_matches_to_peak_assignments(
                 "p_correct": p_correct,
                 "calibrated": calibration is not None,
                 "calibration": calibration_meta,
+                # One-to-many known-compound identities for a database-sourced peak
+                # whose formula is in the reference mirror (name/source/license),
+                # attached whether the target library or the reference set won it.
+                **(
+                    {"reference_identities": formula_identities}
+                    if formula_identities
+                    else {}
+                ),
             },
         }
         assignments.append(assignment)
