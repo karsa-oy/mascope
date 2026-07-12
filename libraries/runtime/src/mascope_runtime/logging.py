@@ -43,6 +43,98 @@ def _duckdb():
     return duckdb
 
 
+# --- optional GlitchTip/Sentry error reporting ------------------------------
+# Fully gated on MASCOPE_SENTRY_DSN: unset (the default) => no import, no
+# sentry_sdk.init, no sink, i.e. zero behavior change. Set it to a GlitchTip
+# project DSN to forward WARNING+ log records as events. Needs the optional
+# dependency: `pip install mascope_runtime[sentry]`.
+_SENTRY_LEVELS = {"WARNING": "warning", "ERROR": "error", "CRITICAL": "fatal"}
+_sentry_ready = False
+
+
+def _init_sentry(environment: str, release: str | None) -> bool:
+    """
+    Initialize the Sentry SDK once, iff ``MASCOPE_SENTRY_DSN`` is set.
+
+    Returns True when error reporting is active (DSN set and ``sentry-sdk``
+    importable), so the caller appends the loguru sink handler. Idempotent: a
+    second call after a successful init returns True without re-initializing.
+    """
+    global _sentry_ready
+    if _sentry_ready:
+        return True
+    dsn = os.environ.get("MASCOPE_SENTRY_DSN")
+    if not dsn:
+        return False
+    try:
+        import logging as std_logging
+
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.loguru import LoguruIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+    except ImportError:
+        logger.warning(
+            "MASCOPE_SENTRY_DSN is set but sentry-sdk is not installed; error "
+            "reporting is OFF. Install mascope_runtime[sentry]."
+        )
+        return False
+
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=environment,
+        release=release,
+        traces_sample_rate=0.0,  # errors only, no performance tracing
+        profiles_sample_rate=0.0,
+        send_default_pii=False,  # no cookies / auth headers / client IPs
+        max_request_body_size="never",
+        auto_session_tracking=False,  # GlitchTip does not consume sessions
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            # Breadcrumbs only (event_level=None): our own sink owns event
+            # creation, so records are never double-reported.
+            LoguruIntegration(level=std_logging.INFO, event_level=None),
+        ],
+    )
+    _sentry_ready = True
+    return True
+
+
+def _sentry_sink(message) -> None:
+    """
+    Loguru sink: forward a WARNING+ record to GlitchTip as a Sentry event.
+
+    Installed as an extra loguru handler only when ``_init_sentry`` succeeded.
+    Must never raise (a sink cannot) and must never call ``logger.*`` (recurses).
+    """
+    import sentry_sdk
+
+    record = message.record
+    # Loop guard: never re-report the SDK's own transport/worker errors. Matters
+    # if stdlib logging is ever routed into loguru - a failed send logged on
+    # "sentry_sdk.errors" would otherwise recurse back through this sink.
+    name = str(record["name"])
+    if name.startswith("sentry_sdk") or name.startswith("urllib3"):
+        return
+
+    level_name = record["level"].name
+    sentry_level = _SENTRY_LEVELS.get(level_name, level_name.lower())
+    exc = record["exception"]  # loguru (type, value, traceback) tuple, or None
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_level(sentry_level)
+            scope.set_tag("log_level", level_name)
+            scope.set_tag("logger", name)
+            if exc is not None:
+                sentry_sdk.capture_exception((exc.type, exc.value, exc.traceback))
+            else:
+                sentry_sdk.capture_message(record["message"])
+    except Exception:
+        # A sink must never raise, and must not logger.* here (loop guard).
+        pass
+
+
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
 
 palette = {
@@ -165,10 +257,25 @@ class RuntimeLogging:
         )
         # create fresh config
         logger.remove()  # remove old settings
-        logger.configure(  # apply new settings
-            handlers=[file_handler, terminal_handler]
+
+        handlers = (
+            [file_handler, terminal_handler]
             if self.runtime.module.name != "cli"
-            else [terminal_handler],
+            else [terminal_handler]
+        )
+        # Optional GlitchTip/Sentry error reporting, OFF unless MASCOPE_SENTRY_DSN
+        # is set. Init here (once) so the SDK is live before the backend builds
+        # FastAPI() - fast.py imports this Runtime first. The callable sink reads
+        # the record directly, so it ignores the text `format` used above.
+        if _init_sentry(
+            environment=str(self.runtime.mode), release=self.runtime.version
+        ):
+            handlers.append(
+                dict(sink=_sentry_sink, level="WARNING", enqueue=False, catch=True)
+            )
+
+        logger.configure(  # apply new settings
+            handlers=handlers,
             levels=[
                 dict(name="TRACE", color="<magenta>"),
                 dict(name="DEBUG", color="<magenta>"),
