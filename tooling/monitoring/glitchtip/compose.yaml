@@ -1,0 +1,48 @@
+# GlitchTip (self-hosted error tracking) for the Mascope fleet.
+#
+# Deploy on the internal backup box (192.168.1.88), LAN-only, plain HTTP.
+# Copy this directory to /opt/glitchtip on the box, fill in glitchtip.env, then
+# `docker compose up -d`. See ../README.md for the full runbook.
+#
+# GlitchTip 6 (Feb 2026) runs HTTP + background worker + scheduler in ONE
+# "all-in-one" web container (Celery was replaced by django-vtasks), so there is
+# no separate worker/beat/migrate service. Migrations run automatically on boot
+# (SKIP_INIT defaults to False).
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      # OK here: Postgres has no published port and is only reachable on the
+      # internal compose network. To harden anyway, set POSTGRES_PASSWORD and put
+      # the same value in DATABASE_URL (see glitchtip.env.example).
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    restart: unless-stopped
+    volumes:
+      # postgres:18 default data dir is /var/lib/postgresql (NOT .../data).
+      - pg-data:/var/lib/postgresql
+    # no ports: -> internal only
+
+  valkey:
+    image: valkey/valkey:9
+    restart: unless-stopped
+    # no ports: -> internal only
+
+  web:
+    image: glitchtip/glitchtip:6 # check https://glitchtip.com/blog/ before a major bump
+    depends_on:
+      - postgres
+      - valkey
+    ports:
+      # Bound to the LAN IP ONLY (host_ip:host_port:container_port). Publishing to
+      # 0.0.0.0 would bypass ufw (Docker inserts its DNAT before the INPUT chain).
+      # Change 192.168.1.88 if the box's LAN address differs.
+      - "192.168.1.88:8000:8000"
+    env_file: glitchtip.env
+    restart: unless-stopped
+    volumes:
+      - uploads:/code/uploads
+
+volumes:
+  pg-data:
+  uploads:
