@@ -57,12 +57,17 @@ class PeakAssignmentRecord(BaseModel):
 
 
 class PeakAssignmentsResponse(BaseModel):
-    """Peaks-with-assignments for a sample and the run they belong to."""
+    """Peaks-with-assignments for a sample.
+
+    Uses the standard list envelope (status/message/results/data) like every
+    other data-bearing endpoint. Run identity is denormalized onto each row
+    (``peak_assignment_run_id``); full run metadata is served separately by the
+    runs endpoint, so there is no run object echoed here.
+    """
 
     status: str = "success"
     message: str
     results: int
-    run: PeakAssignmentRunRecord | None = None
     data: list[PeakAssignmentRecord]
 
 
