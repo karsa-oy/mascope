@@ -18,8 +18,8 @@ from mascope_backend.api.new.auth.dependencies import (
 )
 from mascope_backend.api.new.peak_assignments.batch import assign_sample_batch_peaks
 from mascope_backend.api.new.peak_assignments.schemas import (
-    AssignSamplePeaksBody,
     AssignmentVerificationsResponse,
+    AssignSamplePeaksBody,
     CompositionFitBody,
     CompositionVisualizeBody,
     PeakAssignmentQueryParams,
