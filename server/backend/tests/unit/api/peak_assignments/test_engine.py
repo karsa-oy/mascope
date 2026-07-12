@@ -256,16 +256,28 @@ class TestInvertMatches:
         match_df = pd.DataFrame(
             [
                 _isotope_row(
-                    target_isotope_id="isoA", target_ion_id="ionA",
-                    target_compound_id="cmp1", compound_formula="C6H12O6",
-                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
-                    sample_peak_id="p1", match_score=0.9, ionization="+H+",
+                    target_isotope_id="isoA",
+                    target_ion_id="ionA",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                    ionization="+H+",
                 ),
                 _isotope_row(
-                    target_isotope_id="isoB", target_ion_id="ionB",
-                    target_compound_id="cmp1", compound_formula="C6H12O6",
-                    ion_formula="C6H12BrO6-", mz=258.9823, relative_abundance=1.0,
-                    sample_peak_id="p2", match_score=0.9, ionization="+Br-",
+                    target_isotope_id="isoB",
+                    target_ion_id="ionB",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H12BrO6-",
+                    mz=258.9823,
+                    relative_abundance=1.0,
+                    sample_peak_id="p2",
+                    match_score=0.9,
+                    ionization="+Br-",
                 ),
             ]
         )
@@ -285,10 +297,16 @@ class TestInvertMatches:
         match_df = pd.DataFrame(
             [
                 _isotope_row(
-                    target_isotope_id="iso1", target_ion_id="ion1",
-                    target_compound_id="cmp1", compound_formula="C6H12O6",
-                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
-                    sample_peak_id="p1", match_score=0.9, ionization="+H+",
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                    ionization="+H+",
                 )
             ]
         )
@@ -303,16 +321,26 @@ class TestInvertMatches:
         match_df = pd.DataFrame(
             [
                 _isotope_row(
-                    target_isotope_id="iso1", target_ion_id="ion1",
-                    target_compound_id="cmp1", compound_formula="C6H12O6",
-                    ion_formula="C6H13O6+", mz=181.0707, relative_abundance=1.0,
-                    sample_peak_id="p1", match_score=0.9,
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H13O6+",
+                    mz=181.0707,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
                 )
             ]
         )
         [a] = invert_matches_to_peak_assignments(
-            match_df, "sample1", "run1", POSSIBLE, PROBABLE,
-            instrument="orbi", calibration=None,
+            match_df,
+            "sample1",
+            "run1",
+            POSSIBLE,
+            PROBABLE,
+            instrument="orbi",
+            calibration=None,
         )
         assert a["provenance"]["calibrated"] is False
         assert a["provenance"]["p_correct"] is None
@@ -829,3 +857,175 @@ class TestBuildUnassigned:
             assert row["sample_item_id"] == "sample1"
         assert rows[0]["sample_peak_id"] == "p9"
         assert rows[0]["sample_peak_mz"] == pytest.approx(55.05)
+
+
+_REF_IDENTITIES = [
+    {
+        "name": "Pinonic acid",
+        "source": "pinene-tracers",
+        "license": "custom",
+        "inchikey": None,
+        "source_native_id": "473-72-3",
+        "xrefs": {"cas": "473-72-3"},
+    }
+]
+
+
+def _reference_row(**kwargs) -> dict:
+    """A Stage A match row sourced from the reference mirror (no curated target)."""
+    row = _isotope_row(target_compound_id=None, **kwargs)
+    row["reference_identities"] = _REF_IDENTITIES
+    return row
+
+
+class TestReferenceStageAInversion:
+    """Reference-sourced Stage A winners: identity in provenance, null target FKs."""
+
+    def test_reference_winner_persists_identity_and_nulls_target_fks(self):
+        df = pd.DataFrame(
+            [
+                _reference_row(
+                    target_isotope_id="refiso1",
+                    target_ion_id="refion1",  # synthetic - must not persist as FK
+                    compound_formula="C10H16O3",
+                    ion_formula="C10H15O3",
+                    mz=183.1027,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.95,
+                    ionization="-H-",
+                )
+            ]
+        )
+        [assignment] = invert_matches_to_peak_assignments(
+            df,
+            sample_item_id="s1",
+            peak_assignment_run_id="run1",
+            possible_threshold=POSSIBLE,
+            probable_threshold=PROBABLE,
+        )
+        assert assignment["source"] == SOURCE_DATABASE
+        assert assignment["assigned_formula"] == "C10H16O3"
+        # Reference winners carry no curated target linkage...
+        assert assignment["target_compound_id"] is None
+        assert assignment["target_ion_id"] is None
+        # ...but their one-to-many identity rides in provenance.
+        assert assignment["provenance"]["reference_identities"] == _REF_IDENTITIES
+        # JSON-serializable (the provenance column is JSON).
+        json.dumps(assignment["provenance"])
+
+    def test_target_winner_has_no_reference_identities(self):
+        df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C6H12O6",
+                    ion_formula="C6H11O6",
+                    mz=179.0561,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.9,
+                    ionization="-H-",
+                )
+            ]
+        )
+        [assignment] = invert_matches_to_peak_assignments(
+            df,
+            sample_item_id="s1",
+            peak_assignment_run_id="run1",
+            possible_threshold=POSSIBLE,
+            probable_threshold=PROBABLE,
+        )
+        assert assignment["target_compound_id"] == "cmp1"
+        assert assignment["target_ion_id"] == "ion1"
+        assert "reference_identities" not in assignment["provenance"]
+
+    def test_reference_beats_target_on_same_peak_and_target_is_alternative(self):
+        df = pd.DataFrame(
+            [
+                _reference_row(
+                    target_isotope_id="refiso1",
+                    target_ion_id="refion1",
+                    compound_formula="C10H16O3",
+                    ion_formula="C10H15O3",
+                    mz=183.1027,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.95,
+                    ionization="-H-",
+                ),
+                _isotope_row(
+                    target_isotope_id="iso2",
+                    target_ion_id="ion2",
+                    target_compound_id="cmp2",
+                    compound_formula="C9H12N2O2",
+                    ion_formula="C9H11N2O2",
+                    mz=183.1027,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.60,
+                    ionization="-H-",
+                ),
+            ]
+        )
+        [assignment] = invert_matches_to_peak_assignments(
+            df,
+            sample_item_id="s1",
+            peak_assignment_run_id="run1",
+            possible_threshold=POSSIBLE,
+            probable_threshold=PROBABLE,
+        )
+        # Higher-scoring reference candidate owns the peak, with identity.
+        assert assignment["assigned_formula"] == "C10H16O3"
+        assert assignment["target_ion_id"] is None
+        assert assignment["provenance"]["reference_identities"] == _REF_IDENTITIES
+        # The curated target drops to alternatives, keeping its own ids.
+        alt = assignment["alternatives"][0]
+        assert alt["assigned_formula"] == "C9H12N2O2"
+        assert alt["target_ion_id"] == "ion2"
+
+    def test_target_winner_inherits_reference_identity_for_shared_formula(self):
+        # Convergence precedence: when the curated target and a reference compound
+        # share the winning peak's formula, the target owns the FK but the known
+        # name still rides alongside in provenance.
+        df = pd.DataFrame(
+            [
+                _isotope_row(
+                    target_isotope_id="iso1",
+                    target_ion_id="ion1",
+                    target_compound_id="cmp1",
+                    compound_formula="C10H16O3",
+                    ion_formula="C10H15O3",
+                    mz=183.1027,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.95,
+                    ionization="-H-",
+                ),
+                _reference_row(
+                    target_isotope_id="refiso1",
+                    target_ion_id="refion1",
+                    compound_formula="C10H16O3",
+                    ion_formula="C10H15O3",
+                    mz=183.1027,
+                    relative_abundance=1.0,
+                    sample_peak_id="p1",
+                    match_score=0.80,
+                    ionization="-H-",
+                ),
+            ]
+        )
+        [assignment] = invert_matches_to_peak_assignments(
+            df,
+            sample_item_id="s1",
+            peak_assignment_run_id="run1",
+            possible_threshold=POSSIBLE,
+            probable_threshold=PROBABLE,
+        )
+        # Target owns the curated FK...
+        assert assignment["target_compound_id"] == "cmp1"
+        assert assignment["target_ion_id"] == "ion1"
+        # ...and the reference name rides alongside.
+        assert assignment["provenance"]["reference_identities"] == _REF_IDENTITIES

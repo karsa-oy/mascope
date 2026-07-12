@@ -14,14 +14,19 @@ read model ("every peak in sample X with its formula and confidence"):
 """
 
 import asyncio
+from dataclasses import asdict
 from datetime import datetime as dt
 from datetime import timezone
+from types import SimpleNamespace
 
 import pandas as pd
 from sqlalchemy import insert, select, update
 
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.controllers.samples.lib.samples_peaks import extract_peaks
+from mascope_backend.api.controllers.target.lib.compute.target_ions_compute import (
+    generate_target_ions_from_composition,
+)
 from mascope_backend.api.lib.api_features import (
     api_controller,
     api_controller_background_task,
@@ -51,6 +56,7 @@ from mascope_backend.api.new.peak_assignments.config import (
     PeakAssignmentConfig,
 )
 from mascope_backend.api.new.peak_assignments.engine import (
+    REFERENCE_IDENTITIES_COL,
     build_unassigned_assignments,
     invert_matches_to_peak_assignments,
     score_ions_by_fit,
@@ -77,6 +83,7 @@ from mascope_backend.socket.notifications import (
 )
 from mascope_file.name import get_instrument_type
 from mascope_match import compute_match_isotopes
+from mascope_reference import iter_known_compositions
 from mascope_tools.composition import CompositionSearchConfig
 from mascope_tools.composition.calibration import (
     InsufficientCalibrationData,
@@ -499,6 +506,155 @@ async def _fetch_known_target_isotopes(
     return target_isotopes_df
 
 
+def _build_reference_isotopes_df(
+    known_compositions: list,
+    mechanisms: list,
+    resolution_type: str,
+    abundance_threshold: float,
+) -> pd.DataFrame:
+    """Expand reference formulas into Stage A isotope rows (CPU-bound).
+
+    For every unique reference formula, reuses the same target-ion/IsoSpec path
+    the curated library uses to produce ions -> isotopologues, keeps the rows for
+    the sample's resolution above the abundance floor, and shapes them like
+    :func:`_fetch_known_target_isotopes` output. Reference rows carry synthetic
+    isotope/ion ids (for in-run grouping only), no ``target_compound_id``, and a
+    ``reference_identities`` list the inversion drops into provenance.
+    """
+    mech_by_id = {m.ionization_mechanism_id: m for m in mechanisms}
+    rows: list[dict] = []
+    for known in known_compositions:
+        compound = SimpleNamespace(
+            target_compound_id="reference",
+            target_compound_formula=known.formula,
+        )
+        try:
+            ions, isotopes = generate_target_ions_from_composition(compound, mechanisms)
+        except Exception as error:  # noqa: BLE001 - a bad formula skips, never fails the run
+            runtime.logger.debug(
+                f"Skipping reference formula '{known.formula}': {error}"
+            )
+            continue
+        ion_by_id = {ion.target_ion_id: ion for ion in ions}
+        identities = [asdict(identity) for identity in known.identities]
+        for iso in isotopes:
+            if iso.resolution != resolution_type:
+                continue
+            if iso.relative_abundance < abundance_threshold:
+                continue
+            ion = ion_by_id.get(iso.target_ion_id)
+            if ion is None:
+                continue
+            mechanism = mech_by_id.get(ion.ionization_mechanism_id)
+            rows.append(
+                {
+                    "target_isotope_id": iso.target_isotope_id,
+                    "target_ion_id": iso.target_ion_id,
+                    "target_isotope_formula": iso.target_isotope_formula,
+                    "mz": iso.mz,
+                    "relative_abundance": iso.relative_abundance,
+                    "resolution": iso.resolution,
+                    "target_ion_formula": ion.target_ion_formula,
+                    "ionization_mechanism_id": ion.ionization_mechanism_id,
+                    # No curated target for a reference-derived formula.
+                    "target_compound_id": None,
+                    "target_compound_formula": known.formula,
+                    "ionization_mechanism": (
+                        mechanism.ionization_mechanism if mechanism else None
+                    ),
+                    "ionization_mechanism_polarity": (
+                        mechanism.ionization_mechanism_polarity if mechanism else None
+                    ),
+                    REFERENCE_IDENTITIES_COL: identities,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+async def _fetch_reference_known_isotopes(
+    sample: Sample, isotope_abundance_threshold: float
+) -> pd.DataFrame:
+    """Reference-database contribution to the Stage A known set.
+
+    Pulls the active reference compounds (bounded to the atmospheric window by
+    :func:`iter_known_compositions`), then expands them into matchable isotope
+    rows off the event loop. Returns an empty frame when there is no reference
+    data or the sample has no matching ionization mechanisms - so the seam is a
+    no-op until a reference database is loaded.
+
+    :param sample: Sample model object.
+    :param isotope_abundance_threshold: Minimum relative abundance for a
+        reference isotope to participate.
+    :return: DataFrame in the known-isotope shape, or empty.
+    """
+    async with async_session() as session:
+        mechanism_ids = await fetch_sample_ionization_mechanism_ids(
+            sample.sample_item_id
+        )
+        mechanisms = (
+            (
+                await session.execute(
+                    select(IonizationMechanism).where(
+                        IonizationMechanism.ionization_mechanism_id.in_(mechanism_ids),
+                        IonizationMechanism.ionization_mechanism_polarity
+                        == sample.polarity,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        known = await iter_known_compositions(session)
+
+    if not known or not mechanisms:
+        return pd.DataFrame()
+
+    # Detach the mechanism fields the CPU build needs so it can run off-loop.
+    mech_specs = [
+        SimpleNamespace(
+            ionization_mechanism_id=m.ionization_mechanism_id,
+            ionization_mechanism=m.ionization_mechanism,
+            ionization_mechanism_polarity=m.ionization_mechanism_polarity,
+        )
+        for m in mechanisms
+    ]
+    resolution_type = "LOW" if get_instrument_type(sample.filename) == "tof" else "HIGH"
+    reference_isotopes_df = await asyncio.to_thread(
+        _build_reference_isotopes_df,
+        known,
+        mech_specs,
+        resolution_type,
+        isotope_abundance_threshold,
+    )
+    runtime.logger.info(
+        f"Built {len(reference_isotopes_df)} reference known isotopes from "
+        f"{len(known)} reference formulas for sample '{sample.sample_item_name}'"
+    )
+    return reference_isotopes_df
+
+
+def _combine_known_isotopes(
+    target_isotopes_df: pd.DataFrame, reference_isotopes_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Union the target-library and reference known-isotope frames for Stage A.
+
+    Target rows gain a null ``reference_identities`` column so the two frames
+    align; the matcher and inversion then treat both uniformly, with reference
+    rows distinguished only by that carried column.
+    """
+    frames = [
+        frame
+        for frame in (target_isotopes_df, reference_isotopes_df)
+        if not frame.empty
+    ]
+    if not frames:
+        return pd.DataFrame()
+    combined = pd.concat(frames, ignore_index=True)
+    if REFERENCE_IDENTITIES_COL not in combined.columns:
+        combined[REFERENCE_IDENTITIES_COL] = None
+    return combined
+
+
 async def _fetch_untargeted_ionizations(
     sample: Sample,
 ) -> tuple[list[str], dict[str, str]]:
@@ -670,15 +826,22 @@ async def assign_sample_peaks(
         peaks_df = _load_sample_peaks(sample)
         await send_progress_user_notification(notification, 0.1)
 
-        # -- Stage A: database-first assignment from the known target library
+        # -- Stage A: database-first assignment from the known composition set:
+        # the curated target library plus (when loaded) the reference mirror.
         stage_a_assignments: list[dict] = []
         target_isotopes_df = await _fetch_known_target_isotopes(
             sample, match_params.isotope_abundance_threshold
         )
-        if not target_isotopes_df.empty:
+        reference_isotopes_df = await _fetch_reference_known_isotopes(
+            sample, match_params.isotope_abundance_threshold
+        )
+        known_isotopes_df = _combine_known_isotopes(
+            target_isotopes_df, reference_isotopes_df
+        )
+        if not known_isotopes_df.empty:
             match_isotope_df = await compute_match_isotopes(
                 filename=sample.filename,
-                target_isotopes_df=target_isotopes_df,
+                target_isotopes_df=known_isotopes_df,
                 polarity=sample.polarity,
             )
             # Gate raw matches by the sample's match parameters, exactly as the
