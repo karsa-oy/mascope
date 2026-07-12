@@ -4,6 +4,21 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- Self-hosted monitoring stack under `tooling/monitoring/` (GlitchTip error
+  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to an
+  internal LAN box with a copy-paste runbook: compose files (ports bound to the
+  LAN IP so Docker cannot bypass ufw), a restic backup script for the new
+  volumes, and firewall guidance.
+- Optional error reporting from the backend to a self-hosted GlitchTip/Sentry
+  instance. A loguru sink forwards `WARNING`/`ERROR` records (with tracebacks
+  and request context) as events. It is **off by default** and gated entirely on
+  `MASCOPE_SENTRY_DSN`: unset means no SDK import and no behavior change; set it
+  on the backend service (with the `mascope_runtime[sentry]` extra installed) to
+  turn reporting on. Events carry the runtime mode as `environment` and
+  `MASCOPE_VERSION` as `release`. See `docs/maintaining.md` -> Monitoring.
+
 ## [v1.3.2] - 2026.07.12
 
 ### Fixed
