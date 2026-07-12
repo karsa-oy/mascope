@@ -85,6 +85,12 @@ def main() -> None:
         f"Ingesting '{args.name or args.source}' (version '{args.version}') "
         f"from {args.file.name}..."
     )
+
+    def _report_progress(n: int) -> None:
+        # A named function, not a lambda: loguru colorizes the record's function
+        # name, and a "<lambda>" name is parsed as an (invalid) color tag.
+        runtime.logger.info(f"  ...{n:,} records ingested")
+
     try:
         result = ingest(
             engine,
@@ -95,7 +101,7 @@ def main() -> None:
             batch_size=args.batch_size,
             activate=not args.stage,
             prune=args.prune,
-            progress=lambda n: runtime.logger.info(f"  ...{n:,} records ingested"),
+            progress=_report_progress,
         )
     finally:
         engine.dispose()
