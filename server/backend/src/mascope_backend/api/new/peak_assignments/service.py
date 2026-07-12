@@ -346,10 +346,12 @@ async def recalibrate_instrument(
                     AssignmentVerification.evidence,
                     AssignmentVerification.evidence_level,
                     Sample.filename,
-                ).join(
+                )
+                .join(
                     Sample,
                     Sample.sample_item_id == AssignmentVerification.sample_item_id,
-                ).where(
+                )
+                .where(
                     AssignmentVerification.verdict.in_(["confirmed", "rejected"]),
                     AssignmentVerification.evidence.is_not(None),
                 )

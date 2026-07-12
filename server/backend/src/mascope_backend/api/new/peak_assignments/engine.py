@@ -148,9 +148,7 @@ def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
     want recalibrating for the fit scale (DESIGN.md: v2 bands ~0.8/0.5) -- a
     product decision, tracked separately from this measurement change.
     """
-    if match_isotope_df.empty or not _FIT_SCORE_COLS.issubset(
-        match_isotope_df.columns
-    ):
+    if match_isotope_df.empty or not _FIT_SCORE_COLS.issubset(match_isotope_df.columns):
         return match_isotope_df
 
     df = match_isotope_df.copy()

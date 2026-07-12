@@ -129,9 +129,7 @@ async def aggregate_composition_fit(
         }
 
     filtered = apply_match_params(match_isotope_df, match_params)
-    ion_score = float(
-        (filtered["match_score"] * filtered["relative_abundance"]).sum()
-    )
+    ion_score = float((filtered["match_score"] * filtered["relative_abundance"]).sum())
     match_ions = [
         {
             "target_compound_formula": norm(assigned_formula),
