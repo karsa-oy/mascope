@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from mascope_backend.api.new.peak_assignments.config import PeakAssignmentConfig
 
+
 # Verification vocabulary (verification-calibration loop V1). Verdict is the label;
 # evidence_level records why the user is confident -- the guardrail that lets the eventual
 # calibration weight a reference-standard confirmation above a visual guess.
