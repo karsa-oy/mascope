@@ -148,7 +148,9 @@ async def get_peak_assignments(
     :param tier: Optional filter by confidence tier
     :param role: Optional filter by peak role
     :param source: Optional filter by assignment source (database/untargeted)
-    :return: Dictionary with status, message, run record, and assignment rows
+    :return: Dictionary with status, message, and assignment rows. Run identity
+        is on each row (peak_assignment_run_id); run metadata is served by the
+        runs endpoint.
     """
     sample = await fetch_sample(sample_item_id)
 
@@ -181,7 +183,6 @@ async def get_peak_assignments(
                     f"'{sample.sample_item_name}'"
                 ),
                 "results": 0,
-                "run": None,
                 "data": [],
             }
 
@@ -208,7 +209,6 @@ async def get_peak_assignments(
             f"for sample '{sample.sample_item_name}'"
         ),
         "results": len(data),
-        "run": run.to_dict(),
         "data": data,
     }
 
