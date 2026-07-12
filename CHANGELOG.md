@@ -19,6 +19,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - `mascope_reference.iter_known_compositions` - a bulk provider that yields the
   active, deduplicated known compositions (formula -> identities) for Stage A,
   with license, element, carbon, mass, and per-formula identity-count bounds.
+- An example curated reference database,
+  `libraries/reference/examples/atmospheric_organics.csv` (79 atmospheric
+  organics with 17 shared-formula isomer sets), for exercising the reference
+  path end to end and as a template for hand-authored lists. Referenced from the
+  reference-data authoring guide.
 
 ### Fixed
 

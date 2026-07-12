@@ -78,6 +78,18 @@ Names are free-form - use the accepted trivial name where one exists, or a
 descriptive label (`C10 HOM (C10H16O5)`) where the exact structure is unresolved.
 Every row still becomes a queryable identity keyed on its formula.
 
+> A larger, ready-to-load example ships in
+> [`libraries/reference/examples/atmospheric_organics.csv`](../../libraries/reference/examples/atmospheric_organics.csv)
+> (79 atmospheric organics - dicarboxylic acids, terpene and isoprene oxidation
+> products, biomass-burning tracers) with a
+> [README](../../libraries/reference/examples/README.md) documenting its
+> provenance. It is a good template and a quick way to see the reference path
+> light up peaks.
+
+> **Watch for commas in names.** A plain CSV splits on every comma, so a name
+> like `2-methyl-1,3,4-trihydroxybutene` would break the row. Quote such fields
+> (`"2-methyl-1,3,4-..."`) or use a comma-free label.
+
 ---
 
 ## 3. Ingest it
