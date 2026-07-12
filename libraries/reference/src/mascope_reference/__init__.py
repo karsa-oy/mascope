@@ -11,6 +11,11 @@ never imports the backend.
 
 from mascope_reference.dedup import collapse_by_inchikey
 from mascope_reference.ingest import IngestResult, ingest
+from mascope_reference.known import (
+    KnownComposition,
+    KnownIdentity,
+    iter_known_compositions,
+)
 from mascope_reference.normalize import (
     canonical_formula,
     finalize,
@@ -34,6 +39,9 @@ __all__ = [
     "by_mass_window",
     "annotate_formulas",
     "collapse_by_inchikey",
+    "iter_known_compositions",
+    "KnownComposition",
+    "KnownIdentity",
     "available_sources",
     "get_adapter",
     "ingest",
