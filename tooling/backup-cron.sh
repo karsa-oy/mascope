@@ -77,11 +77,35 @@ mascope prod db backup delete --retention-days "$LOCAL_RETENTION_DAYS"
 
 # --- Layer 2: encrypted off-site copy ----------------------------------------
 
-# Initialize the repository on first use (idempotent).
-if ! restic cat config >/dev/null 2>&1; then
-    log "restic repository not initialized — running restic init..."
-    restic init
-fi
+# Ensure the off-site repository exists before backing up. `restic cat config`
+# is the existence probe, but it also fails on a transient connection blip
+# (e.g. a flaky VPN) — so retry before concluding the repo is absent, and if we
+# then init and restic reports the repo already exists, treat that as success.
+# Without this, a single blip aborts the run AND wastes the dump just taken.
+ensure_repo() {
+    local attempt init_out
+    for attempt in 1 2 3; do
+        if restic cat config >/dev/null 2>&1; then
+            return 0
+        fi
+        log "repository probe failed (attempt ${attempt}/3); retrying in 10s..."
+        sleep 10
+    done
+
+    log "repository not reachable after 3 probes — attempting restic init..."
+    if init_out=$(restic init 2>&1); then
+        log "initialized a new restic repository"
+        return 0
+    fi
+    if grep -qiE "already (exists|initialized)" <<<"$init_out"; then
+        log "repository already exists; earlier probes failed transiently, proceeding"
+        return 0
+    fi
+    log "ERROR: cannot reach or initialize the repository: ${init_out}"
+    return 1
+}
+
+ensure_repo
 
 BACKUP_PATHS=("$DUMP_DIR")
 if [[ -n "${FILESTORE_PATH:-}" ]]; then
