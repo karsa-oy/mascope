@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 # Log querying/garbage collection (RuntimeLogging.query/gc) reads the JSON
 # log files through duckdb; only the CLI's `mascope logs` needs it.
-logs = ["duckdb>=1.2.1,<2"]
+logs = ["duckdb>=1.5.4,<2"]
 
 [project.urls]
 homepage = "https://karsa.fi/"

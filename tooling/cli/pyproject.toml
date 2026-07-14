@@ -29,7 +29,7 @@ mascope = "mascope_cli.main:app"
 dev = [
     "alembic>=1.18.1",
     "sqlalchemy~=2.0",
-    "psycopg2-binary>=2.9.11",
+    "psycopg2-binary>=2.9.12",
 ]
 # `mascope demo build-bundle` / `verify` peak comparison (imported lazily).
 demo = [
