@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from mascope_backend.api.controllers.ionization_mechanisms.ionization_mechanisms_controller import (
     get_ionization_mechanisms,
 )
+from mascope_backend.api.controllers.sample.batches.status.service import (
+    update_sample_batch_status,
+)
 from mascope_backend.api.controllers.target.ions.target_ions_controller import (
     create_target_ions,
 )
@@ -421,6 +424,7 @@ async def update_target_compound(
     existing_target_compounds = []
     updated_target_compounds = []
     affected_target_collection_ids = set()
+    rematch_batch_ids = set()
     message_log = {}
     async with async_session() as session:
         for i, target_compound in enumerate(target_compounds):
@@ -456,8 +460,11 @@ async def update_target_compound(
                 )
                 continue  # Skip this compound update, proceed to the next
 
-            # Get affected target collections before any modifications
-            _, target_collections_ids = await fetch_compound_collections_and_batches(
+            # Get affected target collections and batches before any modifications
+            (
+                compound_batch_ids,
+                target_collections_ids,
+            ) = await fetch_compound_collections_and_batches(
                 target_compound.target_compound_id
             )
             affected_target_collection_ids.update(target_collections_ids)
@@ -563,6 +570,10 @@ async def update_target_compound(
                         )
                         session.add(new_target_compound_in_target_collection)
                 updated_target_compounds.append(new_compound)
+                # The delete+recreate cascade removed every match row derived
+                # from the old compound; flag the batches so a refresh
+                # recomputes the new formula's ions.
+                rematch_batch_ids.update(compound_batch_ids)
 
             else:
                 # If compound formula has not changed, just update the fields
@@ -576,6 +587,13 @@ async def update_target_compound(
                 )
 
         await session.commit()
+
+        # Formula changes wiped match data via cascade; mark the affected
+        # batches pending rematch so the loss is visible and recomputable.
+        if rematch_batch_ids:
+            await update_sample_batch_status(
+                list(rematch_batch_ids), "rematch", independent_transaction=True
+            )
 
         # -- Emit reload events ---
         reload_events = []
@@ -624,7 +642,9 @@ async def delete_target_compound(
     Steps:
     - Fetch the target compound to verify existence
     - Find all target collections containing this compound
-    - Delete the compound (cascade removes associations)
+    - Delete the compound (cascade removes associations and match rows)
+    - Flag batches using those collections for rematch (standalone deletes only;
+      nested callers set the flag themselves)
     - Emit reload events to affected collections
 
     :param target_compound_id: ID of the target compound to delete
@@ -655,11 +675,33 @@ async def delete_target_compound(
     )
     affected_target_collection_ids = result.scalars().all()
 
+    # Resolve the batches using those collections before the delete cascades
+    affected_batch_ids: list[str] = []
+    if affected_target_collection_ids:
+        result = await session.execute(
+            select(TargetCollectionInSampleBatch.sample_batch_id)
+            .where(
+                TargetCollectionInSampleBatch.target_collection_id.in_(
+                    affected_target_collection_ids
+                )
+            )
+            .distinct()
+        )
+        affected_batch_ids = result.scalars().all()
+
     # Delete the compound (associations removed by cascade)
     await session.delete(target_compound)
 
     if independent_transaction:
         await session.commit()
+
+        # The cascade wiped the compound's match rows in every batch using it;
+        # flag those batches pending rematch. Nested callers (e.g. formula
+        # updates, collection deletion) set the flag themselves.
+        if affected_batch_ids:
+            await update_sample_batch_status(
+                affected_batch_ids, "rematch", independent_transaction=True
+            )
 
         # Emit reload events
         reload_events = []

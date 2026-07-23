@@ -14,6 +14,9 @@ from sqlalchemy.orm import joinedload
 from mascope_backend.api.controllers.match.ions.match_ions_controller import (
     delete_match_ions,
 )
+from mascope_backend.api.controllers.match.isotopes.match_isotopes_controller import (
+    delete_match_isotopes,
+)
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
@@ -41,6 +44,7 @@ from mascope_backend.db import (
     TargetCollectionInSampleBatch,
     TargetCompoundInTargetCollection,
     TargetIon,
+    TargetIsotope,
     async_session,
 )
 from mascope_backend.runtime import runtime
@@ -330,8 +334,10 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
     Updates filter parameters for a target ion and triggers re-matching for affected samples.
 
     Filter parameters are instrument-specific matching settings. When these change,
-    any existing match ions for affected samples must be deleted and the batch
-    status set to pending rematch.
+    the ion's existing match isotopes and match ions for affected samples must be
+    deleted (stored isotope rows mark the ion as evaluated and would otherwise
+    block recomputation with the new parameters) and the batch status set to
+    pending rematch.
 
     Steps:
     - Fetch the target ion from the database.
@@ -341,7 +347,8 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
     - Commit target ion changes to the database.
     - For each affected instrument, find all sample items linked to this ion via the
       batch → collection → compound chain, filtered by ionization mechanism.
-    - Delete existing match ions for those samples and mark affected batches for rematch.
+    - Delete the ion's existing match isotopes and match ions for those samples
+      and mark affected batches for rematch.
 
     :param target_ion_id: The ID of the target ion to update.
     :type target_ion_id: str
@@ -390,8 +397,24 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         await session.commit()
         await session.refresh(target_ion)
 
-    # Find affected samples and delete match ions for the updated ion
+    # Find affected samples and delete match data for the updated ion. The
+    # ion's match_isotope rows must go too: changed params can widen the
+    # eligible isotope set (e.g. a lowered abundance threshold), and stored
+    # rows mark the ion as evaluated, which would block recomputation in
+    # fetch_sample_unmatched_target_isotopes.
     ion_mechanism_id = target_ion.ionization_mechanism_id
+    async with async_session() as session:
+        ion_isotope_ids = (
+            (
+                await session.execute(
+                    select(TargetIsotope.target_isotope_id).where(
+                        TargetIsotope.target_ion_id == target_ion_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
     for instrument in affected_instruments:
         affected_samples = await _find_samples_for_ion_and_instrument(
             target_ion_id, ion_mechanism_id, instrument
@@ -401,6 +424,13 @@ async def update_target_ion(target_ion_id: str, target_ion_update: TargetIonUpda
         )
 
         for sample in affected_samples:
+            # Guard the empty case: delete_match_isotopes without isotope ids
+            # would wipe the sample's entire match_isotope set.
+            if ion_isotope_ids:
+                await delete_match_isotopes(
+                    sample_item_id=sample.sample_item_id,
+                    target_isotope_ids=ion_isotope_ids,
+                )
             await delete_match_ions(
                 sample_item_id=sample.sample_item_id,
                 target_ion_ids=[target_ion_id],
