@@ -39,17 +39,20 @@ def _extract_error_message(response: requests.Response) -> str:
     """Extract error message from API response."""
     try:
         content = response.json()
-        # Try common error message locations
+        # Try common error message locations. The backend's canonical error
+        # shape is {"error": <human message>, "detail": {"error_id": ...}} -
+        # prefer the human-readable "error" field over the opaque detail dict.
         if isinstance(content, dict):
+            error = content.get("error")
+            if isinstance(error, str) and error:
+                return error
+            if "message" in content:
+                return content["message"]
             if "detail" in content:
                 detail = content["detail"]
                 if isinstance(detail, dict):
                     return detail.get("error_message", str(detail))
                 return str(detail)
-            if "message" in content:
-                return content["message"]
-            if "error" in content:
-                return content["error"]
         return response.text[:200] if response.text else "Unknown error"
     except (json.JSONDecodeError, ValueError):
         return response.text[:200] if response.text else "Unknown error"
