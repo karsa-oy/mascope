@@ -36,16 +36,18 @@ def open_gitignore():
     code_path = which("code")
 
     if not code_path:
-        print(
-            "Error: 'code' command not found. Make sure VSCode is installed and 'code' is in your PATH."
+        typer.secho(
+            "'code' command not found. Make sure VSCode is installed and 'code' is in your PATH.",
+            fg=typer.colors.RED,
+            err=True,
         )
-        return
+        raise typer.Exit(1)
 
     # Open each .gitignore file in VSCode
     for file in gitignore_files:
         try:
             subprocess.run([code_path, file], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Failed to open {file}: {e}")
+            typer.secho(f"Failed to open {file}: {e}", fg=typer.colors.RED, err=True)
 
     print(f"Opened {len(gitignore_files)} .gitignore files in VSCode")

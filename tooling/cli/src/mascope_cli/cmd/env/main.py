@@ -311,7 +311,9 @@ def sync(
                 else:
                     create_env_local(target_env_name)
             except (ValueError, FileExistsError, RuntimeError, OSError) as e:
-                runtime.logger.error(f"Failed to create target environment: {e}")
+                # The raised messages already state what failed ("Failed to
+                # create environment '<name>' ..."), so no extra prefix here.
+                runtime.logger.error(str(e))
                 raise typer.Exit(1)
 
         # --- Sync ---
@@ -328,7 +330,11 @@ def sync(
                     control_args=ctl,
                 )
             except (ValueError, RuntimeError) as e:
-                runtime.logger.error(f"Database sync failed: {e}")
+                # The raised messages already say what failed ("scp failed
+                # pulling ...", "Filestore sync failed ..."); a "Database sync
+                # failed:" prefix would double the wording. The closing
+                # "Sync completed with errors in: ..." line names the stage.
+                runtime.logger.error(str(e))
                 errors.append("database")
 
         if not skip_filestore:
@@ -336,7 +342,7 @@ def sync(
             try:
                 sync_filestore(source_env, target_env, control_args=ctl)
             except Exception as e:
-                runtime.logger.error(f"Filestore sync failed: {e}")
+                runtime.logger.error(str(e))
                 errors.append("filestore")
 
     if errors:
