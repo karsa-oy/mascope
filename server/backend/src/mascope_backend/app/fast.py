@@ -209,10 +209,12 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     elif exc.status_code == status.HTTP_400_BAD_REQUEST:
         context_message = "Bad request"
     else:
-        context_message = (
-            f"HTTPException on {request.method} {request.url.path}"
-            f" | detail={exc.detail}"
-        )
+        # Keep the user-facing context generic: the exception's detail is
+        # appended by process_exception, and str(exc) (status + detail) is
+        # already part of the server-side log line. Embedding the detail here
+        # as well would duplicate it in the client message and leak the
+        # internal "HTTPException on METHOD /path" wording.
+        context_message = "Request failed"
     return handle_exception(exc, context_message, response_type="http")
 
 
