@@ -73,8 +73,10 @@ def _discover_scripts() -> dict[str, str]:
             if callable(getattr(mod, "main", None)):
                 cli_name = path.stem
                 result[cli_name] = module_path
-        except Exception:
-            pass
+        except Exception as e:
+            # Broken import - skip the script, but leave a breadcrumb so it
+            # doesn't silently vanish from `db script list`.
+            runtime.logger.debug(f"Skipping script module '{module_path}': {e}")
 
     return result
 

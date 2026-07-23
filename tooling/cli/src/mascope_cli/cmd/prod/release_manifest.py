@@ -103,7 +103,7 @@ def load_manifest(path: Path) -> dict:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        raise ManifestError(f"Could not read manifest '{path}': {e}")
+        raise ManifestError(f"Could not read manifest '{path}': {e}") from e
 
     if not isinstance(data, dict):
         raise ManifestError("Manifest must be a JSON object")
