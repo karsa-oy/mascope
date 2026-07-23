@@ -22,6 +22,10 @@ dependencies = [
 # Log querying/garbage collection (RuntimeLogging.query/gc) reads the JSON
 # log files through duckdb; only the CLI's `mascope logs` needs it.
 logs = ["duckdb>=1.2.1,<2"]
+# Error reporting to a self-hosted GlitchTip/Sentry. Only needed when
+# MASCOPE_SENTRY_DSN is set; RuntimeLogging installs the sink lazily, so the
+# base install stays lean. See tooling/monitoring/ and docs/maintaining.md.
+sentry = ["sentry-sdk>=2,<3"]
 
 [project.urls]
 homepage = "https://karsa.fi/"
