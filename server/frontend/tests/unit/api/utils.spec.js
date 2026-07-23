@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 
-import { extractDistinctValues, generateCopyName, snakeToCamel } from '@/api/utils'
+import {
+  extractDistinctValues,
+  generateCopyName,
+  getApiErrorMessage,
+  snakeToCamel
+} from '@/api/utils'
 
 describe('extractDistinctValues', () => {
   it('deduplicates a property across objects', () => {
@@ -27,6 +32,25 @@ describe('generateCopyName', () => {
   it('returns null for empty input', () => {
     expect(generateCopyName(null)).toBe(null)
     expect(generateCopyName('')).toBe(null)
+  })
+})
+
+describe('getApiErrorMessage', () => {
+  it('prefers the backend error field', () => {
+    const error = {
+      message: 'Request failed with status code 409',
+      response: { data: { error: 'Failed to update workspace. Name already in use.' } }
+    }
+    expect(getApiErrorMessage(error)).toBe('Failed to update workspace. Name already in use.')
+  })
+
+  it('falls back to the error message when there is no response body', () => {
+    expect(getApiErrorMessage(new Error('Network Error'))).toBe('Network Error')
+  })
+
+  it('falls back to the default when nothing is available', () => {
+    expect(getApiErrorMessage(undefined)).toBe('An error occurred')
+    expect(getApiErrorMessage({}, 'Failed to upload files')).toBe('Failed to upload files')
   })
 })
 
