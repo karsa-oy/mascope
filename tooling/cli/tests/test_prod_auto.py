@@ -209,7 +209,9 @@ def test_auto_migration_records_and_exits_pending(auto_env):
 
     def _record(path, version, head):
         recorded["v"] = version
-        return au.PendingUpdate(version, head, "2026-07-07T00:00:00")
+        # first_seen_at must be "now" so the grace period can never have
+        # elapsed, whatever the real date is when the test runs.
+        return au.PendingUpdate(version, head, au._now().isoformat())
 
     auto_env.setattr(prod_main.auto_update, "record_pending", _record)
     auto_env.setattr(
