@@ -9,6 +9,9 @@ from sqlalchemy import (
 )
 
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
+from mascope_backend.api.controllers.match.lib.match_write_lock import (
+    acquire_match_write_locks,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -260,9 +263,12 @@ async def create_match_compounds(
     if not match_compounds:
         return {"message": "No match compounds provided", "data": []}
 
-    # Step 1: Group match compounds by sample item ID.
+    # Step 1: Group match compounds by sample item ID, in stable natural-key
+    # order so concurrent writers touch rows in the same sequence.
     grouped_match_compounds = defaultdict(list)
-    for match_compound in match_compounds:
+    for match_compound in sorted(
+        match_compounds, key=lambda mc: (mc.sample_item_id, mc.target_compound_id)
+    ):
         grouped_match_compounds[match_compound.sample_item_id].append(match_compound)
 
     processed_compounds = []
@@ -270,6 +276,9 @@ async def create_match_compounds(
     unchanged_count = 0
 
     async with async_session() as session:
+        # Serialize with every other match writer of the affected batches;
+        # holds until commit, making the read-then-write below race-free.
+        await acquire_match_write_locks(session, grouped_match_compounds.keys())
         for sample_item_id, m_compounds in grouped_match_compounds.items():
             # Step 2: Get existing match compounds for this sample
             target_compound_ids = [mc.target_compound_id for mc in m_compounds]
@@ -384,6 +393,7 @@ async def delete_match_compounds(
         sample_item_id, sample_batch_id
     )
     async with async_session() as session:
+        await acquire_match_write_locks(session, sample_item_ids)
         query = delete(MatchCompound).where(
             MatchCompound.sample_item_id.in_(sample_item_ids)
         )

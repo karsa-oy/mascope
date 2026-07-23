@@ -2,6 +2,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy import and_, asc, delete, desc, func, insert, select
 
+from mascope_backend.api.controllers.match.lib.match_write_lock import (
+    acquire_match_write_locks,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -191,6 +194,7 @@ async def delete_match_isotopes(
     )
 
     async with async_session() as session:
+        await acquire_match_write_locks(session, sample_item_ids)
         query = delete(MatchIsotope).where(
             MatchIsotope.sample_item_id.in_(sample_item_ids)
         )
@@ -245,6 +249,9 @@ async def create_match_isotopes(
     ]
 
     async with async_session() as session:
+        # Serialize with every other match writer of the affected batch;
+        # holds until commit, making the duplicate check below race-free.
+        await acquire_match_write_locks(session, [sample_item_id])
         # Step 1: Check for existing matches to avoid duplication.
         stmt = (
             select(MatchIsotope.match_isotope_id)

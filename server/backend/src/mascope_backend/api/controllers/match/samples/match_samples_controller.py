@@ -7,6 +7,9 @@ from sqlalchemy import (
     select,
 )
 
+from mascope_backend.api.controllers.match.lib.match_write_lock import (
+    acquire_match_write_locks,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -156,9 +159,10 @@ async def create_match_samples(
     if not match_samples:
         return {"message": "No match samples provided", "data": []}
 
-    # Step 1: Group match samples by sample item ID.
+    # Step 1: Group match samples by sample item ID, in stable order so
+    # concurrent writers touch rows in the same sequence.
     grouped_match_samples = defaultdict(list)
-    for match_sample in match_samples:
+    for match_sample in sorted(match_samples, key=lambda ms: ms.sample_item_id):
         grouped_match_samples[match_sample.sample_item_id].append(match_sample)
 
     new_match_samples = []
@@ -166,6 +170,9 @@ async def create_match_samples(
     unchanged_count = 0
 
     async with async_session() as session:
+        # Serialize with every other match writer of the affected batches;
+        # holds until commit, making the read-then-write below race-free.
+        await acquire_match_write_locks(session, grouped_match_samples.keys())
         for sample_item_id, m_samples in grouped_match_samples.items():
             provided_match_sample = m_samples[0]
             # Step 2: Check for existing match sample
@@ -256,23 +263,36 @@ async def create_match_samples(
 async def delete_match_samples(
     sample_item_id: str | None = None,
     sample_batch_id: str | None = None,
+    sample_item_ids: list[str] | None = None,
 ):
     """
     Deletes match samples for specified sample items.
 
     Steps:
-    1. Fetch sample item IDs using the utility function.
+    1. Resolve the target sample item IDs: an explicit `sample_item_ids` list
+       takes precedence (used by partial/orphan removal to narrow the delete
+       to affected samples only); otherwise resolve from `sample_item_id` /
+       `sample_batch_id` with the utility function.
     2. Construct and execute a delete query for match samples based on the sample item IDs.
     3. Commit the transaction and report the number of deleted records.
 
     :param sample_item_id: ID of the single sample item, optional.
     :param sample_batch_id: ID of the sample batch, optional.
+    :param sample_item_ids: Explicit sample item IDs to delete for; overrides
+        the other scope parameters when provided.
     :return: A message indicating the outcome of the deletion process.
     """
-    sample_item_ids, sample_ref = await fetch_sample_item_ids(
-        sample_item_id, sample_batch_id
-    )
+    if sample_item_ids is not None:
+        sample_ref = (
+            f"{len(sample_item_ids)} sample item"
+            f"{'s' if len(sample_item_ids) != 1 else ''}"
+        )
+    else:
+        sample_item_ids, sample_ref = await fetch_sample_item_ids(
+            sample_item_id, sample_batch_id
+        )
     async with async_session() as session:
+        await acquire_match_write_locks(session, sample_item_ids)
         query = delete(MatchSample).where(
             MatchSample.sample_item_id.in_(sample_item_ids)
         )
