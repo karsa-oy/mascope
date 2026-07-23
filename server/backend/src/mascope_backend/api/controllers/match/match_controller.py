@@ -14,6 +14,9 @@ from mascope_backend.api.controllers.match.lib.match_compute import (
     compute_and_create_sample_match_isotope_data,
 )
 from mascope_backend.api.controllers.match.lib.match_remove import remove_matches
+from mascope_backend.api.controllers.match.samples.match_samples_controller import (
+    delete_match_samples,
+)
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
@@ -65,6 +68,33 @@ def _is_blank_sample(sample: Sample) -> bool:
     # Blank samples are created without an instrument config and should not be
     # blocked by m/z calibration verification.
     return sample.instrument_function_id is None
+
+
+async def _batch_aggregates_incomplete(sample_batch_id: str) -> bool:
+    """
+    Returns whether any sample of the batch has stored match isotopes but no
+    MatchSample row - the signature of a missing or previously-failed
+    aggregation (MatchSample rows are written by the last create funnel of a
+    successful aggregation, and are deleted when an aggregation fails).
+
+    :param sample_batch_id: The batch to probe.
+    :type sample_batch_id: str
+    :return: True when the batch's aggregates are incomplete.
+    :rtype: bool
+    """
+    async with async_session() as session:
+        stmt = (
+            select(MatchIsotope.sample_item_id)
+            .join(Sample, Sample.sample_item_id == MatchIsotope.sample_item_id)
+            .where(
+                Sample.sample_batch_id == sample_batch_id,
+                ~select(MatchSample.match_sample_id)
+                .where(MatchSample.sample_item_id == MatchIsotope.sample_item_id)
+                .exists(),
+            )
+            .limit(1)
+        )
+        return (await session.scalar(stmt)) is not None
 
 
 # -------------------------------------------------------------------
@@ -853,13 +883,17 @@ async def rematch_batch(
             parent_id=process_id,
         )
 
-        # Step 4: Compute new matches
+        # Step 4: Compute new matches. The removed count lets the compute step
+        # skip re-aggregation when the removal was also a no-op.
         compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             independent_transaction=False,
             user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
+            removed_matches_count=remove_result.get("data", {}).get(
+                "removed_match_isotopes_count", 0
+            ),
         )
 
         # Step 5: Determine final status and message
@@ -1041,11 +1075,14 @@ async def match_compute_batch(
     user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
+    removed_matches_count: int = 0,
 ) -> dict:
     """
     Computes new matches for all samples within a batch, processing each sample:
     - Filters which target isotopes need computation
-    - Aggregates higher-level matches based on computed isotopes
+    - Aggregates higher-level matches based on computed isotopes; skipped when
+      provably nothing changed (nothing computed or failed this run, nothing
+      removed by the preceding removal, and the stored aggregates are complete)
 
     :param sample_batch_id: The identifier of the sample batch for which match computation is to be performed.
     :type sample_batch_id: str
@@ -1055,6 +1092,9 @@ async def match_compute_batch(
     :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :param parent_id: Parent process identifier
+    :param removed_matches_count: Match isotopes removed by a preceding removal
+        step (rematch flow); a nonzero count forces re-aggregation
+    :type removed_matches_count: int
     :raises NotFoundException: When batch not found
     :raises ApiException: When batch has no samples or critical failures occur
     :return: Batch data with computation results and status message
@@ -1187,18 +1227,53 @@ async def match_compute_batch(
     # the batch-level target queries for every sample. A failure here must not
     # discard the per-sample isotopes already computed and saved above, so it is
     # caught and reflected in the batch status rather than propagated.
+    #
+    # The aggregation is skipped when provably nothing changed: no sample
+    # computed (or even failed - a failure after the isotope insert would leave
+    # stored rows unaggregated), the preceding removal removed nothing, and the
+    # stored aggregates are complete. All aggregation inputs live in match/
+    # target tables whose invalidation paths delete match rows or force a
+    # compute, so an unchanged-and-complete state re-aggregates to the values
+    # already stored. (One deliberate behavior change: aggregates saved via the
+    # /save routes with custom match_params are no longer silently
+    # canonicalized back to defaults by a no-op refresh.)
     aggregation_failed = False
-    try:
-        match_aggregate_result = await aggregate_and_create_matches(
-            sample_batch_id=sample_batch_id
+    match_aggregate_result = {}
+    aggregation_needed = (
+        bool(computed_samples)
+        or bool(failed_samples)
+        or removed_matches_count > 0
+        or await _batch_aggregates_incomplete(sample_batch_id)
+    )
+    if not aggregation_needed:
+        runtime.logger.info(
+            f"Skipped higher-level match aggregation for sample batch "
+            f"'{sample_batch_name}': no match data changed."
         )
-    except Exception as e:
-        aggregation_failed = True
-        match_aggregate_result = {}
-        runtime.logger.error(
-            f"Higher-level match aggregation failed for sample batch "
-            f"'{sample_batch_name}': {e}"
-        )
+    else:
+        try:
+            match_aggregate_result = await aggregate_and_create_matches(
+                sample_batch_id=sample_batch_id
+            )
+        except Exception as e:
+            aggregation_failed = True
+            match_aggregate_result = {}
+            runtime.logger.error(
+                f"Higher-level match aggregation failed for sample batch "
+                f"'{sample_batch_name}': {e}"
+            )
+            # Break the aggregate-completeness invariant that the skip above
+            # relies on: without MatchSample rows, the next refresh probes as
+            # incomplete and re-aggregates instead of trusting a half-written
+            # aggregation. Best-effort - the original error already set the
+            # batch outcome.
+            try:
+                await delete_match_samples(sample_batch_id=sample_batch_id)
+            except Exception as cleanup_error:
+                runtime.logger.warning(
+                    f"Could not clear match samples after failed aggregation "
+                    f"for sample batch '{sample_batch_name}': {cleanup_error}"
+                )
     match_aggregate_status = match_aggregate_result.get("status")
     if match_aggregate_status in ("success", "partial"):
         runtime.logger.debug(
