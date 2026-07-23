@@ -155,6 +155,7 @@ def _run_dev_compose(args: list[str]):
             "MASCOPE_DB_PORT": str(db_cfg.port),
             "MASCOPE_DB_USER": db_cfg.user,
             "MASCOPE_DB_SHM_SIZE": db_cfg.shm_size,
+            "MASCOPE_DB_MAX_CONNECTIONS": str(db_cfg.max_connections),
             "MASCOPE_DB_SHARED_BUFFERS": db_cfg.shared_buffers,
             "MASCOPE_DB_EFFECTIVE_CACHE_SIZE": db_cfg.effective_cache_size,
             "MASCOPE_DB_WORK_MEM": db_cfg.work_mem,

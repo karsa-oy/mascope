@@ -17,6 +17,8 @@ services:
     command:
       - "postgres"
       - "-c"
+      - "max_connections=${MASCOPE_DB_MAX_CONNECTIONS:-100}"
+      - "-c"
       - "shared_buffers=${MASCOPE_DB_SHARED_BUFFERS:-512MB}"
       - "-c"
       - "effective_cache_size=${MASCOPE_DB_EFFECTIVE_CACHE_SIZE:-4GB}"
