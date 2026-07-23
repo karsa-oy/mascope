@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { api } from '@/api'
+import { getApiErrorMessage } from '@/api/utils'
 
 import { genId } from '@/lib/utils'
 import { useData } from '@/lib/store'
@@ -190,7 +191,7 @@ export const useSample = defineStore('app.data.sample', () => {
           type: 'sample_file_upload',
           process_id: mainProcessId,
           status: 'error',
-          message: error.response?.data?.error || error.message || 'Failed to upload files',
+          message: getApiErrorMessage(error, 'Failed to upload files'),
           progress: 100
         })
 

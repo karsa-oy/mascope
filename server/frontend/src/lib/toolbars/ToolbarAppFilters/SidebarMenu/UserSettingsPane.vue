@@ -7,6 +7,7 @@ import Select from 'primevue/select'
 import Button from 'primevue/button'
 
 import { api } from '@/api'
+import { getApiErrorMessage } from '@/api/utils'
 import { useApp } from '@/stores'
 import { BaseCopyableField, BaseEditableField } from '@/lib/base'
 import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
@@ -80,7 +81,7 @@ const regenerateToken = async () => {
     app.ui.notification.push({
       type: `${config.id}_token_refresh`,
       status: 'error',
-      message: `${e?.response?.data?.error || e?.message}`
+      message: getApiErrorMessage(e, 'Failed to regenerate the access token.')
     })
   }
 }
