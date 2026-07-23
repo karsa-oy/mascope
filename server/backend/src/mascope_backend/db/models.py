@@ -853,6 +853,9 @@ class MatchSample(Base):
     __table_args__ = (
         CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
         CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+        # One aggregate row per sample; concurrent aggregations must never
+        # duplicate it (create_match_samples reads with one_or_none)
+        UniqueConstraint("sample_item_id", name="uq_match_sample_sample_item"),
     )
 
 
@@ -892,6 +895,12 @@ class MatchCollection(Base):
     __table_args__ = (
         CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
         CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+        # Natural key of the aggregate; guards concurrent upserts
+        UniqueConstraint(
+            "sample_item_id",
+            "target_collection_id",
+            name="uq_match_collection_sample_item_target_collection",
+        ),
     )
 
 
@@ -929,6 +938,12 @@ class MatchCompound(Base):
     __table_args__ = (
         CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
         CheckConstraint("match_category BETWEEN 0 AND 2", name="match_category_range"),
+        # Natural key of the aggregate; guards concurrent upserts
+        UniqueConstraint(
+            "sample_item_id",
+            "target_compound_id",
+            name="uq_match_compound_sample_item_target_compound",
+        ),
     )
 
 
@@ -971,6 +986,12 @@ class MatchIon(Base):
             "ix_match_ion_target_ion_id_match_score",
             "target_ion_id",
             "match_score",
+        ),
+        # Natural key of the aggregate; guards concurrent upserts
+        UniqueConstraint(
+            "sample_item_id",
+            "target_ion_id",
+            name="uq_match_ion_sample_item_target_ion",
         ),
     )
 
@@ -1045,6 +1066,12 @@ class MatchIsotope(Base):
 
     __table_args__ = (
         CheckConstraint("match_score BETWEEN 0 AND 1", name="match_score_range"),
+        # One row per evaluated isotope per sample; guards concurrent computes
+        UniqueConstraint(
+            "sample_item_id",
+            "target_isotope_id",
+            name="uq_match_isotope_sample_item_target_isotope",
+        ),
     )
 
 
