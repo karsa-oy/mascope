@@ -7,6 +7,9 @@ from sqlalchemy import (
     select,
 )
 
+from mascope_backend.api.controllers.match.lib.match_write_lock import (
+    acquire_match_write_locks,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -167,9 +170,13 @@ async def create_match_collections(
     if not match_collections:
         return {"message": "No match collections provided", "data": []}
 
-    # Step 1: Group match collections by sample item ID.
+    # Step 1: Group match collections by sample item ID, in stable natural-key
+    # order so concurrent writers touch rows in the same sequence.
     grouped_match_collections = defaultdict(list)
-    for match_collection in match_collections:
+    for match_collection in sorted(
+        match_collections,
+        key=lambda mc: (mc.sample_item_id, mc.target_collection_id),
+    ):
         grouped_match_collections[match_collection.sample_item_id].append(
             match_collection
         )
@@ -179,6 +186,9 @@ async def create_match_collections(
     unchanged_count = 0
 
     async with async_session() as session:
+        # Serialize with every other match writer of the affected batches;
+        # holds until commit, making the read-then-write below race-free.
+        await acquire_match_write_locks(session, grouped_match_collections.keys())
         for sample_item_id, m_collections in grouped_match_collections.items():
             # Step 2: Get existing match collections for this sample
             target_collection_ids = [mc.target_collection_id for mc in m_collections]
@@ -294,6 +304,7 @@ async def delete_match_collections(
         sample_item_id, sample_batch_id
     )
     async with async_session() as session:
+        await acquire_match_write_locks(session, sample_item_ids)
         query = delete(MatchCollection).where(
             MatchCollection.sample_item_id.in_(sample_item_ids)
         )

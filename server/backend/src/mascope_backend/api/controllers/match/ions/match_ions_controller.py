@@ -9,6 +9,9 @@ from sqlalchemy import (
 )
 
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
+from mascope_backend.api.controllers.match.lib.match_write_lock import (
+    acquire_match_write_locks,
+)
 from mascope_backend.api.controllers.sample.lib.sample_items_fetch import (
     fetch_sample_item_ids,
 )
@@ -322,9 +325,12 @@ async def create_match_ions(
     if not match_ions:
         return {"message": "No match ions provided", "data": []}
 
-    # Step 1: Group match ions by sample item ID.
+    # Step 1: Group match ions by sample item ID, in stable natural-key order
+    # so concurrent writers touch rows in the same sequence.
     grouped_match_ions = defaultdict(list)
-    for match_ion in match_ions:
+    for match_ion in sorted(
+        match_ions, key=lambda mi: (mi.sample_item_id, mi.target_ion_id)
+    ):
         grouped_match_ions[match_ion.sample_item_id].append(match_ion)
 
     processed_ions = []
@@ -332,6 +338,9 @@ async def create_match_ions(
     unchanged_count = 0
 
     async with async_session() as session:
+        # Serialize with every other match writer of the affected batches;
+        # holds until commit, making the read-then-write below race-free.
+        await acquire_match_write_locks(session, grouped_match_ions.keys())
         for sample_item_id, m_ions in grouped_match_ions.items():
             # Step 2: Get existing match ions for this sample
             target_ion_ids = [mi.target_ion_id for mi in m_ions]
@@ -451,6 +460,7 @@ async def delete_match_ions(
     )
 
     async with async_session() as session:
+        await acquire_match_write_locks(session, sample_item_ids)
         query = delete(MatchIon).where(MatchIon.sample_item_id.in_(sample_item_ids))
         if target_ion_ids:
             query = query.where(MatchIon.target_ion_id.in_(target_ion_ids))
