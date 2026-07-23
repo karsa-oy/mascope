@@ -1,12 +1,15 @@
 """
-Maintenance script to remove unmatched (score-0) match isotopes.
+Maintenance script to remove unmatched (score-0) match isotopes, keeping one
+sentinel row per fully-unmatched ion.
 
 Deletes match_isotope rows with match_score = 0 - isotopes that are not a real
 match (no peak in the window, or a peak whose m/z / abundance error is so large it
-scores 0 and can never become a match at any read-time tolerance). These are no
-longer stored by the backend and are reconstructed on read from their
-target_isotope, so removing the historical ones is lossless and reclaims the bulk
-of the table. Run in bounded batches; follow with ``VACUUM FULL match_isotope``
+scores 0 and can never become a match at any read-time tolerance) - except one
+sentinel row per (sample, ion) whose isotopes all scored 0. The sentinel is the
+"this ion was evaluated" marker that fetch_sample_unmatched_target_isotopes uses
+to skip recomputation on refresh; the remaining rows are reconstructed on read
+from their target_isotope, so removing them is lossless and reclaims the bulk of
+the table. Run in bounded batches; follow with ``VACUUM FULL match_isotope``
 (or pg_repack) to return the freed space to the OS.
 
 Usage:
@@ -58,7 +61,8 @@ async def run_remove() -> None:
     runtime.logger.info(f"Status: {result['status']}")
     runtime.logger.info(result["message"])
     runtime.logger.info(
-        f"Deleted={result['deleted']}, total_unmatched={result['total_unmatched']}"
+        f"Deleted={result['deleted']}, total_unmatched={result['total_unmatched']}, "
+        f"sentinels_kept={result['sentinels_kept']}"
     )
     runtime.logger.info("=" * 80)
 
