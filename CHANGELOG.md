@@ -4,8 +4,25 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL `max_connections` is now configurable via `[backend.database]` in
+  the `.mascope.toml` layers and passed to the postgres container like the
+  other tuning flags (`MASCOPE_DB_MAX_CONNECTIONS`). Default stays 100;
+  production sets 200. `mascope prod db status` / `mascope dev db status` now
+  display the server cap next to the pool settings.
+
 ### Fixed
 
+- Production backend pool exhaustion during acquisition ingest
+  (`QueuePool limit of size 3 overflow 2 reached, connection timed out`): a
+  burst of converted files stacks several concurrent calibrate/match pipelines
+  on a single uvicorn worker, exhausting its 5-connection pool and failing
+  unrelated requests (including auth) on that worker for 30 s at a time.
+  `max_overflow` is raised 2 → 7 in prod (per-worker ceiling 5 → 10;
+  12-worker peak 120, under the new `max_connections = 200`). The developer
+  guide's connection-pool section now documents the two sizing constraints
+  (global budget and per-worker burst ceiling).
 - "Refresh matches" is incremental again. Since v1.3.0 stopped storing
   non-matching (score-0) `match_isotope` rows, every refresh re-fetched and
   re-scored every previously non-matching isotope of every sample - adding a

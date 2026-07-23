@@ -18,11 +18,17 @@ port = 5432
 shm_size = "20g" # shared_buffers (16GB) + 2GB IPC overhead + 2GB headroom
 
 # --- SQLAlchemy pool (per worker) ---
-# SQLAlchemy engine pool settings for multi-worker production
-# NOTE: With auto workers (12 usually): pool_size=3, max_overflow=2 → 12 × 5 = 60 max connections
-# Stays under PostgreSQL max_connections=100 default
+# SQLAlchemy engine pool settings for multi-worker production.
+# Sizing rule: max_connections ≥ workers × (pool_size + max_overflow) + ~10
+# headroom (superuser reserved, db_init, backups, psql).
+# pool_size stays small — it is held open as idle connections by every worker.
+# max_overflow is the burst absorber (free when idle): acquisition ingest can
+# stack several concurrent calibrate/match pipelines on ONE worker, so the
+# per-worker ceiling (pool_size + max_overflow) must cover that burst.
+# NOTE: With auto workers (12 usually): 12 × (3 + 7) = 120 peak connections
+# — under max_connections=200 set below.
 pool_size = 3
-max_overflow = 2
+max_overflow = 7
 pool_timeout = 30
 pool_pre_ping = true
 expire_on_commit = false
@@ -30,6 +36,9 @@ expire_on_commit = false
 # 64 GB RAM, 24-core, NVMe.
 # Values from PGTune (mixed workload profile) minus unsupported flags.
 # See postgres README.md for full explanation.
+
+# --- PostgreSQL: connections ---
+max_connections = 200             # 12 workers × 10 pool max = 120 peak + headroom
 
 # --- PostgreSQL: memory ---
 shared_buffers = "16GB"           # 25% of 64GB RAM; primary data cache

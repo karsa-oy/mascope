@@ -46,6 +46,11 @@ expire_on_commit = false
 # See postgres README.md for full explanation.
 # Override in prod.mascope.toml for production hardware.
 
+# --- PostgreSQL: connections ---
+# Server-side cap. Must exceed workers × (pool_size + max_overflow) plus
+# ~10 headroom (superuser reserved, db_init, backups, psql sessions).
+max_connections = 100
+
 # --- PostgreSQL: memory ---
 shared_buffers = "512MB"          # 25% of ~8GB floor; primary data cache
 effective_cache_size = "4GB"      # planner hint; ~50-75% of available RAM

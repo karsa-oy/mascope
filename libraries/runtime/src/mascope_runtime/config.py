@@ -85,6 +85,12 @@ class DatabaseConfig(BaseModel):
     )
     expire_on_commit: bool = False  # Keep loaded objects accessible after commit
 
+    # --- PostgreSQL: connections ---
+    # Server-side connection cap. Must exceed
+    # workers x (pool_size + max_overflow) + ~10 headroom for
+    # superuser_reserved_connections (3), db_init, backups and psql sessions.
+    max_connections: int = 100
+
     # --- PostgreSQL: memory ---
     shared_buffers: str = "512MB"  # primary data cache; 25% RAM on prod
     effective_cache_size: str = (

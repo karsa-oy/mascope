@@ -573,7 +573,8 @@ Notes:
 
 - Because every instance shares one Postgres, watch the connection budget: dev pools are
   `pool_size` + `max_overflow` per worker against `max_connections` (default 100). A handful of
-  instances is fine; for many, raise `max_connections` on the shared server.
+  instances is fine; for many, raise `max_connections` under `[backend.database]` in a dev
+  config layer and restart the shared Postgres (`mascope dev down && mascope dev up`).
 - Redis is a single shared instance with no per-env namespace. For independent tasks this is
   usually harmless; namespace keys by env if collisions matter.
 - The same ports are exposed manually via `MASCOPE_API_PORT` / `MASCOPE_FRONTEND_PORT` (and the
@@ -1313,16 +1314,31 @@ Use a strong, unique password for production servers.
 
 ### Connection pool
 
-SQLAlchemy pool settings are **per worker**. Total possible connections across all workers
-must stay under PostgreSQL's `max_connections` (default 100).
+SQLAlchemy pool settings are **per worker** — every uvicorn worker process holds its own
+engine and pool, and a single worker can exhaust *its* pool (raising
+`QueuePool limit of size N overflow M reached`) while other workers' connections sit idle.
+Two constraints must hold at once:
+
+1. **Global budget** — `workers × (pool_size + max_overflow)` plus ~10 headroom
+   (superuser reserved connections, `db_init`, backups, psql sessions) must stay under
+   PostgreSQL's `max_connections`, configurable via `[backend.database]` (passed to the
+   container as a `-c` flag; requires a postgres container restart).
+2. **Per-worker ceiling** — `pool_size + max_overflow` must cover one worker's burst.
+   Acquisition ingest can stack several concurrent calibrate/match pipelines plus
+   auth and API queries on a single worker, so keep the ceiling comfortably above the
+   expected concurrent DB-touching tasks per worker.
+
+Keep `pool_size` small (those connections are held open even when idle, by every worker)
+and use `max_overflow` for burst capacity — overflow connections cost nothing when unused.
 
 ```toml
 # base.mascope.toml — applies to dev and prod unless overridden
 [backend.database]
-pool_size = 3       # persistent connections kept open per worker
-max_overflow = 2    # additional burst connections allowed per worker
-pool_timeout = 30   # seconds to wait before raising timeout
+pool_size = 3          # persistent connections kept open per worker
+max_overflow = 2       # additional burst connections allowed per worker
+pool_timeout = 30      # seconds to wait before raising timeout
 pool_pre_ping = true
+max_connections = 100  # PostgreSQL server-side cap
 ```
 
 ```toml
@@ -1334,14 +1350,16 @@ max_overflow = 10
 ```
 
 ```toml
-# prod.mascope.toml — multi-worker, conservative pool
+# prod.mascope.toml — multi-worker, burst-tolerant pool
 [backend.database]
 pool_size = 3
-max_overflow = 2
-# "auto" workers on 24-core = 12 workers × 5 max = 60 connections — under 100
+max_overflow = 7
+max_connections = 200
+# "auto" workers on 24-core = 12 workers × 10 max = 120 peak — under 200
 ```
 
 To check live connections: `mascope prod db cli` → `SELECT count(*) FROM pg_stat_activity;`
+Compare against `mascope prod db status`, which prints the pool settings and server cap.
 
 ---
 
@@ -1472,6 +1490,7 @@ Postgres tuning parameters are passed as `-c` flags via Docker Compose command o
 
 | Setting                        | PG Default | Base (dev, ~16 GB SSD) | Prod (64 GB NVMe) |
 | ------------------------------ | ---------- | ---------------------- | ----------------- |
+| `max_connections`              | 100        | 100                    | 200               |
 | `shared_buffers`               | 128MB      | 512MB                  | 16GB              |
 | `effective_cache_size`         | 4GB        | 4GB                    | 48GB              |
 | `work_mem`                     | 4MB        | 32MB                   | 64MB              |
@@ -1488,6 +1507,15 @@ Postgres tuning parameters are passed as `-c` flags via Docker Compose command o
 | `jit`                          | on         | off                    | off               |
 | `autovacuum_max_workers`       | 3          | 3                      | 4                 |
 | `shm_size` (Docker)            | 64m        | 1g                     | 20g               |
+
+### Connections
+
+- **`max_connections`** — Server-side cap on concurrent connections. Size it from the app:
+  `workers × (pool_size + max_overflow)` plus ~10 headroom (`superuser_reserved_connections`
+  defaults to 3, plus `db_init`, backup dumps, and interactive psql). Each idle connection
+  costs only a few MB, so a generous cap is cheap — but every *active* connection can
+  allocate `work_mem` per operation, so check the `work_mem` formula below when raising it.
+  Requires a postgres container restart.
 
 ### Memory
 
@@ -1506,7 +1534,9 @@ Postgres tuning parameters are passed as `-c` flags via Docker Compose command o
 
   ```
   workers × (pool_size + max_overflow) × ops_per_query × work_mem
-  # Prod: 12 × 5 × 3 × 64MB = ~11GB - acceptable on 64GB
+  # Prod: 12 × 10 × 3 × 64MB = ~22.5GB theoretical worst case - acceptable on
+  # 64GB next to shared_buffers=16GB (assumes every connection running 3 sorts
+  # at once, which real workloads never reach)
   ```
 
   Diagnostic: set `log_temp_files = 0` and watch for spill entries in logs.
