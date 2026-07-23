@@ -9,6 +9,7 @@ from rich.pretty import pretty_repr
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
     api_e_response_json,
+    compose_user_message,
     handle_exception,
     process_exception,
 )
@@ -56,14 +57,14 @@ def api_controller():
                     # Error cases
                     context_message = f"Failed to {beautify_func_name(func.__name__)}"
 
-                user_message = f"{context_message}. {e.user_message}"
+                user_message = compose_user_message(context_message, e.user_message)
 
-                raise ApiException(user_message, e.tech_message, e.status_code)
+                raise ApiException(user_message, e.tech_message, e.status_code) from e
             except Exception as e:
                 context_message = f"Failed to {beautify_func_name(func.__name__)}"
                 api_exc = process_exception(e, context_message)
 
-                raise api_exc
+                raise api_exc from e
 
         return wrapper
 
@@ -308,7 +309,10 @@ def api_controller_background_task(
                 else:
                     # Update the payload with ApiException error details
                     notification.status = "error"
-                    notification.message = f"Failed to {beautify_func_name(func.__name__)}.  {e.user_message}"
+                    notification.message = compose_user_message(
+                        f"Failed to {beautify_func_name(func.__name__)}",
+                        e.user_message,
+                    )
                     notification.error = {"detail": e.tech_message}
                     #  Emit error user notifications only if this is an independent transaction
                     if independent_transaction:
@@ -329,8 +333,12 @@ def api_controller_background_task(
                         context_message = (
                             f"Failed to {beautify_func_name(func.__name__)}"
                         )
-                        user_message = f"{context_message}. {e.user_message}"
-                        raise ApiException(user_message, e.tech_message, e.status_code)
+                        user_message = compose_user_message(
+                            context_message, e.user_message
+                        )
+                        raise ApiException(
+                            user_message, e.tech_message, e.status_code
+                        ) from e
 
             except Exception as e:
                 context_message = f"Failed to {beautify_func_name(func.__name__)}"
