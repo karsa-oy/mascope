@@ -4,6 +4,45 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- "Refresh matches" is incremental again. Since v1.3.0 stopped storing
+  non-matching (score-0) `match_isotope` rows, every refresh re-fetched and
+  re-scored every previously non-matching isotope of every sample - adding a
+  few targets to a large batch redid the whole batch's matching work. Matching
+  now persists one zero-score **sentinel** row per fully non-matching ion (the
+  main isotope), and the unmatched-isotope fetch skips every isotope of an ion
+  that has any stored row, so a refresh computes only ions never evaluated for
+  the sample (or invalidated since). The sentinel adds back roughly one row per
+  non-matching ion - a small fraction of the rows the optimization removed.
+  The `remove_unmatched_match_isotopes` maintenance script now converts legacy
+  score-0 rows into sentinel form instead of deleting them all, so cleaned
+  databases keep their evaluated markers.
+- Concurrent match writes no longer deadlock. All match create/delete funnels
+  serialize per sample batch on transaction-scoped Postgres advisory locks and
+  process rows in stable natural-key order, eliminating the
+  `DeadlockDetectedError` seen when a batch refresh overlapped another refresh
+  or the upload pipeline's per-sample aggregation. The match tables also gain
+  unique constraints on their natural keys (a migration dedupes any existing
+  duplicates first, keeping the newest row per key), so a race now fails loudly
+  instead of silently duplicating rows.
+- Editing a target ion's match parameters now also deletes the ion's stored
+  match isotopes (previously only its match ions), so the recompute after the
+  edit actually applies the new parameters instead of skipping the stored
+  isotopes.
+- Changing a target compound's formula (or deleting a compound) now flags the
+  affected batches for rematch. Previously the edit cascade-deleted the
+  compound's match rows across all batches but left the batches marked "ready",
+  where a plain refresh is refused.
+
+### Changed
+
+- The batch refresh skips the full-batch higher-level aggregation when provably
+  nothing changed (nothing computed or removed, stored aggregates complete), so
+  a no-op refresh is near-instant. Partial (orphan-only) match removal now
+  deletes sample-level aggregates only for the affected samples instead of the
+  whole batch.
+
 ## [v1.3.2] - 2026.07.12
 
 ### Fixed
