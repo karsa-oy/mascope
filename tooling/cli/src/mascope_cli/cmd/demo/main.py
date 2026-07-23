@@ -191,7 +191,13 @@ def _run(
             raise typer.Exit(1)
         runtime.logger.info(f"Using local bundle directory: {local}")
     else:
-        _fetch.fetch(version, force=force)
+        try:
+            _fetch.fetch(version, force=force)
+        except (ValueError, RuntimeError, OSError) as e:
+            # Ordinary download/verification failures get a clean one-liner,
+            # not a traceback (matching the sibling dev/prod flows).
+            runtime.logger.error(str(e))
+            raise typer.Exit(1)
 
     # --- secrets ---
     _ensure_dev_secrets()
@@ -228,7 +234,11 @@ def _run(
         # calibrate + match, then ingest raw via the real upload endpoint.
         # Uploads are deferred to a background thread that waits for the backend.
         if _seed.has_block("seed", version, source_dir=local):
-            _seed.restore_seed(version, source_dir=local)
+            try:
+                _seed.restore_seed(version, source_dir=local)
+            except (RuntimeError, OSError) as e:
+                runtime.logger.error(str(e))
+                raise typer.Exit(1)
         else:
             runtime.logger.warning(
                 "No reference seed in bundle - rebuilding from an empty database. "
@@ -243,8 +253,12 @@ def _run(
     else:
         # Restore snapshot, then upgrade to head in case the snapshot predates
         # the current schema.
-        _seed.restore_snapshot(version, source_dir=local)
-        _seed.restore_filestore(version, source_dir=local)
+        try:
+            _seed.restore_snapshot(version, source_dir=local)
+            _seed.restore_filestore(version, source_dir=local)
+        except (RuntimeError, OSError) as e:
+            runtime.logger.error(str(e))
+            raise typer.Exit(1)
         if check_pending_migrations() and not run_migrations():
             runtime.logger.error("Failed to apply migrations after restore")
             raise typer.Exit(1)

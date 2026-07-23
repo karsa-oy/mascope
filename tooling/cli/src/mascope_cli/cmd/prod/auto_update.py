@@ -89,7 +89,11 @@ def parse_window(spec: Optional[str]) -> Optional[tuple[int, int]]:
         start_s, end_s = spec.split("-", 1)
         start, end = int(start_s), int(end_s)
     except ValueError:
-        raise ValueError(f"Invalid window '{spec}' - expected 'HH-HH' (e.g. '2-5')")
+        # The re-raised message fully describes the parse failure; suppress the
+        # implicit "During handling of the above exception" chaining noise.
+        raise ValueError(
+            f"Invalid window '{spec}' - expected 'HH-HH' (e.g. '2-5')"
+        ) from None
     for h in (start, end):
         if not 0 <= h <= 23:
             raise ValueError(f"Window hour {h} out of range 0-23")
