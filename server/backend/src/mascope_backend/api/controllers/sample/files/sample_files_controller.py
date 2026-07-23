@@ -1310,7 +1310,11 @@ async def get_sample_file_metadata(sample_file_id: str) -> dict:
     try:
         metadata = m_compute.get_metadata(filename)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get metadata: {e}")
+        # str(e) can carry internal file paths; the cause is logged server-side
+        # (with traceback) by the @api_controller error handling.
+        raise HTTPException(
+            status_code=500, detail="Could not read metadata from the sample file."
+        ) from e
 
     # Step 3: Convert metadata to dict
     metadata_dict = metadata.to_dict()

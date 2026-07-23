@@ -9,11 +9,13 @@ logs, correlated to the response through an opaque ``error_id``.
 import json
 
 import pytest
+from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
     api_e_response_json,
+    compose_user_message,
     handle_exception,
     process_exception,
 )
@@ -134,6 +136,52 @@ class TestProcessExceptionDoesNotLeakInternals:
         assert api_exc.status_code == 409
         assert "error_id" in api_exc.tech_message
         assert api_exc.tech_message["detail"] == "collection is locked"
+
+
+class TestComposeUserMessage:
+    """Nested error contexts must not stack into "Failed to X. Failed to Y. ..."."""
+
+    def test_prepends_context_to_plain_message(self):
+        assert (
+            compose_user_message("Failed to Update Workspace", "Name is required.")
+            == "Failed to Update Workspace. Name is required."
+        )
+
+    def test_does_not_stack_failed_to_prefixes(self):
+        inner = "Failed to Create Sample Item. Sample not found."
+        assert compose_user_message("Failed to Import Sample Items", inner) == inner
+
+    def test_does_not_repeat_identical_context(self):
+        inner = "Failed to Update Workspace. Name is required."
+        assert compose_user_message("Failed to Update Workspace", inner) == inner
+
+    def test_empty_inner_message_returns_context(self):
+        assert compose_user_message("Failed to Update Workspace", "") == (
+            "Failed to Update Workspace."
+        )
+
+    def test_http_exception_detail_is_not_duplicated(self):
+        api_exc = _raise_and_process(
+            HTTPException(
+                status_code=429,
+                detail="Too many requests. Please wait and try again.",
+            ),
+            context="Request failed",
+        )
+
+        assert api_exc.status_code == 429
+        assert api_exc.user_message == (
+            "Request failed. Too many requests. Please wait and try again."
+        )
+        assert api_exc.user_message.count("Too many requests") == 1
+
+    def test_http_exception_with_failed_detail_keeps_single_prefix(self):
+        api_exc = _raise_and_process(
+            HTTPException(status_code=500, detail="Failed to get metadata."),
+            context="Failed to Get Sample File Metadata",
+        )
+
+        assert api_exc.user_message == "Failed to get metadata."
 
 
 class TestApiEResponseJson:
