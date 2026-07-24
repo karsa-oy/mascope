@@ -129,6 +129,47 @@ def detect_target_collection_changes(
     }
 
 
+async def validate_batch_scope_for_collection(
+    sample_batch_ids: list[str] | None,
+    workspace_id: str | None,
+) -> None:
+    """Validate that batches assigned to a workspace-scoped collection belong
+    to that workspace.
+
+    Global collections (``workspace_id`` is None) may be assigned to batches
+    in any workspace. This enforces at assignment time the same invariant
+    that :func:`validate_scope_change` enforces when narrowing scope.
+
+    :param sample_batch_ids: Sample batch IDs being assigned to the collection
+    :param workspace_id: The collection's (effective) workspace_id, None for global
+    :raises ApiException: 409 if any batch belongs to a different workspace
+    """
+    if workspace_id is None or not sample_batch_ids:
+        return
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(SampleBatch.sample_batch_id)
+            .join(Dataset, Dataset.dataset_id == SampleBatch.dataset_id)
+            .where(SampleBatch.sample_batch_id.in_(sample_batch_ids))
+            .where(Dataset.workspace_id != workspace_id)
+            .limit(1)
+        )
+        out_of_scope = result.scalar_one_or_none()
+
+    if out_of_scope is not None:
+        msg = (
+            "Cannot assign batches from other workspaces to a workspace-scoped "
+            "collection. Move the collection to the global scope first, or pick "
+            "batches from the collection's workspace."
+        )
+        raise ApiException(
+            user_message=msg,
+            tech_message=msg,
+            status_code=409,
+        )
+
+
 async def validate_scope_change(
     target_collection_db: TargetCollection,
     new_workspace_id: str | None,

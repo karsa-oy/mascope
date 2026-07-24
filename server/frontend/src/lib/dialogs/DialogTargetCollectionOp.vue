@@ -451,8 +451,9 @@ function execute() {
       return
     }
     case 'update_batches': {
+      // Only batch associations change here - sending the basic fields
+      // (in particular workspace_id) would needlessly trigger scope checks
       app.data.target.collection.update({
-        ...common,
         target_collection_id,
         sample_batch_ids
       })

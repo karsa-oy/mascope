@@ -18,6 +18,8 @@ from mascope_backend.api.new.auth.dependencies import current_active_user
 from mascope_backend.api.new.auth.exceptions import ForbiddenAccessException
 from mascope_backend.api.new.workspaces.dependencies import (
     accessible_workspace_ids_for_user,
+    check_batch_access_bulk,
+    check_collection_batch_change_access,
     check_target_collection_access,
     check_workspace_access,
 )
@@ -90,6 +92,9 @@ async def create_target_collection_route(
             user.role_id is None or user.role_id < admin_level
         ):
             raise ForbiddenAccessException()
+    # Assigning batches requires editor access to their workspaces
+    if body.sample_batch_ids:
+        await check_batch_access_bulk(body.sample_batch_ids, user, "editor")
     return await create_target_collection(
         target_collection_create=body,
         independent_transaction=True,
@@ -128,6 +133,13 @@ async def update_target_collection_route(
                 user.role_id is None or user.role_id < admin_level
             ):
                 raise ForbiddenAccessException()
+
+    # Changing batch associations requires editor access to the workspaces of
+    # the batches being added or removed (preserved associations are exempt)
+    if body.sample_batch_ids is not None:
+        await check_collection_batch_change_access(
+            target_collection_id, body.sample_batch_ids, user, "editor"
+        )
 
     return await update_target_collection(
         target_collection_id=target_collection_id,
