@@ -6,6 +6,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- Target compounds can be pasted from a spreadsheet as a single formula
+  column; the name column is no longer required. The paste infers the layout
+  from the column count (1 = formula, 2 = name + formula, 3 = name + formula +
+  CAS), tolerates a header cell on formula-only pastes, and rejects columns
+  that do not contain valid formulas with a clear message. The target
+  collection dialog also gains help-mode popovers (paste layouts, add-compounds
+  panel, collection types); previously help mode showed nothing there.
 - PostgreSQL `max_connections` is now configurable via `[backend.database]` in
   the `.mascope.toml` layers and passed to the postgres container like the
   other tuning flags (`MASCOPE_DB_MAX_CONNECTIONS`). Default stays 100;
