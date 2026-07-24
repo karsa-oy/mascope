@@ -789,12 +789,29 @@ To run all services needed to emulate the Orbitrap acquisition workflow in devel
 
 ### Building File Agent for production
 
-To build for production, you execute a build script _on a Windows machine_:
+Releases are built by CI: when a GitHub Release is published, the
+`build-file-agent` job in `.github/workflows/build-release-images.yaml` runs
+the agent tests on a Windows runner, builds the executable and an Inno Setup
+installer stamped with the release tag, and uploads the installer to the
+release - both under a versioned name and as the fixed-name asset
+`Mascope-File-Agent-Setup.exe`, which is what the web app's "Download File
+Agent installer" button (and any `releases/latest/download/...` URL) points
+at.
+
+To build manually _on a Windows machine_:
 
 ```
 cd agents/file
-./build.ps1
+./build.ps1                              # exe only, version from git describe
+./build.ps1 -Version v1.4.0 -Installer   # stamped exe + installer
 ```
+
+`-Installer` compiles `installer.iss` and requires Inno Setup 6 (preinstalled
+on GitHub windows runners; locally `winget install JRSoftware.InnoSetup`).
+The installer is per-user (no admin rights), offers a run-at-login startup
+task, and leaves `%AppData%\Mascope\FileAgent` untouched on uninstall. The
+build stamps the version into `src/mascope_file_agent/_version.py`
+(gitignored); unstamped source builds report `dev`.
 
 Then run the executable found in `agents/file/dist`.
 

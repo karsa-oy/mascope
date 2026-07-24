@@ -40,7 +40,11 @@ const SERVICE_CONFIGS = [
   {
     id: 'file-agent',
     label: 'File Agent',
-    minRole: 200 // editor role_id
+    minRole: 200, // editor role_id
+    // Fixed-name asset uploaded to every GitHub release by CI, so this
+    // URL always resolves to the newest released installer
+    downloadUrl:
+      'https://github.com/karsa-oy/mascope/releases/latest/download/Mascope-File-Agent-Setup.exe'
   },
   {
     id: 'export-agent',
@@ -200,6 +204,16 @@ const vHelpLayer = app.ui.help.directive(layer)
           <p>Token is shown only once for security reasons; if you lose it, regenerate a new one</p>
         </Message>
       </div>
+      <Button
+        v-if="currentServiceConfig?.downloadUrl"
+        as="a"
+        :href="currentServiceConfig.downloadUrl"
+        label="Download File Agent installer"
+        icon="pi pi-download"
+        severity="secondary"
+        text
+        id="agent-download-button"
+      />
     </div>
   </section>
   <section
@@ -242,6 +256,10 @@ const vHelpLayer = app.ui.help.directive(layer)
     #token-service-select {
       width: 100%;
     }
+  }
+
+  #agent-download-button {
+    width: fit-content;
   }
 
   #token-info {

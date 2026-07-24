@@ -11,7 +11,8 @@ import os
 import requests
 import urllib3
 
-from .config import base_url, normalize_host
+from mascope_file_agent import __version__
+from mascope_file_agent.config import base_url, normalize_host
 
 
 # Agents talk to servers with self-signed certificates (verify=False).
@@ -113,7 +114,7 @@ def run_setup_wizard(settings: dict) -> dict:
     """
     print(
         "\n"
-        "=== Mascope File Agent setup ===\n"
+        f"=== Mascope File Agent setup ({__version__}) ===\n"
         "\n"
         "The agent watches a folder and uploads new data files to your\n"
         "Mascope server. You will need an API access token:\n"
