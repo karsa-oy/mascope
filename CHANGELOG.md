@@ -51,6 +51,31 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   affected batches for rematch. Previously the edit cascade-deleted the
   compound's match rows across all batches but left the batches marked "ready",
   where a plain refresh is refused.
+- User-facing error messages no longer contain duplicated wording. Nested
+  controller layers each prepended their own "Failed to ..." context
+  ("Failed to Update Workspace. Failed to Update Workspace. ..."), and the
+  global HTTP exception handler repeated the error detail twice while leaking
+  internal request wording ("HTTPException on POST /path | detail=...") to the
+  client. The most specific message now wins; full context still reaches the
+  server logs.
+- The File Agent reports the specific upload failure cause (rejected token,
+  timeout, connection refused, server error message) instead of a generic
+  "File upload failed", and no longer retries on a rejected access token - it
+  fails fast with a hint to fix the configured `access_token`. Its 401 log
+  line previously printed "None Please check your API token.".
+- File converter error notifications no longer surface bare exception reprs
+  (a malformed h5 file showed as "Failed to process X: 'Configuration File'")
+  or relabel known causes as "Unexpected error"; cryptic messages are prefixed
+  with the exception type instead.
+- The SDK surfaces the backend's human-readable error message; previously
+  every API error rendered as the opaque `{'error_id': '...'}` dict.
+- Frontend error toasts always carry a message (some failure paths showed a
+  blank toast or the literal text "undefined").
+- CLI: `mascope demo` prints a clean one-line error instead of a Python
+  traceback for ordinary fetch/restore failures; `mascope env sync`/`create`
+  no longer double their error wording; database script discovery logs
+  skipped (broken) script modules at debug level instead of hiding them
+  silently.
 
 ### Changed
 
@@ -59,6 +84,9 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   a no-op refresh is near-instant. Partial (orphan-only) match removal now
   deletes sample-level aggregates only for the affected samples instead of the
   whole batch.
+- Genericized error messages ("Unexpected error.", "Database operation
+  failed.") now include a short reference to the server-side log entry, e.g.
+  "(ref: 3f9a1b2c)", so users can quote it to support for correlation.
 
 ## [v1.3.2] - 2026.07.12
 
