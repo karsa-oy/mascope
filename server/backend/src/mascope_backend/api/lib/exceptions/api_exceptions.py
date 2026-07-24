@@ -71,7 +71,8 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     error_message = f"{context_message}. {str(e)}."
     # Opaque reference for correlating a client-visible error with the
     # server-side log entry. The traceback and internal details are only
-    # logged, never returned to the client.
+    # logged, never returned to the client; genericized user messages carry a
+    # short "ref:" prefix of this id so users can quote it to support.
     error_id = uuid.uuid4().hex
     tech_message = {"error_id": error_id}
     # Unexpected exceptions are logged with their traceback for debugging. For
@@ -83,7 +84,9 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     # Use pattern matching to determine user message and status code
     match e:
         case SQLAlchemyError():
-            user_message = f"{context_message}. Database operation failed."
+            user_message = (
+                f"{context_message}. Database operation failed (ref: {error_id[:8]})."
+            )
             status_code = 400  # Bad Request
 
         case ApiException():
@@ -170,19 +173,19 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         case AttributeError():
             # str(e) can name internal attributes/objects; keep it out of the
             # client response (the full message is still logged server-side).
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 400  # Bad Request
 
         case RuntimeError():
             # RuntimeError messages often embed internal paths/state; do not
             # echo them to the client (logged server-side under error_id).
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 500  # Internal Server Error
 
         case _:  # Default case
             # Do not echo str(e) for unexpected exceptions: messages such as
             # FileNotFoundError include internal filesystem paths.
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 500  # Internal Server Error
 
     # Log the exception with context server-side, correlated by error_id. The
