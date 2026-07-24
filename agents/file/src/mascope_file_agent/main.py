@@ -18,6 +18,7 @@ from mascope_runtime import Runtime
 
 mascope_sdk.SERVICE_NAME = "file-agent"
 from mascope_sdk import api_post_file  # noqa: E402  (needs SERVICE_NAME set first)
+from mascope_sdk.exceptions import AuthenticationError  # noqa: E402
 
 
 # default configuration
@@ -98,10 +99,20 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
         except ValueError as ve:
             runtime.logger.error(f"File upload failed: {ve}")
             break  # do not retry on validation errors
+        except AuthenticationError as e:
+            runtime.logger.error(
+                f"File upload failed for file {os.path.basename(filepath)}: {e} "
+                "Retrying will not help - fix the access_token in the "
+                "file-agent configuration and restart the agent."
+            )
+            break  # a rejected token stays rejected; do not retry
         except Exception as e:
+            # Timeouts, connection and server errors are transient - retry.
+            # The message carries the specific cause (e.g. connection refused,
+            # HTTP status + server error message).
             runtime.logger.warning(
                 f"Upload attempt {attempt}/{max_retries} for file "
-                f"{os.path.basename(filepath)} failed: {e.__class__.__name__}({e})"
+                f"{os.path.basename(filepath)} failed: {e}"
             )
             runtime.logger.info("Retrying upload in 30 seconds...")
             time.sleep(30)
@@ -145,7 +156,9 @@ def upload_sample_file(filepath: str) -> None:
         runtime.logger.info(
             f"Uploading file {os.path.basename(filepath)} as {upload_filename}"
         )
-    resp = api_post_file(
+    # Raises a typed mascope_sdk exception carrying the specific cause
+    # (rejected token, timeout, connection error, server error message).
+    api_post_file(
         url=URL,
         path="sample/files/upload",
         access_token=runtime.config.access_token,
@@ -153,12 +166,7 @@ def upload_sample_file(filepath: str) -> None:
         upload_filename=upload_filename,
     )
 
-    if resp is not None:
-        runtime.logger.info(
-            f"File upload of file {os.path.basename(filepath)} succeeded!"
-        )
-    else:
-        raise RuntimeError(f"File upload failed for file {os.path.basename(filepath)}")
+    runtime.logger.info(f"File upload of file {os.path.basename(filepath)} succeeded!")
 
 
 def mkdir(*args: tuple) -> str:

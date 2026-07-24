@@ -75,6 +75,7 @@ def upload_raw(version: str | None = None, source_dir: "Path | None" = None) -> 
     """
     import mascope_sdk
     from mascope_sdk import api_post_file
+    from mascope_sdk.exceptions import MascopeError
 
     src = _raw_dir(version, source_dir)
     url = f"http://localhost:{runtime.meta.api_port}"
@@ -88,14 +89,16 @@ def upload_raw(version: str | None = None, source_dir: "Path | None" = None) -> 
 
     uploaded = 0
     for i, raw in enumerate(raw_files, 1):
-        resp = api_post_file(
-            url=url,
-            path=_UPLOAD_PATH,
-            access_token=_UPLOAD_TOKEN,
-            filepath=str(raw),
-        )
-        if resp is not None:
+        try:
+            api_post_file(
+                url=url,
+                path=_UPLOAD_PATH,
+                access_token=_UPLOAD_TOKEN,
+                filepath=str(raw),
+            )
             uploaded += 1
+        except MascopeError as e:
+            runtime.logger.error(f"Upload of {raw.name} failed: {e}")
         if i % 25 == 0 or i == total:
             runtime.logger.info(f"  uploaded {uploaded}/{total}")
 
