@@ -21,6 +21,31 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Creating or updating a large target collection no longer shows a spurious
+  "Request timed out" error while the backend is still working: the frontend
+  gives target collection create/update/delete a 5-minute request timeout
+  (the global default is 20 s, but generating ion and isotope patterns for
+  hundreds of pasted compounds legitimately takes longer). The backend also
+  fetches ionization mechanisms once per request instead of once per created
+  compound.
+- Collection-batch associations now respect workspace scoping from both
+  directions: a workspace-scoped collection can no longer be assigned batches
+  from another workspace (409), and a batch can no longer be assigned another
+  workspace's collection - previously only scope *changes* were validated, so
+  the invariant could be silently violated at assignment time. Changing a
+  collection's batch associations now also requires editor access to the
+  workspaces of the batches being added or removed (associations the request
+  preserves are exempt, keeping cross-workspace global collections manageable
+  by admins).
+- "Edit batches" on a global target collection is now disabled for non-admins
+  in the collection context menu, matching Edit/Delete - previously it opened
+  the dialog and failed with a permissions error on save. The dialog also
+  sends a batches-only payload in that mode, and the collection update API
+  gained true PATCH semantics: omitted fields are left unchanged, whereas
+  previously an omitted collection type was read as the default TARGETS and
+  an omitted description as empty, wrongly flagging changes (triggering
+  needless full-batch rematches) and validating batch types against the wrong
+  collection type.
 - Production backend pool exhaustion during acquisition ingest
   (`QueuePool limit of size 3 overflow 2 reached, connection timed out`): a
   burst of converted files stacks several concurrent calibrate/match pipelines
