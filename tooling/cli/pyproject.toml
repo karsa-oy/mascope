@@ -18,7 +18,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mascope_runtime[logs]>=2026.7.7",
     "typer>=0.26.8,<0.27",
-    "rich>=13.7.1,<14",
+    "rich>=15.0.0,<16",
 ]
 
 [project.scripts]
