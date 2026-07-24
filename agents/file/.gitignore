@@ -1,2 +1,4 @@
 build
+dist
 *.spec
+src/mascope_file_agent/_version.py

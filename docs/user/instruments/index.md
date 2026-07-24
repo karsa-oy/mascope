@@ -11,16 +11,26 @@ uploads them to your Mascope server automatically.
 
 ### Installing
 
-1. Get `Mascope-File-Agent.exe` from your Mascope administrator and place it
-   anywhere on the instrument PC (for example the Desktop).
+1. Download the installer on the instrument PC. In the Mascope web app, open
+   the sidebar via your profile icon and click **Download File Agent
+   installer** under **API Access Tokens** (or download
+   `Mascope-File-Agent-Setup.exe` from the latest [Mascope release on
+   GitHub](https://github.com/karsa-oy/mascope/releases/latest)).
 2. Before you start, generate an access token:
    1. Log in to Mascope in your browser. Your account needs the *editor* role
       or higher.
    2. Click your profile icon to open the sidebar.
    3. Under **API Access Tokens**, select **File Agent** and generate a token.
    4. Copy the token — it is shown only once.
-3. Double-click `Mascope-File-Agent.exe`. On first start a guided setup runs
-   in the console window and asks for:
+3. Run the installer. It needs no administrator rights and offers a
+   **Start the File Agent automatically when you sign in to Windows**
+   checkbox — leave it enabled so the agent survives reboots.
+
+   > The installer is not yet code-signed, so Windows SmartScreen may warn
+   > about an unrecognized app. Click **More info** → **Run anyway**.
+
+4. When the agent first starts, a guided setup runs in the console window
+   and asks for:
    - the **Mascope server address** (for example `mascope.example.com`),
    - the **access token** you just generated,
    - the **folder to watch** for new data files,
@@ -30,9 +40,8 @@ The setup checks the server connection and the token immediately, so a typo
 is caught before any data acquisition depends on it. After setup completes,
 the agent starts watching the folder right away.
 
-Leave the console window open while acquiring — closing it stops the agent.
-To start the agent automatically, place a shortcut to the executable in the
-Windows Startup folder (press `Win+R`, run `shell:startup`).
+Leave the console window open while acquiring — closing it stops the agent
+until the next sign-in (or until you start it again from the Start Menu).
 
 ### Changing the configuration
 
@@ -61,9 +70,11 @@ Mascope-File-Agent.exe --setup
 
 ### Upgrading
 
-Replace the executable with the new version and start it — your settings are
-kept. Installs made with older agent versions are migrated automatically on
-first start.
+Download and run the newest installer — it replaces the previous version in
+place and your settings are kept. Installs made with older agent versions
+(before the installer existed) are migrated automatically on first start.
+The agent prints its version when it starts, and uninstalling (Windows
+**Settings → Apps**) never removes your configuration.
 
 ### Troubleshooting uploads
 
