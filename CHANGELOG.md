@@ -6,6 +6,17 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- File Agent Windows installer (Inno Setup): per-user install with no admin
+  rights, Start Menu entry, an optional run-at-login startup task so the
+  agent survives reboots, and an uninstaller that leaves the configuration
+  in `%AppData%` untouched. Built and attached to every GitHub release by
+  CI as `Mascope-File-Agent-Setup.exe` (fixed name, so
+  `releases/latest/download/...` always serves the newest version) plus a
+  versioned copy; the exe is stamped with the release version and reports
+  it at startup. A "Download File Agent installer" button in the web app's
+  user settings links to the latest release. File Agent unit tests now run
+  in CI on every PR.
+
 - File Agent guided setup: on first start (or with `--setup`) the bundled
   agent asks for the server address, access token and watched folder in the
   console, verifies the token against the server right away, and starts

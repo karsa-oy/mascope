@@ -105,3 +105,47 @@ jobs:
           uv run mascope prod manifest --version "$TAG" --output mascope-manifest.json
           cat mascope-manifest.json
           gh release upload "$TAG" mascope-manifest.json --clobber
+
+  build-file-agent:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      # contents:write to upload the installer as a release asset
+      contents: write
+    env:
+      # mascope terminal logs contain a glyph that breaks cp1252 when
+      # output is captured (see the developer guide)
+      PYTHONUTF8: "1"
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@f98e06938123ccabd21905ea5d0069192241f9f1 # v8.3.1
+        with:
+          version: "0.11.2"
+
+      - name: Run the File Agent tests
+        working-directory: agents/file
+        run: uv run pytest tests/
+
+      - name: Build the executable and installer
+        working-directory: agents/file
+        # Inno Setup 6 is preinstalled on the GitHub windows runner image
+        run: ./build.ps1 -Version "${{ github.event.release.tag_name }}" -Installer
+
+      - name: Upload the installer to the release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The fixed-name asset gives the web app's "Download File Agent"
+          # button a stable URL:
+          #   releases/latest/download/Mascope-File-Agent-Setup.exe
+          # The versioned copy keeps older installers distinguishable when
+          # downloaded from the releases page.
+          gh release upload "$env:TAG" "agents/file/dist/Mascope-File-Agent-Setup.exe" --clobber
+          Copy-Item "agents/file/dist/Mascope-File-Agent-Setup.exe" "agents/file/dist/Mascope-File-Agent-Setup-$env:TAG.exe"
+          gh release upload "$env:TAG" "agents/file/dist/Mascope-File-Agent-Setup-$env:TAG.exe" --clobber

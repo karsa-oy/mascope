@@ -12,6 +12,7 @@ from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 import mascope_sdk
+from mascope_file_agent import __version__
 from mascope_file_agent import config as agent_config
 from mascope_file_agent.config import ConfigError
 from mascope_file_agent.wizard import run_setup_wizard
@@ -438,6 +439,8 @@ def run() -> None:
     except KeyboardInterrupt:
         print("\nSetup cancelled.")
         sys.exit(1)
+
+    runtime.logger.info(f"Mascope File Agent {__version__}")
 
     global URL
     global HOST
