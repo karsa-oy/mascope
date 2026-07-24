@@ -1,7 +1,6 @@
 import os
 import shutil
 import sys
-import textwrap
 import time
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Event, Queue
@@ -13,6 +12,9 @@ from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 import mascope_sdk
+from mascope_file_agent import config as agent_config
+from mascope_file_agent.config import ConfigError
+from mascope_file_agent.wizard import run_setup_wizard
 from mascope_runtime import Runtime
 
 
@@ -20,35 +22,6 @@ mascope_sdk.SERVICE_NAME = "file-agent"
 from mascope_sdk import api_post_file  # noqa: E402  (needs SERVICE_NAME set first)
 from mascope_sdk.exceptions import AuthenticationError  # noqa: E402
 
-
-# default configuration
-# created in production as an initial
-# template for users to modify
-DEFAULT_CONFIG = textwrap.dedent(
-    """\
-    [meta]
-    # meta
-    log_level = 'info'
-    # settings
-    description = "The default runtime env"
-    api_port = 8090
-    filestore = './filestore'
-
-    [file-agent]
-    # meta
-    log_level = 'info'
-    log_path = './logs'
-    color = "purple"
-    # settings
-    mask = '*.raw'
-    timeout = 3
-    source = './data'
-    host = 'localhost'
-    access_token = ''
-    # filename_prefix = ''
-    # filename_suffix = ''
-    """
-)
 
 # TODO: Use TUS protocol for large file uploads, see issue #1131
 # https://github.com/karsa-oy/mascope/issues/1131
@@ -184,6 +157,55 @@ def mkdir(*args: tuple) -> str:
     return path
 
 
+def resolve_settings(mascope_path: str, env_path: str) -> dict:
+    """Load the agent settings, running the guided setup when needed.
+
+    Settings come from the single user-facing ``config.toml`` at the root
+    of `mascope_path`. When it is missing, settings from a pre-config.toml
+    install are migrated; when required settings are still missing (or the
+    agent was started with ``--setup``), the interactive wizard collects
+    them and writes the file.
+
+    :param mascope_path: The agent's data directory (MASCOPE_PATH)
+    :type mascope_path: str
+    :param env_path: Path of the ``.runtime/env/prod`` directory
+    :type env_path: str
+    :return: Complete, validated settings dict
+    :rtype: dict
+    :raises ConfigError: When settings are missing and the wizard cannot run,
+        or the watched folder does not exist
+    """
+    config_path = os.path.join(mascope_path, agent_config.CONFIG_FILENAME)
+    if os.path.exists(config_path):
+        settings = agent_config.load_user_config(config_path)
+    else:
+        settings = agent_config.load_legacy_config(env_path)
+        if settings:
+            agent_config.write_user_config(config_path, settings)
+            print(f"Migrated existing settings to {config_path}")
+        else:
+            settings = agent_config.merge_settings({})
+
+    if "--setup" in sys.argv[1:] or agent_config.missing_settings(settings):
+        if not (sys.stdin and sys.stdin.isatty()):
+            raise ConfigError(
+                "The agent is not configured. Start it in a console to use "
+                "the guided setup, or fill in host, access_token and source "
+                f"in:\n  {config_path}"
+            )
+        settings = run_setup_wizard(settings)
+        agent_config.write_user_config(config_path, settings)
+        print(f"Settings saved to {config_path}\n")
+
+    if not os.path.isdir(settings["source"]):
+        raise ConfigError(
+            f"The watched folder does not exist: {settings['source']}\n"
+            f"Update 'source' in {config_path}, or restart the agent "
+            "with --setup to run the guided setup again."
+        )
+    return settings
+
+
 def initialize() -> None:
     """Initialize the application and runtime depending on dev/prod mode
 
@@ -202,17 +224,11 @@ def initialize() -> None:
         os.environ.setdefault("MASCOPE_PATH", mascope_path)
         # setup runtime environment
         env_path = mkdir(mascope_path, ".runtime", "env", "prod")
-        mkdir(env_path, "logs")
-        mkdir(env_path, "data")
-        # init config files if they don't exists
-        config_paths = [
-            os.path.join(env_path, "base.mascope.toml"),
-            os.path.join(env_path, "prod.mascope.toml"),
-        ]
-        for path in config_paths:
-            if not os.path.exists(path):
-                with open(path, "w", encoding="utf-8") as file:
-                    file.write(DEFAULT_CONFIG)
+        mkdir(mascope_path, "logs")
+        # resolve user settings (guided setup on first run) and regenerate
+        # the runtime-format config the mascope_runtime loader reads
+        settings = resolve_settings(mascope_path, env_path)
+        agent_config.write_runtime_config(env_path, settings, mascope_path)
         # initialize the runtime in production mode
         runtime = Runtime("file-agent", env="prod", mode="prod", path=mascope_path)
     else:
@@ -398,13 +414,30 @@ class FileUploader:
             self.shutdown_event.set()
 
 
+def pause_before_exit() -> None:
+    """Keep the console window open so double-click users can read the error."""
+    if getattr(sys, "frozen", False) and sys.stdin and sys.stdin.isatty():
+        try:
+            input("Press Enter to exit...")
+        except EOFError:
+            pass
+
+
 def run() -> None:
     """Main function of the application
 
     Start `FileUploader` thread and wait until it finishes
     """
     # Initialize runtime
-    initialize()
+    try:
+        initialize()
+    except ConfigError as e:
+        print(f"\nConfiguration error:\n{e}\n")
+        pause_before_exit()
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nSetup cancelled.")
+        sys.exit(1)
 
     global URL
     global HOST
@@ -416,7 +449,8 @@ def run() -> None:
         case "dev":
             URL = f"http://{HOST}:{PORT}"
         case "prod":
-            URL = f"https://{HOST}"
+            # https unless the host is configured with an explicit scheme
+            URL = agent_config.base_url(HOST) if HOST else None
     if not URL:
         runtime.logger.error(
             "Mascope host not defined, please check configuration. Exiting..."

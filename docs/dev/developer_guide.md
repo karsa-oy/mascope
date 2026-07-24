@@ -789,9 +789,7 @@ To run all services needed to emulate the Orbitrap acquisition workflow in devel
 
 ### Building File Agent for production
 
-To build for production, you execute a build script _on a Windows machine_. In this section we use the TOF Agent as an example, but the the File Agent functions analogously.
-
-To run the agent build script, execute:
+To build for production, you execute a build script _on a Windows machine_:
 
 ```
 cd agents/file
@@ -800,27 +798,17 @@ cd agents/file
 
 Then run the executable found in `agents/file/dist`.
 
-When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileAgent` and the runtime environment will therefore be `%AppData%\Mascope\FileAgent\.runtime\env\prod`.
+When you run this executable, the `MASCOPE_PATH` will be `%AppData%\Mascope\FileAgent`. On first start (or when started with `--setup`) the agent runs a guided setup in the console, asking for the server address, an access token and the folder to watch, and verifies the token against the server before saving. Settings are stored in a single user-facing file:
 
-You will need to run the agent once so that it initializes the directory structure, but it will fail to resolve some paths because the configuration needs to be updated. Then go to the env path listed above and update `prod.mascope.toml` with:
+```
+%AppData%\Mascope\FileAgent\config.toml
+```
 
-1. Server URL
-2. Access token with write access:
-   - Log into Mascope web application (editor role or higher required)
-   - Click the user profile icon to open the sidebar
-   - In the "API Access Tokens" section, select "File Agent" from the dropdown
-   - Generate and copy the access token (note: token is shown only once)
+On every start the agent merges `config.toml` over built-in defaults and regenerates the runtime-format config at `%AppData%\Mascope\FileAgent\.runtime\env\prod\prod.mascope.toml` (see `agents/file/src/mascope_file_agent/config.py`). That nested file is an implementation detail of the `mascope_runtime` config loader — never edit it, and note that in the bundled agent `Runtime` is initialized with explicit `env="prod", mode="prod"`, so `state.json` is not consulted. Because missing keys fall back to defaults and unknown keys are dropped, config-schema changes do not require deleting existing configuration; installs made by pre-`config.toml` agent versions are migrated automatically on first start.
 
-You will also need to manually edit the `state.json` file in the `.runtime/` directory to correctly resolve the config path:
+The end-user installation guide lives in `docs/user/instruments/index.md`.
 
-1. Open `state.json` in a text editor
-2. Change `env.active` variable to `"prod"`
-3. Change `mode.active` variable to `"prod"`
-
-Then restart the agent, and the correct config is loaded and the agent is ready to go.
-
-> [!IMPORTANT]
-> In case the config schema is changed, any existing configuration in the target environment must be deleted prior to running the updated version of FileAgent, in order to initialize correct configs.
+Unit tests for the config handling are hermetic; run them with `uv run pytest` in `agents/file`.
 
 > [!IMPORTANT]
 > Windows prevents applications from writing into `Program Files` directory. Therefore, when testing the agent with TofDaq Recorder, its data directory must be outside `Program Files`.

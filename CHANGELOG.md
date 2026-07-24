@@ -4,6 +4,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- File Agent guided setup: on first start (or with `--setup`) the bundled
+  agent asks for the server address, access token and watched folder in the
+  console, verifies the token against the server right away, and starts
+  watching - no more editing TOML files in `.runtime` or `state.json` by
+  hand. A user-facing installation guide was added to
+  `docs/user/instruments/index.md`.
+
+### Changed
+
+- File Agent settings now live in a single flat file,
+  `%AppData%\Mascope\FileAgent\config.toml`; the nested runtime config is
+  regenerated from it on every start. Logs moved to
+  `%AppData%\Mascope\FileAgent\logs`. Existing installs are migrated
+  automatically, and config-schema changes no longer require deleting the
+  configuration on upgrade (missing keys fall back to defaults). A host
+  configured with an explicit `http://` scheme is now respected for
+  plain-HTTP servers.
+
 ## [1.4.2] - 2026.07.25
 
 ### Fixed
