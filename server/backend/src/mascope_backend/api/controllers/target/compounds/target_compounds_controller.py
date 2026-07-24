@@ -256,6 +256,9 @@ async def create_target_compound(
     target_compounds_to_create = []
     # Initialize message log
     message_log = {}
+    # Ionization mechanisms are the same for every compound in this call;
+    # fetched once on first need instead of per created compound
+    ionization_mechanisms: list[IonizationMechanism] | None = None
 
     for i, target_compound in enumerate(target_compounds):
         # Initialize messages list
@@ -366,11 +369,12 @@ async def create_target_compound(
         session.add(target_compound)
 
         # Create target ions for the compound
-        ionization_mechanisms_data = await get_ionization_mechanisms()
-        ionization_mechanisms = [
-            IonizationMechanism(**ionization_mechanism_dict)
-            for ionization_mechanism_dict in ionization_mechanisms_data["data"]
-        ]
+        if ionization_mechanisms is None:
+            ionization_mechanisms_data = await get_ionization_mechanisms()
+            ionization_mechanisms = [
+                IonizationMechanism(**ionization_mechanism_dict)
+                for ionization_mechanism_dict in ionization_mechanisms_data["data"]
+            ]
 
         await create_target_ions(
             target_compound=target_compound,

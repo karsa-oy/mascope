@@ -9,6 +9,11 @@ import { getApiErrorMessage } from './utils.js'
 
 const API_RESPONSE_TIMEOUT = 20_000 // 20 seconds
 
+// Per-request override for operations that legitimately take long on large
+// inputs (e.g. creating a target collection computes ion/isotope patterns for
+// every new compound). Pass as `timeout` in the request config.
+export const API_SLOW_RESPONSE_TIMEOUT = 300_000 // 5 minutes
+
 export const initHttp = () => {
   const client = axios.create({
     baseURL: `${runtime.api_path}/api`,

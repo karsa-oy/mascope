@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { api } from '@/api'
+import { API_SLOW_RESPONSE_TIMEOUT } from '@/api/http'
 import { useData } from '@/lib/store'
 
 export const useTargetCollection = defineStore('app.data.target.collection', () => {
@@ -63,21 +64,27 @@ export const useTargetCollection = defineStore('app.data.target.collection', () 
     read,
     loadDetailed,
     // backend methods
+    // Create/update generate ion and isotope records for every new compound
+    // and delete may cascade over them, so large collections take well beyond
+    // the default request timeout.
     create: (collection) =>
       api.http.post(`/target/collections`, collection, {
         use: 'create',
-        type: 'create_target_collection'
+        type: 'create_target_collection',
+        timeout: API_SLOW_RESPONSE_TIMEOUT
       }),
     update: (collection) =>
       api.http.patch(`/target/collections/${collection.target_collection_id}`, collection, {
         use: 'update',
-        type: 'update_target_collection'
+        type: 'update_target_collection',
+        timeout: API_SLOW_RESPONSE_TIMEOUT
       }),
     delete: ({ collectionId, deleteOrphanCompounds }) =>
       api.http.delete(`/target/collections/${collectionId}`, {
         params: { delete_orphan_compounds: deleteOrphanCompounds },
         use: 'delete',
-        type: 'delete_target_collection'
+        type: 'delete_target_collection',
+        timeout: API_SLOW_RESPONSE_TIMEOUT
       })
   }
 })
