@@ -26,9 +26,15 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
-import { fromSpreadsheet, equals } from '@/lib/table'
+import { equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
-import { isValidChemicalFormula, isSameCompound, findExistingCompound } from '@/lib/chem'
+import {
+  isValidChemicalFormula,
+  isSameCompound,
+  findExistingCompound,
+  parseCompoundPaste,
+  validateCompoundPaste
+} from '@/lib/chem'
 import { clone } from '@/lib/utils'
 import { collectionTypes, getAllowedDatasetTypes, getAllowedBatchTypes } from '@/lib/constants'
 import { ROLES } from '@/lib/roles'
@@ -1000,61 +1006,15 @@ watch(
                         text-align: right;
                       `"
                     >
-                      Add compounds by pasting spreadsheet cells here or by using the panel to the
-                      right.
+                      Add compounds by pasting spreadsheet cells here (a formula column alone, or
+                      name + formula + optional CAS) or by using the panel to the right.
                     </span>
                   </div>
                   <BaseClipboardContext
                     hideInitMessage
                     @validated="({ data }) => loadSpreadsheet({ rows: data })"
-                    :parse="
-                      (text) => {
-                        const { rows } = fromSpreadsheet(text, [
-                          'target_compound_name',
-                          'target_compound_formula',
-                          'cas_number' // optional
-                        ])
-                        return rows
-                      }
-                    "
-                    :validate="
-                      (data) => {
-                        if (!data || !Array.isArray(data) || data.length === 0 || !data[0]) {
-                          return {
-                            valid: false,
-                            severity: 'error',
-                            message: 'No valid data found in paste'
-                          }
-                        }
-                        const cols = Object.keys(data[0]).length
-                        const rows = data.length
-                        if (cols == 1 && rows == 1) {
-                          return {
-                            valid: false,
-                            severity: 'warn',
-                            message: 'Please paste spreadsheet cells'
-                          }
-                        }
-                        const validCols = 2 <= cols && cols <= 3
-                        const validRows = data.map(
-                          (row) => row?.target_compound_formula?.length > 0
-                        )
-                        const valid = validRows && validCols
-                        const messageCols = !validCols
-                          ? `You pasted ${cols} columns but 2 or 3 are expected`
-                          : null
-                        const messageRows = !validRows
-                          ? `Some rows are missing a formula, which is required`
-                          : null
-                        const message =
-                          messageCols ?? messageRows ?? `Pasted ${cols} columns and ${rows} rows`
-                        return {
-                          valid,
-                          severity: valid ? 'success' : 'warn',
-                          message
-                        }
-                      }
-                    "
+                    :parse="parseCompoundPaste"
+                    :validate="validateCompoundPaste"
                     :persistMessage="changes.length == 0"
                   >
                     <DataTable
@@ -1260,7 +1220,7 @@ watch(
                     :value="
                       compounds.loaded.filter((comp) => {
                         const query = selected.search.toLowerCase()
-                        const nameMatch = comp.target_compound_name.toLowerCase()?.includes(query)
+                        const nameMatch = comp.target_compound_name?.toLowerCase().includes(query)
                         const formulaMatch = comp.target_compound_formula
                           ?.toLowerCase()
                           .includes(query)
