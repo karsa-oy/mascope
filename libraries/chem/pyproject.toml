@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "mascope_runtime",
     "colorcet~=3.2",
-    "datashader>=0.17,<0.18",
+    "datashader>=0.19.1,<0.20",
     "h5py~=3.11",
     "numpy~=1.26",
     "pandas~=2.2",

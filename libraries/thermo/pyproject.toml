@@ -10,7 +10,7 @@ dependencies = [
     "numpy~=1.26",
     "opentfraw~=1.2",
     "pythonnet~=3.1",
-    "xarray>=2025.06.1",
+    "xarray>=2026.7.0",
 ]
 
 [build-system]
