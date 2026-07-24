@@ -47,7 +47,10 @@ class TestProcessExceptionDoesNotLeakInternals:
 
         assert api_exc.status_code == 500
         assert secret_path not in api_exc.user_message
-        assert api_exc.user_message == "Test context. Unexpected error."
+        assert api_exc.user_message.startswith("Test context. Unexpected error")
+        # The message carries a short reference to the logged error_id so the
+        # user can quote it to support.
+        assert f"(ref: {api_exc.tech_message['error_id'][:8]})" in api_exc.user_message
 
     def test_response_json_contains_no_traceback(self):
         try:
@@ -86,7 +89,7 @@ class TestProcessExceptionDoesNotLeakInternals:
 
         assert api_exc.status_code == 400
         assert "_engine" not in api_exc.user_message
-        assert api_exc.user_message == "Test context. Unexpected error."
+        assert api_exc.user_message.startswith("Test context. Unexpected error")
 
     def test_runtime_error_message_is_generic(self):
         secret_path = "/app/.runtime/secrets/jwt_secret_key.txt"
@@ -94,7 +97,7 @@ class TestProcessExceptionDoesNotLeakInternals:
 
         assert api_exc.status_code == 500
         assert secret_path not in api_exc.user_message
-        assert api_exc.user_message == "Test context. Unexpected error."
+        assert api_exc.user_message.startswith("Test context. Unexpected error")
 
     def test_validation_error_input_never_reaches_client_or_log(self):
         # A RequestValidationError renders the offending "input" (which can be a

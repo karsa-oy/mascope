@@ -24,6 +24,7 @@ from .api import (
     create_sample_file_db_record,
     delete_sample_file_by_filename,
 )
+from .errors import describe_exception
 from .peak_guard import PeakDetectionGuard
 from .runtime import runtime
 from .schema import SampleFileProps
@@ -536,7 +537,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                     self._cleanup_successful_file(self.file_to_process, file_basename)
 
                 except Exception as e:
-                    error_msg = str(e)
+                    error_msg = describe_exception(e)
                     runtime.logger.error(
                         f"Failed to process file {Path(self.file_to_process).name}: {e}\n{traceback.format_exc()}"
                     )
@@ -575,7 +576,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                         {
                             "filename": file_basename,
                             "instrument": instrument or "unknown",
-                            "error": f"Unexpected error: {str(e)}",
+                            "error": describe_exception(e),
                         },
                     )
 

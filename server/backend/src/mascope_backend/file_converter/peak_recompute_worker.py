@@ -25,6 +25,7 @@ from mascope_backend.file_converter.api import (
     is_blank_sample_file,
     rematch_sample,
 )
+from mascope_backend.file_converter.errors import describe_exception
 from mascope_backend.file_converter.peak_guard import PeakDetectionGuard
 from mascope_backend.file_converter.runtime import runtime
 from mascope_signal.peak import compute_peaks
@@ -184,7 +185,7 @@ class PeakRecomputeWorker(Thread):
                     "filename": filename,
                     "sample_file_id": sample_file_id,
                     "process_id": process_id,
-                    "error": str(e),
+                    "error": describe_exception(e),
                 },
                 auth,
             )
@@ -228,7 +229,7 @@ class PeakRecomputeWorker(Thread):
                             "filename": filename,
                             "sample_file_id": sample_file_id,
                             "process_id": process_id,
-                            "error": f"Unexpected error: {e}",
+                            "error": describe_exception(e),
                         },
                         auth,
                     )
