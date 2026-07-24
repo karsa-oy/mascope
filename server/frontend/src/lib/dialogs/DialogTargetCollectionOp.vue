@@ -845,22 +845,19 @@ watch(
  * Load batches when dataset or collection type changes.
  * Updates checkbox state to reflect current dataset selection.
  */
-watch(
-  [() => selected.dataset, () => info.type],
-  async ([newDataset, newType]) => {
-    // Skip during initialization - init handles the first load
-    if (initializing.value) return
+watch([() => selected.dataset, () => info.type], async ([newDataset, newType]) => {
+  // Skip during initialization - init handles the first load
+  if (initializing.value) return
 
-    // Skip if no dataset or type (invalid state)
-    if (!newDataset || !newType) {
-      batches.loaded = []
-      return
-    }
-
-    // Load batches for the new dataset
-    await loadBatches(newDataset, newType)
+  // Skip if no dataset or type (invalid state)
+  if (!newDataset || !newType) {
+    batches.loaded = []
+    return
   }
-)
+
+  // Load batches for the new dataset
+  await loadBatches(newDataset, newType)
+})
 
 // Auto-clear search when switching to manual input mode
 watchEffect(() => {
@@ -933,6 +930,20 @@ watch(
           :options="collectionTypes"
           :allowEmpty="false"
           :disabled="action == 'update_batches'"
+          :pt="
+            app.ui.help.bottom(
+              `
+                <h1>Collection type</h1>
+                <p>
+                  <b>TARGETS</b> are compounds of interest to match in samples.
+                  <b>DIAGNOSTICS</b> are used to monitor instrument performance.
+                  <b>CALIBRANTS</b> are used for mass calibration.
+                </p>
+                <p>The type determines which batches the collection can be assigned to.</p>
+              `,
+              { layer }
+            )
+          "
         />
       </div>
       <div class="row" style="margin-top: 0.5rem; align-items: center">
@@ -990,7 +1001,28 @@ watch(
                 class="row"
                 style="align-items: stretch; height: 450px; gap: 0.5rem; min-width: 1072px"
               >
-                <Panel>
+                <Panel
+                  :pt="
+                    app.ui.help.right(
+                      `
+                        <h1>Paste compounds</h1>
+                        <p>Copy cells from a spreadsheet and paste them anywhere in this panel:</p>
+                        <ul>
+                          <li><b>1 column:</b> formula</li>
+                          <li><b>2 columns:</b> name, formula</li>
+                          <li><b>3 columns:</b> name, formula, CAS number</li>
+                        </ul>
+                        <p>
+                          Only the formula is required. Rows matching an existing compound by
+                          formula or CAS number reuse it instead of creating a duplicate, and
+                          each row shows whether it will be created, added, kept or removed
+                          when you save.
+                        </p>
+                      `,
+                      { layer }
+                    )
+                  "
+                >
                   <div
                     class="row"
                     style="margin-bottom: 1rem; align-items: flex-start; min-width: 500px"
@@ -1140,7 +1172,25 @@ watch(
                     </div>
                   </BaseClipboardContext>
                 </Panel>
-                <Panel style="flex: 1; min-width: 500px">
+                <Panel
+                  style="flex: 1; min-width: 500px"
+                  :pt="
+                    app.ui.help.left(
+                      `
+                        <h1>Add compounds</h1>
+                        <p>
+                          <b>Import existing</b> selects compounds from another collection or
+                          from all known compounds.
+                        </p>
+                        <p>
+                          <b>Create new</b> adds a single compound manually. The formula is
+                          required; name and CAS number are optional.
+                        </p>
+                      `,
+                      { layer }
+                    )
+                  "
+                >
                   <div class="row" style="align-items: flex-start">
                     <h4 style="margin-bottom: 0.5rem">Add compounds</h4>
                     <SelectButton
