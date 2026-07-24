@@ -1,4 +1,5 @@
 import { norm } from '@/lib/utils'
+import { fromSpreadsheet } from '@/lib/table'
 
 /**
  * Validates chemical formula format
@@ -67,6 +68,85 @@ export function findExistingCompound(compoundList, searchCompound) {
   if (!searchCompound?.target_compound_formula?.trim()) return null
 
   return compoundList.find((comp) => isSameCompound(comp, searchCompound))
+}
+
+/**
+ * Parses spreadsheet cells pasted as target compounds.
+ *
+ * The column layout is inferred from the number of pasted columns:
+ * - 1 column:  formula
+ * - 2 columns: name, formula
+ * - 3 columns: name, formula, CAS number
+ *
+ * A single-column paste may start with a header cell (e.g. "Formula"); it is
+ * dropped when it is not a valid formula but the row below it is.
+ *
+ * @param {string} text - Raw clipboard text (tab-separated cells)
+ * @returns {Array<Object>} Parsed compound rows
+ */
+export function parseCompoundPaste(text) {
+  const lines = text.split('\n').filter((line) => line.trim().length)
+  const cols = lines[0] ? lines[0].split('\t').length : 0
+  const fields =
+    cols === 1
+      ? ['target_compound_formula']
+      : ['target_compound_name', 'target_compound_formula', 'cas_number']
+  const { rows } = fromSpreadsheet(text, fields)
+  if (
+    cols === 1 &&
+    rows.length > 1 &&
+    !isValidChemicalFormula(rows[0].target_compound_formula) &&
+    isValidChemicalFormula(rows[1].target_compound_formula)
+  ) {
+    rows.shift()
+  }
+  return rows
+}
+
+/**
+ * Validates compound rows parsed from a spreadsheet paste.
+ *
+ * Every row needs a formula. Single-column pastes are additionally checked
+ * against isValidChemicalFormula, so that pasting a name-only column is
+ * rejected instead of imported as bogus formulas.
+ *
+ * @param {Array<Object>} data - Rows from parseCompoundPaste
+ * @returns {{valid: boolean, severity: string, message: string}}
+ */
+export function validateCompoundPaste(data) {
+  if (!data || !Array.isArray(data) || data.length === 0 || !data[0]) {
+    return { valid: false, severity: 'error', message: 'No valid data found in paste' }
+  }
+  const cols = Object.keys(data[0]).length
+  if (cols > 3) {
+    return {
+      valid: false,
+      severity: 'warn',
+      message: `You pasted ${cols} columns but 1 to 3 are expected`
+    }
+  }
+  if (data.some((row) => !row?.target_compound_formula?.length)) {
+    return {
+      valid: false,
+      severity: 'warn',
+      message: 'Some rows are missing a formula, which is required'
+    }
+  }
+  if (cols === 1) {
+    const invalid = data.find((row) => !isValidChemicalFormula(row.target_compound_formula))
+    if (invalid) {
+      return {
+        valid: false,
+        severity: 'warn',
+        message: `'${invalid.target_compound_formula}' is not a valid chemical formula`
+      }
+    }
+  }
+  return {
+    valid: true,
+    severity: 'success',
+    message: `Pasted ${data.length} compound${data.length === 1 ? '' : 's'}`
+  }
 }
 
 /**
