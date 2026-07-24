@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.0] - 2026.07.24
+
 ### Added
 
 - Target compounds can be pasted from a spreadsheet as a single formula
@@ -31,7 +33,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - Collection-batch associations now respect workspace scoping from both
   directions: a workspace-scoped collection can no longer be assigned batches
   from another workspace (409), and a batch can no longer be assigned another
-  workspace's collection - previously only scope *changes* were validated, so
+  workspace's collection - previously only scope _changes_ were validated, so
   the invariant could be silently violated at assignment time. Changing a
   collection's batch associations now also requires editor access to the
   workspaces of the batches being added or removed (associations the request
