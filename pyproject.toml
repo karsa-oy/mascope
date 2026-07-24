@@ -28,7 +28,7 @@ mascope-backend = "mascope_backend.main:exec"
 
 [dependency-groups]
 # Small standalone group so CI can install the linter without the heavy dev deps.
-lint = ["ruff>=0.15.20,<0.16"]
+lint = ["ruff>=0.16.0,<0.17"]
 dev = [
     { include-group = "lint" },
     "deptry>=0.25.1,<0.26",
@@ -36,7 +36,7 @@ dev = [
     # jupyter
     "jupyterlab>=4.6,<5",
     "ipywidgets~=8.1",
-    "matplotlib>=3.11.0",
+    "matplotlib>=3.11.1",
     "plotly>=5.23.0,<6",
     "scikit-learn>=1.9.0,<2",
     "voila>=0.5.12,<0.6",

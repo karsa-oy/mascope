@@ -17,7 +17,7 @@ requires-python = ">=3.12,<3.13"
 # commands live behind the `dev` extra and a source-checkout gate in main.py.
 dependencies = [
     "mascope_runtime[logs]>=2026.7.7",
-    "typer>=0.26.8,<0.27",
+    "typer>=0.27.0,<0.28",
     "rich>=13.7.1,<14",
 ]
 
