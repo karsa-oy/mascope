@@ -44,6 +44,7 @@ from mascope_backend.db import (
     SampleFile,
     SampleItem,
     TargetCollection,
+    TargetCollectionInSampleBatch,
     User,
     Workspace,
     WorkspaceMember,
@@ -590,6 +591,43 @@ async def check_target_collection_access(
         return None
 
     return await _enforce(workspace_id, user, _role_levels[min_role])
+
+
+async def check_collection_batch_change_access(
+    target_collection_id: str,
+    desired_sample_batch_ids: list[str],
+    user: User,
+    min_role: str,
+) -> None:
+    """Check workspace ACL for changing a collection's batch associations.
+
+    Only the batches being added or removed (relative to the collection's
+    current associations) require workspace access. Associations the request
+    preserves — possible in other workspaces for global collections — do not
+    require membership there.
+
+    :raises ForbiddenAccessException: If any added or removed batch resolves
+        to a workspace the user lacks the required role for.
+    """
+    if user.is_superuser:
+        return
+
+    async with async_session() as session:
+        current = set(
+            (
+                await session.execute(
+                    select(TargetCollectionInSampleBatch.sample_batch_id).where(
+                        TargetCollectionInSampleBatch.target_collection_id
+                        == target_collection_id
+                    )
+                )
+            ).scalars()
+        )
+
+    desired = set(desired_sample_batch_ids)
+    changed = (desired - current) | (current - desired)
+    if changed:
+        await check_batch_access_bulk(list(changed), user, min_role)
 
 
 async def accessible_workspace_ids_for_user(user: User) -> set[str]:

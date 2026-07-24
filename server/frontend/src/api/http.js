@@ -5,8 +5,14 @@ import { runtime } from '@/lib/runtime.js'
 import { useApp } from '@/stores'
 import { api } from './client.js'
 import handlers from './handlers.js'
+import { getApiErrorMessage } from './utils.js'
 
 const API_RESPONSE_TIMEOUT = 20_000 // 20 seconds
+
+// Per-request override for operations that legitimately take long on large
+// inputs (e.g. creating a target collection computes ion/isotope patterns for
+// every new compound). Pass as `timeout` in the request config.
+export const API_SLOW_RESPONSE_TIMEOUT = 300_000 // 5 minutes
 
 export const initHttp = () => {
   const client = axios.create({
@@ -67,7 +73,8 @@ function handleClientError(error) {
   const { method, url, headers } = error?.config || {}
   const type = headers?.['X-Type']
   // log to console for developers
-  const { detail, error: message } = error?.response?.data || {}
+  const { detail } = error?.response?.data || {}
+  const message = getApiErrorMessage(error)
   console.error(
     `❌[api:http] ${method} ${url} client failure: ${message} (error_id: ${detail?.error_id})`,
     error
@@ -126,7 +133,8 @@ function handleServerError(error) {
   }
 
   // log to console for developers
-  const { detail, error: message } = error?.response?.data || {}
+  const { detail } = error?.response?.data || {}
+  const message = getApiErrorMessage(error)
   console.error(
     `🚫 [api:http] ${type} ${method} ${url} server failure: ${message} (error_id: ${detail?.error_id})`,
     error
@@ -136,7 +144,7 @@ function handleServerError(error) {
   app.ui.notification.push({
     type,
     status: 'error',
-    message: message || 'An error occurred'
+    message
   })
   // throw
   return Promise.reject(error)

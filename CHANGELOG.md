@@ -4,6 +4,126 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.0] - 2026.07.24
+
+### Added
+
+- Target compounds can be pasted from a spreadsheet as a single formula
+  column; the name column is no longer required. The paste infers the layout
+  from the column count (1 = formula, 2 = name + formula, 3 = name + formula +
+  CAS), tolerates a header cell on formula-only pastes, and rejects columns
+  that do not contain valid formulas with a clear message. The target
+  collection dialog also gains help-mode popovers (paste layouts, add-compounds
+  panel, collection types); previously help mode showed nothing there.
+- PostgreSQL `max_connections` is now configurable via `[backend.database]` in
+  the `.mascope.toml` layers and passed to the postgres container like the
+  other tuning flags (`MASCOPE_DB_MAX_CONNECTIONS`). Default stays 100;
+  production sets 200. `mascope prod db status` / `mascope dev db status` now
+  display the server cap next to the pool settings.
+
+### Fixed
+
+- Creating or updating a large target collection no longer shows a spurious
+  "Request timed out" error while the backend is still working: the frontend
+  gives target collection create/update/delete a 5-minute request timeout
+  (the global default is 20 s, but generating ion and isotope patterns for
+  hundreds of pasted compounds legitimately takes longer). The backend also
+  fetches ionization mechanisms once per request instead of once per created
+  compound.
+- Collection-batch associations now respect workspace scoping from both
+  directions: a workspace-scoped collection can no longer be assigned batches
+  from another workspace (409), and a batch can no longer be assigned another
+  workspace's collection - previously only scope _changes_ were validated, so
+  the invariant could be silently violated at assignment time. Changing a
+  collection's batch associations now also requires editor access to the
+  workspaces of the batches being added or removed (associations the request
+  preserves are exempt, keeping cross-workspace global collections manageable
+  by admins).
+- Workspace editors can now use "Edit batches" on a global target collection
+  to bulk-assign it to their own workspaces' batches: a batches-only update
+  no longer requires the admin rights reserved for mutating the collection
+  itself (name, type, scope, compounds), only editor access in the workspaces
+  of the batches being added or removed. The Manage batches dialog
+  accordingly sends a batches-only payload, and the collection update API
+  gained true PATCH semantics: omitted fields are left unchanged, whereas
+  previously an omitted collection type was read as the default TARGETS and
+  an omitted description as empty, wrongly flagging changes (triggering
+  needless full-batch rematches) and validating batch types against the wrong
+  collection type.
+- Production backend pool exhaustion during acquisition ingest
+  (`QueuePool limit of size 3 overflow 2 reached, connection timed out`): a
+  burst of converted files stacks several concurrent calibrate/match pipelines
+  on a single uvicorn worker, exhausting its 5-connection pool and failing
+  unrelated requests (including auth) on that worker for 30 s at a time.
+  `max_overflow` is raised 2 → 7 in prod (per-worker ceiling 5 → 10;
+  12-worker peak 120, under the new `max_connections = 200`). The developer
+  guide's connection-pool section now documents the two sizing constraints
+  (global budget and per-worker burst ceiling).
+- "Refresh matches" is incremental again. Since v1.3.0 stopped storing
+  non-matching (score-0) `match_isotope` rows, every refresh re-fetched and
+  re-scored every previously non-matching isotope of every sample - adding a
+  few targets to a large batch redid the whole batch's matching work. Matching
+  now persists one zero-score **sentinel** row per fully non-matching ion (the
+  main isotope), and the unmatched-isotope fetch skips every isotope of an ion
+  that has any stored row, so a refresh computes only ions never evaluated for
+  the sample (or invalidated since). The sentinel adds back roughly one row per
+  non-matching ion - a small fraction of the rows the optimization removed.
+  The `remove_unmatched_match_isotopes` maintenance script now converts legacy
+  score-0 rows into sentinel form instead of deleting them all, so cleaned
+  databases keep their evaluated markers.
+- Concurrent match writes no longer deadlock. All match create/delete funnels
+  serialize per sample batch on transaction-scoped Postgres advisory locks and
+  process rows in stable natural-key order, eliminating the
+  `DeadlockDetectedError` seen when a batch refresh overlapped another refresh
+  or the upload pipeline's per-sample aggregation. The match tables also gain
+  unique constraints on their natural keys (a migration dedupes any existing
+  duplicates first, keeping the newest row per key), so a race now fails loudly
+  instead of silently duplicating rows.
+- Editing a target ion's match parameters now also deletes the ion's stored
+  match isotopes (previously only its match ions), so the recompute after the
+  edit actually applies the new parameters instead of skipping the stored
+  isotopes.
+- Changing a target compound's formula (or deleting a compound) now flags the
+  affected batches for rematch. Previously the edit cascade-deleted the
+  compound's match rows across all batches but left the batches marked "ready",
+  where a plain refresh is refused.
+- User-facing error messages no longer contain duplicated wording. Nested
+  controller layers each prepended their own "Failed to ..." context
+  ("Failed to Update Workspace. Failed to Update Workspace. ..."), and the
+  global HTTP exception handler repeated the error detail twice while leaking
+  internal request wording ("HTTPException on POST /path | detail=...") to the
+  client. The most specific message now wins; full context still reaches the
+  server logs.
+- The File Agent reports the specific upload failure cause (rejected token,
+  timeout, connection refused, server error message) instead of a generic
+  "File upload failed", and no longer retries on a rejected access token - it
+  fails fast with a hint to fix the configured `access_token`. Its 401 log
+  line previously printed "None Please check your API token.".
+- File converter error notifications no longer surface bare exception reprs
+  (a malformed h5 file showed as "Failed to process X: 'Configuration File'")
+  or relabel known causes as "Unexpected error"; cryptic messages are prefixed
+  with the exception type instead.
+- The SDK surfaces the backend's human-readable error message; previously
+  every API error rendered as the opaque `{'error_id': '...'}` dict.
+- Frontend error toasts always carry a message (some failure paths showed a
+  blank toast or the literal text "undefined").
+- CLI: `mascope demo` prints a clean one-line error instead of a Python
+  traceback for ordinary fetch/restore failures; `mascope env sync`/`create`
+  no longer double their error wording; database script discovery logs
+  skipped (broken) script modules at debug level instead of hiding them
+  silently.
+
+### Changed
+
+- The batch refresh skips the full-batch higher-level aggregation when provably
+  nothing changed (nothing computed or removed, stored aggregates complete), so
+  a no-op refresh is near-instant. Partial (orphan-only) match removal now
+  deletes sample-level aggregates only for the affected samples instead of the
+  whole batch.
+- Genericized error messages ("Unexpected error.", "Database operation
+  failed.") now include a short reference to the server-side log entry, e.g.
+  "(ref: 3f9a1b2c)", so users can quote it to support for correlation.
+
 ## [v1.3.2] - 2026.07.12
 
 ### Fixed

@@ -172,6 +172,7 @@ def status() -> None:
     runtime.logger.info(f"Pool size: {db_cfg.pool_size}")
     runtime.logger.info(f"Max overflow: {db_cfg.max_overflow}")
     runtime.logger.info(f"Pool timeout: {db_cfg.pool_timeout}s")
+    runtime.logger.info(f"Server max_connections: {db_cfg.max_connections}")
 
     # Status
     runtime.logger.info("=== Status ===")

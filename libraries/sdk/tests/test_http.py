@@ -87,3 +87,35 @@ def test_http_post_preserves_auth_headers(monkeypatch):
 
     assert captured["headers"]["Authorization"] == "Bearer secret-token"
     assert captured["headers"]["X-Service-Name"] == "mascope_sdk"
+
+
+def _fake_error_response(status_code: int, payload: dict) -> requests.Response:
+    response = requests.Response()
+    response.status_code = status_code
+    response._content = json.dumps(payload).encode()
+    return response
+
+
+def test_extract_error_message_prefers_backend_error_field():
+    """The backend's error shape is ``{"error": <human message>, "detail":
+    {"error_id": ...}}``. Regression test for the bug where the opaque detail
+    dict was returned instead of the human-readable message.
+    """
+    response = _fake_error_response(
+        404,
+        {
+            "error": "Failed to Get Sample. Sample not found.",
+            "detail": {"error_id": "a1b2c3"},
+        },
+    )
+
+    message = _http._extract_error_message(response)
+
+    assert message == "Failed to Get Sample. Sample not found."
+
+
+def test_extract_error_message_falls_back_to_detail():
+    """Plain FastAPI-style ``{"detail": ...}`` errors still resolve."""
+    response = _fake_error_response(404, {"detail": "Not found"})
+
+    assert _http._extract_error_message(response) == "Not found"

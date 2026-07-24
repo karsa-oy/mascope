@@ -8,6 +8,7 @@ from mascope_backend.api.controllers.sample.batches.status.service import (
 )
 from mascope_backend.api.controllers.target.collections.lib.util import (
     detect_target_collection_changes,
+    validate_batch_scope_for_collection,
     validate_scope_change,
 )
 from mascope_backend.api.controllers.target.compounds.target_compounds_controller import (
@@ -270,11 +271,15 @@ async def create_target_collection(
     target_compound_ids = target_collection_create.target_compound_ids or []
     target_compounds_to_create = target_collection_create.target_compounds_create or []
 
-    # Step 1: Validate sample batch type constraints
+    # Step 1: Validate sample batch type and scope constraints
     if sample_batch_ids:
         await validate_sample_batches_for_collection(
             sample_batch_ids=sample_batch_ids,
             target_collection_type=target_collection_create.target_collection_type,
+        )
+        await validate_batch_scope_for_collection(
+            sample_batch_ids=sample_batch_ids,
+            workspace_id=target_collection_create.workspace_id,
         )
 
     # Step 2: Create new target compounds if provided
@@ -456,6 +461,16 @@ async def update_target_collection(
         await validate_sample_batches_for_collection(
             sample_batch_ids=sample_batches_update,
             target_collection_type=collection_type,
+        )
+        # Batches must stay within the collection's (possibly updated) workspace
+        effective_workspace_id = (
+            target_collection_update.workspace_id
+            if "workspace_id" in target_collection_update.model_fields_set
+            else target_collection_db.workspace_id
+        )
+        await validate_batch_scope_for_collection(
+            sample_batch_ids=sample_batches_update,
+            workspace_id=effective_workspace_id,
         )
 
     # Step 3: Create new target compounds if provided

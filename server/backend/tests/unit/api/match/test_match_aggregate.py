@@ -21,7 +21,9 @@ import pytest
 from mascope_backend.api.controllers.match.lib.match_aggregate import (
     MATCH_ISOTOPE_VALUE_COLUMNS,
     aggregate_match_collections,
+    aggregate_match_compounds,
     aggregate_match_compounds_light,
+    aggregate_match_ions,
     aggregate_match_ions_light,
     aggregate_match_samples,
     compile_samples_df,
@@ -229,6 +231,79 @@ class TestAggregateMatchSamples:
 
         assert len(result) == 1
         assert result.iloc[0]["sample_peak_intensity_sum"] == 10.0
+
+
+class TestStoredFrameNaturalKeys:
+    """
+    The persisted ion/compound frames must be unique on their natural keys
+    even when a compound is shared by several collections of the batch - the
+    database enforces this with unique constraints
+    (uq_match_ion_sample_item_target_ion etc.), so the per-collection
+    duplication of the working frames must never leak into the stored frames.
+    """
+
+    @staticmethod
+    def make_isotope_frame() -> pd.DataFrame:
+        # One compound/ion with two isotopes, reached through TWO collections
+        # of the same sample: 4 working rows, but one logical ion.
+        rows = []
+        for collection in ("coll_a", "coll_b"):
+            for isotope, score, abundance, intensity in (
+                ("iso_1", 0.9, 1.0, 100.0),
+                ("iso_2", 0.5, 0.1, 50.0),
+            ):
+                rows.append(
+                    {
+                        "sample_item_id": "s1",
+                        "sample_item_name": "sample 1",
+                        "sample_item_type": "ANALYSIS",
+                        "filename": "f.raw",
+                        "instrument": "orbi",
+                        "target_ion_id": "ion_1",
+                        "target_ion_formula": "C6H13O6+",
+                        "ionization_mechanism": "[M+H]+",
+                        "target_compound_id": "comp_1",
+                        "target_compound_formula": "C6H12O6",
+                        "target_compound_name": "Glucose",
+                        "target_collection_id": collection,
+                        "target_collection_name": collection,
+                        "target_collection_description": "",
+                        "target_collection_type": "TARGETS",
+                        "target_isotope_id": isotope,
+                        "match_score": score,
+                        "relative_abundance": abundance,
+                        "sample_peak_intensity": intensity,
+                        "filter_params": None,
+                    }
+                )
+        return pd.DataFrame(rows)
+
+    @pytest.mark.asyncio
+    async def test_shared_compound_yields_unique_stored_ion_rows(self):
+        ions_data_df, ions_df = await aggregate_match_ions(self.make_isotope_frame())
+
+        # Working frame keeps per-collection context; stored frame is unique
+        # on (sample_item_id, target_ion_id) with the per-collection values
+        # identical, not doubled.
+        assert len(ions_data_df) == 2
+        assert not ions_df.duplicated(["sample_item_id", "target_ion_id"]).any()
+        assert len(ions_df) == 1
+        assert ions_df.iloc[0]["match_score"] == pytest.approx(0.9 * 1.0 + 0.5 * 0.1)
+        assert ions_df.iloc[0]["sample_peak_intensity_sum"] == pytest.approx(150.0)
+
+    @pytest.mark.asyncio
+    async def test_shared_compound_yields_unique_stored_compound_rows(self):
+        ions_data_df, _ = await aggregate_match_ions(self.make_isotope_frame())
+        compounds_data_df, compounds_df = await aggregate_match_compounds(ions_data_df)
+
+        assert len(compounds_data_df) == 2  # one per collection
+        assert not compounds_df.duplicated(
+            ["sample_item_id", "target_compound_id"]
+        ).any()
+        assert len(compounds_df) == 1
+        # Intensity summed within one collection's ions - not doubled across
+        # the collections.
+        assert compounds_df.iloc[0]["sample_peak_intensity_sum"] == pytest.approx(150.0)
 
 
 class TestSetAlarmMode:

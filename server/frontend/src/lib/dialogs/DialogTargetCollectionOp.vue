@@ -26,9 +26,15 @@ import { useConfirm } from 'primevue/useconfirm'
 
 import { api } from '@/api'
 import { useApp } from '@/stores'
-import { fromSpreadsheet, equals } from '@/lib/table'
+import { equals } from '@/lib/table'
 import { BaseClipboardContext } from '@/lib/base'
-import { isValidChemicalFormula, isSameCompound, findExistingCompound } from '@/lib/chem'
+import {
+  isValidChemicalFormula,
+  isSameCompound,
+  findExistingCompound,
+  parseCompoundPaste,
+  validateCompoundPaste
+} from '@/lib/chem'
 import { clone } from '@/lib/utils'
 import { collectionTypes, getAllowedDatasetTypes, getAllowedBatchTypes } from '@/lib/constants'
 import { ROLES } from '@/lib/roles'
@@ -445,8 +451,9 @@ function execute() {
       return
     }
     case 'update_batches': {
+      // Only batch associations change here - sending the basic fields
+      // (in particular workspace_id) would needlessly trigger scope checks
       app.data.target.collection.update({
-        ...common,
         target_collection_id,
         sample_batch_ids
       })
@@ -839,22 +846,19 @@ watch(
  * Load batches when dataset or collection type changes.
  * Updates checkbox state to reflect current dataset selection.
  */
-watch(
-  [() => selected.dataset, () => info.type],
-  async ([newDataset, newType]) => {
-    // Skip during initialization - init handles the first load
-    if (initializing.value) return
+watch([() => selected.dataset, () => info.type], async ([newDataset, newType]) => {
+  // Skip during initialization - init handles the first load
+  if (initializing.value) return
 
-    // Skip if no dataset or type (invalid state)
-    if (!newDataset || !newType) {
-      batches.loaded = []
-      return
-    }
-
-    // Load batches for the new dataset
-    await loadBatches(newDataset, newType)
+  // Skip if no dataset or type (invalid state)
+  if (!newDataset || !newType) {
+    batches.loaded = []
+    return
   }
-)
+
+  // Load batches for the new dataset
+  await loadBatches(newDataset, newType)
+})
 
 // Auto-clear search when switching to manual input mode
 watchEffect(() => {
@@ -927,6 +931,20 @@ watch(
           :options="collectionTypes"
           :allowEmpty="false"
           :disabled="action == 'update_batches'"
+          :pt="
+            app.ui.help.bottom(
+              `
+                <h1>Collection type</h1>
+                <p>
+                  <b>TARGETS</b> are compounds of interest to match in samples.
+                  <b>DIAGNOSTICS</b> are used to monitor instrument performance.
+                  <b>CALIBRANTS</b> are used for mass calibration.
+                </p>
+                <p>The type determines which batches the collection can be assigned to.</p>
+              `,
+              { layer }
+            )
+          "
         />
       </div>
       <div class="row" style="margin-top: 0.5rem; align-items: center">
@@ -951,8 +969,12 @@ watch(
                 style="font-size: 1rem; opacity: 0.7"
               />
               <span>{{
-                workspaceScopeOptions.find((o) => o.value === value)?.label ??
-                'Select workspace scope'
+                // Non-admins have no Global option in the list but can still
+                // view global collections (e.g. managing their batches)
+                value === GLOBAL_SENTINEL
+                  ? 'Global (all workspaces)'
+                  : (workspaceScopeOptions.find((o) => o.value === value)?.label ??
+                    'Select workspace scope')
               }}</span>
             </div>
           </template>
@@ -984,7 +1006,28 @@ watch(
                 class="row"
                 style="align-items: stretch; height: 450px; gap: 0.5rem; min-width: 1072px"
               >
-                <Panel>
+                <Panel
+                  :pt="
+                    app.ui.help.right(
+                      `
+                        <h1>Paste compounds</h1>
+                        <p>Copy cells from a spreadsheet and paste them anywhere in this panel:</p>
+                        <ul>
+                          <li><b>1 column:</b> formula</li>
+                          <li><b>2 columns:</b> name, formula</li>
+                          <li><b>3 columns:</b> name, formula, CAS number</li>
+                        </ul>
+                        <p>
+                          Only the formula is required. Rows matching an existing compound by
+                          formula or CAS number reuse it instead of creating a duplicate, and
+                          each row shows whether it will be created, added, kept or removed
+                          when you save.
+                        </p>
+                      `,
+                      { layer }
+                    )
+                  "
+                >
                   <div
                     class="row"
                     style="margin-bottom: 1rem; align-items: flex-start; min-width: 500px"
@@ -1000,61 +1043,15 @@ watch(
                         text-align: right;
                       `"
                     >
-                      Add compounds by pasting spreadsheet cells here or by using the panel to the
-                      right.
+                      Add compounds by pasting spreadsheet cells here (a formula column alone, or
+                      name + formula + optional CAS) or by using the panel to the right.
                     </span>
                   </div>
                   <BaseClipboardContext
                     hideInitMessage
                     @validated="({ data }) => loadSpreadsheet({ rows: data })"
-                    :parse="
-                      (text) => {
-                        const { rows } = fromSpreadsheet(text, [
-                          'target_compound_name',
-                          'target_compound_formula',
-                          'cas_number' // optional
-                        ])
-                        return rows
-                      }
-                    "
-                    :validate="
-                      (data) => {
-                        if (!data || !Array.isArray(data) || data.length === 0 || !data[0]) {
-                          return {
-                            valid: false,
-                            severity: 'error',
-                            message: 'No valid data found in paste'
-                          }
-                        }
-                        const cols = Object.keys(data[0]).length
-                        const rows = data.length
-                        if (cols == 1 && rows == 1) {
-                          return {
-                            valid: false,
-                            severity: 'warn',
-                            message: 'Please paste spreadsheet cells'
-                          }
-                        }
-                        const validCols = 2 <= cols && cols <= 3
-                        const validRows = data.map(
-                          (row) => row?.target_compound_formula?.length > 0
-                        )
-                        const valid = validRows && validCols
-                        const messageCols = !validCols
-                          ? `You pasted ${cols} columns but 2 or 3 are expected`
-                          : null
-                        const messageRows = !validRows
-                          ? `Some rows are missing a formula, which is required`
-                          : null
-                        const message =
-                          messageCols ?? messageRows ?? `Pasted ${cols} columns and ${rows} rows`
-                        return {
-                          valid,
-                          severity: valid ? 'success' : 'warn',
-                          message
-                        }
-                      }
-                    "
+                    :parse="parseCompoundPaste"
+                    :validate="validateCompoundPaste"
                     :persistMessage="changes.length == 0"
                   >
                     <DataTable
@@ -1180,7 +1177,25 @@ watch(
                     </div>
                   </BaseClipboardContext>
                 </Panel>
-                <Panel style="flex: 1; min-width: 500px">
+                <Panel
+                  style="flex: 1; min-width: 500px"
+                  :pt="
+                    app.ui.help.left(
+                      `
+                        <h1>Add compounds</h1>
+                        <p>
+                          <b>Import existing</b> selects compounds from another collection or
+                          from all known compounds.
+                        </p>
+                        <p>
+                          <b>Create new</b> adds a single compound manually. The formula is
+                          required; name and CAS number are optional.
+                        </p>
+                      `,
+                      { layer }
+                    )
+                  "
+                >
                   <div class="row" style="align-items: flex-start">
                     <h4 style="margin-bottom: 0.5rem">Add compounds</h4>
                     <SelectButton
@@ -1260,7 +1275,7 @@ watch(
                     :value="
                       compounds.loaded.filter((comp) => {
                         const query = selected.search.toLowerCase()
-                        const nameMatch = comp.target_compound_name.toLowerCase()?.includes(query)
+                        const nameMatch = comp.target_compound_name?.toLowerCase().includes(query)
                         const formulaMatch = comp.target_compound_formula
                           ?.toLowerCase()
                           .includes(query)

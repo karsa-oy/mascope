@@ -124,7 +124,11 @@ async def fetch_sample_unmatched_target_isotopes(
     - Filters by sample ionization mechanisms (from ionization mode)
     - Filters by sample polarity compatibility
     - Applies match parameter filtering based on sample instrument type
-    - Excludes isotopes that already have matches for this sample in match_isotopes table
+    - Excludes isotopes of ions already evaluated for this sample: any stored
+      match_isotope row of an ion (a real match or the zero-score sentinel kept
+      by select_match_isotopes_to_persist) marks the whole ion as evaluated
+    - Excludes isotopes that already have a stored row themselves (safety net
+      for half-invalidated states, so recompute never double-inserts)
 
     :param sample: Sample model object
     :type sample: Sample
@@ -152,6 +156,22 @@ async def fetch_sample_unmatched_target_isotopes(
             select(MatchIsotope.target_isotope_id)
             .where(MatchIsotope.sample_item_id == sample.sample_item_id)
             .distinct(MatchIsotope.target_isotope_id)
+        )
+
+        # Subquery for ions already evaluated for this sample. Any stored
+        # isotope row marks its whole ion as evaluated: compute keeps every
+        # scoring isotope plus one zero-score sentinel per ion that matched
+        # nothing (select_match_isotopes_to_persist), so absence of rows means
+        # the ion was never evaluated - or an invalidation path deleted its
+        # rows to force recomputation.
+        evaluated_ions_subquery = (
+            select(TargetIsotope.target_ion_id)
+            .join(
+                MatchIsotope,
+                MatchIsotope.target_isotope_id == TargetIsotope.target_isotope_id,
+            )
+            .where(MatchIsotope.sample_item_id == sample.sample_item_id)
+            .distinct(TargetIsotope.target_ion_id)
         )
 
         # Effective isotope abundance threshold per ion (ion-scoped override in
@@ -202,7 +222,11 @@ async def fetch_sample_unmatched_target_isotopes(
                 TargetIsotope.resolution == resolution_type,
                 # Skip negligible isotopes below the effective abundance threshold
                 TargetIsotope.relative_abundance >= abundance_threshold,
-                # Exclude already matched isotopes
+                # Exclude every isotope of an already-evaluated ion
+                TargetIsotope.target_ion_id.notin_(evaluated_ions_subquery),
+                # Safety net: never re-fetch an isotope that still has a stored
+                # row (e.g. after a partial invalidation deleted only some of
+                # an ion's rows) - recomputing it would double-insert
                 TargetIsotope.target_isotope_id.notin_(matched_isotopes_subquery),
             )
         )

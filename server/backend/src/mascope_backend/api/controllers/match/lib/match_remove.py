@@ -140,7 +140,17 @@ async def remove_matches(
         operations.append((delete_match_collections, "match_collections", params))
 
     if match_samples:
-        operations.append((delete_match_samples, "match_samples", {}))
+        # Partial removal wipes MatchSample rows only for the samples that
+        # actually had orphaned data - they are re-created by the following
+        # aggregation. Unaffected samples keep their valid rows, which also
+        # lets the aggregation skip/scoping logic trust MatchSample presence
+        # as "this sample's aggregates are complete".
+        params = (
+            {"sample_item_ids": orphaned_match_data.sample_item_ids}
+            if not full_remove
+            else {}
+        )
+        operations.append((delete_match_samples, "match_samples", params))
 
     if not operations:
         raise ValueError(

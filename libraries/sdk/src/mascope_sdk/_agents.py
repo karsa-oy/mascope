@@ -11,7 +11,10 @@ import sys
 import requests
 import urllib3
 from loguru import logger
-from requests.exceptions import HTTPError, RequestException, Timeout
+from requests.exceptions import RequestException, Timeout
+
+from ._http import _raise_for_status
+from .exceptions import MascopeConnectionError, MascopeTimeoutError
 
 
 # Suppress InsecureRequestWarning from urllib3 (agents use verify=False)
@@ -36,7 +39,7 @@ def api_post_file(
     access_token: str,
     filepath: str,
     upload_filename: str | None = None,
-):
+) -> requests.Response:
     """Send a POST request with a file upload.
 
     :param url: The base URL of the server.
@@ -46,27 +49,34 @@ def api_post_file(
     :param upload_filename: Optional filename override for the uploaded file.
         If provided, the server will see this filename instead of the one on disk.
     :type upload_filename: str, optional
-    :return: The response object on success, otherwise None.
-    :rtype: requests.Response | None
+    :return: The response object on success.
+    :rtype: requests.Response
+    :raises ValueError: if ``upload_filename`` contains path components.
+    :raises MascopeTimeoutError: if the request times out.
+    :raises MascopeConnectionError: if the server cannot be reached.
+    :raises MascopeAPIError: on an error response; the concrete subclass
+        (``AuthenticationError``, ``NotFoundError``, ``ValidationError``,
+        ``ServerError``) and message carry the specific cause so callers can
+        act on it (e.g. not retry on a rejected token).
     """
     full_url = url + "/api/" + path
-    try:
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "X-Service-Name": _get_service_name(),
-        }
-        with open(filepath, "rb") as file:
-            if upload_filename:
-                from pathlib import PurePosixPath, PureWindowsPath
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "X-Service-Name": _get_service_name(),
+    }
+    with open(filepath, "rb") as file:
+        if upload_filename:
+            from pathlib import PurePosixPath, PureWindowsPath
 
-                sanitized = PurePosixPath(PureWindowsPath(upload_filename).name).name
-                if sanitized != upload_filename:
-                    raise ValueError(
-                        f"upload_filename contains path components: {upload_filename!r}"
-                    )
-                files = [("files", (sanitized, file))]
-            else:
-                files = [("files", file)]
+            sanitized = PurePosixPath(PureWindowsPath(upload_filename).name).name
+            if sanitized != upload_filename:
+                raise ValueError(
+                    f"upload_filename contains path components: {upload_filename!r}"
+                )
+            files = [("files", (sanitized, file))]
+        else:
+            files = [("files", file)]
+        try:
             resp = requests.post(
                 full_url,
                 files=files,
@@ -74,45 +84,24 @@ def api_post_file(
                 verify=False,
                 timeout=60,
             )
-        resp.raise_for_status()
+        except Timeout as e:
+            raise MascopeTimeoutError(
+                "The upload request timed out.", url=full_url
+            ) from e
+        except RequestException as e:
+            raise MascopeConnectionError(
+                "Could not connect to the server. Please check the URL "
+                f"and your network connection ({e.__class__.__name__}).",
+                url=full_url,
+            ) from e
+
+    # Raises a typed MascopeAPIError subclass carrying the server's message.
+    _raise_for_status(resp, full_url)
+
+    try:
         message = json.loads(resp.content).get("message", None)
-        if message is not None:
-            logger.debug(message)
-    except HTTPError as http_err:
-        if resp.status_code in (401, 403):
-            response = json.loads(resp.content)
-            error_message = response.get("detail", {}).get("error_message", None)
-            logger.error(f"{error_message} Please check your API token.")
-        else:
-            try:
-                error_message = (
-                    json.loads(resp.content)
-                    .get("detail", {})
-                    .get(
-                        "error_message",
-                        "No additional error information from the server.",
-                    )
-                )
-            except json.JSONDecodeError:
-                error_message = "Failed to decode error message from server response."
-            logger.error(
-                f"HTTP error: Unable to upload to {full_url}. "
-                f"\nDetails: {http_err} \nServer message: {error_message}"
-            )
-        return None
-    except Timeout:
-        logger.error(f"Timeout error: The request to {full_url} timed out.")
-        return None
-    except RequestException as req_err:
-        logger.error(
-            f"Connection error: Could not connect to {full_url}. "
-            f"Please check the URL and your network connection. \nDetails: {req_err}"
-        )
-        return None
-    except Exception as e:
-        logger.error(
-            f"Error: An unexpected error occurred while trying to reach {full_url}. "
-            f"\nDetails: {str(e)}"
-        )
-        return None
+    except (json.JSONDecodeError, AttributeError):
+        message = None
+    if message is not None:
+        logger.debug(message)
     return resp

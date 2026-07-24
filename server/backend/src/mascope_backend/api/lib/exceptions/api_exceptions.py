@@ -20,6 +20,43 @@ class ApiException(Exception):
         self.status_code = status_code
 
 
+#: Context prefixes added by the wrapping layers (api_controller,
+#: api_controller_background_task, api_route). Used to detect messages that
+#: already carry an operation context so nesting does not stack prefixes.
+_CONTEXT_PREFIXES = (
+    "failed to ",
+    "error in ",
+    "warning during ",
+    "partially succeeded to ",
+)
+
+
+def compose_user_message(context_message: str, inner_message) -> str:
+    """
+    Join an error context with an inner message without duplicating wording.
+
+    Nested controllers each wrap errors with their own context ("Failed to X"),
+    so the inner message may already start with one; prepending another would
+    produce messages like "Failed to X. Failed to Y. <cause>". In that case the
+    innermost (most specific) message wins - the outer context still reaches
+    the server log via ``process_exception``.
+
+    :param context_message: The wrapping layer's context, e.g. "Failed to Update Workspace".
+    :param inner_message: The message from the caught exception.
+    :return: The combined user-facing message.
+    :rtype: str
+    """
+    inner = str(inner_message).strip() if inner_message is not None else ""
+    if not inner:
+        return f"{context_message}."
+    lowered = inner.lower()
+    if lowered.startswith(_CONTEXT_PREFIXES) or lowered.startswith(
+        context_message.strip().lower()
+    ):
+        return inner
+    return f"{context_message}. {inner}"
+
+
 class NotFoundException(HTTPException):
     def __init__(self, detail: str):
         super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
@@ -34,7 +71,8 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     error_message = f"{context_message}. {str(e)}."
     # Opaque reference for correlating a client-visible error with the
     # server-side log entry. The traceback and internal details are only
-    # logged, never returned to the client.
+    # logged, never returned to the client; genericized user messages carry a
+    # short "ref:" prefix of this id so users can quote it to support.
     error_id = uuid.uuid4().hex
     tech_message = {"error_id": error_id}
     # Unexpected exceptions are logged with their traceback for debugging. For
@@ -46,7 +84,9 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     # Use pattern matching to determine user message and status code
     match e:
         case SQLAlchemyError():
-            user_message = f"{context_message}. Database operation failed."
+            user_message = (
+                f"{context_message}. Database operation failed (ref: {error_id[:8]})."
+            )
             status_code = 400  # Bad Request
 
         case ApiException():
@@ -88,7 +128,7 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
                         "The role is invalid. Please contact the administrator."
                     )
                 case _:
-                    user_message = f"{context_message}. {e.detail}"
+                    user_message = compose_user_message(context_message, e.detail)
 
         # Handling for httpx timeout errors
         case httpx.TimeoutException():
@@ -133,19 +173,19 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
         case AttributeError():
             # str(e) can name internal attributes/objects; keep it out of the
             # client response (the full message is still logged server-side).
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 400  # Bad Request
 
         case RuntimeError():
             # RuntimeError messages often embed internal paths/state; do not
             # echo them to the client (logged server-side under error_id).
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 500  # Internal Server Error
 
         case _:  # Default case
             # Do not echo str(e) for unexpected exceptions: messages such as
             # FileNotFoundError include internal filesystem paths.
-            user_message = f"{context_message}. Unexpected error."
+            user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 500  # Internal Server Error
 
     # Log the exception with context server-side, correlated by error_id. The

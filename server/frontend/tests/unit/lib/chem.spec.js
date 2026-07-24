@@ -4,7 +4,9 @@ import {
   isValidChemicalFormula,
   isSameCompound,
   findExistingCompound,
-  formatIsotopeFormula
+  formatIsotopeFormula,
+  parseCompoundPaste,
+  validateCompoundPaste
 } from '@/lib/chem'
 
 describe('isValidChemicalFormula', () => {
@@ -69,6 +71,98 @@ describe('findExistingCompound', () => {
 
   it('returns undefined when nothing matches', () => {
     expect(findExistingCompound(list, { target_compound_formula: 'CH4' })).toBeUndefined()
+  })
+})
+
+describe('parseCompoundPaste', () => {
+  it('maps a single column to formulas only', () => {
+    expect(parseCompoundPaste('H2O\nC6H12O6')).toEqual([
+      { target_compound_formula: 'H2O' },
+      { target_compound_formula: 'C6H12O6' }
+    ])
+  })
+
+  it('handles Windows line endings and a trailing newline', () => {
+    expect(parseCompoundPaste('H2O\r\nCO2\r\n')).toEqual([
+      { target_compound_formula: 'H2O' },
+      { target_compound_formula: 'CO2' }
+    ])
+  })
+
+  it('drops a header cell from a single-column paste', () => {
+    expect(parseCompoundPaste('Formula\nH2O')).toEqual([{ target_compound_formula: 'H2O' }])
+  })
+
+  it('keeps a lone single cell as-is for validation to judge', () => {
+    expect(parseCompoundPaste('Formula')).toEqual([{ target_compound_formula: 'Formula' }])
+  })
+
+  it('maps two columns to name and formula', () => {
+    expect(parseCompoundPaste('Water\tH2O')).toEqual([
+      { target_compound_name: 'Water', target_compound_formula: 'H2O' }
+    ])
+  })
+
+  it('maps three columns to name, formula and CAS number', () => {
+    expect(parseCompoundPaste('Water\tH2O\t7732-18-5')).toEqual([
+      { target_compound_name: 'Water', target_compound_formula: 'H2O', cas_number: '7732-18-5' }
+    ])
+  })
+})
+
+describe('validateCompoundPaste', () => {
+  it('rejects empty or missing data', () => {
+    expect(validateCompoundPaste(null).valid).toBe(false)
+    expect(validateCompoundPaste([]).valid).toBe(false)
+    expect(validateCompoundPaste([null]).valid).toBe(false)
+  })
+
+  it('accepts a formula-only column', () => {
+    const result = validateCompoundPaste([
+      { target_compound_formula: 'H2O' },
+      { target_compound_formula: 'C6H12O6' }
+    ])
+    expect(result.valid).toBe(true)
+    expect(result.message).toBe('Pasted 2 compounds')
+  })
+
+  it('accepts a single pasted formula cell', () => {
+    const result = validateCompoundPaste([{ target_compound_formula: 'H2O' }])
+    expect(result.valid).toBe(true)
+    expect(result.message).toBe('Pasted 1 compound')
+  })
+
+  it('rejects a single column that does not contain formulas', () => {
+    const result = validateCompoundPaste([
+      { target_compound_formula: 'Water' },
+      { target_compound_formula: 'Glucose' }
+    ])
+    expect(result.valid).toBe(false)
+    expect(result.message).toContain('not a valid chemical formula')
+  })
+
+  it('accepts name and formula columns without formula syntax checks', () => {
+    const result = validateCompoundPaste([
+      { target_compound_name: 'Water', target_compound_formula: 'H2O' }
+    ])
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects rows missing a formula', () => {
+    const result = validateCompoundPaste([
+      { target_compound_name: 'Water', target_compound_formula: 'H2O' },
+      { target_compound_name: 'Glucose', target_compound_formula: '' }
+    ])
+    expect(result.valid).toBe(false)
+    expect(result.message).toBe('Some rows are missing a formula, which is required')
+  })
+
+  it('rejects more than three columns', () => {
+    const result = validateCompoundPaste([
+      { a: '1', b: '2', c: '3', d: '4' } // 4 columns
+    ])
+    expect(result.valid).toBe(false)
+    expect(result.message).toContain('1 to 3 are expected')
   })
 })
 
