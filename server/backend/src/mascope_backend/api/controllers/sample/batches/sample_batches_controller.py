@@ -53,6 +53,7 @@ from mascope_backend.api.controllers.target.isotopes.target_isotopes_controller 
 )
 from mascope_backend.api.controllers.target.lib.fetch.target_collections_fetch import (
     validate_collections_for_batch,
+    validate_collections_scope_for_batch,
 )
 from mascope_backend.api.lib.api_features import (
     api_controller,
@@ -336,10 +337,14 @@ async def create_sample_batch(
                     f"Dataset '{dataset.dataset_name}' is of type '{dataset.dataset_type}'"
                 )
 
-        # Validate target collection type constraints
+        # Validate target collection type and scope constraints
         await validate_collections_for_batch(
             target_collection_ids=sample_batch.target_collection_ids,
             sample_batch_type=sample_batch.sample_batch_type,
+        )
+        await validate_collections_scope_for_batch(
+            target_collection_ids=sample_batch.target_collection_ids,
+            dataset_id=sample_batch.dataset_id,
         )
 
         # --- Construct new sample batch object ---
@@ -435,10 +440,14 @@ async def update_sample_batch(
 
         # Step 3: Validate new configurations when changes detected
         if changes["collections"]:
-            # Validate target collection type constraints
+            # Validate target collection type and scope constraints
             await validate_collections_for_batch(
                 target_collection_ids=sample_batch_update.target_collection_ids,
                 sample_batch_type=batch.sample_batch_type,
+            )
+            await validate_collections_scope_for_batch(
+                target_collection_ids=sample_batch_update.target_collection_ids,
+                dataset_id=batch.dataset_id,
             )
 
         # Step 4: Update batch data

@@ -39,6 +39,9 @@ export const useCollectionContextMenu = defineStore('collectionContextMenu', () 
       {
         label: 'Edit batches',
         icon: 'pi pi-pen-to-square',
+        // Batch associations are part of the collection, so global
+        // collections require admin rights here too
+        disabled: !canMutate,
         command: () => {
           dialog.op = 'update_batches'
         }

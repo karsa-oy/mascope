@@ -104,7 +104,23 @@ class TargetCollectionCreate(TargetCollectionValidator, TargetCollectionBase):
 
 
 class TargetCollectionUpdate(TargetCollectionValidator, TargetCollectionBase):
-    """Model used for target collection update requests."""
+    """Model used for target collection update requests.
+
+    All basic fields are optional (PATCH semantics): fields not present in the
+    request are left unchanged. Overrides the required/defaulted base fields -
+    inherited defaults (e.g. type "TARGETS") would otherwise masquerade as
+    requested changes on partial updates.
+    """
+
+    target_collection_name: str | None = Field(
+        None, description="Name of the target collection"
+    )
+    target_collection_description: str | None = Field(
+        None, description="Description of the target collection"
+    )
+    target_collection_type: str | None = Field(
+        None, description="Type of the target collection"
+    )
 
     target_compound_ids: list[str] | None = Field(
         None,

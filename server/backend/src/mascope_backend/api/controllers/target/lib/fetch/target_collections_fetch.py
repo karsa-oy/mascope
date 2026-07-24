@@ -5,12 +5,15 @@ Target collection validation helpers.
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
-from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.lib.exceptions.api_exceptions import (
+    ApiException,
+    NotFoundException,
+)
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
-from mascope_backend.db import SampleBatch, TargetCollection, async_session
+from mascope_backend.db import Dataset, SampleBatch, TargetCollection, async_session
 from mascope_backend.runtime import runtime
 
 
@@ -74,6 +77,53 @@ async def validate_sample_batches_for_collection(
             )
             runtime.logger.warning(message)
             raise ValueError(message)
+
+
+async def validate_collections_scope_for_batch(
+    target_collection_ids: list | None, dataset_id: str
+) -> None:
+    """
+    Validates that target collections assigned to a batch are global or belong
+    to the batch's workspace.
+
+    Mirrors validate_batch_scope_for_collection on the collection side, so the
+    invariant "a workspace-scoped collection is only associated with batches of
+    its own workspace" holds regardless of which side the association is made
+    from.
+
+    :param target_collection_ids: List of target collection IDs to validate
+    :param dataset_id: Dataset of the batch, resolved to its workspace
+    :raises ApiException: 409 if any collection is scoped to another workspace
+    """
+    if not target_collection_ids:
+        return
+
+    async with async_session() as session:
+        workspace_id = (
+            await session.execute(
+                select(Dataset.workspace_id).where(Dataset.dataset_id == dataset_id)
+            )
+        ).scalar_one_or_none()
+
+        stmt = select(func.count()).where(
+            TargetCollection.target_collection_id.in_(target_collection_ids),
+            TargetCollection.workspace_id.is_not(None),
+            TargetCollection.workspace_id != workspace_id,
+        )
+        invalid_count = await session.scalar(stmt)
+
+    if invalid_count > 0:
+        msg = (
+            "Batches can only be assigned global collections or collections of "
+            f"the batch's own workspace. Found {invalid_count} collection(s) "
+            "scoped to another workspace."
+        )
+        runtime.logger.warning(msg)
+        raise ApiException(
+            user_message=msg,
+            tech_message=msg,
+            status_code=409,
+        )
 
 
 async def validate_collections_for_batch(
