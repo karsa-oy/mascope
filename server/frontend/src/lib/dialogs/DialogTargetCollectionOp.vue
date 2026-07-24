@@ -969,8 +969,12 @@ watch(
                 style="font-size: 1rem; opacity: 0.7"
               />
               <span>{{
-                workspaceScopeOptions.find((o) => o.value === value)?.label ??
-                'Select workspace scope'
+                // Non-admins have no Global option in the list but can still
+                // view global collections (e.g. managing their batches)
+                value === GLOBAL_SENTINEL
+                  ? 'Global (all workspaces)'
+                  : (workspaceScopeOptions.find((o) => o.value === value)?.label ??
+                    'Select workspace scope')
               }}</span>
             </div>
           </template>

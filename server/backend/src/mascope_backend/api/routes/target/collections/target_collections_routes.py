@@ -119,7 +119,17 @@ async def update_target_collection_route(
     :return: Update results details
     :rtype: dict
     """
-    await check_target_collection_access(target_collection_id, user, "editor")
+    # A batches-only payload changes associations, not the collection itself:
+    # read access to the collection suffices here, and the per-batch editor
+    # ACL below carries the mutation rights. This lets workspace editors bulk
+    # assign global collections to their own workspaces' batches.
+    batches_only = body.sample_batch_ids is not None and body.model_fields_set <= {
+        "sample_batch_ids"
+    }
+
+    await check_target_collection_access(
+        target_collection_id, user, "guest" if batches_only else "editor"
+    )
 
     # If scope is being changed, validate access to the new scope
     if "workspace_id" in body.model_fields_set:
