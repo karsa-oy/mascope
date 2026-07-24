@@ -13,7 +13,7 @@ maintainers = [
 license.text = "Apache-2.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "rich>=13.7.1,<14",
+    "rich>=15.0.0,<16",
     "pydantic>=2.13.4,<3",
     "loguru>=0.7.2,<0.8",
 ]
