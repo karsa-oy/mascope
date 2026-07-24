@@ -236,6 +236,76 @@ async def test_update_removing_foreign_batch_forbidden(
     assert resp.status_code == 403
 
 
+# ============= Collection side: batches-only updates by editors =============
+
+
+@pytest.mark.asyncio
+async def test_batches_only_update_of_global_collection_as_editor(
+    editor_client, global_collection, scratch_alpha_batch
+):
+    """A workspace editor can bulk-assign a global collection to their own
+    workspace's batches via the collection-side Edit batches route."""
+    resp = await editor_client.patch(
+        f"/api/target/collections/{global_collection}",
+        json={"sample_batch_ids": [scratch_alpha_batch]},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_batches_only_update_of_global_collection_foreign_batch_forbidden(
+    editor_client, global_collection, scratch_beta_batch
+):
+    """An alpha editor cannot assign a global collection to beta batches."""
+    resp = await editor_client.patch(
+        f"/api/target/collections/{global_collection}",
+        json={"sample_batch_ids": [scratch_beta_batch]},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_global_collection_field_update_still_requires_admin(
+    editor_client, global_collection, scratch_alpha_batch
+):
+    """Mixing basic-field changes into the payload keeps the admin gate on
+    global collections."""
+    resp = await editor_client.patch(
+        f"/api/target/collections/{global_collection}",
+        json={
+            "target_collection_name": "Renamed Global",
+            "sample_batch_ids": [scratch_alpha_batch],
+        },
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_batches_only_update_as_guest_forbidden(
+    guest_client, global_collection, scratch_alpha_batch
+):
+    """A guest (read-only member) cannot change a global collection's batch
+    associations in their workspace."""
+    resp = await guest_client.patch(
+        f"/api/target/collections/{global_collection}",
+        json={"sample_batch_ids": [scratch_alpha_batch]},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_batches_only_update_as_outsider_forbidden(
+    outsider_client, alpha_collection, scratch_alpha_batch
+):
+    """A non-member cannot change a workspace collection's associations at
+    all (no read access to the collection)."""
+    resp = await outsider_client.patch(
+        f"/api/target/collections/{alpha_collection}",
+        json={"sample_batch_ids": [scratch_alpha_batch]},
+    )
+    assert resp.status_code == 403
+
+
 # ============= Batch side: scope validation =============
 
 

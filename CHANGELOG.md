@@ -37,10 +37,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   workspaces of the batches being added or removed (associations the request
   preserves are exempt, keeping cross-workspace global collections manageable
   by admins).
-- "Edit batches" on a global target collection is now disabled for non-admins
-  in the collection context menu, matching Edit/Delete - previously it opened
-  the dialog and failed with a permissions error on save. The dialog also
-  sends a batches-only payload in that mode, and the collection update API
+- Workspace editors can now use "Edit batches" on a global target collection
+  to bulk-assign it to their own workspaces' batches: a batches-only update
+  no longer requires the admin rights reserved for mutating the collection
+  itself (name, type, scope, compounds), only editor access in the workspaces
+  of the batches being added or removed. The Manage batches dialog
+  accordingly sends a batches-only payload, and the collection update API
   gained true PATCH semantics: omitted fields are left unchanged, whereas
   previously an omitted collection type was read as the default TARGETS and
   an omitted description as empty, wrongly flagging changes (triggering
