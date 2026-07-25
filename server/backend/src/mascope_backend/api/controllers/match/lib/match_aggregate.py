@@ -328,30 +328,34 @@ async def aggregate_match_ions(
         _weighted_score=filtered_match_isotope_df["match_score"]
         * filtered_match_isotope_df["relative_abundance"]
     )
+    # Group on the id columns only - every label column is functionally
+    # dependent on them (same id => same label), so aggregating labels as
+    # "first" yields the same rows while the groupby hashes 4 narrow keys
+    # instead of 15 wide string columns.
     match_ions_data_df = (
         weighted.groupby(
             [
                 "sample_item_id",
-                "sample_item_name",
-                "sample_item_type",
-                "filename",
-                "instrument",
                 "target_ion_id",
-                "target_ion_formula",
-                "ionization_mechanism",
                 "target_compound_id",
-                "target_compound_formula",
-                "target_compound_name",
                 "target_collection_id",
-                "target_collection_name",
-                "target_collection_description",
-                "target_collection_type",
             ]
         )
         .agg(
             match_score=("_weighted_score", "sum"),
             sample_peak_intensity_sum=("sample_peak_intensity", "sum"),
             filter_params=("filter_params", "first"),
+            sample_item_name=("sample_item_name", "first"),
+            sample_item_type=("sample_item_type", "first"),
+            filename=("filename", "first"),
+            instrument=("instrument", "first"),
+            target_ion_formula=("target_ion_formula", "first"),
+            ionization_mechanism=("ionization_mechanism", "first"),
+            target_compound_formula=("target_compound_formula", "first"),
+            target_compound_name=("target_compound_name", "first"),
+            target_collection_name=("target_collection_name", "first"),
+            target_collection_description=("target_collection_description", "first"),
+            target_collection_type=("target_collection_type", "first"),
         )
         .reset_index()
     )
@@ -436,6 +440,8 @@ async def aggregate_match_compounds(
     :return: pandas DataFrame with aggregated match compounds data.
     :rtype: pd.DataFrame
     """
+    # Group on the id columns only - label columns are functionally dependent
+    # on them and aggregate as "first" (see aggregate_match_ions).
     match_compounds_data_df = (
         match_ions_df.sort_values(
             by=["match_category", "match_score"], ascending=[False, False]
@@ -443,16 +449,8 @@ async def aggregate_match_compounds(
         .groupby(
             [
                 "target_compound_id",
-                "target_compound_name",
-                "target_compound_formula",
-                "filename",
                 "sample_item_id",
-                "sample_item_name",
-                "sample_item_type",
                 "target_collection_id",
-                "target_collection_name",
-                "target_collection_description",
-                "target_collection_type",
             ],
             sort=False,
         )
@@ -462,6 +460,14 @@ async def aggregate_match_compounds(
             match_score=("match_score", "first"),
             match_category=("match_category", "first"),
             sample_peak_intensity_sum=("sample_peak_intensity_sum", "sum"),
+            target_compound_name=("target_compound_name", "first"),
+            target_compound_formula=("target_compound_formula", "first"),
+            filename=("filename", "first"),
+            sample_item_name=("sample_item_name", "first"),
+            sample_item_type=("sample_item_type", "first"),
+            target_collection_name=("target_collection_name", "first"),
+            target_collection_description=("target_collection_description", "first"),
+            target_collection_type=("target_collection_type", "first"),
         )
         .reset_index()
     )
