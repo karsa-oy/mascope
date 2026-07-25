@@ -793,6 +793,8 @@ agents/           # Agent applications
 
 The File Agent is responsible for uploading files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
 
+Agents authenticate with a service access token, obtained either manually (web app → API Access Tokens) or via device pairing (`server/backend/src/mascope_backend/api/new/auth/pairing/`): the agent requests a short code from `/api/auth/pairing/start`, an editor approves it in the web app, and the agent polls `/api/auth/pairing/poll` for its token. Pairing creates tokens additively — one per machine — while the regenerate endpoint replaces all of a user's tokens for the service.
+
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 
 ### Building File Agent for production

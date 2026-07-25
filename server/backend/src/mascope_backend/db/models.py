@@ -271,6 +271,8 @@ class AccessToken(SQLAlchemyBaseAccessTokenTable[int], Base):
         ForeignKey("user.id", ondelete="CASCADE"), nullable=False
     )
     service_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # Optional label, e.g. the paired machine's hostname (set by device pairing)
+    description: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[dt] = mapped_column(
         TIMESTAMP(timezone=True),
         index=True,

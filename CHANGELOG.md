@@ -4,6 +4,23 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- Agent device pairing: instrument agents can now be connected without
+  copy-pasting an access token. The File Agent's guided setup offers
+  pairing as the default - the agent shows a short code (e.g. `BCD-234`),
+  an editor approves it in the web app under API Access Tokens > "Pair an
+  agent", and the agent picks up its token automatically. Each pairing
+  creates its own token without revoking existing ones, so pairing a new
+  instrument PC never disconnects another (the manual Regenerate button
+  still replaces all of the user's tokens for the service). Backend:
+  `/api/auth/pairing/start|poll|approve` - start/poll are unauthenticated
+  and rate-limited per client IP, codes live in Redis with a 10-minute
+  TTL, and only the authenticated editor-role approval mints a token,
+  which is handed to the agent exactly once. Access tokens gain an
+  optional description stamped with the paired machine's hostname
+  (migration `f2d8b5c3a9e1`).
+
 ### Fixed
 
 - The File Agent setup wizard no longer reports a working connection when
