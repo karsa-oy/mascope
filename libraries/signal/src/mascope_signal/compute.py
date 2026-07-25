@@ -462,7 +462,14 @@ def load_signal(
             case _:
                 raise NotImplementedError(f"Unsupported sample type: {sample_type}")
     except Exception as e:
-        runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
+        # Both paths return an empty dataset (callers render "no data"), but
+        # expected data conditions (empty range, unsupported type) must not
+        # look like faults, and real faults must carry their traceback -
+        # a flat ERROR string here used to be the only trace of either.
+        if isinstance(e, (ValueError, NotImplementedError)):
+            runtime.logger.info(f"No signal loaded from {base_filename}: {e}")
+        else:
+            runtime.logger.exception(f"Error loading signal from {base_filename}")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
         return xr.Dataset(
             {

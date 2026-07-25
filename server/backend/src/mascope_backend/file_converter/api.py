@@ -343,6 +343,13 @@ def rematch_sample(
             params=params,
             timeout=timeout,
         )
+        # Callers ignore the return value, so an unchecked non-2xx response
+        # would make a failed rematch completely invisible.
+        if resp.status_code >= 400:
+            raise Exception(
+                f"Failed to request rematch for {sample_item_id}: "
+                f"HTTP {resp.status_code}"
+            )
         return resp.json()
     except requests.exceptions.RequestException as e:
         raise Exception(f"Failed to request rematch for {sample_item_id}: {e}") from e
