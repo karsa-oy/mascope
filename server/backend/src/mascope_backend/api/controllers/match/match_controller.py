@@ -1249,8 +1249,24 @@ async def match_compute_batch(
         )
     else:
         try:
+            # Per-chunk progress: on a large batch the aggregation runs for
+            # minutes after the per-sample bar reaches 100%, so it reports
+            # its own phase through the same tracked process.
+            aggregation_notification = UserNotification(
+                process_id=process_id,
+                parent_id=parent_id,
+                type="match_aggregate_batch",
+                status="pending",
+                message=f"Aggregating matches for sample batch '{sample_batch_name}'",
+                data={
+                    "sample_batch_id": sample_batch_id,
+                    "_room_ids": [sample_batch_id],
+                    "_user_id": user_id,
+                },
+            )
             match_aggregate_result = await aggregate_and_create_matches(
-                sample_batch_id=sample_batch_id
+                sample_batch_id=sample_batch_id,
+                notification=aggregation_notification,
             )
         except Exception as e:
             aggregation_failed = True

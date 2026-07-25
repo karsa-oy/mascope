@@ -69,6 +69,10 @@ from mascope_backend.db import (
     async_session,
 )
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    send_progress_user_notification,
+)
 from mascope_backend.socket.records.service import (
     emit_record_created,
     emit_record_reload,
@@ -473,6 +477,7 @@ async def aggregate_and_create_matches(
     match_compounds: bool = True,
     match_collections: bool = True,
     match_samples: bool = True,
+    notification: UserNotification | None = None,
 ) -> dict:
     """
     Processes aggregated match data by first aggregating data based on given filters and then creating
@@ -500,6 +505,8 @@ async def aggregate_and_create_matches(
     :param sample_item_id: ID of the sample item.
     :param target_ion_id: ID of the target ion.
     :param match_params: Additional match parameters.
+    :param notification: Optional progress notification; batch scope reports
+        per-chunk progress through it (type "match_aggregate_batch").
     :return: A dictionary with a message and log of actions taken.
     """
     # Whether this call aggregates a whole batch (rather than a single sample).
@@ -564,7 +571,7 @@ async def aggregate_and_create_matches(
         + (f" in {len(sample_chunks)} chunk(s)" if len(sample_chunks) > 1 else "")
     )
 
-    for chunk_sample_item_ids in sample_chunks:
+    for chunk_index, chunk_sample_item_ids in enumerate(sample_chunks):
         aggregated_result = await aggregate_matches(
             sample_batch_id=sample_batch_id,
             sample_item_id=sample_item_id,
@@ -572,26 +579,32 @@ async def aggregate_and_create_matches(
             match_params=match_params,
             sample_item_ids=chunk_sample_item_ids,
         )
-        if aggregated_result.get("results", 0) == 0:
-            continue
-        any_match_data = True
-        match_data = aggregated_result.get("data", {})
+        if aggregated_result.get("results", 0) != 0:
+            any_match_data = True
+            match_data = aggregated_result.get("data", {})
 
-        for create_func, model_cls, level_name, enabled in level_configs:
-            raw_data = match_data.get(level_name)
-            if not enabled or not raw_data:
-                continue
-            # Convert each data item to the corresponding Pydantic model
-            model_data = [model_cls(**item) for item in raw_data]
-            result = await create_func(model_data)
-            statuses.append(result.get("status"))
-            written_by_level[level_name] = written_by_level.get(level_name, 0) + len(
-                result.get("data", [])
-            )
+            for create_func, model_cls, level_name, enabled in level_configs:
+                raw_data = match_data.get(level_name)
+                if not enabled or not raw_data:
+                    continue
+                # Convert each data item to the corresponding Pydantic model
+                model_data = [model_cls(**item) for item in raw_data]
+                result = await create_func(model_data)
+                statuses.append(result.get("status"))
+                written_by_level[level_name] = written_by_level.get(
+                    level_name, 0
+                ) + len(result.get("data", []))
 
-            # Collect sample_item_ids from created records
-            for record in result.get("data", []):
-                sample_item_ids.add(record.get("sample_item_id"))
+                # Collect sample_item_ids from created records
+                for record in result.get("data", []):
+                    sample_item_ids.add(record.get("sample_item_id"))
+
+        # Report per-chunk progress so a minutes-long batch aggregation is
+        # visible in the UI after the compute phase's bar completes
+        if notification is not None and batch_scope:
+            notification.data["_item_index"] = chunk_index
+            notification.data["_total_samples"] = len(sample_chunks)
+            await send_progress_user_notification(notification, 1.0)
 
     if not any_match_data:
         message = f"No match data found for {sample_ref}"

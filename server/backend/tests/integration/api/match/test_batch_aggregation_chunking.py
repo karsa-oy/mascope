@@ -44,6 +44,7 @@ from mascope_backend.db import (
     Workspace,
 )
 from mascope_backend.db.id import gen_id
+from mascope_backend.socket.notifications import UserNotification
 from mascope_match.params import BaseMatchParams
 
 
@@ -268,11 +269,35 @@ class TestChunkedBatchAggregation:
         # passes must together cover the whole batch.
         monkeypatch.setattr(mac, "BATCH_AGGREGATION_CHUNK_SIZE", 1)
 
+        # Capture the per-chunk progress reports (UI progress after the
+        # per-sample compute bar completes)
+        progress_calls = []
+
+        async def record_progress(notification, increment=None):
+            progress_calls.append(
+                (
+                    notification.data.get("_item_index"),
+                    notification.data.get("_total_samples"),
+                )
+            )
+
+        monkeypatch.setattr(mac, "send_progress_user_notification", record_progress)
+        notification = UserNotification(
+            process_id="stress-test",
+            type="match_aggregate_batch",
+            status="pending",
+            message="Aggregating",
+            data={},
+        )
+
         result = await mac.aggregate_and_create_matches(
-            sample_batch_id=aggregation_chain.batch, match_params=MATCH_PARAMS
+            sample_batch_id=aggregation_chain.batch,
+            match_params=MATCH_PARAMS,
+            notification=notification,
         )
 
         assert result["status"] == "success"
+        assert progress_calls == [(i, SAMPLE_COUNT) for i in range(SAMPLE_COUNT)]
         assert set(result["data"]["affected_sample_item_ids"]) == set(
             aggregation_chain.items
         )
