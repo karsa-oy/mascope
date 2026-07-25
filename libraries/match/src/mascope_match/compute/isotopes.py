@@ -169,8 +169,10 @@ async def compute_match_isotopes(
         # --- Return a DataFrame containing match details for all target isotopes ---
         return match_isotope_df
     except Exception as e:
+        # No log here: the raised ValueError is logged by the caller (per
+        # sample, with a per-batch summary) - a pre-log would double every
+        # failure in batch runs
         error_message = f"Computing matches failed: {e}"
-        runtime.logger.error(error_message)
         raise ValueError(error_message) from e
 
 

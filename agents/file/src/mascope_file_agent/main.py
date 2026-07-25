@@ -279,8 +279,8 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.src_path)
-            except Exception as e:
-                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
+            except Exception:
+                runtime.logger.exception("Unexpected error handling filesystem event")
 
         def on_moved(self, event: watchdog.events.FileSystemEvent) -> None:
             """File moved
@@ -290,8 +290,8 @@ class FileSystemWatcher:
             """
             try:
                 self.client.on_filesystem_object_created(event.dest_path)
-            except Exception as e:
-                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
+            except Exception:
+                runtime.logger.exception("Unexpected error handling filesystem event")
 
     def __init__(self, client, path: str, mask: str, recursive=False):
         self.client = client
@@ -332,8 +332,8 @@ class FileSystemWatcher:
                 time.sleep(1)
             except KeyboardInterrupt:
                 self.client.shutdown_event.set()
-            except Exception as e:
-                runtime.logger.error(f"Exception {e.__class__.__name__}({e})")
+            except Exception:
+                runtime.logger.exception("Unexpected error in the watcher loop")
         self.stop()
 
     def run_as_daemon(self):
@@ -426,8 +426,8 @@ class FileUploader:
 
         except KeyboardInterrupt:
             runtime.logger.info("Shutdown requested by user.")
-        except Exception as e:
-            runtime.logger.error(f"{e.__class__.__name__}({e})")
+        except Exception:
+            runtime.logger.exception("Unexpected error in the upload loop")
         finally:
             self.shutdown_event.set()
 

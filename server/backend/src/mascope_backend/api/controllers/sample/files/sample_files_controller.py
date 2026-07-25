@@ -358,7 +358,7 @@ async def delete_sample_file_from_filestore(filename: str) -> dict[str, str]:
     try:
         filestore_path = parse_path_from_item_filename(filename)
     except Exception as e:
-        runtime.logger.error(f"Failed to parse filestore path for '{filename}': {e}")
+        runtime.logger.exception(f"Failed to parse filestore path for '{filename}'")
         return {
             "status": "error",
             "message": f"Failed to parse filestore path for '{filename}': {e}",
@@ -378,8 +378,8 @@ async def delete_sample_file_from_filestore(filename: str) -> dict[str, str]:
             "message": f"Filestore directory for '{filename}' deleted successfully.",
         }
     except Exception as e:
-        runtime.logger.error(
-            f"Failed to delete filestore directory for '{filename}': {e}"
+        runtime.logger.exception(
+            f"Failed to delete filestore directory for '{filename}'"
         )
         return {
             "status": "error",
@@ -593,10 +593,10 @@ async def delete_sample_files(
                 identifier = file_data["sample_file_id"] or file_data["filename"]
                 skipped_files_not_found.append(identifier)
 
-        except Exception as e:
+        except Exception:
             identifier = file_data["sample_file_id"] or file_data["filename"]
-            runtime.logger.error(
-                f"Unexpected error deleting sample file {identifier}: {e}"
+            runtime.logger.exception(
+                f"Unexpected error deleting sample file {identifier}"
             )
             skipped_files_not_found.append(identifier)
 
@@ -792,7 +792,9 @@ async def upload_sample_files(
                     "message": f"Failed to upload {filename}: {e.user_message}",
                 }
             )
-            runtime.logger.error(f"Failed to upload file {filename}: {e.user_message}")
+            # INFO: the ApiException was already logged by the exception
+            # pipeline when it was processed; this only adds per-file context
+            runtime.logger.info(f"Failed to upload file {filename}: {e.user_message}")
         except Exception as e:
             error_msg = str(e)
             failed_uploads.append(
@@ -802,7 +804,7 @@ async def upload_sample_files(
                     "message": f"Failed to upload {filename}: {error_msg}",
                 }
             )
-            runtime.logger.error(f"Failed to upload file {filename}: {e}")
+            runtime.logger.exception(f"Failed to upload file {filename}")
 
         finally:
             # Check if file handle is properly closed
@@ -897,7 +899,8 @@ async def upload_sample_file(
         }
 
     except ApiException as e:
-        runtime.logger.error(f"Failed to upload file {filename}: {e.user_message}")
+        # INFO: already logged by the exception pipeline when processed
+        runtime.logger.info(f"Failed to upload file {filename}: {e.user_message}")
         return {
             "message": f"Failed to upload {filename}: {e.user_message}",
             "status": "error",
@@ -905,7 +908,7 @@ async def upload_sample_file(
         }
     except Exception as e:
         error_msg = str(e)
-        runtime.logger.error(f"Failed to upload file {filename}: {error_msg}")
+        runtime.logger.exception(f"Failed to upload file {filename}")
         return {
             "message": f"Failed to upload {filename}: {error_msg}",
             "status": "error",

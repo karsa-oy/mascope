@@ -1,5 +1,3 @@
-import traceback
-
 from sqlalchemy import select
 
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
@@ -149,10 +147,8 @@ async def retrieve_compositions_by_mz(
                     "target_isotope_mz_error_ppm": raw["composition_error_ppm"],
                 }
             )
-        except Exception as e:
-            runtime.logger.error(
-                f"Error processing result {raw}:\n{e}: {traceback.format_exc()}"
-            )
+        except Exception:
+            runtime.logger.exception(f"Error processing result {raw}")
             # Skip malformed results rather than failing
             continue
 

@@ -60,12 +60,12 @@ async def lifespan(app: FastAPI):
     )
     try:
         await redis_storage_client.connect()
-    except ConnectionError as e:
-        runtime.logger.error(
-            f"Fast App startup: Redis storage client failed to connect:"
-            f" {e} [Worker {worker_pid}]"
+    except ConnectionError:
+        # One record with the traceback (not an ERROR + WARNING pair)
+        runtime.logger.exception(
+            f"Fast App startup: Redis storage client failed to connect -"
+            f" multi-worker storage sharing will not work [Worker {worker_pid}]"
         )
-        runtime.logger.warning("Multi-worker storage sharing will not work")
 
     # Yield control back to FastAPI
     yield

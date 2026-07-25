@@ -72,5 +72,8 @@ async def validate_jwt_token(jwt_token: str):
     except SocketUnauthenticatedError:
         raise
     except Exception as e:
-        runtime.logger.error(f"Token validation failed: {str(e)}")
+        # logger.exception: the raised SocketUnauthenticatedError is handled
+        # as a routine rejection upstream, so this is the only record of the
+        # unexpected underlying failure
+        runtime.logger.exception("Token validation failed")
         raise SocketUnauthenticatedError("Token validation failed") from e

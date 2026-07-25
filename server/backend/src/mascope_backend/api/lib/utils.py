@@ -128,7 +128,7 @@ async def handle_reloads(
 
         try:
             await emit_record_reload(record_type=record_type, room=rooms)
-        except Exception as e:
-            runtime.logger.error(
-                f"{context}: Failed to emit '{record_type}_reload': {e}"
+        except Exception:
+            runtime.logger.exception(
+                f"{context}: Failed to emit '{record_type}_reload'"
             )

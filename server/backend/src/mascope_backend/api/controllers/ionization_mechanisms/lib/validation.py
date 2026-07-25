@@ -13,7 +13,6 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
 )
 from mascope_backend.api.models.sample.batches.config import sample_batch_config
 from mascope_backend.db import IonizationMechanism, async_session
-from mascope_backend.runtime import runtime
 
 
 async def validate_ionization_mechanisms_polarity(
@@ -70,7 +69,7 @@ async def validate_ionization_mechanisms_polarity(
             f"The ionization mechanisms {', '.join(incompatible)} are incompatible with "
             f"{sample_batch_type.lower()} batch polarity '{batch_polarity}'."
         )
-        runtime.logger.error(error_message)
+        # No log here: the raised ApiException is logged by the pipeline
         raise ApiException(
             error_message,
             {

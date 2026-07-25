@@ -62,10 +62,8 @@ class EventEmitter:
             for handler in self._handlers[event]:
                 try:
                     await handler(*args, **kwargs)
-                except Exception as e:
-                    runtime.logger.error(
-                        f"Error in event handler for {event}: {str(e)}"
-                    )
+                except Exception:
+                    runtime.logger.exception(f"Error in event handler for {event}")
 
 
 # Global event emitter instance

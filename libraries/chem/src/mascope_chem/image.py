@@ -569,6 +569,10 @@ class ImageGenerator(Process):
         self.queue_in = queue_in
         self.queue_out = queue_out
         self.shutdown_event = shutdown_event
+        # Per-process guard: the generation loop can fail on every queued
+        # frame (e.g. after acquisition stop), so only the first failure is
+        # logged with its traceback at ERROR - repeats go to DEBUG.
+        self._generation_error_logged = False
 
     def run(self):
         global VIZ_GENERATORS
@@ -580,8 +584,10 @@ class ImageGenerator(Process):
                 # Normal shutdown of the generator process, not a fault
                 runtime.logger.info(f"KeyboardInterrupt for PID: {os.getpid()}")
                 break
-            except Exception as e:
-                runtime.logger.critical(f"Exception {str(e)} for PID: {os.getpid()}")
+            except Exception:
+                runtime.logger.exception(
+                    f"Failed to read from image queue for PID: {os.getpid()}"
+                )
                 break
             if data is not None:
                 # Select function to generate the image
@@ -608,9 +614,15 @@ class ImageGenerator(Process):
                 except Exception as e:
                     # TODO: check if this exception handling is right: without it process hangs
                     # after acq.stopped, often there goes exception: y must be real (y_range-[0, 15.135354995727539])
-                    runtime.logger.error(
-                        f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"
-                    )
+                    if not self._generation_error_logged:
+                        self._generation_error_logged = True
+                        runtime.logger.exception(
+                            f"ImageGenerator {os.getpid()} exception for y_range {y_range}"
+                        )
+                    else:
+                        runtime.logger.debug(
+                            f"ImageGenerator {os.getpid()} exception: {str(e)} for y_range {y_range}"
+                        )
                     continue
                 if isinstance(viz, Image.Image):
                     img_b = convert_to_base64(viz)
