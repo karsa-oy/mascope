@@ -166,16 +166,21 @@ const vHelpLayer = app.ui.help.directive(layer)
     </div>
   </section>
   <section
-    v-help-layer.right="
-      `
+    v-help-layer.right="{
+      message: `
       <b>API Access Tokens</b>
       <p>
         API tokens are used for authentication when accessing Mascope programmatically,
-        e.g., from Jupyter Notebooks or other external tools. Here you can generate tokens
-        for specific services.
+        e.g., from Jupyter Notebooks or the instrument agents. Here you can generate
+        tokens for specific services; each token is shown only once.
       </p>
-    `
-    "
+      <p>
+        The File Agent uploads data files from an instrument PC automatically — its
+        Windows installer can be downloaded below.
+      </p>
+    `,
+      doc: 'https://github.com/karsa-oy/mascope/blob/develop/docs/user/instruments/index.md'
+    }"
   >
     <h3>API Access Tokens</h3>
     <div id="token-container">
