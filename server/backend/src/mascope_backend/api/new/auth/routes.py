@@ -6,6 +6,7 @@ from mascope_backend.api.new.auth import (
     fastapi_users,
 )
 from mascope_backend.api.new.auth.access_token.routes import access_token_router
+from mascope_backend.api.new.auth.pairing.routes import pairing_router
 
 
 # main Auth router
@@ -21,6 +22,9 @@ auth_router.include_router(
 
 # Include the access token router within the main auth router for nested routing
 auth_router.include_router(access_token_router)
+
+# Agent device-pairing routes (rate limits declared per route)
+auth_router.include_router(pairing_router)
 
 
 # add more routes such as password reset and email verification etc, check library code
