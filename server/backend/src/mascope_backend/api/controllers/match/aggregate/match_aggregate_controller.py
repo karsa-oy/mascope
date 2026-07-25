@@ -380,6 +380,30 @@ def _assemble_filtered_isotope_frame(
         .reset_index(drop=True)
     )
 
+    # Nullable label columns must never reach the aggregation groupbys as
+    # NaN: pandas drops groups with a missing key (dropna default), which
+    # would silently erase every row of e.g. a collection without a
+    # description from ALL aggregate levels. The labels are display-only -
+    # the persisted match rows carry ids and values, never these strings -
+    # so normalizing to "" is lossless.
+    label_columns = [
+        "filename",
+        "instrument",
+        "sample_item_name",
+        "sample_item_type",
+        "target_collection_name",
+        "target_collection_description",
+        "target_collection_type",
+        "target_compound_formula",
+        "target_compound_name",
+        "target_ion_formula",
+        "ionization_mechanism",
+        "target_isotope_formula",
+    ]
+    aggregated_sample_match_isotope_data_df[label_columns] = (
+        aggregated_sample_match_isotope_data_df[label_columns].fillna("")
+    )
+
     # Apply match_params (provided may be None) filtering match_score,
     # sample_peak_intensity, setting match_category
     return apply_match_params(aggregated_sample_match_isotope_data_df, match_params)
