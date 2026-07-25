@@ -86,6 +86,11 @@ The agent prints its version when it starts, and uninstalling (Windows
   token in the web app and update `access_token` in the configuration (or
   re-run `--setup`). Note that generating a new token invalidates your
   previous File Agent token, including on other machines using it.
+- *Uploads fail with HTTP 404*: the configured `host` is answering but is
+  not the Mascope API. In a production deployment, use the normal Mascope
+  web app address. In a development setup, use the backend address (e.g.
+  `http://localhost:8090`) — the frontend dev server (port 5173) cannot
+  receive uploads.
 - Files larger than 100 MB are not uploaded; they are logged and copied to
   `failed_uploads`.
 

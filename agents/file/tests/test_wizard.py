@@ -9,11 +9,12 @@ from mascope_file_agent import wizard
 
 
 class FakeResponse:
-    def __init__(self, status_code):
+    def __init__(self, status_code, content_type="application/json"):
         self.status_code = status_code
+        self.headers = {"content-type": content_type}
 
 
-def test_verify_connection_accepts_200(monkeypatch):
+def test_verify_connection_accepts_200_json(monkeypatch):
     captured = {}
 
     def fake_get(url, params, headers, verify, timeout):
@@ -26,6 +27,20 @@ def test_verify_connection_accepts_200(monkeypatch):
     assert captured["url"] == "https://mascope.example.com/api/sample/files"
     assert captured["headers"]["Authorization"] == "Bearer tok"
     assert captured["headers"]["X-Service-Name"] == "file-agent"
+
+
+def test_verify_connection_rejects_html_200(monkeypatch):
+    # A single-page-app server (e.g. the Vite frontend dev server) answers
+    # any GET with the app page and 200; that must not pass verification.
+    monkeypatch.setattr(
+        wizard.requests,
+        "get",
+        lambda *a, **k: FakeResponse(200, content_type="text/html; charset=utf-8"),
+    )
+    ok, message = wizard.verify_connection("localhost:5173", "tok")
+    assert not ok
+    assert "does not look like the Mascope API" in message
+    assert "http://localhost:8090" in message
 
 
 @pytest.mark.parametrize("status", [401, 403])

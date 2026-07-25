@@ -21,7 +21,11 @@ from mascope_runtime import Runtime
 
 mascope_sdk.SERVICE_NAME = "file-agent"
 from mascope_sdk import api_post_file  # noqa: E402  (needs SERVICE_NAME set first)
-from mascope_sdk.exceptions import AuthenticationError  # noqa: E402
+from mascope_sdk.exceptions import (  # noqa: E402
+    AuthenticationError,
+    NotFoundError,
+    ValidationError,
+)
 
 
 # TODO: Use TUS protocol for large file uploads, see issue #1131
@@ -80,6 +84,17 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
                 "file-agent configuration and restart the agent."
             )
             break  # a rejected token stays rejected; do not retry
+        except (NotFoundError, ValidationError) as e:
+            runtime.logger.error(
+                f"File upload failed for file {os.path.basename(filepath)}: {e} "
+                "Retrying will not help - the server rejected the request. "
+                "A 404 usually means the configured host is not the Mascope "
+                "API (in development setups the frontend dev server cannot "
+                "receive uploads; use the backend address, e.g. "
+                "http://localhost:8090). Fix 'host' in the file-agent "
+                "configuration and restart the agent."
+            )
+            break  # a wrong address or rejected payload cannot heal by waiting
         except Exception as e:
             # Timeouts, connection and server errors are transient - retry.
             # The message carries the specific cause (e.g. connection refused,
