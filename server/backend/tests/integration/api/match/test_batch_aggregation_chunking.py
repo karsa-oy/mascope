@@ -29,6 +29,7 @@ from mascope_backend.db import (
     Dataset,
     IonizationMechanism,
     IonizationMode,
+    MatchCollection,
     MatchIon,
     MatchIsotope,
     MatchSample,
@@ -82,6 +83,7 @@ async def aggregation_chain(async_session_factory):
         mechanism=gen_id(),
         mode=gen_id(),
         collection=gen_id(),
+        nameless_collection=gen_id(),
         compound=gen_id(),
         ion1=gen_id(),
         ion2=gen_id(),
@@ -180,6 +182,24 @@ async def aggregation_chain(async_session_factory):
                 sample_batch_id=ids.batch,
             )
         )
+        # Second collection sharing the compound, with a NULL description:
+        # regression guard for the NaN-groupby-key bug that silently dropped
+        # such collections from every aggregate level.
+        session.add(
+            TargetCollection(
+                target_collection_id=ids.nameless_collection,
+                target_collection_name=f"Agg NULL-desc {ids.nameless_collection}",
+                target_collection_description=None,
+                target_collection_type="TARGETS",
+                workspace_id=ids.workspace,
+            )
+        )
+        session.add(
+            TargetCollectionInSampleBatch(
+                target_collection_id=ids.nameless_collection,
+                sample_batch_id=ids.batch,
+            )
+        )
         session.add(
             TargetCompound(
                 target_compound_id=ids.compound,
@@ -191,6 +211,12 @@ async def aggregation_chain(async_session_factory):
             TargetCompoundInTargetCollection(
                 target_compound_id=ids.compound,
                 target_collection_id=ids.collection,
+            )
+        )
+        session.add(
+            TargetCompoundInTargetCollection(
+                target_compound_id=ids.compound,
+                target_collection_id=ids.nameless_collection,
             )
         )
         for ion_id in (ids.ion1, ids.ion2):
@@ -320,6 +346,22 @@ class TestChunkedBatchAggregation:
         )
         assert len(samples) == SAMPLE_COUNT
         assert not await _batch_aggregates_incomplete(aggregation_chain.batch)
+
+        # The NULL-description collection must aggregate like any other:
+        # a missing label used as a groupby key must not drop its rows
+        # (pandas groupby dropna would silently erase the whole collection)
+        collections = await fetch_level_rows(
+            async_session_factory, MatchCollection, aggregation_chain.items
+        )
+        per_sample_collections = {
+            (row.sample_item_id, row.target_collection_id) for row in collections
+        }
+        for item_id in aggregation_chain.items:
+            assert (item_id, aggregation_chain.collection) in per_sample_collections
+            assert (
+                item_id,
+                aggregation_chain.nameless_collection,
+            ) in per_sample_collections
 
     @pytest.mark.asyncio
     async def test_rerun_is_consistent(
