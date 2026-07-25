@@ -4,6 +4,19 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.2] - 2026.07.25
+
+### Fixed
+
+- A target collection without a description no longer silently loses all of
+  its match aggregates. The aggregation pipeline groups on label columns, and
+  pandas drops groups whose key is missing - so a NULL
+  `target_collection_description` (legal in the API, and since the v1.4.0
+  PATCH-semantics change the stored value for a collection created without a
+  description) erased every row of that collection from all aggregate levels
+  with no error. Nullable label columns are now normalized before
+  aggregation; the labels are display-only, so the change is lossless.
+
 ## [1.4.1] - 2026.07.25
 
 ### Fixed
