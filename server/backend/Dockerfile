@@ -65,8 +65,15 @@ RUN echo '{"env":{"active":"prod","override":null},"mode":{"active":"prod","over
 ADD . .
 
 # Install Mascope backend and all workspace dependencies
-# This creates the mascope-backend console script in /opt/uv/bin (UV_TOOL_BIN_DIR)
-RUN uv tool install .
+# This creates the mascope-backend console script in /opt/uv/bin (UV_TOOL_BIN_DIR).
+# `uv tool install` resolves from PyPI and ignores uv.lock, so constrain it to
+# the locked versions - otherwise dependencies float within their specifiers
+# and the image drifts from the versions dev/tests run (e.g. the opentfraw raw
+# reader drifting ahead of the demo-bundle goldens broke the nightly
+# reproducibility workflow).
+RUN uv export --frozen --no-emit-workspace --no-hashes -o /tmp/uv-lock-constraints.txt \
+    && uv tool install . --constraints /tmp/uv-lock-constraints.txt \
+    && rm /tmp/uv-lock-constraints.txt
 
 # Run as a non-root user so files written to the bind mounts (filestore
 # uploads, pre-migration dumps in /backups, log files in the env dir) land on
