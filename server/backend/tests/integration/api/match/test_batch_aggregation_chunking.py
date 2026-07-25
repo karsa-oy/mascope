@@ -386,6 +386,43 @@ class TestChunkedBatchAggregation:
         assert len(samples) == SAMPLE_COUNT
 
     @pytest.mark.asyncio
+    async def test_scoped_aggregation_touches_only_requested_samples(
+        self, aggregation_chain, async_session_factory
+    ):
+        # Full aggregation, then re-aggregate a single sample: only that
+        # sample's MatchSample row is recreated (new primary key from the
+        # crash-safe delete+restore); the untouched samples keep their rows.
+        await mac.aggregate_and_create_matches(
+            sample_batch_id=aggregation_chain.batch, match_params=MATCH_PARAMS
+        )
+        before = {
+            row.sample_item_id: row.match_sample_id
+            for row in await fetch_level_rows(
+                async_session_factory, MatchSample, aggregation_chain.items
+            )
+        }
+
+        scoped_sample = aggregation_chain.items[0]
+        result = await mac.aggregate_and_create_matches(
+            sample_batch_id=aggregation_chain.batch,
+            match_params=MATCH_PARAMS,
+            sample_item_ids=[scoped_sample],
+        )
+        assert result["status"] in ("success", "partial")
+
+        after = {
+            row.sample_item_id: row.match_sample_id
+            for row in await fetch_level_rows(
+                async_session_factory, MatchSample, aggregation_chain.items
+            )
+        }
+        assert set(after) == set(before)
+        assert after[scoped_sample] != before[scoped_sample]
+        for item_id in aggregation_chain.items[1:]:
+            assert after[item_id] == before[item_id]
+        assert not await _batch_aggregates_incomplete(aggregation_chain.batch)
+
+    @pytest.mark.asyncio
     async def test_failed_chunk_leaves_completeness_probe_incomplete(
         self, aggregation_chain, async_session_factory, monkeypatch
     ):
