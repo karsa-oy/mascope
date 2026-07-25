@@ -7,10 +7,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - Self-hosted monitoring stack under `tooling/monitoring/` (GlitchTip error
-  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to an
-  internal LAN box with a copy-paste runbook: compose files (ports bound to the
-  LAN IP so Docker cannot bypass ufw), a restic backup script for the new
-  volumes, and firewall guidance.
+  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to the
+  internal ops box with a copy-paste runbook: compose files, DOCKER-USER
+  firewall rules restricting the published ports to LAN + tailnet (plain ufw
+  cannot filter Docker-published ports), a restic backup script for the new
+  volumes, and Uptime Kuma monitor guidance including inverted port-22/443
+  tripwires on the fleet's public IPs.
 - Optional error reporting from the backend to a self-hosted GlitchTip/Sentry
   instance. A loguru sink forwards `WARNING`/`ERROR` records (with tracebacks
   and request context) as events. It is **off by default** and gated entirely on

@@ -1,7 +1,8 @@
 # Monitoring stack — GlitchTip + Uptime Kuma
 
 Self-hosted monitoring for the Mascope fleet, meant to run on the internal
-**backup box `192.168.1.88`**, LAN-only (`192.168.1.0/24`), plain HTTP:
+backup box **`ops`** (LAN `192.168.1.88`, tailnet `100.96.42.122` / MagicDNS
+`ops`), reachable from the LAN and the tailnet only, plain HTTP:
 
 - **GlitchTip** — error tracking. Mascope's backend forwards `WARNING`/`ERROR`
   log records (with tracebacks and request context) so you stop grepping log
@@ -14,8 +15,11 @@ Self-hosted monitoring for the Mascope fleet, meant to run on the internal
 These files are a **template**: copy them to the box and run them there. The real
 `glitchtip.env` and `data/` never live in git.
 
-> Everything published is bound to `192.168.1.88` only. If the box's LAN address
-> differs, change it in both `compose.yaml` files (and the `ufw` rules below).
+> **Why the tailnet matters:** the Mascope servers live at Contabo/Hetzner — the
+> box's LAN address does not route from them. Error reporting reaches GlitchTip
+> over Tailscale, so the published ports are bound to `0.0.0.0` and access is
+> restricted to LAN + tailnet in the `DOCKER-USER` chain (§2). The DSN and
+> `GLITCHTIP_DOMAIN` use the MagicDNS name `ops`.
 
 ## 1. Prerequisites — Docker
 
@@ -27,31 +31,39 @@ sudo usermod -aG docker "$USER"      # log out/in for the group to take effect
 docker --version && docker compose version
 ```
 
-## 2. Firewall (LAN-only)
+## 2. Firewall (LAN + tailnet only)
 
 `ufw` alone does **not** filter Docker-published ports (Docker's DNAT runs before
-`ufw`'s INPUT chain). Two layers, do both:
+`ufw`'s INPUT chain), so filtering for the published services lives in the
+`DOCKER-USER` chain via [ufw-docker](https://github.com/chaifeng/ufw-docker).
+Host-level rules cover SSH.
 
-1. The `compose.yaml` files already bind published ports to `192.168.1.88` — they
-   listen only on the LAN interface, not `0.0.0.0`.
-2. Host firewall + a `DOCKER-USER` backstop via [ufw-docker](https://github.com/chaifeng/ufw-docker):
+> **Do not lock the tailnet out.** This box is also the fleet's fallback admin
+> workstation, reached over Tailscale — the `tailscale0` rules below are what
+> keep that working (and what let the Mascope backends deliver events).
 
 ```sh
+# host-level (INPUT chain): SSH from the LAN and the tailnet
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow from 192.168.1.0/24 to any port 22   proto tcp   # SSH
-sudo ufw allow from 192.168.1.0/24 to any port 8000 proto tcp   # GlitchTip
-sudo ufw allow from 192.168.1.0/24 to any port 3001 proto tcp   # Uptime Kuma
+sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp     # SSH (LAN)
+sudo ufw allow in on tailscale0 to any port 22 proto tcp        # SSH (tailnet)
 sudo ufw enable
 
+# DOCKER-USER chain: the published monitoring ports, LAN + tailnet only
 sudo wget -O /usr/local/bin/ufw-docker \
   https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
 sudo chmod +x /usr/local/bin/ufw-docker
 sudo ufw-docker install
 sudo systemctl restart ufw
-sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 8000
-sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 3001
+sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 8000   # GlitchTip (LAN)
+sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 3001   # Uptime Kuma (LAN)
+sudo ufw route allow proto tcp from 100.64.0.0/10  to any port 8000   # GlitchTip (tailnet)
+sudo ufw route allow proto tcp from 100.64.0.0/10  to any port 3001   # Uptime Kuma (tailnet)
 ```
+
+(`100.64.0.0/10` is the Tailscale CGNAT range every tailnet node gets its
+address from.)
 
 ## 3. GlitchTip
 
@@ -76,14 +88,17 @@ cd /opt/uptime-kuma
 docker compose up -d
 ```
 
-Open `http://192.168.1.88:3001` and create the admin account on first load
-(see [§7](#7-uptime-kuma-monitors)).
+Open `http://ops:3001` (or `http://192.168.1.88:3001` from a non-tailnet LAN
+machine) and create the admin account on first load (see
+[§8](#8-uptime-kuma-monitors)).
 
 ## 5. Backups
 
 Copy `backup-monitoring.sh` to the box (e.g. `/opt/monitoring/`), point it at your
-restic repo, and schedule it nightly. It logically dumps GlitchTip's Postgres,
-backs up GlitchTip uploads, and takes a quiesced copy of Uptime Kuma's SQLite.
+restic repo, and schedule it nightly **in root's crontab** (`sudo crontab -e` —
+the script needs docker, `/var/lib/docker/volumes`, and `/root/.restic-pass`).
+It logically dumps GlitchTip's Postgres, backs up GlitchTip uploads, and takes a
+quiesced copy of Uptime Kuma's SQLite.
 
 ```sh
 sudo mkdir -p /opt/monitoring && sudo cp backup-monitoring.sh /opt/monitoring/
@@ -102,13 +117,16 @@ RESTIC_PASSWORD_FILE=/root/.restic-pass
 
 ## 6. First-run: GlitchTip
 
-1. Browse to `http://192.168.1.88:8000` and **register the first account** at
+1. Browse to `http://ops:8000` and **register the first account** at
    `/register` (allowed even with `ENABLE_USER_REGISTRATION=False`; there is no
    default admin). You are prompted to **create an organization**, then a
    **project** — pick platform **FastAPI**/**Python**.
 2. **Copy the DSN.** Project → *Settings → Client Keys (DSN)*. It looks like
-   `http://<public_key>@192.168.1.88:8000/<project_id>` (plain HTTP mirrors
-   `GLITCHTIP_DOMAIN`, correct for this LAN).
+   `http://<public_key>@100.96.42.122:8000/<project_id>` — it mirrors
+   `GLITCHTIP_DOMAIN`, which deliberately uses the box's **tailnet IP**: the
+   backend containers must reach it, and container DNS does not resolve
+   MagicDNS names (Docker's embedded resolver bypasses the tailnet resolver).
+   The `ops` name is for humans in browsers only.
 3. **Notifications:** in the project/organization settings, add an alert (email
    via your SMTP relay, or a Slack/webhook integration) so new issues page you.
 
@@ -117,14 +135,28 @@ RESTIC_PASSWORD_FILE=/root/.restic-pass
 The backend has an **optional, off-by-default** GlitchTip sink (see
 `docs/maintaining.md` → Monitoring). On each Mascope server:
 
-1. Install the extra: `uv pip install "mascope_runtime[sentry]"` (or add the
+1. **One-time network prerequisite** — the backend runs in Docker with
+   `iptables: false`, and the standing `MASCOPE NAT` block in
+   `/etc/ufw/before.rules` only masquerades container traffic leaving the WAN
+   interface. Events travel over the **tailnet**, so add a `tailscale0`
+   masquerade line next to the existing ones and reload:
+   ```
+   -A POSTROUTING -s 172.18.0.0/16 -o tailscale0 -j MASQUERADE
+   ```
+   ```sh
+   sudo ufw reload
+   # verify from inside the container before relying on it (expect HTTP 200):
+   docker exec mascope_prod_backend python3 -c \
+     "import urllib.request; print(urllib.request.urlopen('http://100.96.42.122:8000/', timeout=5).status)"
+   ```
+2. Install the extra: `uv pip install "mascope_runtime[sentry]"` (or add the
    `sentry` extra to the backend image build).
-2. Set the DSN in the **backend service environment only** (scopes reporting to
+3. Set the DSN in the **backend service environment only** (scopes reporting to
    the API server):
    ```sh
-   MASCOPE_SENTRY_DSN=http://<public_key>@192.168.1.88:8000/<project_id>
+   MASCOPE_SENTRY_DSN=http://<public_key>@100.96.42.122:8000/<project_id>
    ```
-3. Restart the backend. Smoke-test: `runtime.logger.error("glitchtip smoke test")`
+4. Restart the backend. Smoke-test: `runtime.logger.error("glitchtip smoke test")`
    and confirm the event appears in GlitchTip. Unset the var anywhere you don't
    want reporting — it's a complete no-op when absent.
 
@@ -134,14 +166,23 @@ There is no supported config API, so add monitors in the UI. **For each Mascope
 server:**
 
 1. **Add New Monitor** → Type **HTTP(s)**.
-2. **URL** = the server's **HTTPS** endpoint (e.g. `https://mascope-1.lan`).
-   TLS-expiry checks require an `https://` target and *"Ignore TLS/SSL error"*
-   **off**.
+2. **URL** = the server's public app URL, e.g. `https://tuni.mascope.app`
+   (goes through Cloudflare — exactly the path users take). TLS-expiry checks
+   require an `https://` target and *"Ignore TLS/SSL error"* **off**.
 3. Set a friendly name, heartbeat interval, retries.
 4. Enable **Certificate Expiry Notification** (global thresholds default to
    **21/14/7 days** before expiry).
 5. Tick the notification channel (Settings → Notifications: email/Slack/webhook),
    then **Save**.
+
+**Security tripwires (inverted monitors).** The fleet's origin servers must
+never answer strangers directly: port 22 is tailnet-only and 443 is
+Cloudflare-only (see the July 2026 incident notes in the fleet docs). Encode
+that as standing alarms — for each server add two **TCP Port** monitors against
+its **public IP**, ports **22** and **443**, with **Upside Down Mode** enabled
+(healthy = connection *fails*). If a firewall regresses or Docker starts
+bypassing ufw again, the "port reachable" alert fires within minutes instead of
+being discovered months later.
 
 ## Notes & caveats
 
