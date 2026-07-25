@@ -774,7 +774,7 @@ The best resource for learning about the Typer API is the [Typer docs Learn sect
 
 ## 🤖 Agents
 
-Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform minimal transformations and move files to the server. As opposed to other packages, the agent dependencies are managed by separate Poetry environments, to avoid the need to compile whole uv workspace into the distributable.
+Agents are small Python programs installed with Pyinstaller on Windows instrument machines. They perform minimal transformations and move files to the server. As opposed to other packages, each agent is its own uv project (not a workspace member), to avoid the need to compile the whole uv workspace into the distributable.
 
 ```sh
 agents/           # Agent applications
