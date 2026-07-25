@@ -9,6 +9,12 @@ from mascope_backend.socket.notifications.schemas import UserNotification
 from mascope_backend.socket.storage import room_tracker
 
 
+# Share of a batch match refresh's single progress bar filled by the
+# per-sample compute phase; the chunked batch aggregation that follows fills
+# the remaining share of the same bar.
+MATCH_COMPUTE_PROGRESS_SHARE = 0.7
+
+
 async def emit_user_notification(
     notification: UserNotification,
     room_id: str | None = None,
@@ -142,18 +148,25 @@ async def send_progress_user_notification(
         and increment
     ):
         notification_copy.progress = increment * 100
+    # A batch match refresh is one progress bar across two phases: per-sample
+    # compute fills the first share, the chunked batch aggregation that
+    # follows fills the rest (the message names the current phase).
     if notification_copy.type == "match_compute_batch":
         if total_samples is not None and item_index is not None:
             notification_copy.progress = (
-                (item_index + increment) / total_samples
-            ) * 100
+                ((item_index + increment) / total_samples)
+                * MATCH_COMPUTE_PROGRESS_SHARE
+                * 100
+            )
             notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
 
     if notification_copy.type == "match_aggregate_batch":
-        # Chunked batch aggregation: items are sample chunks, not samples
+        # Items are sample chunks, not samples
         if total_samples is not None and item_index is not None:
             notification_copy.progress = (
-                (item_index + increment) / total_samples
+                MATCH_COMPUTE_PROGRESS_SHARE
+                + ((item_index + increment) / total_samples)
+                * (1 - MATCH_COMPUTE_PROGRESS_SHARE)
             ) * 100
             notification_copy.message = (
                 f"Aggregating batch matches, part {item_index + 1}/{total_samples}"
