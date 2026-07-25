@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.1] - 2026.07.25
+
 ### Fixed
 
 - Backend/file-converter images are now built with dependencies constrained to
@@ -28,6 +30,11 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   OOM kill or restart that no error handler ever sees - leaves the next
   refresh re-aggregating instead of skipping over stale aggregates that sit
   next to freshly stored match isotopes.
+
+### Changed
+
+- Updated several frontend dependencies minor versions
+- Updated several backend dependencies minor versions
 
 ## [1.4.0] - 2026.07.24
 
