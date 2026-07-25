@@ -823,7 +823,9 @@ def _validate_time_range(
     if adjustments:
         adjustment_text = " and ".join(adjustments)
         warning_msg = f"Time range adjusted: {adjustment_text} to fit sample acquisition window [{sample_t0:.2f}s, {sample_t1:.2f}s]"
-        runtime.logger.warning(warning_msg)
+        # INFO: fires on common visualization requests and the adjustment is
+        # already returned to the user in the response message
+        runtime.logger.info(warning_msg)
         time_adjustment_info = f" {warning_msg}."
     else:
         time_adjustment_info = ""

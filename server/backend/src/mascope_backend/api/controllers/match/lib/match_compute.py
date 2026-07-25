@@ -108,7 +108,8 @@ async def compute_and_create_sample_match_isotope_data(
         existing_reference_df=existing_reference_df,
     )
     if match_isotope_df.empty:
-        runtime.logger.warning(
+        # Normal outcome for blanks and sparse samples
+        runtime.logger.info(
             f"No match isotopes found for sample '{sample.sample_item_name}'"
         )
 

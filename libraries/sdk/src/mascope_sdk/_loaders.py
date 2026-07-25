@@ -95,7 +95,8 @@ def _confirm_sample_count(count: int, threshold: int) -> None:
 
     Raises ``KeyboardInterrupt`` when the user declines.
     """
-    logger.warning(
+    # INFO: preamble for the interactive confirmation prompt below, not a fault
+    logger.info(
         (
             "The requested number of samples ({}) exceeds the confirmation threshold "
             "{}. Please check the confirmation prompt."
@@ -152,7 +153,7 @@ def _collect_sample_tasks(
 
     all_batches = client.batches._list_by_id(dataset_id)
     if all_batches is None or all_batches.empty:
-        logger.warning("No batches found in dataset")
+        logger.info("No batches found in dataset")
         return [], dataset_id
 
     if batches is not None:
@@ -160,7 +161,7 @@ def _collect_sample_tasks(
             _name_mask(all_batches["sample_batch_name"], batches, exact=exact)
         ]
         if all_batches.empty:
-            logger.warning("No batches matching '{}'", batches)
+            logger.info("No batches matching '{}'", batches)
             return [], dataset_id
 
     batch_names = all_batches["sample_batch_name"].tolist()
@@ -291,7 +292,7 @@ def load_peaks(
         client, dataset, batches, samples=samples, exact=exact
     )
     if not sample_tasks:
-        logger.warning("No samples found")
+        logger.info("No samples found")
         return None
 
     if confirm_above is not None and len(sample_tasks) > confirm_above:
@@ -334,7 +335,7 @@ def load_peaks(
     )
 
     if not frames:
-        logger.warning("No peaks found")
+        logger.info("No peaks found")
         return None
 
     # Drop all-NA columns per frame to avoid FutureWarning on concat
@@ -470,7 +471,7 @@ def load_peaks_by_stage(
     )
 
     if not frames:
-        logger.warning("No peaks found")
+        logger.info("No peaks found")
         return None
 
     frames = [f.dropna(axis=1, how="all") for f in frames]
@@ -606,7 +607,7 @@ def load_peak_timeseries(
         client, dataset, batches, samples=samples, exact=exact
     )
     if not sample_tasks:
-        logger.warning("No samples found")
+        logger.info("No samples found")
         return None
 
     if confirm_above is not None and len(sample_tasks) > confirm_above:
@@ -663,7 +664,7 @@ def load_peak_timeseries(
     ] = [task for batch in matched_lists for task in batch]
 
     if not all_peak_tasks:
-        logger.warning("No peaks matching {} in {}", formula_column, formula_values)
+        logger.info("No peaks matching {} in {}", formula_column, formula_values)
         return None
 
     logger.info(
@@ -718,7 +719,7 @@ def load_peak_timeseries(
     )
 
     if not frames:
-        logger.warning("No timeseries data loaded")
+        logger.info("No timeseries data loaded")
         return None
 
     frames = [f.dropna(axis=1, how="all") for f in frames]

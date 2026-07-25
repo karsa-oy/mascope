@@ -916,7 +916,9 @@ class OpenTFRawBackend:
         if self._bad_first_scan(scans):
             from mascope_thermo.runtime import runtime
 
-            runtime.logger.warning(
+            # INFO: a data quirk of the file, re-evaluated on every scan
+            # selection (see thermo.py scan_indices_1based)
+            runtime.logger.info(
                 "The first scan appears to be an outlier with abnormally high "
                 "TIC. Excluding the first scan from selection."
             )

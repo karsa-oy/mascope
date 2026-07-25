@@ -329,7 +329,8 @@ def _write_cached_sum_signal(
     :rtype: xr.DataArray | None
     """
     filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
-    runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
+    # DEBUG: purely informational cache write, fires on every cache miss
+    runtime.logger.debug(f"Saving computed sum signal to {filename_sum_signal}")
 
     synchronizer = m_io.get_zarr_synchronizer(filename_sum_signal)
     write_lock = m_io.get_zarr_write_lock(filename_sum_signal)
@@ -528,7 +529,8 @@ def get_tic_per_scan(
                 total_tic = m_io.read_props(base_filename)["tic"]
                 tic_per_scan = tic_per_scan / tic_per_scan.sum() * total_tic
             except KeyError:
-                runtime.logger.warning(
+                # Expected for files whose props carry no "tic" entry
+                runtime.logger.info(
                     "Total TIC value is not available in the sample file"
                 )
 
@@ -1108,7 +1110,9 @@ def get_metadata(
     :return: Metadata class instance or None if the file type is not supported
     :rtype: RawFileMetadataLegacy | None
     """
-    runtime.logger.warning(
+    # DEBUG: this is called on every metadata request; a per-call WARNING
+    # would emit one GlitchTip event per API call
+    runtime.logger.debug(
         "Metadata retrieval using compute.get_metadata is deprecated and will be "
         "removed in future versions. "
         "Please use the new mascope_signal.metadata module."
