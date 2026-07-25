@@ -63,6 +63,13 @@ sudo ufw route allow proto tcp from <lan-subnet>  to any port 8000   # GlitchTip
 sudo ufw route allow proto tcp from <lan-subnet>  to any port 3001   # Uptime Kuma (LAN)
 sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 8000   # GlitchTip (tailnet)
 sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 3001   # Uptime Kuma (tailnet)
+
+# REQUIRED last step: restarting ufw flushed the FORWARD chain, wiping
+# Docker's own forwarding rules - containers lose OUTBOUND internet (webhook
+# notifications, update checks) while inbound to the published ports still
+# works. Restarting Docker re-inserts its chains. Repeat this after ANY
+# future `systemctl restart ufw` on this box.
+sudo systemctl restart docker
 ```
 
 (`100.64.0.0/10` is the Tailscale CGNAT range every tailnet node gets its
