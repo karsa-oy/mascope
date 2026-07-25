@@ -1,12 +1,12 @@
-from collections import defaultdict
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     delete,
     func,
     select,
 )
 
+from mascope_backend.api.controllers.match.lib.match_upsert import (
+    bulk_upsert_match_level,
+)
 from mascope_backend.api.controllers.match.lib.match_write_lock import (
     acquire_match_write_locks,
 )
@@ -21,7 +21,6 @@ from mascope_backend.api.models.match.collections.match_collection_pydantic_mode
     MatchCollectionBase,
 )
 from mascope_backend.db import MatchCollection, SampleItem, async_session
-from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 
 
@@ -170,94 +169,33 @@ async def create_match_collections(
     if not match_collections:
         return {"message": "No match collections provided", "data": []}
 
-    # Step 1: Group match collections by sample item ID, in stable natural-key
-    # order so concurrent writers touch rows in the same sequence.
-    grouped_match_collections = defaultdict(list)
-    for match_collection in sorted(
-        match_collections,
-        key=lambda mc: (mc.sample_item_id, mc.target_collection_id),
-    ):
-        grouped_match_collections[match_collection.sample_item_id].append(
-            match_collection
-        )
-
-    processed_collections = []
-    updated_count = 0
-    unchanged_count = 0
-
     async with async_session() as session:
         # Serialize with every other match writer of the affected batches;
-        # holds until commit, making the read-then-write below race-free.
-        await acquire_match_write_locks(session, grouped_match_collections.keys())
-        for sample_item_id, m_collections in grouped_match_collections.items():
-            # Step 2: Get existing match collections for this sample
-            target_collection_ids = [mc.target_collection_id for mc in m_collections]
-            existing_collections = {
-                row.target_collection_id: row
-                for row in (
-                    await session.execute(
-                        select(MatchCollection).where(
-                            MatchCollection.sample_item_id == sample_item_id,
-                            MatchCollection.target_collection_id.in_(
-                                target_collection_ids
-                            ),
-                        )
-                    )
-                ).scalars()
-            }
+        # holds until commit, making the upsert below race-free.
+        await acquire_match_write_locks(
+            session, {mc.sample_item_id for mc in match_collections}
+        )
+        # Bulk upsert on the natural key: inserts missing rows, updates only
+        # rows whose values changed, leaves identical rows untouched.
+        created_count, updated_count, changed_rows = await bulk_upsert_match_level(
+            session,
+            MatchCollection,
+            id_column="match_collection_id",
+            natural_key=("sample_item_id", "target_collection_id"),
+            value_columns=(
+                "match_score",
+                "match_category",
+                "sample_peak_intensity_sum",
+            ),
+            utc_created_column="match_collection_utc_created",
+            utc_modified_column="match_collection_utc_modified",
+            rows=match_collections,
+        )
+        await session.commit()
 
-            for new_collection in m_collections:
-                existing = existing_collections.get(new_collection.target_collection_id)
-
-                if existing:
-                    # Step 3: Compare and update if different
-                    needs_update = (
-                        existing.match_score != new_collection.match_score
-                        or existing.match_category != new_collection.match_category
-                        or existing.sample_peak_intensity_sum
-                        != new_collection.sample_peak_intensity_sum
-                    )
-
-                    if needs_update:
-                        existing.match_score = new_collection.match_score
-                        existing.match_category = new_collection.match_category
-                        existing.sample_peak_intensity_sum = (
-                            new_collection.sample_peak_intensity_sum
-                        )
-                        existing.match_collection_utc_modified = datetime.now(
-                            timezone.utc
-                        )
-                        updated_count += 1
-                        processed_collections.append(existing)
-                        runtime.logger.trace(
-                            f"Updated match collection for sample '{sample_item_id}' "
-                            f"and collection '{new_collection.target_collection_id}'"
-                        )
-                    else:
-                        unchanged_count += 1
-                        runtime.logger.trace(
-                            f"Match collection unchanged for sample '{sample_item_id}' "
-                            f"and collection '{new_collection.target_collection_id}'"
-                        )
-                else:
-                    # Step 4: Create new match collection
-                    new_match_collection = MatchCollection(
-                        match_collection_id=gen_id(32),
-                        **new_collection.model_dump(),
-                        match_collection_utc_created=datetime.now(timezone.utc),
-                    )
-                    session.add(new_match_collection)
-                    processed_collections.append(new_match_collection)
-
-        # Step 5: Commit transaction. All values are set client-side and the
-        # session keeps objects loaded after commit (expire_on_commit=False),
-        # so no per-row refresh is needed.
-        if processed_collections:
-            await session.commit()
-
-    # Step 6: Generate result message
+    # Generate result message
     total_requested = len(match_collections)
-    created_count = len(processed_collections) - updated_count
+    unchanged_count = total_requested - created_count - updated_count
 
     if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
         status = "partial"
@@ -276,7 +214,7 @@ async def create_match_collections(
     return {
         "status": status,
         "message": message,
-        "data": [collection.to_dict() for collection in processed_collections],
+        "data": changed_rows,
     }
 
 

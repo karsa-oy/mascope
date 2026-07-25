@@ -1,12 +1,12 @@
-from collections import defaultdict
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     delete,
     func,
     select,
 )
 
+from mascope_backend.api.controllers.match.lib.match_upsert import (
+    bulk_upsert_match_level,
+)
 from mascope_backend.api.controllers.match.lib.match_write_lock import (
     acquire_match_write_locks,
 )
@@ -21,7 +21,6 @@ from mascope_backend.api.models.match.samples.match_sample_pydantic_model import
     MatchSampleBase,
 )
 from mascope_backend.db import MatchSample, SampleItem, async_session
-from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 
 
@@ -159,84 +158,34 @@ async def create_match_samples(
     if not match_samples:
         return {"message": "No match samples provided", "data": []}
 
-    # Step 1: Group match samples by sample item ID, in stable order so
-    # concurrent writers touch rows in the same sequence.
-    grouped_match_samples = defaultdict(list)
-    for match_sample in sorted(match_samples, key=lambda ms: ms.sample_item_id):
-        grouped_match_samples[match_sample.sample_item_id].append(match_sample)
-
-    new_match_samples = []
-    updated_count = 0
-    unchanged_count = 0
-
     async with async_session() as session:
         # Serialize with every other match writer of the affected batches;
-        # holds until commit, making the read-then-write below race-free.
-        await acquire_match_write_locks(session, grouped_match_samples.keys())
-        for sample_item_id, m_samples in grouped_match_samples.items():
-            provided_match_sample = m_samples[0]
-            # Step 2: Check for existing match sample
-            existing_sample = (
-                (
-                    await session.execute(
-                        select(MatchSample).where(
-                            MatchSample.sample_item_id == sample_item_id
-                        )
-                    )
-                )
-                .scalars()
-                .one_or_none()
-            )
+        # holds until commit, making the upsert below race-free.
+        await acquire_match_write_locks(
+            session, {ms.sample_item_id for ms in match_samples}
+        )
+        # Bulk upsert on the natural key (one row per sample): inserts missing
+        # rows, updates only rows whose values changed, leaves identical rows
+        # untouched.
+        created_count, updated_count, changed_rows = await bulk_upsert_match_level(
+            session,
+            MatchSample,
+            id_column="match_sample_id",
+            natural_key=("sample_item_id",),
+            value_columns=(
+                "match_score",
+                "match_category",
+                "sample_peak_intensity_sum",
+            ),
+            utc_created_column="match_sample_utc_created",
+            utc_modified_column="match_sample_utc_modified",
+            rows=match_samples,
+        )
+        await session.commit()
 
-            if existing_sample:
-                # Step 3: Compare data and update if different
-                needs_update = (
-                    existing_sample.match_score != provided_match_sample.match_score
-                    or existing_sample.match_category
-                    != provided_match_sample.match_category
-                    or existing_sample.sample_peak_intensity_sum
-                    != provided_match_sample.sample_peak_intensity_sum
-                )
-                if needs_update:
-                    existing_sample.match_score = provided_match_sample.match_score
-                    existing_sample.match_category = (
-                        provided_match_sample.match_category
-                    )
-                    existing_sample.sample_peak_intensity_sum = (
-                        provided_match_sample.sample_peak_intensity_sum
-                    )
-                    existing_sample.match_sample_utc_modified = datetime.now(
-                        timezone.utc
-                    )
-                    updated_count += 1
-                    new_match_samples.append(existing_sample)
-                    runtime.logger.trace(
-                        f"Updated match sample for sample '{sample_item_id}'"
-                    )
-                else:
-                    unchanged_count += 1
-                    runtime.logger.trace(
-                        f"Match sample unchanged for sample '{sample_item_id}'"
-                    )
-            else:
-                # Step 4: Create new match sample
-                new_match_sample = MatchSample(
-                    match_sample_id=gen_id(32),
-                    **provided_match_sample.model_dump(),
-                    match_sample_utc_created=datetime.now(timezone.utc),
-                )
-                session.add(new_match_sample)
-                new_match_samples.append(new_match_sample)
-
-        # Step 5: Commit the transaction. All values are set client-side and the
-        # session keeps objects loaded after commit (expire_on_commit=False),
-        # so no per-row refresh is needed.
-        if new_match_samples:
-            await session.commit()
-
-    # Step 6: Generate result message
+    # Generate result message
     total_requested = len(match_samples)
-    created_count = len(new_match_samples) - updated_count
+    unchanged_count = total_requested - created_count - updated_count
 
     if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
         status = "partial"
@@ -255,7 +204,7 @@ async def create_match_samples(
     return {
         "status": status,
         "message": message,
-        "data": [match_sample.to_dict() for match_sample in new_match_samples],
+        "data": changed_rows,
     }
 
 
