@@ -92,8 +92,10 @@ def _init_sentry(environment: str, release: str | None) -> bool:
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),
-            # Breadcrumbs only (event_level=None): our own sink owns event
-            # creation, so records are never double-reported.
+            # event_level=None neutralizes the auto-enabled default (which
+            # would double-report ERROR events next to our own sink). Its
+            # breadcrumb handler does not survive the logger.configure() that
+            # follows init, so this integration exists only as that override.
             LoguruIntegration(level=std_logging.INFO, event_level=None),
         ],
     )
@@ -255,6 +257,14 @@ class RuntimeLogging:
             enqueue=True,  # multiprocess safe
             catch=True,
         )
+        # Optional GlitchTip/Sentry error reporting, OFF unless MASCOPE_SENTRY_DSN
+        # is set. Init here (once) so the SDK is live before the backend builds
+        # FastAPI() - fast.py imports this Runtime first. Must run BEFORE
+        # logger.remove(): its "SDK missing" warning needs a live handler.
+        sentry_on = _init_sentry(
+            environment=str(self.runtime.mode), release=self.runtime.version
+        )
+
         # create fresh config
         logger.remove()  # remove old settings
 
@@ -263,13 +273,9 @@ class RuntimeLogging:
             if self.runtime.module.name != "cli"
             else [terminal_handler]
         )
-        # Optional GlitchTip/Sentry error reporting, OFF unless MASCOPE_SENTRY_DSN
-        # is set. Init here (once) so the SDK is live before the backend builds
-        # FastAPI() - fast.py imports this Runtime first. The callable sink reads
-        # the record directly, so it ignores the text `format` used above.
-        if _init_sentry(
-            environment=str(self.runtime.mode), release=self.runtime.version
-        ):
+        if sentry_on:
+            # The callable sink reads the record directly, so it ignores the
+            # text `format` used above.
             handlers.append(
                 dict(sink=_sentry_sink, level="WARNING", enqueue=False, catch=True)
             )

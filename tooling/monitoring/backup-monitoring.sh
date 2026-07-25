@@ -2,7 +2,7 @@
 #
 # Back up the monitoring stack (GlitchTip + Uptime Kuma) on the box that hosts
 # it. Mirrors the pattern of tooling/backup-cron.sh: restic + optional
-# healthchecks.io ping. Run it from cron/systemd on 192.168.1.88, e.g.:
+# healthchecks.io ping. Run it from root's cron/systemd on the ops box, e.g.:
 #   30 4 * * * /opt/monitoring/backup-monitoring.sh 2>&1 | logger -t monitoring-backup
 #
 # What it backs up (and why each is handled differently):
@@ -45,6 +45,9 @@ KEEP_MONTHLY="${KEEP_MONTHLY:-6}"
 
 on_error() {
     log "ERROR: backup failed (line $1)"
+    # Never leave monitoring down: if we failed inside the quiesced Uptime Kuma
+    # window, restart it (a no-op when it is already running).
+    docker compose -f "$UPTIME_KUMA_COMPOSE" start uptime-kuma >/dev/null 2>&1 || true
     if [[ -n "${HEALTHCHECK_URL:-}" ]]; then
         curl -fsS -m 10 --retry 3 "${HEALTHCHECK_URL}/fail" >/dev/null || true
     fi
