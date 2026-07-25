@@ -67,17 +67,17 @@ def _is_blank_sample(sample: Sample) -> bool:
     return sample.instrument_function_id is None
 
 
-async def _batch_aggregates_incomplete(sample_batch_id: str) -> bool:
+async def _incomplete_aggregate_sample_ids(sample_batch_id: str) -> list[str]:
     """
-    Returns whether any sample of the batch has stored match isotopes but no
-    MatchSample row - the signature of a missing or previously-failed
-    aggregation (MatchSample rows are written by the last create funnel of a
-    successful aggregation, and are deleted when an aggregation fails).
+    Samples of the batch with stored match isotopes but no MatchSample row -
+    the signature of a missing or previously-failed aggregation (MatchSample
+    rows are cleared when an aggregation starts and restored per chunk, so an
+    interrupted aggregation leaves its unfinished samples in this state).
 
     :param sample_batch_id: The batch to probe.
     :type sample_batch_id: str
-    :return: True when the batch's aggregates are incomplete.
-    :rtype: bool
+    :return: The affected sample item ids (empty when aggregates are complete).
+    :rtype: list[str]
     """
     async with async_session() as session:
         stmt = (
@@ -89,9 +89,14 @@ async def _batch_aggregates_incomplete(sample_batch_id: str) -> bool:
                 .where(MatchSample.sample_item_id == MatchIsotope.sample_item_id)
                 .exists(),
             )
-            .limit(1)
+            .distinct()
         )
-        return (await session.scalar(stmt)) is not None
+        return list((await session.execute(stmt)).scalars())
+
+
+async def _batch_aggregates_incomplete(sample_batch_id: str) -> bool:
+    """Returns whether any sample of the batch has incomplete aggregates."""
+    return bool(await _incomplete_aggregate_sample_ids(sample_batch_id))
 
 
 # -------------------------------------------------------------------
@@ -880,16 +885,17 @@ async def rematch_batch(
             parent_id=process_id,
         )
 
-        # Step 4: Compute new matches. The removed count lets the compute step
-        # skip re-aggregation when the removal was also a no-op.
+        # Step 4: Compute new matches. The removal-affected samples join the
+        # compute step's aggregation scope (and a no-op removal contributes
+        # nothing, letting a no-op refresh skip aggregation entirely).
         compute_result = await match_compute_batch(
             sample_batch_id=sample_batch_id,
             independent_transaction=False,
             user_id=user_id,
             process_id=gen_id(8),
             parent_id=process_id,
-            removed_matches_count=remove_result.get("data", {}).get(
-                "removed_match_isotopes_count", 0
+            removed_sample_item_ids=remove_result.get("data", {}).get(
+                "orphaned_sample_item_ids", []
             ),
         )
 
@@ -1055,6 +1061,9 @@ async def match_remove_batch(
         "message": message,
         "data": {
             "removed_match_isotopes_count": removed_match_isotopes_count,
+            "orphaned_sample_item_ids": result.get("data", {}).get(
+                "orphaned_sample_item_ids", []
+            ),
         },
         "_notification_data": {"sample_batch_id": sample_batch_id},
     }
@@ -1072,14 +1081,15 @@ async def match_compute_batch(
     user_id: int | None = None,
     process_id: str | None = None,
     parent_id: str | None = None,
-    removed_matches_count: int = 0,
+    removed_sample_item_ids: list[str] | None = None,
 ) -> dict:
     """
     Computes new matches for all samples within a batch, processing each sample:
     - Filters which target isotopes need computation
-    - Aggregates higher-level matches based on computed isotopes; skipped when
-      provably nothing changed (nothing computed or failed this run, nothing
-      removed by the preceding removal, and the stored aggregates are complete)
+    - Aggregates higher-level matches, scoped to the affected samples only
+      (computed or failed this run, touched by the preceding removal, or with
+      incomplete stored aggregates); skipped entirely when no sample is
+      affected
 
     :param sample_batch_id: The identifier of the sample batch for which match computation is to be performed.
     :type sample_batch_id: str
@@ -1089,9 +1099,9 @@ async def match_compute_batch(
     :type user_id: int | None, optional
     :param process_id: Process identifier for progress tracking
     :param parent_id: Parent process identifier
-    :param removed_matches_count: Match isotopes removed by a preceding removal
-        step (rematch flow); a nonzero count forces re-aggregation
-    :type removed_matches_count: int
+    :param removed_sample_item_ids: Samples whose match rows the preceding
+        removal step touched (rematch flow); they join the aggregation scope
+    :type removed_sample_item_ids: list[str] | None
     :raises NotFoundException: When batch not found
     :raises ApiException: When batch has no samples or critical failures occur
     :return: Batch data with computation results and status message
@@ -1225,24 +1235,24 @@ async def match_compute_batch(
     # discard the per-sample isotopes already computed and saved above, so it is
     # caught and reflected in the batch status rather than propagated.
     #
-    # The aggregation is skipped when provably nothing changed: no sample
-    # computed (or even failed - a failure after the isotope insert would leave
-    # stored rows unaggregated), the preceding removal removed nothing, and the
-    # stored aggregates are complete. All aggregation inputs live in match/
-    # target tables whose invalidation paths delete match rows or force a
-    # compute, so an unchanged-and-complete state re-aggregates to the values
-    # already stored. (One deliberate behavior change: aggregates saved via the
+    # The aggregation is scoped to the affected samples: computed this run
+    # (or failed - a failure after the isotope insert would leave stored rows
+    # unaggregated), touched by the preceding removal, or left with
+    # incomplete aggregates by an interrupted earlier run. Aggregate levels
+    # are per-sample, so unaffected samples' stored aggregates are already
+    # correct; when no sample is affected the aggregation is skipped
+    # entirely. (One deliberate behavior change: aggregates saved via the
     # /save routes with custom match_params are no longer silently
     # canonicalized back to defaults by a no-op refresh.)
     aggregation_failed = False
     match_aggregate_result = {}
-    aggregation_needed = (
-        bool(computed_samples)
-        or bool(failed_samples)
-        or removed_matches_count > 0
-        or await _batch_aggregates_incomplete(sample_batch_id)
+    aggregation_scope = sorted(
+        set(computed_samples)
+        | set(failed_samples)
+        | set(removed_sample_item_ids or [])
+        | set(await _incomplete_aggregate_sample_ids(sample_batch_id))
     )
-    if not aggregation_needed:
+    if not aggregation_scope:
         runtime.logger.info(
             f"Skipped higher-level match aggregation for sample batch "
             f"'{sample_batch_name}': no match data changed."
@@ -1267,6 +1277,13 @@ async def match_compute_batch(
             match_aggregate_result = await aggregate_and_create_matches(
                 sample_batch_id=sample_batch_id,
                 notification=aggregation_notification,
+                # None = whole batch; an explicit subset skips re-aggregating
+                # the untouched samples
+                sample_item_ids=(
+                    None
+                    if len(aggregation_scope) >= total_samples_count
+                    else aggregation_scope
+                ),
             )
         except Exception as e:
             aggregation_failed = True
