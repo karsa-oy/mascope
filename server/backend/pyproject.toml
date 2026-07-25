@@ -7,7 +7,9 @@ requires-python = ">=3.12,<3.13"
 license.text = "Apache-2.0"
 dependencies = [
     # internal
-    "mascope_runtime",
+    # [sentry] bakes sentry-sdk into the backend image so MASCOPE_SENTRY_DSN
+    # can enable error reporting without a rebuild; unset DSN = fully inert.
+    "mascope_runtime[sentry]",
     "mascope_chem",
     "mascope_thermo",
     "mascope_tofwerk",

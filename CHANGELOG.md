@@ -4,6 +4,72 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.3] - 2026.07.25
+
+### Fixed
+
+- GlitchTip error reporting is now actually deployable: backend images ship
+  `sentry-sdk` (the runtime's `[sentry]` extra), and `docker compose` passes
+  `MASCOPE_SENTRY_DSN` from the host into the backend and file-converter
+  containers. Previously the DSN never reached the container and the SDK was
+  missing from the image, so enabling reporting per the runbook had no effect.
+  Reporting remains off unless the DSN is set.
+
+### Added
+
+- Self-hosted monitoring stack under `tooling/monitoring/` (GlitchTip error
+  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to an
+  internal monitoring box with a copy-paste runbook: compose files, DOCKER-USER
+  firewall rules restricting the published ports to LAN + tailnet (plain ufw
+  cannot filter Docker-published ports), a restic backup script for the new
+  volumes, and Uptime Kuma monitor guidance including inverted port-22/443
+  tripwires on the fleet's public IPs.
+- Optional error reporting from the backend to a self-hosted GlitchTip/Sentry
+  instance. A loguru sink forwards `WARNING`/`ERROR` records (with tracebacks
+  and request context) as events. It is **off by default** and gated entirely on
+  `MASCOPE_SENTRY_DSN`: unset means no SDK import and no behavior change; set it
+  on the backend service (with the `mascope_runtime[sentry]` extra installed) to
+  turn reporting on. Events carry the runtime mode as `environment` and
+  `MASCOPE_VERSION` as `release`. See `docs/maintaining.md` -> Monitoring.
+- File Agent Windows installer (Inno Setup): per-user install with no admin
+  rights, Start Menu entry, an optional run-at-login startup task so the
+  agent survives reboots, and an uninstaller that leaves the configuration
+  in `%AppData%` untouched. Built and attached to every GitHub release by
+  CI as `Mascope-File-Agent-Setup.exe` (fixed name, so
+  `releases/latest/download/...` always serves the newest version) plus a
+  versioned copy; the exe is stamped with the release version and reports
+  it at startup. A "Download File Agent installer" button in the web app's
+  user settings links to the latest release. File Agent unit tests now run
+  in CI on every PR.
+
+- File Agent guided setup: on first start (or with `--setup`) the bundled
+  agent asks for the server address, access token and watched folder in the
+  console, verifies the token against the server right away, and starts
+  watching - no more editing TOML files in `.runtime` or `state.json` by
+  hand. A user-facing installation guide was added to
+  `docs/user/instruments/index.md`.
+
+### Changed
+
+- File Agent settings now live in a single flat file,
+  `%AppData%\Mascope\FileAgent\config.toml`; the nested runtime config is
+  regenerated from it on every start. Logs moved to
+  `%AppData%\Mascope\FileAgent\logs`. Existing installs are migrated
+  automatically, and config-schema changes no longer require deleting the
+  configuration on upgrade (missing keys fall back to defaults). A host
+  configured with an explicit `http://` scheme is now respected for
+  plain-HTTP servers.
+- Batch match aggregation is roughly twice as fast on large batches (a full
+  re-create of a 2268-sample stress batch drops from ~9 to ~5 minutes, with
+  bit-identical results). The match create funnels now write each level as a
+  single bulk `INSERT .. ON CONFLICT DO UPDATE .. WHERE row IS DISTINCT FROM
+excluded` statement instead of a per-row ORM read-then-diff loop; the ion
+  and compound aggregations group on id columns instead of up to 15 label
+  strings; and the aggregation chunk size adapts to the batch's target-chain
+  shape instead of a fixed sample count. Per-chunk aggregate/create timings
+  are logged at debug level so production refreshes show where aggregation
+  time goes.
+
 ## [1.4.2] - 2026.07.25
 
 ### Fixed

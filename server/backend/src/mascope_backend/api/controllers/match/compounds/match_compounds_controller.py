@@ -1,6 +1,3 @@
-from collections import defaultdict
-from datetime import datetime, timezone
-
 import pandas as pd
 from sqlalchemy import (
     delete,
@@ -8,6 +5,10 @@ from sqlalchemy import (
     select,
 )
 
+from mascope_backend.api.controllers.match.lib.match_upsert import (
+    bulk_upsert_match_level,
+    row_value,
+)
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_backend.api.controllers.match.lib.match_write_lock import (
     acquire_match_write_locks,
@@ -31,7 +32,6 @@ from mascope_backend.db import (
     TargetCompoundInTargetCollection,
     async_session,
 )
-from mascope_backend.db.id import gen_id
 from mascope_backend.runtime import runtime
 from mascope_file.name import resolve_instrument_type
 
@@ -263,89 +263,33 @@ async def create_match_compounds(
     if not match_compounds:
         return {"message": "No match compounds provided", "data": []}
 
-    # Step 1: Group match compounds by sample item ID, in stable natural-key
-    # order so concurrent writers touch rows in the same sequence.
-    grouped_match_compounds = defaultdict(list)
-    for match_compound in sorted(
-        match_compounds, key=lambda mc: (mc.sample_item_id, mc.target_compound_id)
-    ):
-        grouped_match_compounds[match_compound.sample_item_id].append(match_compound)
-
-    processed_compounds = []
-    updated_count = 0
-    unchanged_count = 0
-
     async with async_session() as session:
         # Serialize with every other match writer of the affected batches;
-        # holds until commit, making the read-then-write below race-free.
-        await acquire_match_write_locks(session, grouped_match_compounds.keys())
-        for sample_item_id, m_compounds in grouped_match_compounds.items():
-            # Step 2: Get existing match compounds for this sample
-            target_compound_ids = [mc.target_compound_id for mc in m_compounds]
-            existing_compounds = {
-                row.target_compound_id: row
-                for row in (
-                    await session.execute(
-                        select(MatchCompound).where(
-                            MatchCompound.sample_item_id == sample_item_id,
-                            MatchCompound.target_compound_id.in_(target_compound_ids),
-                        )
-                    )
-                ).scalars()
-            }
+        # holds until commit, making the upsert below race-free.
+        await acquire_match_write_locks(
+            session, {row_value(mc, "sample_item_id") for mc in match_compounds}
+        )
+        # Bulk upsert on the natural key: inserts missing rows, updates only
+        # rows whose values changed, leaves identical rows untouched.
+        created_count, updated_count, changed_rows = await bulk_upsert_match_level(
+            session,
+            MatchCompound,
+            id_column="match_compound_id",
+            natural_key=("sample_item_id", "target_compound_id"),
+            value_columns=(
+                "match_score",
+                "match_category",
+                "sample_peak_intensity_sum",
+            ),
+            utc_created_column="match_compound_utc_created",
+            utc_modified_column="match_compound_utc_modified",
+            rows=match_compounds,
+        )
+        await session.commit()
 
-            for new_compound in m_compounds:
-                existing = existing_compounds.get(new_compound.target_compound_id)
-
-                if existing:
-                    # Step 3: Compare and update if different
-                    needs_update = (
-                        existing.match_score != new_compound.match_score
-                        or existing.match_category != new_compound.match_category
-                        or existing.sample_peak_intensity_sum
-                        != new_compound.sample_peak_intensity_sum
-                    )
-
-                    if needs_update:
-                        existing.match_score = new_compound.match_score
-                        existing.match_category = new_compound.match_category
-                        existing.sample_peak_intensity_sum = (
-                            new_compound.sample_peak_intensity_sum
-                        )
-                        existing.match_compound_utc_modified = datetime.now(
-                            timezone.utc
-                        )
-                        updated_count += 1
-                        processed_compounds.append(existing)
-                        runtime.logger.trace(
-                            f"Updated match compound for sample '{sample_item_id}' "
-                            f"and compound '{new_compound.target_compound_id}'"
-                        )
-                    else:
-                        unchanged_count += 1
-                        runtime.logger.trace(
-                            f"Match compound unchanged for sample '{sample_item_id}' "
-                            f"and compound '{new_compound.target_compound_id}'"
-                        )
-                else:
-                    # Step 4: Create new match compound
-                    new_match_compound = MatchCompound(
-                        match_compound_id=gen_id(32),
-                        **new_compound.model_dump(),
-                        match_compound_utc_created=datetime.now(timezone.utc),
-                    )
-                    session.add(new_match_compound)
-                    processed_compounds.append(new_match_compound)
-
-        # Step 5: Commit transaction. All values are set client-side and the
-        # session keeps objects loaded after commit (expire_on_commit=False),
-        # so no per-row refresh is needed.
-        if processed_compounds:
-            await session.commit()
-
-    # Step 6: Generate result message
+    # Generate result message
     total_requested = len(match_compounds)
-    created_count = len(processed_compounds) - updated_count
+    unchanged_count = total_requested - created_count - updated_count
 
     if created_count > 0 and (updated_count > 0 or unchanged_count > 0):
         status = "partial"
@@ -364,7 +308,7 @@ async def create_match_compounds(
     return {
         "status": status,
         "message": message,
-        "data": [compound.to_dict() for compound in processed_compounds],
+        "data": changed_rows,
     }
 
 

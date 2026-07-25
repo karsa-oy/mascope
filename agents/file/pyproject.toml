@@ -8,6 +8,7 @@ license = "Apache-2.0"
 dependencies = [
     "mascope_runtime",
     "mascope_sdk",
+    "requests>=2.34.2,<3",
     "watchdog~=4.0",
 ]
 
@@ -16,7 +17,8 @@ mascope-file-agent = "mascope_file_agent.main:run"
 
 [dependency-groups]
 dev = [
-  "pyinstaller~=6.12"
+  "pyinstaller~=6.12",
+  "pytest~=8.0",
 ]
 
 [tool.uv.sources]

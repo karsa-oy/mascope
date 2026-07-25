@@ -1,0 +1,60 @@
+# GlitchTip (self-hosted error tracking) for the Mascope fleet.
+#
+# Deploy on the internal monitoring box ("ops"), reachable from LAN + tailnet
+# only, plain HTTP. Concrete host addresses are deliberately not in this public
+# repo - see the private fleet docs. Copy this directory to /opt/glitchtip on
+# the box, fill in glitchtip.env, then `docker compose up -d`. See ../README.md
+# for the full runbook.
+#
+# GlitchTip 6 (Feb 2026) runs HTTP + background worker + scheduler in ONE
+# "all-in-one" web container (Celery was replaced by django-vtasks), so there is
+# no separate worker/beat/migrate service. Migrations run automatically on boot
+# (SKIP_INIT defaults to False).
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      # OK here: Postgres has no published port and is only reachable on the
+      # internal compose network. To harden anyway, set POSTGRES_PASSWORD and put
+      # the same value in DATABASE_URL (see glitchtip.env.example).
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      # postgres:18 default data dir is /var/lib/postgresql (NOT .../data).
+      - pg-data:/var/lib/postgresql
+    # no ports: -> internal only
+
+  valkey:
+    image: valkey/valkey:9
+    restart: unless-stopped
+    # no ports: -> internal only
+
+  web:
+    image: glitchtip/glitchtip:6 # check https://glitchtip.com/blog/ before a major bump
+    depends_on:
+      postgres:
+        condition: service_healthy # migrations on boot need a ready DB
+      valkey:
+        condition: service_started
+    ports:
+      # Published on all interfaces: the fleet's backends report events over the
+      # TAILNET (the LAN IP does not route from the Mascope servers), and binding
+      # the 100.x tailscale IP directly would race tailscaled at boot. Docker's
+      # DNAT bypasses ufw's INPUT chain, so access control lives in the
+      # DOCKER-USER chain instead - the `ufw route allow` rules in ../README.md
+      # (LAN + tailnet only) are REQUIRED, not optional.
+      - "8000:8000"
+    env_file: glitchtip.env
+    restart: unless-stopped
+    volumes:
+      - uploads:/code/uploads
+
+volumes:
+  pg-data:
+  uploads:

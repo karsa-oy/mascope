@@ -256,6 +256,46 @@ especially with unattended updates). The running stack's images are referenced
 and kept; a manual rollback re-pulls the previous release (guarded by the disk
 guard above), the same as the documented rollback flow.
 
+## Monitoring
+
+Beyond the healthchecks.io dead-man's-switch pings (backups, disk monitor), a
+small self-hosted stack gives error tracking and external uptime monitoring. It
+runs off the Mascope servers - typically on the internal backup box. See
+[`tooling/monitoring/`](../tooling/monitoring/README.md) for the full deploy
+runbook (GlitchTip + Uptime Kuma, LAN-only).
+
+### Error reporting to GlitchTip (opt-in)
+
+The backend can forward `WARNING`/`ERROR` log records (with tracebacks and
+request context) to a self-hosted [GlitchTip](https://glitchtip.com/) instance,
+so you stop grepping log files for problems. It is **off by default** and gated
+entirely on one environment variable:
+
+- Unset `MASCOPE_SENTRY_DSN` (the default) - no SDK import, no reporting, zero
+  behavior change.
+- Set it to a GlitchTip project DSN on the **host** - `docker compose` passes it
+  into the backend and file-converter containers, which install a loguru sink
+  that reports WARNING+ events.
+
+```sh
+# on each Mascope server: append to /etc/environment (read by mascope.service),
+# then bring the stack up again so the containers pick it up:
+MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
+```
+
+The DSN targets the monitoring box's **tailnet IP** — events travel over
+Tailscale (the box's LAN address does not route from the servers, and container
+DNS cannot resolve MagicDNS names). One-time per server: the backend container
+needs a `tailscale0` masquerade line in the `MASCOPE NAT` block; see the
+[monitoring runbook](../tooling/monitoring/README.md) step 7.1.
+
+Backend images ship `sentry-sdk` (the runtime's `[sentry]` extra) since
+2026-07, so there is nothing to install per server; the DSN alone toggles
+reporting. The event `environment` is the runtime mode and `release` follows
+`MASCOPE_VERSION` when set, so events group by deployment. Full setup -
+creating the project, copying the DSN, and the Uptime Kuma monitors - is in the
+[monitoring runbook](../tooling/monitoring/README.md).
+
 ## Files and secrets
 
 | Path | What |

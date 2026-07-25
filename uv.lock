@@ -1474,7 +1474,7 @@ dependencies = [
     { name = "mascope-chem" },
     { name = "mascope-file" },
     { name = "mascope-match" },
-    { name = "mascope-runtime" },
+    { name = "mascope-runtime", extra = ["sentry"] },
     { name = "mascope-signal" },
     { name = "mascope-thermo" },
     { name = "mascope-tofwerk" },
@@ -1513,7 +1513,7 @@ requires-dist = [
     { name = "mascope-chem", editable = "libraries/chem" },
     { name = "mascope-file", editable = "libraries/file" },
     { name = "mascope-match", editable = "libraries/match" },
-    { name = "mascope-runtime", editable = "libraries/runtime" },
+    { name = "mascope-runtime", extras = ["sentry"], editable = "libraries/runtime" },
     { name = "mascope-signal", editable = "libraries/signal" },
     { name = "mascope-thermo", editable = "libraries/thermo" },
     { name = "mascope-tofwerk", editable = "libraries/tofwerk" },
@@ -1669,6 +1669,9 @@ dependencies = [
 logs = [
     { name = "duckdb" },
 ]
+sentry = [
+    { name = "sentry-sdk" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1676,8 +1679,9 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.2,<0.8" },
     { name = "pydantic", specifier = ">=2.13.4,<3" },
     { name = "rich", specifier = ">=15.0.0,<16" },
+    { name = "sentry-sdk", marker = "extra == 'sentry'", specifier = ">=2,<3" },
 ]
-provides-extras = ["logs"]
+provides-extras = ["logs", "sentry"]
 
 [[package]]
 name = "mascope-sdk"
@@ -2817,6 +2821,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c5/f0/184b4b5f8d00f2a92cf96eec8967a3d550b52cf94362dad1100df9e48d57/send2trash-2.1.0.tar.gz", hash = "sha256:1c72b39f09457db3c05ce1d19158c2cbef4c32b8bedd02c155e49282b7ea7459", size = 17255, upload-time = "2026-01-14T06:27:36.056Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/78/504fdd027da3b84ff1aecd9f6957e65f35134534ccc6da8628eb71e76d3f/send2trash-2.1.0-py3-none-any.whl", hash = "sha256:0da2f112e6d6bb22de6aa6daa7e144831a4febf2a87261451c4ad849fe9a873c", size = 17610, upload-time = "2026-01-14T06:27:35.218Z" },
+]
+
+[[package]]
+name = "sentry-sdk"
+version = "2.66.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7f/6f/d59cad0889d15fde85254cf58e701484de3f3f0406003b3197746910b19b/sentry_sdk-2.66.1.tar.gz", hash = "sha256:f882fb08710c5f8bfc603aafa3e901b384009a19cc3f76a572b863392ee81cdc", size = 940543, upload-time = "2026-07-22T12:26:54.553Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/d3/726bd88f0eece09ddf431bea4c9191c18e7a8d070b854eb0014d447712ee/sentry_sdk-2.66.1-py3-none-any.whl", hash = "sha256:86002793161d9a95ef04bdd8d442e9bfece5d989b755f05d6360215094a7aff6", size = 505555, upload-time = "2026-07-22T12:26:52.71Z" },
 ]
 
 [[package]]

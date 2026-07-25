@@ -1,0 +1,215 @@
+# Monitoring stack — GlitchTip + Uptime Kuma
+
+Self-hosted monitoring for the Mascope fleet, meant to run on the internal
+monitoring box (referred to as **`ops`** below), reachable from the LAN and the
+tailnet only, plain HTTP. Concrete addresses are deliberately kept out of this
+public repo — where you see `<ops-tailnet-ip>` or `<lan-subnet>`, substitute
+the real values (on the box: `tailscale ip -4`; private fleet docs have the
+rest):
+
+- **GlitchTip** — error tracking. Mascope's backend forwards `WARNING`/`ERROR`
+  log records (with tracebacks and request context) so you stop grepping log
+  files. Sentry-API compatible; Mascope uses the stock `sentry-sdk`.
+- **Uptime Kuma** — external uptime + **TLS-certificate-expiry** monitoring, one
+  monitor per Mascope server. Complements the healthchecks.io dead-man's-switch
+  checks (backups, disk) with "is the site actually reachable / is the cert about
+  to expire".
+
+These files are a **template**: copy them to the box and run them there. The real
+`glitchtip.env` and `data/` never live in git.
+
+> **Why the tailnet matters:** the Mascope servers live at Contabo/Hetzner — the
+> box's LAN address does not route from them. Error reporting reaches GlitchTip
+> over Tailscale, so the published ports are bound to `0.0.0.0` and access is
+> restricted to LAN + tailnet in the `DOCKER-USER` chain (§2). The DSN and
+> `GLITCHTIP_DOMAIN` use the MagicDNS name `ops`.
+
+## 1. Prerequisites — Docker
+
+```sh
+# Docker Engine + compose plugin (skip if already installed). Review before
+# running on a shared box.
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"      # log out/in for the group to take effect
+docker --version && docker compose version
+```
+
+## 2. Firewall (LAN + tailnet only)
+
+`ufw` alone does **not** filter Docker-published ports (Docker's DNAT runs before
+`ufw`'s INPUT chain), so filtering for the published services lives in the
+`DOCKER-USER` chain via [ufw-docker](https://github.com/chaifeng/ufw-docker).
+Host-level rules cover SSH.
+
+> **Do not lock the tailnet out.** This box is also the fleet's fallback admin
+> workstation, reached over Tailscale — the `tailscale0` rules below are what
+> keep that working (and what let the Mascope backends deliver events).
+
+```sh
+# host-level (INPUT chain): SSH from the LAN and the tailnet
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from <lan-subnet> to any port 22 proto tcp       # SSH (LAN)
+sudo ufw allow in on tailscale0 to any port 22 proto tcp        # SSH (tailnet)
+sudo ufw enable
+
+# DOCKER-USER chain: the published monitoring ports, LAN + tailnet only
+sudo wget -O /usr/local/bin/ufw-docker \
+  https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
+sudo chmod +x /usr/local/bin/ufw-docker
+sudo ufw-docker install
+sudo systemctl restart ufw
+sudo ufw route allow proto tcp from <lan-subnet>  to any port 8000   # GlitchTip (LAN)
+sudo ufw route allow proto tcp from <lan-subnet>  to any port 3001   # Uptime Kuma (LAN)
+sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 8000   # GlitchTip (tailnet)
+sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 3001   # Uptime Kuma (tailnet)
+
+# REQUIRED last step: restarting ufw flushed the FORWARD chain, wiping
+# Docker's own forwarding rules - containers lose OUTBOUND internet (webhook
+# notifications, update checks) while inbound to the published ports still
+# works. Restarting Docker re-inserts its chains. Repeat this after ANY
+# future `systemctl restart ufw` on this box.
+sudo systemctl restart docker
+```
+
+(`100.64.0.0/10` is the Tailscale CGNAT range every tailnet node gets its
+address from.)
+
+## 3. GlitchTip
+
+```sh
+sudo mkdir -p /opt/glitchtip
+sudo cp glitchtip/compose.yaml glitchtip/glitchtip.env.example /opt/glitchtip/
+cd /opt/glitchtip
+cp glitchtip.env.example glitchtip.env
+sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|" glitchtip.env
+docker compose up -d
+docker compose logs -f web      # wait until it serves on :8000 (migrations run on boot); Ctrl-C when up
+```
+
+Then create the first account and a project (see [§6](#6-first-run-glitchtip)).
+
+## 4. Uptime Kuma
+
+```sh
+sudo mkdir -p /opt/uptime-kuma/data
+sudo cp uptime-kuma/compose.yaml /opt/uptime-kuma/
+cd /opt/uptime-kuma
+docker compose up -d
+```
+
+Open `http://ops:3001` (MagicDNS, from any tailnet machine; use the box's LAN
+IP from a non-tailnet LAN machine) and create the admin account on first load
+(see [§8](#8-uptime-kuma-monitors)).
+
+## 5. Backups
+
+Copy `backup-monitoring.sh` to the box (e.g. `/opt/monitoring/`), point it at your
+restic repo, and schedule it nightly **in root's crontab** (`sudo crontab -e` —
+the script needs docker, `/var/lib/docker/volumes`, and `/root/.restic-pass`).
+It logically dumps GlitchTip's Postgres, backs up GlitchTip uploads, and takes a
+quiesced copy of Uptime Kuma's SQLite.
+
+```sh
+sudo mkdir -p /opt/monitoring && sudo cp backup-monitoring.sh /opt/monitoring/
+export RESTIC_REPOSITORY=/srv/restic-repo          # or your existing repo
+sudo install -m 600 /dev/stdin /root/.restic-pass <<<"$(openssl rand -hex 24)"
+sudo RESTIC_PASSWORD_FILE=/root/.restic-pass restic init --repo "$RESTIC_REPOSITORY"
+```
+
+Cron (niced so it never starves the backup workload):
+
+```cron
+RESTIC_REPOSITORY=/srv/restic-repo
+RESTIC_PASSWORD_FILE=/root/.restic-pass
+30 4 * * * nice -n 19 ionice -c3 /opt/monitoring/backup-monitoring.sh 2>&1 | logger -t monitoring-backup
+```
+
+## 6. First-run: GlitchTip
+
+1. Browse to `http://ops:8000` and **register the first account** at
+   `/register` (allowed even with `ENABLE_USER_REGISTRATION=False`; there is no
+   default admin). You are prompted to **create an organization**, then a
+   **project** — pick platform **FastAPI**/**Python**.
+2. **Copy the DSN.** Project → *Settings → Client Keys (DSN)*. It looks like
+   `http://<public_key>@<ops-tailnet-ip>:8000/<project_id>` — it mirrors
+   `GLITCHTIP_DOMAIN`, which deliberately uses the box's **tailnet IP**: the
+   backend containers must reach it, and container DNS does not resolve
+   MagicDNS names (Docker's embedded resolver bypasses the tailnet resolver).
+   The MagicDNS name is for humans in browsers only.
+3. **Notifications:** in the project/organization settings, add an alert (email
+   via your SMTP relay, or a Slack/webhook integration) so new issues page you.
+
+## 7. Turn on error reporting in Mascope
+
+The backend has an **optional, off-by-default** GlitchTip sink (see
+`docs/maintaining.md` → Monitoring). On each Mascope server:
+
+1. **One-time network prerequisite** — the backend runs in Docker with
+   `iptables: false`, and the standing `MASCOPE NAT` block in
+   `/etc/ufw/before.rules` only masquerades container traffic leaving the WAN
+   interface. Events travel over the **tailnet**, so add a `tailscale0`
+   masquerade line next to the existing ones and reload:
+   ```
+   -A POSTROUTING -s 172.18.0.0/16 -o tailscale0 -j MASQUERADE
+   ```
+   ```sh
+   sudo ufw reload
+   # verify from inside the container before relying on it (expect HTTP 200):
+   docker exec mascope_prod_backend python3 -c \
+     "import urllib.request; print(urllib.request.urlopen('http://<ops-tailnet-ip>:8000/', timeout=5).status)"
+   ```
+2. Make sure the server runs a backend image that ships `sentry-sdk` (builds
+   from 2026-07 onward include the runtime's `[sentry]` extra — check with
+   `docker exec mascope_prod_backend python3 -c "import sentry_sdk"`; update
+   the stack if that fails).
+3. Set the DSN on the **host** — compose passes it into the backend and
+   file-converter containers:
+   ```sh
+   # append to /etc/environment, then restart the stack (mascope prod up)
+   MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
+   ```
+4. Smoke-test: `runtime.logger.error("glitchtip smoke test")` on the server (or
+   trigger any backend warning) and confirm the event appears in GlitchTip.
+   Unset the var and restart to turn reporting back off — it's a complete no-op
+   when absent.
+
+## 8. Uptime Kuma monitors
+
+There is no supported config API, so add monitors in the UI. **For each Mascope
+server:**
+
+1. **Add New Monitor** → Type **HTTP(s)**.
+2. **URL** = the server's public app URL, e.g. `https://tuni.mascope.app`
+   (goes through Cloudflare — exactly the path users take). TLS-expiry checks
+   require an `https://` target and *"Ignore TLS/SSL error"* **off**.
+3. Set a friendly name, heartbeat interval, retries.
+4. Enable **Certificate Expiry Notification** (global thresholds default to
+   **21/14/7 days** before expiry).
+5. Tick the notification channel (Settings → Notifications: email/Slack/webhook),
+   then **Save**.
+
+**Security tripwires (inverted monitors).** The fleet's origin servers must
+never answer strangers directly: port 22 is tailnet-only and 443 is
+Cloudflare-only (see the July 2026 incident notes in the fleet docs). Encode
+that as standing alarms — for each server add two **TCP Port** monitors against
+its **public IP**, ports **22** and **443**, with **Upside Down Mode** enabled
+(healthy = connection *fails*). If a firewall regresses or Docker starts
+bypassing ufw again, the "port reachable" alert fires within minutes instead of
+being discovered months later.
+
+## Notes & caveats
+
+- **GlitchTip 6** runs one all-in-one `web` container (no separate worker/beat).
+  The in-container port var is `GRANIAN_PORT`, not `PORT`; to move the port, remap
+  the host side in `compose.yaml`.
+- **Postgres 18** stores data at `/var/lib/postgresql` (not `.../data`) — the
+  volume mount reflects that. `POSTGRES_HOST_AUTH_METHOD=trust` is acceptable only
+  because Postgres has no published port; set a password to harden.
+- **`DOCKER-USER` interface**: if you hand-write firewall rules instead of
+  ufw-docker, confirm the real interface with `ip -br addr` (often not `eth0`).
+- **Resource footprint** on the shared box: budget ~1 GB RAM for GlitchTip
+  (web + Postgres + Valkey) and ~256 MB for Uptime Kuma. Trim GlitchTip's worker
+  with `VTASKS_CONCURRENCY` if constrained.
+- Pin concrete image tags (`glitchtip/glitchtip:6.x`, `louislam/uptime-kuma:2.x.y`,
+  `postgres:18.x`) before you consider this production-frozen.
