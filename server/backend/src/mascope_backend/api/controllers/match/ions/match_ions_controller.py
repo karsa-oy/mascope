@@ -7,6 +7,7 @@ from sqlalchemy import (
 
 from mascope_backend.api.controllers.match.lib.match_upsert import (
     bulk_upsert_match_level,
+    row_value,
 )
 from mascope_backend.api.controllers.match.lib.match_util import deduplicate_match_df
 from mascope_backend.api.controllers.match.lib.match_write_lock import (
@@ -329,7 +330,7 @@ async def create_match_ions(
         # Serialize with every other match writer of the affected batches;
         # holds until commit, making the upsert below race-free.
         await acquire_match_write_locks(
-            session, {mi.sample_item_id for mi in match_ions}
+            session, {row_value(mi, "sample_item_id") for mi in match_ions}
         )
         # Bulk upsert on the natural key: inserts missing rows, updates only
         # rows whose values changed, leaves identical rows untouched.

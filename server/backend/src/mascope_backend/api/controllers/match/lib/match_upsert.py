@@ -26,7 +26,7 @@ for the whole transaction, so concurrent writers serialize before any row
 lock is taken.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 
 from pydantic import BaseModel
@@ -37,6 +37,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from mascope_backend.db.id import gen_id
 
 
+def row_value(row: BaseModel | Mapping, column: str):
+    """Column accessor for pydantic-model or mapping rows."""
+    if isinstance(row, Mapping):
+        return row[column]
+    return getattr(row, column)
+
+
 async def bulk_upsert_match_level(
     session: AsyncSession,
     model: type,
@@ -45,7 +52,7 @@ async def bulk_upsert_match_level(
     value_columns: Sequence[str],
     utc_created_column: str,
     utc_modified_column: str,
-    rows: Sequence[BaseModel],
+    rows: Sequence[BaseModel | Mapping],
 ) -> tuple[int, int, list[dict]]:
     """
     Upserts one match level's rows on its natural key.
@@ -79,7 +86,7 @@ async def bulk_upsert_match_level(
     utc_now = datetime.now(timezone.utc)
 
     deduped = {
-        tuple(getattr(row, column) for column in natural_key): row for row in rows
+        tuple(row_value(row, column) for column in natural_key): row for row in rows
     }
     ordered_rows = [deduped[key] for key in sorted(deduped)]
 
@@ -110,7 +117,7 @@ async def bulk_upsert_match_level(
     params = [
         {
             id_column: gen_id(32),
-            **row.model_dump(),
+            **(row if isinstance(row, Mapping) else row.model_dump()),
             utc_created_column: utc_now,
         }
         for row in ordered_rows
