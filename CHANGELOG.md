@@ -6,6 +6,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Backend/file-converter images are now built with dependencies constrained to
+  `uv.lock` instead of re-resolving from PyPI at build time. Unconstrained
+  resolution let transitive pins drift within their specifiers - the opentfraw
+  raw reader floated from the locked 1.2.0 to 1.3.x in freshly built images,
+  which made the nightly golden-dataset reproducibility workflow fail its
+  reader-version pin on every run since it was introduced.
 - Batch match aggregation no longer exhausts process memory on large batches.
   The full-batch aggregation built one reconstructed isotope frame for the
   whole batch (samples x isotopes x collection memberships, with a dozen
