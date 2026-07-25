@@ -480,6 +480,7 @@ async def aggregate_matches(
     match_params: BaseMatchParams = None,
     match_isotopes: bool = False,
     sample_item_ids: list[str] | None = None,
+    as_frames: bool = False,
 ) -> dict:
     # Aggregate match isotopes filtered data
     aggregated_match_isotope_filtered_data_df = (
@@ -525,6 +526,24 @@ async def aggregate_matches(
         "match_collections": len(match_collections_df),
         "match_samples": len(match_samples_df),
     }
+
+    # Internal fast path (aggregate_and_create_matches): hand the frames over
+    # directly - the per-row dict payload and its category/score sort exist
+    # for JSON consumers only, and skipping them avoids materializing hundreds
+    # of thousands of dicts per large batch.
+    if as_frames:
+        aggregated_match_data_dict["data"] = {
+            "match_ions": match_ions_df,
+            "match_compounds": match_compounds_df,
+            "match_collections": match_collections_df,
+            "match_samples": match_samples_df,
+        }
+        if match_isotopes:
+            aggregated_match_data_dict["data"]["match_isotopes"] = match_isotopes_df
+        return {
+            "results": aggregated_match_data_dict["results"],
+            "data": aggregated_match_data_dict["data"],
+        }
     aggregated_match_data_dict["data"] = {
         "match_ions": match_ions_df.sort_values(
             by=["match_category", "match_score"], ascending=[False, False]
@@ -565,6 +584,7 @@ async def aggregate_and_create_matches(
     match_collections: bool = True,
     match_samples: bool = True,
     notification: UserNotification | None = None,
+    sample_item_ids: list[str] | None = None,
 ) -> dict:
     """
     Processes aggregated match data by first aggregating data based on given filters and then creating
@@ -594,6 +614,9 @@ async def aggregate_and_create_matches(
     :param match_params: Additional match parameters.
     :param notification: Optional progress notification; batch scope reports
         per-chunk progress through it (type "match_aggregate_batch").
+    :param sample_item_ids: Optional batch-scope narrowing to the affected
+        samples only (every aggregate level is per-sample, so unaffected
+        samples' stored aggregates stay valid untouched).
     :return: A dictionary with a message and log of actions taken.
     """
     # Whether this call aggregates a whole batch (rather than a single sample).
@@ -609,6 +632,15 @@ async def aggregate_and_create_matches(
         return {
             "message": str(e),
         }
+
+    # Narrow batch scope to the requested subset (intersected with the
+    # batch's actual samples so stale ids cannot widen any delete)
+    if batch_scope and sample_item_ids is not None:
+        requested = set(sample_item_ids)
+        scope_sample_item_ids = [
+            item_id for item_id in scope_sample_item_ids if item_id in requested
+        ]
+        sample_ref += f" ({len(scope_sample_item_ids)} affected samples)"
 
     level_configs = [
         (create_match_ions, MatchIonBase, "match_ions", match_ions),
@@ -653,7 +685,7 @@ async def aggregate_and_create_matches(
     # Execute the aggregation and create operations chunk by chunk
     statuses = []
     written_by_level: dict[str, int] = {}
-    sample_item_ids = set()
+    affected_sample_item_ids = set()
     any_match_data = False
     runtime.logger.info(
         f"Creating match aggregates for {sample_ref}"
@@ -668,6 +700,7 @@ async def aggregate_and_create_matches(
             target_ion_id=target_ion_id,
             match_params=match_params,
             sample_item_ids=chunk_sample_item_ids,
+            as_frames=True,
         )
         aggregate_seconds = time.perf_counter() - chunk_started
         if aggregated_result.get("results", 0) != 0:
@@ -675,11 +708,15 @@ async def aggregate_and_create_matches(
             match_data = aggregated_result.get("data", {})
 
             for create_func, model_cls, level_name, enabled in level_configs:
-                raw_data = match_data.get(level_name)
-                if not enabled or not raw_data:
+                frame = match_data.get(level_name)
+                if not enabled or frame is None or frame.empty:
                     continue
-                # Convert each data item to the corresponding Pydantic model
-                model_data = [model_cls(**item) for item in raw_data]
+                # Project the frame to the level's model columns and hand the
+                # records to the funnel directly: the values are this
+                # aggregation's own output, so the pydantic validate +
+                # re-serialize round trip would be pure overhead at hundreds
+                # of thousands of rows per large batch.
+                model_data = frame[list(model_cls.model_fields)].to_dict("records")
                 result = await create_func(model_data)
                 statuses.append(result.get("status"))
                 written_by_level[level_name] = written_by_level.get(
@@ -688,7 +725,7 @@ async def aggregate_and_create_matches(
 
                 # Collect sample_item_ids from created records
                 for record in result.get("data", []):
-                    sample_item_ids.add(record.get("sample_item_id"))
+                    affected_sample_item_ids.add(record.get("sample_item_id"))
 
         runtime.logger.debug(
             f"Aggregation chunk {chunk_index + 1}/{len(sample_chunks)}: "
@@ -715,9 +752,9 @@ async def aggregate_and_create_matches(
     ]
 
     # After all creations, emit notification events so the frontend refreshes.
-    if not sample_batch_id and sample_item_ids:
+    if not sample_batch_id and affected_sample_item_ids:
         # fetch any sample to get the batch ID
-        first_sample_item_id = next(iter(sample_item_ids))
+        first_sample_item_id = next(iter(affected_sample_item_ids))
         sample = await fetch_sample(first_sample_item_id)
         sample_batch_id = sample.sample_batch_id
 
@@ -725,7 +762,7 @@ async def aggregate_and_create_matches(
         # Batch aggregation writes every sample's matches in one final burst, so
         # a per-sample match event storm would just tell the frontend to reload N
         # times. Emit a single "batch_match_created" event for the whole batch.
-        if sample_batch_id and sample_item_ids:
+        if sample_batch_id and affected_sample_item_ids:
             await emit_record_created(
                 record_type="batch_match",
                 record_id=sample_batch_id,
@@ -735,13 +772,13 @@ async def aggregate_and_create_matches(
     else:
         # Single-sample aggregation: notify per sample so an open sample view can
         # update incrementally.
-        for sample_item_id in sample_item_ids:
+        for affected_sample_item_id in affected_sample_item_ids:
             # Emit "sample_match_created" notification event
             await emit_record_created(
                 record_type="sample_match",
-                record_id=sample_item_id,
+                record_id=affected_sample_item_id,
                 record={
-                    "sample_item_id": sample_item_id,
+                    "sample_item_id": affected_sample_item_id,
                     "sample_batch_id": sample_batch_id,
                 },
                 room=sample_batch_id,
@@ -752,11 +789,11 @@ async def aggregate_and_create_matches(
     # scoped to its sample room, so this is not the batch-chart "storm" the
     # single "batch_match_created" event above avoids - only a client actually
     # viewing that sample's peaks is in the room.
-    for sample_item_id in sample_item_ids:
+    for affected_sample_item_id in affected_sample_item_ids:
         # "target_isotope_formula" (and match category) may have changed.
         await emit_record_reload(
             record_type="peak",
-            room=sample_item_id,
+            room=affected_sample_item_id,
         )
 
     # Determine overall status
@@ -777,7 +814,7 @@ async def aggregate_and_create_matches(
     return {
         "status": status,
         "message": message,
-        "data": {"affected_sample_item_ids": list(sample_item_ids)},
+        "data": {"affected_sample_item_ids": list(affected_sample_item_ids)},
     }
 
 
