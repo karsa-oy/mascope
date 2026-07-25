@@ -40,7 +40,9 @@ class PeakDetectionGuard:
                     f"Peak detection already in progress for '{filename}'. "
                     "Please wait for the current operation to complete."
                 )
-                runtime.logger.warning(reason)
+                # Routine double-request (e.g. a double-click); the caller
+                # relays the reason to the UI.
+                runtime.logger.info(reason)
                 return False, reason
             self._files_in_progress.add(filename)
 

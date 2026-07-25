@@ -219,7 +219,9 @@ class ScanSelector:
             mask &= self._ms_type_mask()
 
         if self._bad_first_scan():
-            runtime.logger.warning(
+            # INFO: a data quirk of the file, re-evaluated on every scan
+            # selection - an affected file would emit this warning forever
+            runtime.logger.info(
                 "The first scan appears to be an outlier with abnormally high TIC. "
                 "Excluding the first scan from selection."
             )

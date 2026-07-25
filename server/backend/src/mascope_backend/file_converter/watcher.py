@@ -58,7 +58,9 @@ class FSWatcher(Thread):
                 runtime.logger.info(f"Processing {filepath}")
                 self.file_queue.put(filepath)
             except PermissionError:
-                runtime.logger.error(f"Cannot access file {filepath}, retrying...")
+                # Routine while the instrument still holds the file open: the
+                # watcher retries on its next poll, so this is not a fault.
+                runtime.logger.debug(f"Cannot access file {filepath}, retrying...")
                 files_in_progress.append([filepath, new_filesize])
                 continue
         return files_in_progress
@@ -77,7 +79,8 @@ class FSWatcher(Thread):
                 files = latest_files
                 new_files = self.on_created(new_files)
             except KeyboardInterrupt:
-                runtime.logger.critical("KeyboardInterrupt")
+                # Normal shutdown, not a fault
+                runtime.logger.info("KeyboardInterrupt")
                 self.shutdown_event.set()
             except Exception as e:
                 runtime.logger.exception(e)

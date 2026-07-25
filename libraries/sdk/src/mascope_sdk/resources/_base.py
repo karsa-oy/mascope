@@ -26,7 +26,8 @@ def _coerce_datetime_columns(df: pd.DataFrame) -> pd.DataFrame:
             try:
                 df[col] = pd.to_datetime(df[col], utc=is_utc)
             except Exception as e:
-                logger.warning(f"Failed to convert column {col} to datetime: {e}")
+                # INFO: fires per column per DataFrame on odd data
+                logger.info(f"Failed to convert column {col} to datetime: {e}")
     return df
 
 

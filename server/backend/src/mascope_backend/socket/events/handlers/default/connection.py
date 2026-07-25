@@ -65,7 +65,9 @@ async def connect(sid: str, environ: dict) -> bool:
         return True
 
     except SocketUnauthenticatedError as e:
-        runtime.logger.error(
+        # Routine: every visitor without a valid login cookie lands here (and
+        # every open tab after a session expires), so this is not a fault.
+        runtime.logger.info(
             f"User socket session authentication failed: {str(e)} [Worker {worker_pid}]"
         )
         return True

@@ -41,7 +41,8 @@ async def fetch_sample_item_ids(
             )
             sample_items = results.scalars().all()
             if not sample_items:
-                runtime.logger.warning(
+                # Routine not-found condition
+                runtime.logger.info(
                     f"No sample items found for sample batch with ID '{sample_batch_id}'"
                 )
             sample_item_ids = [item.sample_item_id for item in sample_items]

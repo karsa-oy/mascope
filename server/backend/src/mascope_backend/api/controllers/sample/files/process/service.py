@@ -180,7 +180,9 @@ async def auto_process_sample_file(
             ionization_mode_name = (
                 ionization_mode.ionization_mode_name if ionization_mode else "unknown"
             )
-            runtime.logger.warning(
+            # INFO: reflects the user's collection configuration and fires for
+            # every ingested file while unset
+            runtime.logger.info(
                 f"Skipping m/z calibration for sample '{sample['sample_item_name']}': "
                 "Calibration collection is not set for the ionization mode "
                 f"'{ionization_mode_name}'."
@@ -571,7 +573,7 @@ async def create_acquisition_batches_and_items(
                     )
 
                 if not target_collection_ids:
-                    runtime.logger.warning(
+                    runtime.logger.info(
                         "No "
                         f"{', '.join(sample_batch_config.ACQUISITION_COLLECTION_TYPES)}"
                         " target collections found for ACQUISITION batch"
@@ -669,7 +671,9 @@ async def calibrate_with_retry(
                     mz_calibration_params.refine_window = (
                         mz_calibration_params.mz_error_tolerance + 1
                     )
-                runtime.logger.warning(
+                # INFO: a retry that usually succeeds; the final give-up above
+                # is what logs at ERROR
+                runtime.logger.info(
                     "Not enough calibration peaks with m/z error tolerance "
                     f"{old_tolerance}, retrying m/z calibration for sample "
                     f"{sample['sample_item_name']} with "
