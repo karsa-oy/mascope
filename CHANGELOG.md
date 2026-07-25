@@ -48,6 +48,16 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   configuration on upgrade (missing keys fall back to defaults). A host
   configured with an explicit `http://` scheme is now respected for
   plain-HTTP servers.
+- Batch match aggregation is roughly twice as fast on large batches (a full
+  re-create of a 2268-sample stress batch drops from ~9 to ~5 minutes, with
+  bit-identical results). The match create funnels now write each level as a
+  single bulk `INSERT .. ON CONFLICT DO UPDATE .. WHERE row IS DISTINCT FROM
+  excluded` statement instead of a per-row ORM read-then-diff loop; the ion
+  and compound aggregations group on id columns instead of up to 15 label
+  strings; and the aggregation chunk size adapts to the batch's target-chain
+  shape instead of a fixed sample count. Per-chunk aggregate/create timings
+  are logged at debug level so production refreshes show where aggregation
+  time goes.
 
 ## [1.4.2] - 2026.07.25
 
