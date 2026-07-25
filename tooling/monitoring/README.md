@@ -1,8 +1,11 @@
 # Monitoring stack — GlitchTip + Uptime Kuma
 
 Self-hosted monitoring for the Mascope fleet, meant to run on the internal
-backup box **`ops`** (LAN `192.168.1.88`, tailnet `100.96.42.122` / MagicDNS
-`ops`), reachable from the LAN and the tailnet only, plain HTTP:
+monitoring box (referred to as **`ops`** below), reachable from the LAN and the
+tailnet only, plain HTTP. Concrete addresses are deliberately kept out of this
+public repo — where you see `<ops-tailnet-ip>` or `<lan-subnet>`, substitute
+the real values (on the box: `tailscale ip -4`; private fleet docs have the
+rest):
 
 - **GlitchTip** — error tracking. Mascope's backend forwards `WARNING`/`ERROR`
   log records (with tracebacks and request context) so you stop grepping log
@@ -46,7 +49,7 @@ Host-level rules cover SSH.
 # host-level (INPUT chain): SSH from the LAN and the tailnet
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp     # SSH (LAN)
+sudo ufw allow from <lan-subnet> to any port 22 proto tcp       # SSH (LAN)
 sudo ufw allow in on tailscale0 to any port 22 proto tcp        # SSH (tailnet)
 sudo ufw enable
 
@@ -56,10 +59,10 @@ sudo wget -O /usr/local/bin/ufw-docker \
 sudo chmod +x /usr/local/bin/ufw-docker
 sudo ufw-docker install
 sudo systemctl restart ufw
-sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 8000   # GlitchTip (LAN)
-sudo ufw route allow proto tcp from 192.168.1.0/24 to any port 3001   # Uptime Kuma (LAN)
-sudo ufw route allow proto tcp from 100.64.0.0/10  to any port 8000   # GlitchTip (tailnet)
-sudo ufw route allow proto tcp from 100.64.0.0/10  to any port 3001   # Uptime Kuma (tailnet)
+sudo ufw route allow proto tcp from <lan-subnet>  to any port 8000   # GlitchTip (LAN)
+sudo ufw route allow proto tcp from <lan-subnet>  to any port 3001   # Uptime Kuma (LAN)
+sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 8000   # GlitchTip (tailnet)
+sudo ufw route allow proto tcp from 100.64.0.0/10 to any port 3001   # Uptime Kuma (tailnet)
 ```
 
 (`100.64.0.0/10` is the Tailscale CGNAT range every tailnet node gets its
@@ -88,9 +91,9 @@ cd /opt/uptime-kuma
 docker compose up -d
 ```
 
-Open `http://ops:3001` (or `http://192.168.1.88:3001` from a non-tailnet LAN
-machine) and create the admin account on first load (see
-[§8](#8-uptime-kuma-monitors)).
+Open `http://ops:3001` (MagicDNS, from any tailnet machine; use the box's LAN
+IP from a non-tailnet LAN machine) and create the admin account on first load
+(see [§8](#8-uptime-kuma-monitors)).
 
 ## 5. Backups
 
@@ -122,11 +125,11 @@ RESTIC_PASSWORD_FILE=/root/.restic-pass
    default admin). You are prompted to **create an organization**, then a
    **project** — pick platform **FastAPI**/**Python**.
 2. **Copy the DSN.** Project → *Settings → Client Keys (DSN)*. It looks like
-   `http://<public_key>@100.96.42.122:8000/<project_id>` — it mirrors
+   `http://<public_key>@<ops-tailnet-ip>:8000/<project_id>` — it mirrors
    `GLITCHTIP_DOMAIN`, which deliberately uses the box's **tailnet IP**: the
    backend containers must reach it, and container DNS does not resolve
    MagicDNS names (Docker's embedded resolver bypasses the tailnet resolver).
-   The `ops` name is for humans in browsers only.
+   The MagicDNS name is for humans in browsers only.
 3. **Notifications:** in the project/organization settings, add an alert (email
    via your SMTP relay, or a Slack/webhook integration) so new issues page you.
 
@@ -147,14 +150,14 @@ The backend has an **optional, off-by-default** GlitchTip sink (see
    sudo ufw reload
    # verify from inside the container before relying on it (expect HTTP 200):
    docker exec mascope_prod_backend python3 -c \
-     "import urllib.request; print(urllib.request.urlopen('http://100.96.42.122:8000/', timeout=5).status)"
+     "import urllib.request; print(urllib.request.urlopen('http://<ops-tailnet-ip>:8000/', timeout=5).status)"
    ```
 2. Install the extra: `uv pip install "mascope_runtime[sentry]"` (or add the
    `sentry` extra to the backend image build).
 3. Set the DSN in the **backend service environment only** (scopes reporting to
    the API server):
    ```sh
-   MASCOPE_SENTRY_DSN=http://<public_key>@100.96.42.122:8000/<project_id>
+   MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
    ```
 4. Restart the backend. Smoke-test: `runtime.logger.error("glitchtip smoke test")`
    and confirm the event appears in GlitchTip. Unset the var anywhere you don't

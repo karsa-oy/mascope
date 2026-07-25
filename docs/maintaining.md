@@ -278,7 +278,7 @@ entirely on one environment variable:
 
 ```sh
 # on each Mascope server, in the backend service environment:
-MASCOPE_SENTRY_DSN=http://<public_key>@100.96.42.122:8000/<project_id>
+MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
 ```
 
 The DSN targets the monitoring box's **tailnet IP** — events travel over

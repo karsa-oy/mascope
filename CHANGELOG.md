@@ -7,8 +7,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Added
 
 - Self-hosted monitoring stack under `tooling/monitoring/` (GlitchTip error
-  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to the
-  internal ops box with a copy-paste runbook: compose files, DOCKER-USER
+  tracking + Uptime Kuma uptime/TLS-expiry monitoring), deployable to an
+  internal monitoring box with a copy-paste runbook: compose files, DOCKER-USER
   firewall rules restricting the published ports to LAN + tailnet (plain ufw
   cannot filter Docker-published ports), a restic backup script for the new
   volumes, and Uptime Kuma monitor guidance including inverted port-22/443
