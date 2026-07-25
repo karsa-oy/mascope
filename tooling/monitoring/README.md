@@ -152,16 +152,20 @@ The backend has an **optional, off-by-default** GlitchTip sink (see
    docker exec mascope_prod_backend python3 -c \
      "import urllib.request; print(urllib.request.urlopen('http://<ops-tailnet-ip>:8000/', timeout=5).status)"
    ```
-2. Install the extra: `uv pip install "mascope_runtime[sentry]"` (or add the
-   `sentry` extra to the backend image build).
-3. Set the DSN in the **backend service environment only** (scopes reporting to
-   the API server):
+2. Make sure the server runs a backend image that ships `sentry-sdk` (builds
+   from 2026-07 onward include the runtime's `[sentry]` extra — check with
+   `docker exec mascope_prod_backend python3 -c "import sentry_sdk"`; update
+   the stack if that fails).
+3. Set the DSN on the **host** — compose passes it into the backend and
+   file-converter containers:
    ```sh
+   # append to /etc/environment, then restart the stack (mascope prod up)
    MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
    ```
-4. Restart the backend. Smoke-test: `runtime.logger.error("glitchtip smoke test")`
-   and confirm the event appears in GlitchTip. Unset the var anywhere you don't
-   want reporting — it's a complete no-op when absent.
+4. Smoke-test: `runtime.logger.error("glitchtip smoke test")` on the server (or
+   trigger any backend warning) and confirm the event appears in GlitchTip.
+   Unset the var and restart to turn reporting back off — it's a complete no-op
+   when absent.
 
 ## 8. Uptime Kuma monitors
 

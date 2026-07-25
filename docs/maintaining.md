@@ -273,11 +273,13 @@ entirely on one environment variable:
 
 - Unset `MASCOPE_SENTRY_DSN` (the default) - no SDK import, no reporting, zero
   behavior change.
-- Set it to a GlitchTip project DSN **on the backend service only** - the
-  backend installs a loguru sink that reports WARNING+ events.
+- Set it to a GlitchTip project DSN on the **host** - `docker compose` passes it
+  into the backend and file-converter containers, which install a loguru sink
+  that reports WARNING+ events.
 
 ```sh
-# on each Mascope server, in the backend service environment:
+# on each Mascope server: append to /etc/environment (read by mascope.service),
+# then bring the stack up again so the containers pick it up:
 MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
 ```
 
@@ -287,11 +289,11 @@ DNS cannot resolve MagicDNS names). One-time per server: the backend container
 needs a `tailscale0` masquerade line in the `MASCOPE NAT` block; see the
 [monitoring runbook](../tooling/monitoring/README.md) step 7.1.
 
-Requires the optional dependency (`mascope_runtime[sentry]`, i.e. `sentry-sdk`).
-The event `environment` is the runtime mode and `release` follows
-`MASCOPE_VERSION` when set, so events group by deployment. Keep the DSN set only
-on the backend to scope reporting to the API server. Full setup - creating the
-project, copying the DSN, and the Uptime Kuma monitors - is in the
+Backend images ship `sentry-sdk` (the runtime's `[sentry]` extra) since
+2026-07, so there is nothing to install per server; the DSN alone toggles
+reporting. The event `environment` is the runtime mode and `release` follows
+`MASCOPE_VERSION` when set, so events group by deployment. Full setup -
+creating the project, copying the DSN, and the Uptime Kuma monitors - is in the
 [monitoring runbook](../tooling/monitoring/README.md).
 
 ## Files and secrets

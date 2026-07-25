@@ -4,6 +4,15 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- GlitchTip error reporting is now actually deployable: backend images ship
+  `sentry-sdk` (the runtime's `[sentry]` extra), and `docker compose` passes
+  `MASCOPE_SENTRY_DSN` from the host into the backend and file-converter
+  containers. Previously the DSN never reached the container and the SDK was
+  missing from the image, so enabling reporting per the runbook had no effect.
+  Reporting remains off unless the DSN is set.
+
 ### Added
 
 - Self-hosted monitoring stack under `tooling/monitoring/` (GlitchTip error
