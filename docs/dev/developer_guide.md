@@ -397,17 +397,17 @@ When you instantiate a Mascope runtime instance for some module, you can access 
 
 ```py
 # server/backend/src/mascope_backend/runtime.py
-runtime = Runtime('backend')
+runtime = Runtime("backend")
 
 # elsewhere
 from mascope_backend.runtime import runtime
 
 # works
-print(runtime.meta.api_port) # global config is under .meta
-print(runtime.config.database) # backend specific config is under .config
+print(runtime.meta.api_port)  # global config is under .meta
+print(runtime.config.database)  # backend specific config is under .config
 
 # throws
-print(runtime.file_converter.threads) # other modules are not exposed
+print(runtime.file_converter.threads)  # other modules are not exposed
 
 runtime.logger.debug("who broke my code?")
 runtime.logger.info("so normal, so boring....")
@@ -756,7 +756,7 @@ For example the File converter streamer thread is used as a key:
 ```py
 class FSWatcher(Thread):
     def __init__(
-      # ...
+        # ...
     ):
         Thread.__init__(self)
         self.log = runtime.logger.bind(key=self.name)
@@ -905,15 +905,15 @@ from mascope_backend.socket.records import (
     emit_record_created,
     emit_record_updated,
     emit_record_deleted,
-    emit_record_reload
+    emit_record_reload,
 )
 
 # Emit record creation (broadcast or to specific room)
 await emit_record_created(
-    record_type="batch",           # Frontend store name
-    record_id=str(batch.sample_batch_id),       # Record ID should be string
-    record=batch_dict,             # Full record as dict
-    room=dataset_id              # Optional: target specific room
+    record_type="batch",  # Frontend store name
+    record_id=str(batch.sample_batch_id),  # Record ID should be string
+    record=batch_dict,  # Full record as dict
+    room=dataset_id,  # Optional: target specific room
 )
 
 # Full update
@@ -929,16 +929,13 @@ await emit_record_updated(
     record_type="batch",
     record_id=str(batch.sample_batch_id),
     record={"status": "ready"},
-    changed_fields=["status"]
+    changed_fields=["status"],
 )
 
 # Deletion
 await emit_record_deleted(
-    record_type="batch",
-    record_id=str(batch.sample_batch_id),
-    room=dataset_id
+    record_type="batch", record_id=str(batch.sample_batch_id), room=dataset_id
 )
-
 ```
 
 Events follow the naming convention `{record_type}_{operation}` (e.g., `batch_created`, `batch_updated`, `batch_deleted`). The `record_type` should match the frontend store name for automatic handling.
@@ -1001,8 +998,7 @@ Global RBAC dependencies check the user's system-wide role. They are defined in 
 
 ```python
 @router.get("/api/resource")
-async def resource_route(user: User = Depends(admin_user)):
-    ...
+async def resource_route(user: User = Depends(admin_user)): ...
 ```
 
 Available dependencies: `guest_user`, `editor_user`, `admin_user`, and `owner_user`.
@@ -1026,14 +1022,14 @@ Use a dependency factory. FastAPI caches `Depends()` calls, so `current_active_u
 ```python
 from mascope_backend.api.new.workspaces.dependencies import require_sample_role
 
+
 @router.get("/{sample_item_id}/data")
 @api_route(token_access=True)
 async def get_sample_data(
     sample_item_id: str,
     user: User = Depends(current_active_user),
     membership=Depends(require_sample_role("guest")),
-):
-    ...
+): ...
 ```
 
 Available factories: `require_workspace_role`, `require_dataset_role`, `require_dataset_query_role`, `require_batch_role`, `require_sample_role`.
@@ -1044,6 +1040,7 @@ Call an explicit check function inside the route handler:
 
 ```python
 from mascope_backend.api.new.workspaces.dependencies import check_batch_access_bulk
+
 
 @router.post("/rematch/batches")
 @api_route(status_code=202)
