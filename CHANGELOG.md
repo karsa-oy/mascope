@@ -4,6 +4,17 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- The File Agent setup wizard no longer reports a working connection when
+  the configured address is a web server that is not the Mascope API. Any
+  single-page-app server (such as the Vite frontend dev server in
+  development setups, which cannot receive uploads) answers a GET with the
+  app page and HTTP 200; verification now requires a JSON API response and
+  explains which address to use instead. Uploads rejected with 404/422 also
+  fail fast with a pointed error instead of burning ten 30-second retries
+  on a response that cannot change.
+
 ## [1.4.3] - 2026.07.25
 
 ### Fixed
