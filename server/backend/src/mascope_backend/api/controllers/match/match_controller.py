@@ -14,9 +14,6 @@ from mascope_backend.api.controllers.match.lib.match_compute import (
     compute_and_create_sample_match_isotope_data,
 )
 from mascope_backend.api.controllers.match.lib.match_remove import remove_matches
-from mascope_backend.api.controllers.match.samples.match_samples_controller import (
-    delete_match_samples,
-)
 from mascope_backend.api.controllers.sample.batches.status.service import (
     update_sample_batch_status,
 )
@@ -1252,28 +1249,37 @@ async def match_compute_batch(
         )
     else:
         try:
+            # Per-chunk progress: on a large batch the aggregation runs for
+            # minutes after the per-sample bar reaches 100%, so it reports
+            # its own phase through the same tracked process.
+            aggregation_notification = UserNotification(
+                process_id=process_id,
+                parent_id=parent_id,
+                type="match_aggregate_batch",
+                status="pending",
+                message=f"Aggregating matches for sample batch '{sample_batch_name}'",
+                data={
+                    "sample_batch_id": sample_batch_id,
+                    "_room_ids": [sample_batch_id],
+                    "_user_id": user_id,
+                },
+            )
             match_aggregate_result = await aggregate_and_create_matches(
-                sample_batch_id=sample_batch_id
+                sample_batch_id=sample_batch_id,
+                notification=aggregation_notification,
             )
         except Exception as e:
             aggregation_failed = True
             match_aggregate_result = {}
+            # No cleanup needed here: aggregate_and_create_matches clears the
+            # scope's MatchSample rows up front and restores them chunk by
+            # chunk, so any failure - including a process kill this handler
+            # would never see - already leaves the completeness probe above
+            # reporting incomplete for the next refresh.
             runtime.logger.error(
                 f"Higher-level match aggregation failed for sample batch "
                 f"'{sample_batch_name}': {e}"
             )
-            # Break the aggregate-completeness invariant that the skip above
-            # relies on: without MatchSample rows, the next refresh probes as
-            # incomplete and re-aggregates instead of trusting a half-written
-            # aggregation. Best-effort - the original error already set the
-            # batch outcome.
-            try:
-                await delete_match_samples(sample_batch_id=sample_batch_id)
-            except Exception as cleanup_error:
-                runtime.logger.warning(
-                    f"Could not clear match samples after failed aggregation "
-                    f"for sample batch '{sample_batch_name}': {cleanup_error}"
-                )
     match_aggregate_status = match_aggregate_result.get("status")
     if match_aggregate_status in ("success", "partial"):
         runtime.logger.debug(

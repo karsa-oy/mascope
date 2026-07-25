@@ -1,3 +1,5 @@
+import asyncio
+
 import pandas as pd
 from sqlalchemy import (
     select,
@@ -24,6 +26,7 @@ from mascope_backend.api.controllers.match.lib.match_aggregate import (
 from mascope_backend.api.controllers.match.lib.match_remove import remove_matches
 from mascope_backend.api.controllers.match.samples.match_samples_controller import (
     create_match_samples,
+    delete_match_samples,
 )
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
@@ -66,6 +69,10 @@ from mascope_backend.db import (
     async_session,
 )
 from mascope_backend.runtime import runtime
+from mascope_backend.socket.notifications import (
+    UserNotification,
+    send_progress_user_notification,
+)
 from mascope_backend.socket.records.service import (
     emit_record_created,
     emit_record_reload,
@@ -74,12 +81,21 @@ from mascope_file.name import get_instrument_type
 from mascope_match.params import BaseMatchParams
 
 
+# Samples aggregated per pass in batch scope. The reconstructed isotope frame
+# is O(samples x isotopes x collection memberships) with a dozen string
+# columns, so a whole large batch at once does not fit in memory (a
+# 2306-sample production batch OOM-killed its worker). Every aggregate level
+# is per-sample, so chunking bounds peak memory without changing any result.
+BATCH_AGGREGATION_CHUNK_SIZE = 200
+
+
 @api_controller()
 async def aggregate_match_isotope_filtered_data(
     sample_batch_id: str = None,
     sample_item_id: str = None,
     target_ion_id: str = None,
     match_params: BaseMatchParams = None,
+    sample_item_ids: list[str] | None = None,
 ) -> pd.DataFrame:
     async with async_session() as session:
         # Step 1: Verify existence of the entities and fetch required data
@@ -122,6 +138,12 @@ async def aggregate_match_isotope_filtered_data(
         if sample_item_id is not None:
             sample_query = sample_query.where(Sample.sample_item_id == sample_item_id)
 
+        # Scope to an explicit sample subset (chunked batch aggregation)
+        if sample_item_ids is not None:
+            sample_query = sample_query.where(
+                Sample.sample_item_id.in_(sample_item_ids)
+            )
+
         sample_result = await session.execute(sample_query)
         samples_df = pd.DataFrame([row._asdict() for row in sample_result.fetchall()])
 
@@ -132,6 +154,7 @@ async def aggregate_match_isotope_filtered_data(
             runtime.logger.info(message)
             return samples_df
 
+        # From here on, the in-scope samples (narrows any subset filter above)
         sample_item_ids = samples_df["sample_item_id"].tolist()
 
         # Get all ionization mechanism ids related to the samples in the batch
@@ -255,75 +278,111 @@ async def aggregate_match_isotope_filtered_data(
                 + MATCH_ISOTOPE_VALUE_COLUMNS
             )
 
-        # Reconstruct the unmatched isotopes that are no longer stored, so the
-        # isotope table and all higher-level aggregates match the pre-change
-        # behavior (unmatched rows contribute 0 to every aggregate).
-        match_isotopes_df = reconstruct_full_isotope_frame(
-            match_isotopes_df, samples_df, targets_df
+        # Assemble and filter the frame in a worker thread: this is pure
+        # CPU-bound pandas work that would otherwise block the event loop
+        # (starving health checks and every other request on this worker)
+        # for the duration of a large-scope aggregation.
+        aggregated_match_isotope_filtered_data_df = await asyncio.to_thread(
+            _assemble_filtered_isotope_frame,
+            match_isotopes_df,
+            samples_df,
+            targets_df,
+            match_params,
         )
-        if match_isotopes_df.empty:
+        if aggregated_match_isotope_filtered_data_df.empty:
             runtime.logger.info(
                 f"No match isotopes found for the sample batch '{sample_batch.sample_batch_name}'"
             )
-            return match_isotopes_df
-
-        # Merge DataFrames
-        combined_sample_match_isotopes_df = pd.merge(
-            match_isotopes_df, samples_df, on="sample_item_id", how="inner"
-        )
-        aggregated_sample_match_isotope_data_df = pd.merge(
-            combined_sample_match_isotopes_df,
-            targets_df,
-            on="target_isotope_id",
-            how="inner",
-        )
-
-        # Define the desired column order
-        column_order = [
-            "sample_item_id",
-            "filename",
-            "instrument",
-            "sample_item_name",
-            "sample_item_type",
-            "polarity",
-            "target_collection_id",
-            "target_collection_name",
-            "target_collection_description",
-            "target_collection_type",
-            "target_compound_id",
-            "target_compound_formula",
-            "target_compound_name",
-            "target_ion_id",
-            "target_ion_formula",
-            "filter_params",
-            "ionization_mechanism",
-            "target_isotope_id",
-            "target_isotope_formula",
-            "mz",
-            "relative_abundance",
-            "resolution",
-            "match_mz_error",
-            "match_abundance_error",
-            "sample_peak_intensity",
-            "sample_peak_intensity_relative",
-            "sample_peak_mz",
-            "sample_peak_tof",
-            "match_score",
-        ]
-
-        # Reorder the columns according to the defined order and sort the DataFrame by 'mz'
-        aggregated_sample_match_isotope_data_df = (
-            aggregated_sample_match_isotope_data_df[column_order]
-            .sort_values(by="mz", kind="mergesort")
-            .reset_index(drop=True)
-        )
-
-        # Step 5: Apply match_params (provided may be None) filtering match_score, sample_peak_intensity, setting match_category
-        aggregated_match_isotope_filtered_data_df = apply_match_params(
-            aggregated_sample_match_isotope_data_df, match_params
-        )
 
         return aggregated_match_isotope_filtered_data_df
+
+
+def _assemble_filtered_isotope_frame(
+    match_isotopes_df: pd.DataFrame,
+    samples_df: pd.DataFrame,
+    targets_df: pd.DataFrame,
+    match_params: BaseMatchParams | None,
+) -> pd.DataFrame:
+    """
+    Builds the filtered isotope frame from the fetched inputs: reconstructs
+    the unstored zero-score rows, merges in sample and target context, orders
+    and sorts, and applies the match parameters. Pure pandas - safe to run in
+    a worker thread.
+
+    :param match_isotopes_df: Stored match isotope rows for the in-scope samples.
+    :type match_isotopes_df: pd.DataFrame
+    :param samples_df: In-scope samples with their metadata columns.
+    :type samples_df: pd.DataFrame
+    :param targets_df: The batch's target chain rows.
+    :type targets_df: pd.DataFrame
+    :param match_params: Optional match parameters for read-time filtering.
+    :type match_params: BaseMatchParams | None
+    :return: The filtered isotope frame; empty when nothing reconstructs.
+    :rtype: pd.DataFrame
+    """
+    # Reconstruct the unmatched isotopes that are no longer stored, so the
+    # isotope table and all higher-level aggregates match the pre-change
+    # behavior (unmatched rows contribute 0 to every aggregate).
+    match_isotopes_df = reconstruct_full_isotope_frame(
+        match_isotopes_df, samples_df, targets_df
+    )
+    if match_isotopes_df.empty:
+        return match_isotopes_df
+
+    # Merge DataFrames
+    combined_sample_match_isotopes_df = pd.merge(
+        match_isotopes_df, samples_df, on="sample_item_id", how="inner"
+    )
+    aggregated_sample_match_isotope_data_df = pd.merge(
+        combined_sample_match_isotopes_df,
+        targets_df,
+        on="target_isotope_id",
+        how="inner",
+    )
+
+    # Define the desired column order
+    column_order = [
+        "sample_item_id",
+        "filename",
+        "instrument",
+        "sample_item_name",
+        "sample_item_type",
+        "polarity",
+        "target_collection_id",
+        "target_collection_name",
+        "target_collection_description",
+        "target_collection_type",
+        "target_compound_id",
+        "target_compound_formula",
+        "target_compound_name",
+        "target_ion_id",
+        "target_ion_formula",
+        "filter_params",
+        "ionization_mechanism",
+        "target_isotope_id",
+        "target_isotope_formula",
+        "mz",
+        "relative_abundance",
+        "resolution",
+        "match_mz_error",
+        "match_abundance_error",
+        "sample_peak_intensity",
+        "sample_peak_intensity_relative",
+        "sample_peak_mz",
+        "sample_peak_tof",
+        "match_score",
+    ]
+
+    # Reorder the columns according to the defined order and sort the DataFrame by 'mz'
+    aggregated_sample_match_isotope_data_df = (
+        aggregated_sample_match_isotope_data_df[column_order]
+        .sort_values(by="mz", kind="mergesort")
+        .reset_index(drop=True)
+    )
+
+    # Apply match_params (provided may be None) filtering match_score,
+    # sample_peak_intensity, setting match_category
+    return apply_match_params(aggregated_sample_match_isotope_data_df, match_params)
 
 
 @api_controller()
@@ -333,6 +392,7 @@ async def aggregate_matches(
     target_ion_id: str = None,
     match_params: BaseMatchParams = None,
     match_isotopes: bool = False,
+    sample_item_ids: list[str] | None = None,
 ) -> dict:
     # Aggregate match isotopes filtered data
     aggregated_match_isotope_filtered_data_df = (
@@ -341,6 +401,7 @@ async def aggregate_matches(
             sample_item_id=sample_item_id,
             target_ion_id=target_ion_id,
             match_params=match_params,
+            sample_item_ids=sample_item_ids,
         )
     )
     if aggregated_match_isotope_filtered_data_df.empty:
@@ -416,23 +477,36 @@ async def aggregate_and_create_matches(
     match_compounds: bool = True,
     match_collections: bool = True,
     match_samples: bool = True,
+    notification: UserNotification | None = None,
 ) -> dict:
     """
     Processes aggregated match data by first aggregating data based on given filters and then creating
     entries for each type of match data. After creating the entries, emit notification events for each
     affected sample item.
 
+    Batch scope runs in bounded sample chunks (BATCH_AGGREGATION_CHUNK_SIZE):
+    every aggregate level is per-sample, so chunking bounds peak memory
+    without changing any persisted value. When the match_samples level is
+    enabled, the scope's MatchSample rows are cleared up front and restored
+    chunk by chunk - they are the aggregation-completeness signal for
+    match_compute_batch's skip probe, and clearing them first makes the
+    signal crash-safe (an OOM kill mid-aggregation leaves the probe
+    reporting incomplete).
+
     Note: For notification events, all samples are assumed to belong to the same sample batch.
 
     Steps:
-    1. Aggregate match data based on the provided parameters.
-    2. If data exists, create entries for each type of aggregated match data.
-    3. Report on the success or lack of data for each operation.
+    1. Resolve the sample scope and split it into chunks (batch scope only).
+    2. Clear the scope's MatchSample rows (when that level is enabled).
+    3. Per chunk: aggregate match data and create entries for each enabled level.
+    4. Report on the success or lack of data across all operations.
 
     :param sample_batch_id: ID of the sample batch.
     :param sample_item_id: ID of the sample item.
     :param target_ion_id: ID of the target ion.
     :param match_params: Additional match parameters.
+    :param notification: Optional progress notification; batch scope reports
+        per-chunk progress through it (type "match_aggregate_batch").
     :return: A dictionary with a message and log of actions taken.
     """
     # Whether this call aggregates a whole batch (rather than a single sample).
@@ -441,88 +515,107 @@ async def aggregate_and_create_matches(
     batch_scope = sample_item_id is None and sample_batch_id is not None
 
     try:
-        _, sample_ref = await fetch_sample_item_ids(sample_item_id, sample_batch_id)
+        scope_sample_item_ids, sample_ref = await fetch_sample_item_ids(
+            sample_item_id, sample_batch_id
+        )
     except NotFoundException as e:
         return {
             "message": str(e),
         }
 
-    # Aggregate the match data
-    aggregated_result = await aggregate_matches(
-        sample_batch_id=sample_batch_id,
-        sample_item_id=sample_item_id,
-        target_ion_id=target_ion_id,
-        match_params=match_params,
+    level_configs = [
+        (create_match_ions, MatchIonBase, "match_ions", match_ions),
+        (create_match_compounds, MatchCompoundBase, "match_compounds", match_compounds),
+        (
+            create_match_collections,
+            MatchCollectionBase,
+            "match_collections",
+            match_collections,
+        ),
+        (create_match_samples, MatchSampleBase, "match_samples", match_samples),
+    ]
+    if not any(enabled for _, _, _, enabled in level_configs):
+        message = f"No match data types selected for creation for {sample_ref}"
+        runtime.logger.info(message)
+        return {"message": message}
+
+    # Batch scope aggregates in bounded sample chunks: every aggregate level
+    # is per-sample, so chunking changes peak memory from O(batch) to
+    # O(chunk) without changing any persisted value (see
+    # BATCH_AGGREGATION_CHUNK_SIZE).
+    if batch_scope:
+        sample_chunks = [
+            scope_sample_item_ids[i : i + BATCH_AGGREGATION_CHUNK_SIZE]
+            for i in range(0, len(scope_sample_item_ids), BATCH_AGGREGATION_CHUNK_SIZE)
+        ]
+    else:
+        # Single pass; the sample_item_id parameter scopes the aggregation
+        sample_chunks = [None]
+
+    # Crash-safe completeness marker: MatchSample rows are the "aggregation
+    # completed" signal for match_compute_batch's skip probe, so clear them
+    # for the whole scope up front - the per-chunk creates below restore them
+    # sample by sample. ANY death mid-aggregation (exception, OOM kill,
+    # worker restart) then leaves the probe reporting incomplete instead of
+    # trusting stale aggregates next to freshly stored isotopes.
+    if match_samples:
+        await delete_match_samples(sample_item_ids=scope_sample_item_ids)
+
+    # Execute the aggregation and create operations chunk by chunk
+    statuses = []
+    written_by_level: dict[str, int] = {}
+    sample_item_ids = set()
+    any_match_data = False
+    runtime.logger.info(
+        f"Creating match aggregates for {sample_ref}"
+        + (f" in {len(sample_chunks)} chunk(s)" if len(sample_chunks) > 1 else "")
     )
 
-    if aggregated_result.get("results", 0) == 0:
+    for chunk_index, chunk_sample_item_ids in enumerate(sample_chunks):
+        aggregated_result = await aggregate_matches(
+            sample_batch_id=sample_batch_id,
+            sample_item_id=sample_item_id,
+            target_ion_id=target_ion_id,
+            match_params=match_params,
+            sample_item_ids=chunk_sample_item_ids,
+        )
+        if aggregated_result.get("results", 0) != 0:
+            any_match_data = True
+            match_data = aggregated_result.get("data", {})
+
+            for create_func, model_cls, level_name, enabled in level_configs:
+                raw_data = match_data.get(level_name)
+                if not enabled or not raw_data:
+                    continue
+                # Convert each data item to the corresponding Pydantic model
+                model_data = [model_cls(**item) for item in raw_data]
+                result = await create_func(model_data)
+                statuses.append(result.get("status"))
+                written_by_level[level_name] = written_by_level.get(
+                    level_name, 0
+                ) + len(result.get("data", []))
+
+                # Collect sample_item_ids from created records
+                for record in result.get("data", []):
+                    sample_item_ids.add(record.get("sample_item_id"))
+
+        # Report per-chunk progress so a minutes-long batch aggregation is
+        # visible in the UI after the compute phase's bar completes
+        if notification is not None and batch_scope:
+            notification.data["_item_index"] = chunk_index
+            notification.data["_total_samples"] = len(sample_chunks)
+            await send_progress_user_notification(notification, 1.0)
+
+    if not any_match_data:
         message = f"No match data found for {sample_ref}"
         return {
             "message": message,
         }
 
-    match_data = aggregated_result.get("data", {})
-
-    # Build operations list
-    create_operations = []
-    if match_ions and match_data.get("match_ions"):
-        create_operations.append(
-            (
-                create_match_ions,
-                match_data.get("match_ions", []),
-                MatchIonBase,
-                "match_ions",
-            )
-        )
-    if match_compounds and match_data.get("match_compounds"):
-        create_operations.append(
-            (
-                create_match_compounds,
-                match_data.get("match_compounds", []),
-                MatchCompoundBase,
-                "match_compounds",
-            )
-        )
-    if match_collections and match_data.get("match_collections"):
-        create_operations.append(
-            (
-                create_match_collections,
-                match_data.get("match_collections", []),
-                MatchCollectionBase,
-                "match_collections",
-            )
-        )
-    if match_samples and match_data.get("match_samples"):
-        create_operations.append(
-            (
-                create_match_samples,
-                match_data.get("match_samples", []),
-                MatchSampleBase,
-                "match_samples",
-            )
-        )
-
-    if not create_operations:
-        message = f"No match data types selected for creation for {sample_ref}"
-        runtime.logger.info(message)
-        return {"message": message}
-
-    # Execute operations
-    statuses = []
-    messages = []
-    sample_item_ids = set()
-    runtime.logger.info(f"Creating match aggregates for {sample_ref}")
-
-    for create_func, raw_data, model_cls, level_name in create_operations:
-        # Convert each data item to the corresponding Pydantic model
-        model_data = [model_cls(**item) for item in raw_data]
-        result = await create_func(model_data)
-        statuses.append(result.get("status"))
-        messages.append(f"{level_name}: {result['message']}")
-
-        # Collect sample_item_ids from created records
-        for record in result.get("data", []):
-            sample_item_ids.add(record.get("sample_item_id"))
+    messages = [
+        f"{level_name}: {written} created or updated"
+        for level_name, written in written_by_level.items()
+    ]
 
     # After all creations, emit notification events so the frontend refreshes.
     if not sample_batch_id and sample_item_ids:
