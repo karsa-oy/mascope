@@ -4,6 +4,25 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- Batch match aggregation no longer exhausts process memory on large batches.
+  The full-batch aggregation built one reconstructed isotope frame for the
+  whole batch (samples x isotopes x collection memberships, with a dozen
+  string columns); on a 2306-sample production batch this OOM-killed the
+  backend worker mid-refresh, severing its database connections and leaving
+  the batch stuck in "processing". Batch aggregation now runs in bounded
+  sample chunks (200 samples per pass) - every aggregate level is per-sample,
+  so chunking bounds peak memory without changing any persisted value - and
+  the frame assembly runs in a worker thread so a large aggregation can no
+  longer starve health checks and other requests on the same worker.
+- The aggregation-completeness signal is now crash-safe: the scope's
+  sample-level aggregates are cleared when an aggregation starts and restored
+  chunk by chunk, so any death mid-aggregation - an exception, but also an
+  OOM kill or restart that no error handler ever sees - leaves the next
+  refresh re-aggregating instead of skipping over stale aggregates that sit
+  next to freshly stored match isotopes.
+
 ## [1.4.0] - 2026.07.24
 
 ### Added
