@@ -309,7 +309,7 @@ async def create_target_collection(
             # Log excluded compounds if any
             excluded_count = len(set(target_compound_ids) - existing_compounds)
             if excluded_count > 0:
-                runtime.logger.warning(
+                runtime.logger.info(
                     f"{excluded_count} added compound ID(s) were not found in the db"
                 )
 
@@ -504,7 +504,7 @@ async def update_target_collection(
                 set(target_compounds_update) - set(verified_target_compound_ids)
             )
             if excluded_compounds_count > 0:
-                runtime.logger.warning(
+                runtime.logger.info(
                     f"{excluded_compounds_count} provided compound ID(s) were not found"
                 )
 
@@ -790,7 +790,8 @@ async def delete_target_collection(
                 )
                 deleted_compound_count += 1
             except ApiException as e:
-                runtime.logger.warning(
+                # INFO per compound: fires inside a per-item loop
+                runtime.logger.info(
                     f"Failed to delete orphan compound {compound_id}: {e.user_message}"
                 )
 

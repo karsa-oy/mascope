@@ -99,7 +99,9 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
             # Timeouts, connection and server errors are transient - retry.
             # The message carries the specific cause (e.g. connection refused,
             # HTTP status + server error message).
-            runtime.logger.warning(
+            # INFO per attempt: a flaky network would emit up to max_retries
+            # warnings per file; the final give-up below logs at ERROR
+            runtime.logger.info(
                 f"Upload attempt {attempt}/{max_retries} for file "
                 f"{os.path.basename(filepath)} failed: {e}"
             )

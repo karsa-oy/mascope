@@ -216,7 +216,8 @@ async def calibration_mz_fit(
 
     # --- Handle fit errors and warnings ---
     if calibration_data["error"] is not None:
-        runtime.logger.error(calibration_data["error"])
+        # Expected for poor spectra; the raised ApiException reports it
+        runtime.logger.info(calibration_data["error"])
         raise ApiException(
             f"m/z fitting for sample '{sample.sample_item_name}' failed: "
             f"{calibration_data['error']}",
@@ -600,7 +601,10 @@ async def calibration_mz_calibrate_samples(
         except ApiException as e:
             sample = await fetch_sample(sample_item_id=sample_item_id)
 
-            runtime.logger.warning(
+            # INFO per sample: the failures are aggregated into the batch
+            # result and shown to the user; per-sample WARNINGs would emit one
+            # GlitchTip event per affected sample.
+            runtime.logger.info(
                 f"Calibrating sample '{sample.sample_item_name}' "
                 f"failed: {e.user_message}"
             )
@@ -709,7 +713,8 @@ async def calibration_mz_calibrate_batch(
             f"Sample batch '{sample_batch_name}' "
             "is currently being processed - calibration is locked."
         )
-        runtime.logger.warning(message)
+        # Routine concurrency outcome, reported to the user via the response
+        runtime.logger.info(message)
         return {
             "status": "locked",
             "message": message,

@@ -277,7 +277,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             if request and response and "set-cookie" in response.headers:
                 sid = request.headers.get("x-sid")
                 if not sid:
-                    runtime.logger.error(
+                    # Routine for API-only logins (SDK, scripts): there is no
+                    # socket session to authenticate
+                    runtime.logger.info(
                         f"There is no sid in the request headers. User: {user.username} [Worker {worker_pid}]"
                     )
                     return
@@ -293,7 +295,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             if user.role_id >= auth_settings.ROLE_ACCESS_LEVELS.get("editor"):
                 await regenerate_access_token(user=user, service_name="file-converter")
         except SocketUnauthenticatedError as e:
-            runtime.logger.error(
+            runtime.logger.warning(
                 f"Socket authentication failed after login: {str(e)} [Worker {worker_pid}]"
             )
         except Exception as e:

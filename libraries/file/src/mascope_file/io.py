@@ -214,7 +214,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         zarrs = get_file_data_vars(filepath)
         vars = [zarr.removesuffix(".zarr") for zarr in zarrs]
     if "signal" in vars:
-        runtime.logger.error(
+        # INFO: usage deprecation, fires on every affected load_file call
+        runtime.logger.info(
             "Loading signal with load_file is depricated. Use load_signal instead."
         )
         vars.pop(vars.index("signal"))
@@ -232,7 +233,8 @@ def load_file(base_filename, vars=None, prev_dataset=None):
         try:
             var_dataset = load_array(base_filename, var, prev_item)
         except FileNotFoundError:
-            runtime.logger.warning(f"[load_file] {var} not found for {base_filename}:")
+            # Expected for optional variables missing from older files
+            runtime.logger.info(f"[load_file] {var} not found for {base_filename}:")
             continue
         datasets.append(var_dataset)
         zarr_groups[var] = var_dataset.attrs.get("zarr_groups", [])

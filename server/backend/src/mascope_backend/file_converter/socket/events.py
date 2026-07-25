@@ -60,7 +60,7 @@ class SocketEventHandler:
             if self._peak_guard is not None:
                 is_acquired, failure_reason = self._peak_guard.acquire(filename)
                 if not is_acquired:
-                    runtime.logger.warning(failure_reason)
+                    # The guard already logged the rejection
                     self.client.sio.emit(
                         "peak_detection_warning",
                         {

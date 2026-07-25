@@ -192,7 +192,8 @@ def http_get(
             exc_for_log = e
 
         delay = RETRY_BACKOFF_BASE**attempt
-        logger.warning(
+        # INFO: transient retry that usually succeeds; the final failure raises
+        logger.info(
             "GET {} failed (attempt {}/{}), retrying in {}s: {}",
             full_url,
             attempt,
@@ -286,7 +287,8 @@ def http_post(
             exc_for_log = e
 
         delay = RETRY_BACKOFF_BASE**attempt
-        logger.warning(
+        # INFO: transient retry that usually succeeds; the final failure raises
+        logger.info(
             "POST {} failed (attempt {}/{}), retrying in {}s: {}",
             full_url,
             attempt,

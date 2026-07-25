@@ -69,7 +69,8 @@ def rate_limit(*, times: int, seconds: int, scope: str):
                 # full window so the header is always sensible.
                 if retry_after is None or retry_after < 0:
                     retry_after = seconds
-                runtime.logger.warning(
+                # Expected throttling of a noisy client, not a server fault
+                runtime.logger.info(
                     f"Rate limit exceeded for scope '{scope}' from {ip}"
                 )
                 raise HTTPException(

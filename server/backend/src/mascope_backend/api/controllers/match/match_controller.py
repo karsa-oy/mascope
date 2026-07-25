@@ -841,7 +841,8 @@ async def rematch_batch(
                 "locked",
                 f"Sample batch '{sample_batch_name}' is currently being processed - rematch is locked.",
             )
-            runtime.logger.warning(message)
+            # Routine concurrency outcome, reported to the user via the response
+            runtime.logger.info(message)
         else:  # ready status without force
             status, message = (
                 "skipped",
@@ -1220,7 +1221,9 @@ async def match_compute_batch(
             # sample - corrupt file, unreadable metadata, a transient DB error -
             # must fail only that sample, never abort matching for the rest of
             # the batch. CancelledError is a BaseException and is not caught.
-            runtime.logger.warning(
+            # INFO per sample: a systemic problem would otherwise emit one
+            # GlitchTip event per sample; the batch summary below warns once.
+            runtime.logger.info(
                 f"Computing match isotopes for sample '{sample.sample_item_name}' "
                 f"failed: {e}"
             )
@@ -1335,7 +1338,12 @@ async def match_compute_batch(
         f"{failed_samples_count} failed, "
         f"{skipped_samples_count} skipped due to missing calibration or no new targets."
     )
-    runtime.logger.debug(message)
+    if failed_samples_count > 0:
+        # One aggregated warning per problem batch; the per-sample failures
+        # above are logged at INFO.
+        runtime.logger.warning(message)
+    else:
+        runtime.logger.debug(message)
 
     return {
         "status": status,

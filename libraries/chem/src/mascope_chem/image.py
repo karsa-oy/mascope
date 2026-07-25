@@ -577,7 +577,8 @@ class ImageGenerator(Process):
             try:
                 data = self.queue_in.get()
             except KeyboardInterrupt:
-                runtime.logger.critical(f"KeyboardInterrupt for PID: {os.getpid()}")
+                # Normal shutdown of the generator process, not a fault
+                runtime.logger.info(f"KeyboardInterrupt for PID: {os.getpid()}")
                 break
             except Exception as e:
                 runtime.logger.critical(f"Exception {str(e)} for PID: {os.getpid()}")
@@ -588,7 +589,8 @@ class ImageGenerator(Process):
                 try:
                     viz_gen_func = VIZ_GENERATORS[viz_type]
                 except KeyError:
-                    runtime.logger.error(
+                    # WARNING: repeats per queued frame while the mismatch lasts
+                    runtime.logger.warning(
                         f"Requested visualization type '{viz_type}' not available!"
                     )
                     continue
@@ -598,7 +600,8 @@ class ImageGenerator(Process):
                 try:
                     viz = viz_gen_func(data_array, mz_range=mz_range, y_range=y_range)
                 except ZeroDivisionError:
-                    runtime.logger.error(
+                    # Routine for degenerate frames (e.g. empty y-range)
+                    runtime.logger.debug(
                         f"Caught ZeroDivisionError in {str(viz_gen_func)}"
                     )
                     continue

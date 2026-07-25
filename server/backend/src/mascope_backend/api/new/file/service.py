@@ -125,7 +125,7 @@ async def download_files(
     )
 
     if not_found:
-        runtime.logger.warning(message)
+        # raise_api_warning logs the message itself
         raise_api_warning(
             message,
             {
