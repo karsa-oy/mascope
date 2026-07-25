@@ -54,6 +54,20 @@ def verify_connection(host: str, access_token: str) -> tuple[bool, str]:
             f"Details: {e.__class__.__name__}: {e}"
         )
     if resp.status_code == 200:
+        # A 200 alone is not proof of the API: a single-page-app server
+        # (e.g. the Vite frontend dev server, which has no /api proxy)
+        # answers any GET with the app's HTML page and 200. The real API
+        # responds with JSON.
+        content_type = resp.headers.get("content-type", "")
+        if "json" not in content_type.lower():
+            return False, (
+                f"The address {base_url(host)} responded, but it does not "
+                "look like the Mascope API (it returned a web page instead "
+                "of data), so uploads would fail. In a development setup, "
+                "use the backend address (e.g. http://localhost:8090) - the "
+                "frontend dev server cannot receive uploads. In production, "
+                "use the normal Mascope web app address."
+            )
         return True, ""
     if resp.status_code in (401, 403):
         return False, (
