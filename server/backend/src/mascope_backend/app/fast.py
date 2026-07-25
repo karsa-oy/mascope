@@ -113,13 +113,13 @@ async def logger_middleware(request: Request, call_next):
                 full_url += f"?{request.url.query}"
             runtime.logger.debug(f"{full_url} [Worker {worker_pid}]")
 
-        # Log based on status code
-        if 400 <= response.status_code < 500:
-            runtime.logger.warning(request.url.path)
-        elif response.status_code >= 500:
-            runtime.logger.error(request.url.path)
-        else:
-            runtime.logger.info(request.url.path)
+        # Access log, always INFO. 4xx responses are routine client behavior
+        # (expired sessions, validation errors) and 5xx responses were already
+        # logged with their traceback by process_exception; logging either at
+        # WARNING/ERROR here would send a duplicate, traceback-less event to
+        # GlitchTip (the Sentry sink forwards every WARNING+ record). The
+        # status code stays queryable via the contextualized status_code extra.
+        runtime.logger.info(request.url.path)
 
     return response
 

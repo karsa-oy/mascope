@@ -261,18 +261,19 @@ class RuntimeLogging:
         # is set. Init here (once) so the SDK is live before the backend builds
         # FastAPI() - fast.py imports this Runtime first. Must run BEFORE
         # logger.remove(): its "SDK missing" warning needs a live handler.
-        sentry_on = _init_sentry(
+        # The CLI never reports: its WARNING+ records are user-facing terminal
+        # output (bad arguments, status notices), not operator signal, and a
+        # DSN exported in the shell env would otherwise turn every CLI warning
+        # into a GlitchTip event.
+        is_cli = self.runtime.module.name == "cli"
+        sentry_on = not is_cli and _init_sentry(
             environment=str(self.runtime.mode), release=self.runtime.version
         )
 
         # create fresh config
         logger.remove()  # remove old settings
 
-        handlers = (
-            [file_handler, terminal_handler]
-            if self.runtime.module.name != "cli"
-            else [terminal_handler]
-        )
+        handlers = [terminal_handler] if is_cli else [file_handler, terminal_handler]
         if sentry_on:
             # The callable sink reads the record directly, so it ignores the
             # text `format` used above.
