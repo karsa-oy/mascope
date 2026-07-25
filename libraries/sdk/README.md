@@ -59,6 +59,7 @@ Copy them to your project directory:
 
 ```python
 import mascope_sdk
+
 mascope_sdk.copy_examples("./tutorials")
 ```
 
@@ -123,6 +124,7 @@ peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium", samples="12:
 spectrum = mascope.samples.get_spectrum(sample_id=samples.iloc[0]["sample_item_id"])
 
 import matplotlib.pyplot as plt
+
 plt.scatter(spectrum["mz"], spectrum["intensity"])
 plt.xlabel("m/z")
 plt.ylabel("Intensity")
@@ -237,7 +239,7 @@ Load per-scan intensity timeseries for peaks matching a compound, ion, or isotop
 ts = mascope.load_peak_timeseries(
     dataset="My Dataset",
     batches="Uronium",
-    compound="Urea",       # or compound="CH4N2O"
+    compound="Urea",  # or compound="CH4N2O"
 )
 
 # Multiple compounds in one call
@@ -248,6 +250,7 @@ ts = mascope.load_peak_timeseries(
 
 # Plot per-sample timeseries
 import matplotlib.pyplot as plt
+
 for name, group in ts.groupby("sample_item_name"):
     plt.plot(group["time"], group["height"], label=name)
 plt.legend()
@@ -455,6 +458,7 @@ Or in Python before importing the SDK:
 
 ```python
 import os
+
 os.environ["MASCOPE_SDK_LOG_LEVEL"] = "DEBUG"
 
 from mascope_sdk import MascopeClient
