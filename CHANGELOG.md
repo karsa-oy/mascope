@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.2] - 2026.07.25
+
 ### Fixed
 
 - A target collection without a description no longer silently loses all of
