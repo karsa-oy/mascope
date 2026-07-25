@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.3] - 2026.07.25
+
 ### Fixed
 
 - GlitchTip error reporting is now actually deployable: backend images ship
@@ -61,7 +63,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   re-create of a 2268-sample stress batch drops from ~9 to ~5 minutes, with
   bit-identical results). The match create funnels now write each level as a
   single bulk `INSERT .. ON CONFLICT DO UPDATE .. WHERE row IS DISTINCT FROM
-  excluded` statement instead of a per-row ORM read-then-diff loop; the ion
+excluded` statement instead of a per-row ORM read-then-diff loop; the ion
   and compound aggregations group on id columns instead of up to 15 label
   strings; and the aggregation chunk size adapts to the batch's target-chain
   shape instead of a fixed sample count. Per-chunk aggregate/create timings
