@@ -278,8 +278,14 @@ entirely on one environment variable:
 
 ```sh
 # on each Mascope server, in the backend service environment:
-MASCOPE_SENTRY_DSN=http://<public_key>@192.168.1.88:8000/<project_id>
+MASCOPE_SENTRY_DSN=http://<public_key>@100.96.42.122:8000/<project_id>
 ```
+
+The DSN targets the monitoring box's **tailnet IP** — events travel over
+Tailscale (the box's LAN address does not route from the servers, and container
+DNS cannot resolve MagicDNS names). One-time per server: the backend container
+needs a `tailscale0` masquerade line in the `MASCOPE NAT` block; see the
+[monitoring runbook](../tooling/monitoring/README.md) step 7.1.
 
 Requires the optional dependency (`mascope_runtime[sentry]`, i.e. `sentry-sdk`).
 The event `environment` is the runtime mode and `release` follows
