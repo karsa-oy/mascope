@@ -11,6 +11,7 @@ import json
 import pytest
 from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from mascope_backend.api.lib.exceptions.api_exceptions import (
     ApiException,
@@ -139,6 +140,66 @@ class TestProcessExceptionDoesNotLeakInternals:
         assert api_exc.status_code == 409
         assert "error_id" in api_exc.tech_message
         assert api_exc.tech_message["detail"] == "collection is locked"
+
+
+class TestProcessExceptionLogLevels:
+    """
+    Routine client errors must stay below WARNING - the GlitchTip sink forwards
+    every WARNING+ record as an event - while server-side faults must log at
+    ERROR with their traceback attached.
+    """
+
+    def _process_and_capture(self, exc: Exception) -> dict:
+        records = []
+        sink_id = runtime.logger.add(
+            lambda message: records.append(message.record), level="TRACE"
+        )
+        try:
+            _raise_and_process(exc)
+        finally:
+            runtime.logger.remove(sink_id)
+        assert len(records) == 1
+        return records[0]
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            HTTPException(status_code=401, detail="Not authenticated"),
+            HTTPException(status_code=404, detail="Sample not found"),
+            HTTPException(status_code=409, detail="Duplicate file"),
+            ValueError("mz must be positive"),
+            ApiException("Partial success", {"skipped_items": []}, status_code=207),
+            RequestValidationError(
+                [
+                    {
+                        "type": "missing",
+                        "loc": ("body", "name"),
+                        "msg": "Field required",
+                        "input": {},
+                    }
+                ]
+            ),
+        ],
+    )
+    def test_expected_client_errors_log_at_info(self, exc):
+        record = self._process_and_capture(exc)
+        assert record["level"].name == "INFO"
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            FileNotFoundError(2, "No such file", "/some/path"),  # default -> 500
+            RuntimeError("boom"),  # 500
+            HTTPException(status_code=500, detail="Upstream failed"),
+            # 4xx-mapped exception types that signal server-side faults
+            AttributeError("'NoneType' object has no attribute '_engine'"),
+            SQLAlchemyError("connection reset"),
+        ],
+    )
+    def test_server_faults_log_at_error_with_traceback(self, exc):
+        record = self._process_and_capture(exc)
+        assert record["level"].name == "ERROR"
+        assert record["exception"] is not None
 
 
 class TestComposeUserMessage:
