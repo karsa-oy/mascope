@@ -101,7 +101,10 @@ async def remove_matches(
             return {
                 "status": "skipped",
                 "message": f"No orphaned matches found for {entity_type} '{entity_name}'",
-                "data": {"removed_match_isotopes_count": 0},
+                "data": {
+                    "removed_match_isotopes_count": 0,
+                    "orphaned_sample_item_ids": [],
+                },
             }
 
     # Build operations list with conditional parameters
@@ -196,6 +199,12 @@ async def remove_matches(
         "data": {
             "removed_match_isotopes_count": (
                 orphaned_match_data.isotopes_count if orphaned_match_data else 0
+            ),
+            # Samples whose match rows this removal touched; a full removal
+            # reports none - everything is recomputed afterwards, so the
+            # compute/incomplete signals already cover the whole scope
+            "orphaned_sample_item_ids": (
+                orphaned_match_data.sample_item_ids if orphaned_match_data else []
             ),
             "operation_type": operation_type,
             "removed_levels": removed_levels,
