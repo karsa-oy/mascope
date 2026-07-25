@@ -149,6 +149,16 @@ async def send_progress_user_notification(
             ) * 100
             notification_copy.message = f"Computing sample batch matches, processing sample {item_index + 1}/{total_samples}"
 
+    if notification_copy.type == "match_aggregate_batch":
+        # Chunked batch aggregation: items are sample chunks, not samples
+        if total_samples is not None and item_index is not None:
+            notification_copy.progress = (
+                (item_index + increment) / total_samples
+            ) * 100
+            notification_copy.message = (
+                f"Aggregating batch matches, part {item_index + 1}/{total_samples}"
+            )
+
     if notification_copy.type == "rematch_batches":
         notification_copy.progress = (batch_index - 1 + increment) * batch_weight * 100
 
