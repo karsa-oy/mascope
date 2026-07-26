@@ -194,8 +194,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         except PermissionError as e:
             # File locked - this may indicate an issue with file handle cleanup
             # in _finalize(); the file remains in the streams folder and may
-            # need manual cleanup. One warning, not three: each WARNING record
-            # becomes a GlitchTip event.
+            # need manual cleanup.
             runtime.logger.warning(f"Could not delete file {file_to_process}: {e}")
         except Exception:
             # Other deletion errors - log but don't fail
