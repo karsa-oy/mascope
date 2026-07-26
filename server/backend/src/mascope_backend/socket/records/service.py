@@ -125,8 +125,8 @@ async def _emit(event: RecordEvent, room: str | list[str] | None) -> None:
         try:
             await sio.emit(event_name, payload, namespace="/")
             runtime.logger.debug(f"Broadcast {event_name} to all clients")
-        except Exception as e:
-            runtime.logger.error(f"Failed to broadcast {event_name}: {e}")
+        except Exception:
+            runtime.logger.exception(f"Failed to broadcast {event_name}")
         return
 
     # Emit to specific room(s)
@@ -135,5 +135,5 @@ async def _emit(event: RecordEvent, room: str | list[str] | None) -> None:
         try:
             await sio.emit(event_name, payload, room=room_id, namespace="/")
             runtime.logger.debug(f"Emitted {event_name} to {room_id}")
-        except Exception as e:
-            runtime.logger.error(f"Failed to emit {event_name} to {room_id}: {e}")
+        except Exception:
+            runtime.logger.exception(f"Failed to emit {event_name} to {room_id}")

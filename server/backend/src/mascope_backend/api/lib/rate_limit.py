@@ -80,8 +80,8 @@ def rate_limit(*, times: int, seconds: int, scope: str):
                 )
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             # Fail open on Redis errors, but make the gap visible.
-            runtime.logger.error(f"Rate limit check failed for scope '{scope}': {e}")
+            runtime.logger.exception(f"Rate limit check failed for scope '{scope}'")
 
     return dependency

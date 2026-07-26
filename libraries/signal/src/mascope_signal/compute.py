@@ -164,8 +164,8 @@ def get_sum_signal(
             return sum_signal / averaging_factor
         return sum_signal
     except FileNotFoundError:
-        # case where file doesn't exist in filestore
-        runtime.logger.warning(f"Sample file not found: {base_filename}")
+        # case where file doesn't exist in filestore; no log here - the
+        # raised RuntimeError is logged by the caller's handler
         raise RuntimeError(f"Sample file not found or inaccessible: {base_filename}")
     except (KeyError, AttributeError):
         # proceed if sample_file/dataset exists but is missing target sum_signal

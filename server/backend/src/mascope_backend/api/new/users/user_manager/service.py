@@ -298,9 +298,9 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
             runtime.logger.warning(
                 f"Socket authentication failed after login: {str(e)} [Worker {worker_pid}]"
             )
-        except Exception as e:
-            runtime.logger.error(
-                f"Unexpected error during socket authentication after login: {str(e)} [Worker {worker_pid}]"
+        except Exception:
+            runtime.logger.exception(
+                f"Unexpected error during socket authentication after login [Worker {worker_pid}]"
             )
         return
 

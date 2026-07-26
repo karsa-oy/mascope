@@ -84,7 +84,8 @@ def load_array(base_filename, var, prev_array=None):
 
     if not os.path.exists(var_path):
         if var == "signal":
-            runtime.logger.error("Use load_signal to access signal array")
+            # INFO: usage hint next to the raised FileNotFoundError
+            runtime.logger.info("Use load_signal to access signal array")
         raise FileNotFoundError(var_path)
 
     # Load data from file
@@ -120,7 +121,8 @@ def load_coord(base_filename, var, coord_name):
 
     if not os.path.exists(var_path):
         if var == "signal":
-            runtime.logger.error("Use load_signal to access signal array")
+            # INFO: usage hint next to the raised FileNotFoundError
+            runtime.logger.info("Use load_signal to access signal array")
         raise FileNotFoundError(var_path)
 
     sync = get_zarr_synchronizer(var_path)
@@ -207,7 +209,7 @@ def load_file(base_filename, vars=None, prev_dataset=None):
 
     filepath = m_name.parse_path_from_item_filename(base_filename)
     if not os.path.exists(filepath):
-        runtime.logger.warning(f"File not found: {filepath}")
+        # No log here: the raised FileNotFoundError is logged by the caller
         raise FileNotFoundError(filepath)
     if vars is None:
         # Get all saved variable names
@@ -466,7 +468,9 @@ async def _full_overwrite_peaks(
                 try:
                     rmtree(peak_timeseries_path)
                 except Exception:
-                    runtime.logger.error("Failed to remove existing peak timeseries")
+                    runtime.logger.exception(
+                        "Failed to remove existing peak timeseries"
+                    )
                     raise
 
             peak_timeseries.to_zarr(

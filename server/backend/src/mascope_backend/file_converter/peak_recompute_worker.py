@@ -15,7 +15,6 @@ at enqueue time (in the socket event handler), so the workers only see
 unique filenames.
 """
 
-import traceback
 from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Any
@@ -175,9 +174,8 @@ class PeakRecomputeWorker(Thread):
             )
 
         except Exception as e:
-            runtime.logger.error(
-                f"PeakRecomputeWorker: peak detection failed for '{filename}': "
-                f"{e}\n{traceback.format_exc()}"
+            runtime.logger.exception(
+                f"PeakRecomputeWorker: peak detection failed for '{filename}'"
             )
             self.socket_client.emit(
                 "peak_detection_error",
@@ -204,9 +202,8 @@ class PeakRecomputeWorker(Thread):
             try:
                 self._process_request(request)
             except Exception as e:
-                runtime.logger.error(
-                    f"PeakRecomputeWorker: unexpected error while processing request: "
-                    f"{e}\n{traceback.format_exc()}"
+                runtime.logger.exception(
+                    "PeakRecomputeWorker: unexpected error while processing request"
                 )
                 try:
                     if isinstance(request, dict):
@@ -233,10 +230,9 @@ class PeakRecomputeWorker(Thread):
                         },
                         auth,
                     )
-                except Exception as emit_error:
-                    runtime.logger.error(
+                except Exception:
+                    runtime.logger.exception(
                         "PeakRecomputeWorker: failed to emit error message after "
-                        "processing failure: "
-                        f"{emit_error}\n{traceback.format_exc()}"
+                        "processing failure"
                     )
         runtime.logger.info("PeakRecomputeWorker stopped")

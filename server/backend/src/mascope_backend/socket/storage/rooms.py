@@ -62,7 +62,7 @@ class RoomTracker:
             )
 
         except Exception as e:
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Room tracker: failed to join room '{room_id}' for user {user_id}: {e} "
                 f"[Worker {worker_pid}]"
             )
@@ -93,7 +93,7 @@ class RoomTracker:
             )
 
         except Exception as e:
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Room tracker: failed to leave room '{room_id}' for user {user_id}: {e} "
                 f"[Worker {worker_pid}]"
             )
@@ -122,7 +122,7 @@ class RoomTracker:
             )
 
         except Exception as e:
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Room tracker: failed to check membership for user {user_id} "
                 f"in room '{room_id}': {e}"
             )
@@ -167,7 +167,7 @@ class RoomTracker:
             )
 
         except Exception as e:
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Room tracker: failed to clean up rooms for user {user_id}: {e} "
                 f"[Worker {worker_pid}]"
             )
