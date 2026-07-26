@@ -67,7 +67,11 @@ class FSWatcher(Thread):
 
     def run(self):
         runtime.logger.info(f"started watching {self.path}")
-        files = self.walk()
+        # Files already present at startup are pending work (e.g. left behind
+        # by a converter restart mid-run): an empty baseline routes them
+        # through the same size-stability gate as newly appearing files.
+        # Baselining them away would orphan them silently forever.
+        files: list[str] = []
         new_files = []
         while not self.shutdown_event.is_set():
             try:

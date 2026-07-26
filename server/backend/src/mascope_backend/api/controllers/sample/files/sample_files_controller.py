@@ -758,10 +758,22 @@ async def upload_sample_files(
         try:
             file_path = os.path.join(runtime.config.filestreams, filename)
 
-            # Write file in chunks to manage memory usage
-            with open(file_path, "wb") as f:
-                while chunk := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
-                    f.write(chunk)
+            # The filestreams folder is polled by the file converter's watcher,
+            # which queues a file once its size is stable across two ~1s scans.
+            # A write that stalls under I/O load therefore gets picked up (and
+            # its remaining bytes lost) if it lands under its final name, so
+            # write to a temp name the watcher patterns cannot match and
+            # publish with an atomic rename.
+            tmp_path = f"{file_path}.part"
+            try:
+                # Write file in chunks to manage memory usage
+                with open(tmp_path, "wb") as f:
+                    while chunk := file.file.read(FILE_UPLOAD_CHUNK_SIZE):
+                        f.write(chunk)
+                os.replace(tmp_path, file_path)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
             # Emit event for file converter service to register the file
             await event_emitter.emit(
@@ -871,9 +883,18 @@ async def upload_sample_file(
     filename = os.path.basename(file_path)
     dest_path = os.path.join(runtime.config.filestreams, filename)
 
+    # A cross-filesystem move degrades to a non-atomic copy, which the
+    # converter's polling watcher can pick up half-written under its final
+    # name. Stage under a temp name the watcher patterns cannot match, then
+    # publish with an atomic rename.
+    tmp_path = f"{dest_path}.part"
     try:
-        # Move the file to the destination directory
-        shutil.move(file_path, dest_path)
+        try:
+            shutil.move(file_path, tmp_path)
+            os.replace(tmp_path, dest_path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
         # Emit event for file converter service to register the file
         await event_emitter.emit(

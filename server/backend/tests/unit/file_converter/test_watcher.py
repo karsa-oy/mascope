@@ -82,3 +82,29 @@ class TestOnCreated:
 
         assert watcher.on_created(in_progress) == []
         assert watcher.file_queue.empty()
+
+
+class TestStartupSweep:
+    def test_preexisting_file_is_queued_after_start(self, tmp_path):
+        """
+        A file already in the folder when the watcher starts is pending work
+        (e.g. left behind by a converter restart) and must be queued, not
+        silently baselined away.
+        """
+        target = tmp_path / "leftover.raw"
+        target.write_bytes(b"12345")
+        shutdown = Event()
+        watcher = FSWatcher(
+            path=str(tmp_path),
+            pattern="*.raw",
+            file_queue=Queue(),
+            interval=0.02,
+            shutdown_event=shutdown,
+        )
+
+        watcher.start()
+        try:
+            assert watcher.file_queue.get(timeout=5) == str(target)
+        finally:
+            shutdown.set()
+            watcher.join(timeout=5)
