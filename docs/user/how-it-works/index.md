@@ -1,8 +1,24 @@
-# Overview of the Signal Processing Pipeline
+# How it works: the processing pipeline
 
-The data processing workflow provides a standardized, instrument-agnostic architectural framework for converting raw mass spectrometry outputs into isotopic assignments.
-The architecture branches to accommodate physics-based differences in detector characteristics.
-The modular layout decouples raw hardware signal acquisition from logical compound identification, enabling flexible integration of new instrument types without disrupting the core data handling and matching logic.
+When you [process a sample file](../guides/import-files.md) into a
+[sample](../concepts/index.md#sample-files-vs-samples), Mascope runs it through a
+fixed sequence of stages that turn raw spectra into scored assignments. This page
+is an overview of that pipeline; each stage links to a page with the detail.
+
+The pipeline is instrument-agnostic in shape but branches where the physics
+differs, so Orbitrap and Tofwerk TOF data each get the treatment suited to their
+detector. This separation of raw signal handling from compound identification is
+what lets Mascope support new instrument types without changing the matching
+logic.
+
+```mermaid
+graph LR
+    A["Aggregate<br/>sum the scans"] --> B["Instrument<br/>function"]
+    B --> C["Detect<br/>peaks"]
+    C --> D["Quality<br/>control"]
+    D --> E["Calibrate<br/>the mass axis"]
+    E --> F["Match<br/>to targets"]
+```
 
 ![Signal Processing Pipeline](images/signal_processin_pipeline.png)
 
