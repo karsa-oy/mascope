@@ -475,10 +475,14 @@ def get_upload_handler(
     return handler
 
 
-# tuspyserver 4.1.3 touches the upload file before running its own
+# In-flight tus uploads get their own subdirectory so they never share a
+# namespace with the per-user download dirs under temp/ (served by /api/temp).
+# Created eagerly: tuspyserver touches the upload file before running its own
 # makedirs (TusUploadFile.__init__ calls create() first), so on a fresh
-# environment the very first upload 500s - ensure the dir exists up front.
-_tus_files_dir = runtime.env.path("temp")
+# environment the very first upload would 500. Every worker imports this
+# module after the startup temp reset, so the dir is in place before any
+# request.
+_tus_files_dir = runtime.env.path("temp", "tus")
 os.makedirs(_tus_files_dir, exist_ok=True)
 
 sample_files_upload_router = create_tus_router(

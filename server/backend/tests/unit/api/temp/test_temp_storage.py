@@ -38,6 +38,18 @@ def test_user_temp_path_resolves_inside_user_dir(temp_base):
     assert path == os.path.join(storage.user_temp_dir(7), "export.csv")
 
 
+def test_create_false_does_not_mint_directories(temp_base):
+    """The read path (create=False) must not create per-user directories.
+
+    Otherwise any authenticated GET probe against /api/temp would leave an
+    empty directory behind for the probed user id.
+    """
+    path = storage.user_temp_path(999, "probe.csv", create=False)
+    assert not os.path.isdir(storage.user_temp_dir(999, create=False))
+    # The resolved path is still correct for the containment check.
+    assert path == os.path.join(storage.user_temp_dir(999, create=False), "probe.csv")
+
+
 @pytest.mark.parametrize(
     "attack",
     [
