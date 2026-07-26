@@ -543,8 +543,6 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                             f"Failed to process file {Path(self.file_to_process).name}: {e}"
                         )
                     else:
-                        # logger.exception attaches the traceback so GlitchTip
-                        # gets a real exception event, not a flat string
                         runtime.logger.exception(
                             f"Failed to process file {Path(self.file_to_process).name}"
                         )

@@ -174,8 +174,6 @@ class PeakRecomputeWorker(Thread):
             )
 
         except Exception as e:
-            # logger.exception attaches the traceback as a structured exception
-            # (an embedded format_exc string does not group in GlitchTip)
             runtime.logger.exception(
                 f"PeakRecomputeWorker: peak detection failed for '{filename}'"
             )
