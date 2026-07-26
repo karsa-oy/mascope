@@ -239,6 +239,15 @@ one.
 > rerun the `uv tool install` step from `tooling/ubuntu.sh` (or
 > `ubuntu.sh reinstall`).
 
+**Deliberate overlap with the disk-check timer.** `mascope-disk-check.timer`
+(see `tooling/systemd/`) also watches the disk and pings healthchecks.io. That
+is layering, not redundancy: doctor->Kuma is the rich aggregate but depends on
+Python, Docker, the tailnet, and the monitoring box; the disk check is bash +
+`df` + one HTTPS call to an external service — the dumbest reporter survives
+the disk-full scenario that wedges everything else. Keep both, and stagger the
+thresholds so the simple tier warns early and a doctor "down" means it is
+serious.
+
 ## Notes & caveats
 
 - **GlitchTip 6** runs one all-in-one `web` container (no separate worker/beat).
