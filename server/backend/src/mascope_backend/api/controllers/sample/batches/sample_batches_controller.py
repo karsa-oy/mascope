@@ -74,6 +74,7 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
 )
+from mascope_backend.api.new.temp.storage import user_temp_path
 from mascope_backend.db import (
     Dataset,
     SampleBatch,
@@ -951,7 +952,7 @@ async def sample_batch_export_peaks(
     # Save peak data to dataframe and then to csv file
     batch_peak_df = pd.DataFrame(peak_data)
     batch_peak_df.to_csv(
-        runtime.env.path("temp", peakfile_name),
+        user_temp_path(user_id, peakfile_name),
         index=False,
         sep=";",
     )
