@@ -6,6 +6,7 @@ membership tracking. Each subscription:
 2. Records membership in Redis (for cross-worker presence queries)
 """
 
+from mascope_backend.runtime import runtime
 from mascope_backend.socket import sio
 from mascope_backend.socket.auth.decorators import socket_auth
 from mascope_backend.socket.storage import get_session_user, room_tracker
@@ -15,20 +16,42 @@ from mascope_backend.socket.storage import get_session_user, room_tracker
 @socket_auth(minimum_role="guest")
 async def subscribe(sid, room):
     """
-    Subscribe authenticated user to a room.
+    Subscribe authenticated user to a room, if the workspace ACL permits it.
 
-    Performs dual registration:
+    Rooms carry record-sync events with full record data, so a subscription is
+    gated by the same read-access check as the REST API
+    (``user_can_subscribe_to_room``). A user that lacks access to the room's
+    resource is silently not joined - never receiving another tenant's data.
+
+    Performs dual registration on success:
     - Socket.IO room (for event routing via AsyncRedisManager)
     - Redis tracking (for cross-worker membership queries)
 
     :param sid: Socket session ID
     :type sid: str
-    :param room: Room identifier (e.g., "batch-123")
+    :param room: Room identifier (e.g., a sample_batch_id or "user-123")
     :type room: str
     """
+    # Imported lazily: the workspace ACL pulls in the auth/user-manager stack,
+    # which imports socket.auth - a module-level import here would be circular.
+    from mascope_backend.api.new.workspaces.dependencies import (
+        user_can_subscribe_to_room,
+    )
+    from mascope_backend.db import User, async_session
+
     # Get user_id from session
     session = await get_session_user(sid)
     user_id = session["user_id"]
+
+    # Authorize the subscription against the workspace ACL. The user object is
+    # needed for the superuser / global-role bypass, which the session omits.
+    async with async_session() as db:
+        user = await db.get(User, user_id)
+    if user is None or not await user_can_subscribe_to_room(room, user):
+        runtime.logger.warning(
+            f"Denied room subscription: user {user_id} -> room '{room}'"
+        )
+        return
 
     # Socket.IO room (AsyncRedisManager handles pub/sub routing)
     await sio.enter_room(sid, room)
