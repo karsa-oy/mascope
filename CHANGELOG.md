@@ -12,6 +12,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- Stack-health push monitoring: `tooling/monitoring/doctor-push.sh` reports
+  `mascope prod doctor` results to an Uptime Kuma push monitor per server
+  (dead-man's switch), carrying disk usage in each heartbeat; runbook section
+  in `tooling/monitoring/README.md`. The systemd README now also documents the
+  disk-space monitor units (`mascope-disk-check.service`/`.timer`), which its
+  unit table previously omitted.
+
 - Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the
   sshd hardening drop-in, the ufw ruleset (tailnet-only SSH, Cloudflare-only
   443, canonical container-NAT block), the load-bearing Docker
