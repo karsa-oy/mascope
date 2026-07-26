@@ -103,8 +103,17 @@ The agent prints its version when it starts, and uninstalling (Windows
 - Files larger than 100 MB are not uploaded; they are logged and copied to
   `failed_uploads`.
 
+## After files arrive
+
+Files uploaded by the File Agent land in the instrument's
+`Acquisitions <instrument>` workspace and show up in the **Raw files** tab, exactly
+like files uploaded by hand. From there they are the same as any other raw file:
+select a batch and **process** them into samples. The
+[Import data files](../guides/import-files.md#process-the-files-into-samples) guide
+covers processing, and its [prerequisites](../guides/import-files.md#prerequisites)
+(filename rules and ionization modes) apply to File Agent uploads too.
+
 <!-- TODO Phase 3. Outline:
-- Acquisition workflow (Orbitrap, TOF)
-- How uploaded files become ACQUISITION datasets/batches/samples
+- Acquisition workflow specifics (Orbitrap, TOF)
 Cross-reference the developer agent docs in docs/dev/.
 -->
