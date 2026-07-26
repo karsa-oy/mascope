@@ -172,7 +172,7 @@ def sync(
             metavar="SOURCE_ENV",
             help=(
                 "Source environment. Local name (e.g. `tof1`) or remote "
-                "address in `USER@HOST:ENV` format (e.g. `karsa@192.168.1.88:tof1`)."
+                "address in `USER@HOST:ENV` format (e.g. `karsa@203.0.113.10:tof1`)."
             ),
         ),
     ],
@@ -253,11 +253,11 @@ def sync(
 
     \b
     Examples:
-        mascope env sync karsa@192.168.1.88:tof1 prod tof1 dev
+        mascope env sync karsa@203.0.113.10:tof1 prod tof1 dev
         mascope env sync tof1 prod tof1 dev
         mascope env sync tof1 dev test-env dev
-        mascope env sync tof1 prod karsa@192.168.1.88:tof1 prod
-        mascope env sync karsa@192.168.1.88:tof1 prod tof1 dev --skip-filestore
+        mascope env sync tof1 prod karsa@203.0.113.10:tof1 prod
+        mascope env sync karsa@203.0.113.10:tof1 prod tof1 dev --skip-filestore
         mascope env sync tof1 dev test-env dev --skip-db
     """
     if source_mode not in ("dev", "prod"):
