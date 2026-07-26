@@ -114,8 +114,7 @@ def generate_target_ions_from_composition(
     try:
         assert_valid_formula(target_compound_formula)
     except ValueError as e:
-        # INFO: fires per row of a user-imported collection, so a bad CSV
-        # would otherwise flood the WARNING+ GlitchTip sink.
+        # INFO: fires per row of a user-imported collection
         runtime.logger.info(
             f"Skipping target compound with invalid formula "
             f"'{target_compound_formula}': {e}"

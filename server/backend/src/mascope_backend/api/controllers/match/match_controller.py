@@ -1221,8 +1221,8 @@ async def match_compute_batch(
             # sample - corrupt file, unreadable metadata, a transient DB error -
             # must fail only that sample, never abort matching for the rest of
             # the batch. CancelledError is a BaseException and is not caught.
-            # INFO per sample: a systemic problem would otherwise emit one
-            # GlitchTip event per sample; the batch summary below warns once.
+            # INFO per sample; the batch summary below warns once for the
+            # whole batch.
             runtime.logger.info(
                 f"Computing match isotopes for sample '{sample.sample_item_name}' "
                 f"failed: {e}"

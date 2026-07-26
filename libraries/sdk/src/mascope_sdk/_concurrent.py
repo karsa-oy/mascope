@@ -63,8 +63,7 @@ def run_concurrent(
                         results.append(result)
                 except Exception as exc:
                     n_errors += 1
-                    # INFO per task: a dead API would otherwise emit one
-                    # warning per task; the summary below warns once
+                    # INFO per task; the summary below warns once for the run
                     logger.info("Task failed ({}): {}", desc, exc)
                 pbar.update(1)
         except BaseException:
