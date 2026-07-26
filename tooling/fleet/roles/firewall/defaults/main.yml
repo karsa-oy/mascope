@@ -1,0 +1,10 @@
+---
+# Source IPs whose ufw allow rules (on the ports below) should be REMOVED -
+# e.g. a retired office/VPN address that must no longer reach the servers.
+# Empty by default (no-op). Set the real value in the gitignored
+# inventory.local.yml (this repo is public), e.g.:
+#   vars:
+#     retired_allow_sources: ["203.0.113.9"]
+retired_allow_sources: []
+# Ports the retired sources were allowed on (SSH + HTTPS by convention).
+retired_allow_ports: ["22", "443"]

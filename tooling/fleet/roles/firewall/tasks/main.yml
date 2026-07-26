@@ -55,6 +55,18 @@
     comment: Cloudflare
   loop: "{{ cf_raw.results | map(attribute='content') | map('split') | flatten | select | list }}"
 
+# Remove allow rules for retired source IPs (e.g. an old office/VPN address).
+# No-op unless retired_allow_sources is set in the local inventory. Idempotent:
+# ufw delete of an absent rule is a clean no-op.
+- name: Remove retired source-IP allow rules
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item.0 }}"
+    port: "{{ item.1 }}"
+    proto: tcp
+    delete: true
+  loop: "{{ retired_allow_sources | product(retired_allow_ports) | list }}"
+
 # --- canonical container NAT --------------------------------------------
 # One block, ansible-managed. Masquerades container egress via BOTH the WAN
 # interface (internet) and tailscale0 (GlitchTip event delivery to the ops
