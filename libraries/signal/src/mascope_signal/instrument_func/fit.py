@@ -98,7 +98,8 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
         if is_ambient:
             effective_r_sq_thres = min(r_sq_thres, AMBIENT_R_SQ_THRESHOLD)
             if effective_r_sq_thres != r_sq_thres:
-                runtime.logger.warning(
+                # Routine data-driven parameter adjustment
+                runtime.logger.info(
                     "Ambient TOF file detected: overriding r_sq_thres "
                     f"from {r_sq_thres:.3f} to {effective_r_sq_thres:.3f} "
                     f"(SNR={signal_to_noise:.2f}, ambient threshold={AMBIENT_SNR_THRESHOLD})."
@@ -110,8 +111,9 @@ def fit_instrument_functions(filename: str, dmz=0.5, r_sq_thres=0.95) -> tuple:
     )
     # Check if there are enough peaks for peak shape estimation
     if len(p_mzs) < MIN_NUM_PEAKS:
+        # No log here: InsufficientPeaksError is an expected data condition
+        # handled by the caller (e.g. treated as a blank measurement)
         error_message = "Not enough quality peaks to evaluate instrument functions"
-        runtime.logger.error(error_message)
         raise InsufficientPeaksError(error_message)
 
     peak_shape, ps_stats = _calculate_peakshape(p_x, p_ys)
@@ -408,7 +410,8 @@ def _calculate_peakshape(p_x: np.ndarray, p_ys: np.ndarray) -> tuple:
     """
     num_of_peaks = len(p_ys)
     if num_of_peaks < 10:
-        runtime.logger.warning(
+        # Routine for low-signal files
+        runtime.logger.info(
             f"Only {num_of_peaks} peaks will be used to estimate median peak shape!"
         )
     else:
@@ -525,7 +528,7 @@ def _fit_resolution_function(
             runtime.logger.info(f"Orbi resolution a={a:.3e} points={mass.size}")
 
     except ValueError as e:
-        runtime.logger.error(f"Resolution function fitting failed: {e}")
+        # No log here: the raised ValueError is logged by the caller's handler
         raise ValueError("Resolution function fitting failed") from e
 
     return resolution_function, {"resolution_function": stats}

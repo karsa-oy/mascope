@@ -7,8 +7,6 @@ import h5py
 import numpy as np
 import xarray as xr
 
-from mascope_tofwerk.runtime import runtime
-
 
 DEFAULT_NONSENSE_MZ = 10.0  # m/z values below this are considered nonsense
 
@@ -21,17 +19,19 @@ def open_h5_file(datafile_path: str):
     :type datafile_path: str
     :yield: h5py File object
     """
+    # Only the open is wrapped: exceptions raised inside the caller's `with`
+    # body must propagate unchanged instead of being relabelled as a failure
+    # to open the file. No log here either - the raised exception is logged
+    # by the caller's handler.
     try:
         h5_file = h5py.File(datafile_path, "r")
-        try:
-            yield h5_file
-        finally:
-            if h5_file is not None:
-                h5_file.close()
     except Exception as e:
         err_message = f"Failed to open the file {Path(datafile_path).name}: {e}"
-        runtime.logger.error(err_message)
         raise Exception(err_message) from e
+    try:
+        yield h5_file
+    finally:
+        h5_file.close()
 
 
 def get_polarity_options(datafile_path: str) -> str:

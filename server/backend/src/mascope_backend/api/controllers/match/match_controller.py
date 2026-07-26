@@ -673,10 +673,10 @@ async def rematch_batches(
                 sample_batch_id
             )
 
-        except Exception as e:
+        except Exception:
             batch_collections["failed_batches"].append(sample_batch_id)
-            runtime.logger.error(
-                f"Unexpected error rematching batch {sample_batch_id}: {str(e)}"
+            runtime.logger.exception(
+                f"Unexpected error rematching batch {sample_batch_id}"
             )
 
         # Update proress user notification
@@ -995,7 +995,7 @@ async def rematch_batch(
             status="rematch",
             independent_transaction=True,  # reload UI status icons
         )
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Rematch failed for batch '{sample_batch_name}': {e.user_message}"
         )
         raise
@@ -1288,7 +1288,7 @@ async def match_compute_batch(
                     else aggregation_scope
                 ),
             )
-        except Exception as e:
+        except Exception:
             aggregation_failed = True
             match_aggregate_result = {}
             # No cleanup needed here: aggregate_and_create_matches clears the
@@ -1296,9 +1296,9 @@ async def match_compute_batch(
             # chunk, so any failure - including a process kill this handler
             # would never see - already leaves the completeness probe above
             # reporting incomplete for the next refresh.
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Higher-level match aggregation failed for sample batch "
-                f"'{sample_batch_name}': {e}"
+                f"'{sample_batch_name}'"
             )
     match_aggregate_status = match_aggregate_result.get("status")
     if match_aggregate_status in ("success", "partial"):

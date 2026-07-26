@@ -159,8 +159,8 @@ async def init_db() -> None:
         await configure_database_engine()
         await _test_database_connection()
         _log_pool_configuration()
-    except Exception as error:
-        runtime.logger.error(f"Database initialization error: {error}")
+    except Exception:
+        runtime.logger.exception("Database initialization error")
         raise
 
 
@@ -182,8 +182,8 @@ async def _test_database_connection() -> None:
             result = await session.execute(text("SELECT datname FROM pg_database"))
             databases = [row[0] for row in result.fetchall()]
             runtime.logger.debug(f"Available databases: {databases}")
-    except Exception as e:
-        runtime.logger.error(f"Database connection failed: {e}")
+    except Exception:
+        # No log here: init_db logs the failure once, with the traceback
         raise
 
 

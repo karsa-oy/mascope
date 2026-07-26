@@ -5,7 +5,6 @@ Handles automated creation of ACQUISITION datasets, batches, and sample items, a
 """
 
 import asyncio
-import traceback
 
 from sqlalchemy import delete, select
 
@@ -371,9 +370,9 @@ async def re_process_sample_files(
                     "message": f"Failed to resolve ionization modes: {str(e)}",
                 }
             )
-            runtime.logger.error(
+            runtime.logger.exception(
                 "Unexpected error resolving ionization modes for sample file "
-                f"{sample_file.filename}: {e}\n{traceback.format_exc()}"
+                f"{sample_file.filename}"
             )
             continue
 
@@ -547,7 +546,8 @@ async def create_acquisition_batches_and_items(
             ).get("data", [])
 
             if len(batch_data) > 1:
-                runtime.logger.error(
+                # Recovered data anomaly: worth one grouped warning issue
+                runtime.logger.warning(
                     f"Multiple ACQUISITION batches found for {batch_name} with "
                     f"ionization mode {ion_mode_name}, using first one."
                 )
@@ -655,7 +655,7 @@ async def calibrate_with_retry(
             break
         except ApiException as e:
             if i == CALIBRATION_ITERATIONS:
-                runtime.logger.error(
+                runtime.logger.exception(
                     "Failed to calibrate m/z with m/z tolerance "
                     f"{mz_calibration_params.mz_error_tolerance} "
                     f"for sample item {sample['sample_item_name']}: {e}"
