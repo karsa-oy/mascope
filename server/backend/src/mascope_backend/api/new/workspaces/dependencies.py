@@ -58,6 +58,10 @@ from mascope_backend.db import (
 
 _role_levels = auth_settings.ROLE_ACCESS_LEVELS
 
+# Sentinel distinguishing "not a collection" from a collection whose
+# workspace_id is legitimately None (a global collection).
+_NOT_A_COLLECTION = object()
+
 
 async def _get_workspace_membership(
     workspace_id: str, user: User
@@ -646,6 +650,75 @@ async def accessible_workspace_ids_for_user(user: User) -> set[str]:
                 )
             )
         return set(result.scalars().all())
+
+
+async def user_can_subscribe_to_room(room: str, user: User) -> bool:
+    """Authorize a Socket.IO room subscription against the workspace ACL.
+
+    Record-sync events broadcast full record data to rooms, so a subscription
+    must be gated exactly like the REST read path - otherwise any authenticated
+    user could receive another tenant's data by subscribing to a guessed id.
+    Read (guest) access is sufficient to receive record events.
+
+    Room ids mirror the entities the frontend focuses on: a ``user-<id>``
+    private notification channel, or an id/name identifying a sample batch,
+    sample item, dataset, instrument, target collection, or workspace. Ids are
+    unique across those types, so at most one resolver matches; an id that
+    matches nothing is denied (fail closed).
+
+    :param room: The room identifier the client asked to join.
+    :param user: The authenticated user behind the socket session.
+    :return: ``True`` if the user may join the room, else ``False``.
+    """
+    # Private per-user notification channel.
+    if room.startswith("user-"):
+        return room == f"user-{user.id}"
+
+    # Superusers may join any resource room.
+    if user.is_superuser:
+        return True
+
+    guest_level = _role_levels["guest"]
+
+    async def _permits(workspace_id: str | None) -> bool:
+        try:
+            await _enforce(workspace_id, user, guest_level)
+            return True
+        except ForbiddenAccessException:
+            return False
+
+    # Workspace-scoped entities: resolve id -> workspace, then check membership.
+    for resolver in (
+        _get_workspace_id_from_batch,
+        _get_workspace_id_from_sample,
+        _get_workspace_id_from_dataset,
+    ):
+        workspace_id = await resolver(room)
+        if workspace_id is not None:
+            return await _permits(workspace_id)
+
+    # Instrument rooms are the instrument name; global admins/owners have
+    # standing access to every instrument workspace (mirrors REST).
+    if await _get_workspace_id_from_instrument(room) is not None:
+        try:
+            await check_instrument_workspace_access(room, user, "guest")
+            return True
+        except ForbiddenAccessException:
+            return False
+
+    # Target collections: global collections are readable by any authed user.
+    try:
+        collection_workspace_id = await _get_workspace_id_from_collection(room)
+    except ValueError:
+        collection_workspace_id = _NOT_A_COLLECTION
+    if collection_workspace_id is not _NOT_A_COLLECTION:
+        if collection_workspace_id is None:
+            return True  # global collection
+        return await _permits(collection_workspace_id)
+
+    # A workspace id directly (workspace-scoped events); also the deny path for
+    # an unknown room, since a non-member has no membership record.
+    return await _get_workspace_membership(room, user) is not None
 
 
 # ---------------------------------------------------------------------------
