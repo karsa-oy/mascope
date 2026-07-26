@@ -1,0 +1,9 @@
+---
+# Fleet configuration. Run with --check --diff first; see README.md.
+- name: Mascope production fleet
+  hosts: fleet
+  roles:
+    - sshd_hardening
+    - firewall
+    - docker_daemon
+    - unattended_upgrades

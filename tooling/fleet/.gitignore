@@ -1,0 +1,3 @@
+# Real inventory carries tailnet addresses; the repo is public.
+inventory.local.yml
+*.retry
