@@ -2,6 +2,7 @@ import inspect
 from functools import wraps
 from typing import Callable
 
+from fastapi import params
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from rich.pretty import pretty_repr
@@ -124,17 +125,24 @@ def api_route(
         # --- Configure route access token settings ---
         func.token_access = token_access
 
-        # --- Verify route security - either must be public or have auth dependency ---
+        # --- Verify route security - either must be public or bind an auth
+        # dependency to a `user` parameter. Requiring an actual Depends(...)
+        # (not merely a parameter literally named `user`) closes the gap where
+        # a handler declares `user` without injecting auth and is silently
+        # unauthenticated. ---
         if not public:
             signature = inspect.signature(func)
-            if "user" not in signature.parameters:
+            user_param = signature.parameters.get("user")
+            if user_param is None or not isinstance(user_param.default, params.Depends):
                 runtime.logger.error("Please check the route definition")
                 error_message = (
                     f"Configuration error in route '{func.__name__}'\n"
                     f"All routes must either:\n"
-                    f"1. Include auth user dependency (e.g., user=Depends(guest_user))\n"
+                    f"1. Bind an auth dependency to a `user` parameter "
+                    f"(e.g., user=Depends(guest_user))\n"
                     f"2. Be explicitly marked as public with @api_route(public=True)\n"
-                    f"Please update the route definition accordingly."
+                    f"A `user` parameter without Depends(...) leaves the route "
+                    f"unauthenticated; update the route definition accordingly."
                 )
                 raise ValueError(error_message)
 
