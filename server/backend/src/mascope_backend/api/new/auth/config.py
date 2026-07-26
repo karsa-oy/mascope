@@ -2,6 +2,8 @@
 Core authentication configuration including JWT, cookies, and access tokens settings.
 """
 
+import hashlib
+import hmac
 import os
 
 from pydantic import BaseModel
@@ -10,6 +12,24 @@ from mascope_backend.api.new.auth.access_token.config import AccessTokenConfig
 from mascope_backend.api.new.auth.secrets import jwt_secret_key
 from mascope_backend.roles import ROLE_ACCESS_LEVELS as _ROLE_ACCESS_LEVELS
 from mascope_backend.runtime import runtime
+
+
+def _derive_token_secret(purpose: str) -> str:
+    """
+    Derive a purpose-specific token secret from the deployment's JWT secret.
+
+    Domain-separated via HMAC-SHA256 so the reset and verification secrets are
+    unique per deployment, unpredictable, and cryptographically independent of
+    each other and of the JWT signing key - without asking operators to manage
+    extra secret files. (Replaces the former hardcoded ``SECRET_RESET`` /
+    ``SECRET_VERIFY`` constants, which were forgeable defaults.)
+
+    :param purpose: Stable label separating one derived secret from another.
+    :return: Hex-encoded 32-byte secret.
+    """
+    return hmac.new(
+        jwt_secret_key.encode("utf-8"), purpose.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def _resolve_cookie_secure() -> bool:
@@ -78,10 +98,9 @@ class AuthConfig(BaseModel):
     # Set explicitly rather than relying on the transport library's default.
     COOKIE_SAMESITE: str = "lax"
 
-    # Password reset token settings
-    RESET_PASSWORD_TOKEN_SECRET: str = (
-        "SECRET_RESET"  # Separate secret for password reset tokens
-    )
+    # Password reset token settings. Secret derived per-deployment from the JWT
+    # secret (see _derive_token_secret) rather than a hardcoded constant.
+    RESET_PASSWORD_TOKEN_SECRET: str = _derive_token_secret("reset-password")
     RESET_PASSWORD_TOKEN_LIFETIME_SECONDS: int = (
         3600  # Expiration time for reset tokens
     )
@@ -89,10 +108,8 @@ class AuthConfig(BaseModel):
         "mascope-users:reset"  # Audience for password reset tokens
     )
 
-    # Email verification token settings
-    VERIFICATION_TOKEN_SECRET: str = (
-        "SECRET_VERIFY"  # Separate secret for email verification tokens
-    )
+    # Email verification token settings. Secret derived per-deployment (see above).
+    VERIFICATION_TOKEN_SECRET: str = _derive_token_secret("email-verification")
     VERIFICATION_TOKEN_LIFETIME_SECONDS: int = (
         3600  # Expiration time for email verification tokens
     )
