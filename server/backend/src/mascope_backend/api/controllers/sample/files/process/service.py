@@ -68,6 +68,23 @@ from mascope_backend.socket.records.service import (
 # Chosen so that final m/z error tolerance for TOF would be around 1000 ppm
 CALIBRATION_ITERATIONS = 7
 
+#: Fire-and-forget rematch tasks. asyncio only keeps weak references, so an
+#: unreferenced task can be garbage-collected mid-run; the done-callback below
+#: also surfaces failures that would otherwise die as unretrieved exceptions.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _observe_background_task(task: asyncio.Task) -> None:
+    """Log the failure of a background task and release its reference."""
+    _background_tasks.discard(task)
+    if task.cancelled():
+        return
+    exception = task.exception()
+    if exception is not None:
+        runtime.logger.opt(exception=exception).error(
+            f"Background task '{task.get_name()}' failed"
+        )
+
 
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
@@ -205,7 +222,7 @@ async def auto_process_sample_file(
     )
 
     if other_affected_sample_item_ids:
-        asyncio.create_task(
+        task = asyncio.create_task(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Handle reloads independently
@@ -213,6 +230,11 @@ async def auto_process_sample_file(
                 process_id=gen_id(8),
             )
         )
+        # asyncio only holds a weak reference to tasks: keep one so the task
+        # cannot be garbage-collected mid-run, and observe its outcome so a
+        # failure is logged instead of dying as an unretrieved exception.
+        _background_tasks.add(task)
+        task.add_done_callback(_observe_background_task)
 
         runtime.logger.info(
             "Started independent rematch task for "

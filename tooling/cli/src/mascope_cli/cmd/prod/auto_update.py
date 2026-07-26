@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
+
 from mascope_cli.cmd.prod.release_manifest import MANIFEST_FILENAME
 
 
@@ -125,7 +127,10 @@ def load_pending(mascope_path: str) -> Optional[PendingUpdate]:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8")).get("pending")
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as error:
+        # A corrupt state file must not crash the CLI, but silently forgetting
+        # a pending migration update on a prod host would be worse - say so.
+        logger.warning(f"Ignoring unreadable auto-update state {path}: {error}")
         return None
     if not data:
         return None
@@ -300,7 +305,9 @@ def free_gb(path: Path) -> Optional[float]:
         probe = probe.parent
     try:
         return shutil.disk_usage(probe).free / (1024**3)
-    except OSError:
+    except OSError as error:
+        # The precheck is skipped when this returns None - leave a trace
+        logger.warning(f"Could not measure free disk space at {probe}: {error}")
         return None
 
 

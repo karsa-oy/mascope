@@ -451,6 +451,10 @@ def run() -> None:
         initialize()
     except ConfigError as e:
         print(f"\nConfiguration error:\n{e}\n")
+        if runtime is not None:
+            # Also record it in the agent log: without this a misconfigured
+            # prod agent (started headless) dies invisibly
+            runtime.logger.error(f"Configuration error: {e}")
         pause_before_exit()
         sys.exit(1)
     except KeyboardInterrupt:

@@ -31,8 +31,10 @@ if typing.TYPE_CHECKING:
 
 import datetime
 import glob
+import inspect
 import io
 import json
+import logging as std_logging
 import os
 import re
 import sys
@@ -153,6 +155,38 @@ def _sentry_sink(message) -> None:
     except Exception:
         # A sink must never raise, and must not logger.* here (loop guard).
         pass
+
+
+class InterceptHandler(std_logging.Handler):
+    """
+    Route stdlib ``logging`` records into loguru.
+
+    Installed on the stdlib root logger by ``RuntimeLogging.configure`` so
+    records from libraries that use ``logging.getLogger`` (zarr, thermo
+    reader, ...) reach the loguru handlers - the log files, the terminal,
+    and (for WARNING+) the error-monitoring sink. Based on the recipe from
+    the loguru documentation.
+    """
+
+    def emit(self, record: std_logging.LogRecord) -> None:
+        # Get corresponding loguru level if it exists.
+        level: str | int
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message.
+        frame, depth = inspect.currentframe(), 0
+        while frame and (
+            depth == 0 or frame.f_code.co_filename == std_logging.__file__
+        ):
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
@@ -298,6 +332,12 @@ class RuntimeLogging:
             handlers.append(
                 dict(sink=_sentry_sink, level="WARNING", enqueue=False, catch=True)
             )
+
+        # Bridge stdlib logging into loguru: without this, records emitted via
+        # logging.getLogger reach neither the log files nor the monitoring
+        # sink. force=True replaces handlers from any earlier configure().
+        # The sink's loop guard already skips sentry_sdk/urllib3 records.
+        std_logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
         logger.configure(  # apply new settings
             handlers=handlers,
