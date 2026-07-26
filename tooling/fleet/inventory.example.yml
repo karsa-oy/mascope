@@ -16,3 +16,6 @@ fleet:
   vars:
     ansible_user: "<deploy-user>"
     ansible_ssh_private_key_file: ~/.ssh/<deploy-key>
+    # Optional: source IPs whose ufw allow rules should be removed on 22/443
+    # (e.g. a retired office/VPN address). Kept here, not in the public repo.
+    # retired_allow_sources: ["203.0.113.9"]
