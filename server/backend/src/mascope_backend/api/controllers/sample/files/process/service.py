@@ -86,6 +86,19 @@ def _observe_background_task(task: asyncio.Task) -> None:
         )
 
 
+# Upper bound on auto-processing pipelines running concurrently in this
+# worker. Each pipeline opens several database sessions in turn (batch
+# get-or-create, calibration, matching), so an unbounded ingest burst - e.g.
+# a whole folder of raw files converted back to back - stacks enough
+# concurrent sessions to exhaust the worker's connection pool (pool_size +
+# max_overflow), and everything that then waits longer than pool_timeout dies
+# with "QueuePool limit reached, connection timed out": the converter's API
+# calls fail (files quarantined) and pipelines die between sample_file and
+# sample items. Excess files wait here and are processed as slots free up.
+_AUTO_PROCESS_CONCURRENCY = 3
+_auto_process_gate = asyncio.Semaphore(_AUTO_PROCESS_CONCURRENCY)
+
+
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
     success_reload=[("match", "affected_sample_batch_ids")],
@@ -129,6 +142,24 @@ async def auto_process_sample_file(
     :type parent_id: str | None, optional
     :return: Processing results with affected IDs
     """
+    async with _auto_process_gate:
+        return await _auto_process_sample_file(
+            sample_file_id=sample_file_id,
+            independent_transaction=independent_transaction,
+            user_id=user_id,
+            process_id=process_id,
+            parent_id=parent_id,
+        )
+
+
+async def _auto_process_sample_file(
+    sample_file_id: str,
+    independent_transaction: bool = False,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+) -> dict:
+    """Gated body of ``auto_process_sample_file`` - see the public wrapper."""
     # Initialize collector for affected sample items
     all_affected_sample_item_ids = set()
 

@@ -335,7 +335,12 @@ def _diagnose_missing_files() -> str:
             "from mascope_backend.runtime import runtime\n"
             "d = runtime.config.filestreams\n"
             "def ls(p):\n"
-            "    return sorted(os.listdir(p)) if os.path.isdir(p) else []\n"
+            "    if not os.path.isdir(p):\n"
+            "        return []\n"
+            "    # files only - subfolders like failed_files are not streams\n"
+            "    return sorted(\n"
+            "        f for f in os.listdir(p) if os.path.isfile(os.path.join(p, f))\n"
+            "    )\n"
             "print(json.dumps({'pending': ls(d),"
             " 'failed': ls(os.path.join(d, 'failed_files'))}))\n"
         )

@@ -19,6 +19,17 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Acquisition ingest bursts no longer exhaust the backend's database
+  connection pool. Auto-processing pipelines (batch creation, calibration,
+  matching for each converted file) now run at most three at a time per
+  worker; an unbounded burst - a whole folder of raw files converted back to
+  back - stacked enough concurrent sessions that everything waiting longer
+  than `pool_timeout` died with "QueuePool limit reached, connection timed
+  out": the converter's API calls failed with 400 (raw files quarantined in
+  `failed_files`) and pipelines died between creating the sample file and its
+  sample items. Together with the upload race below, this caused the nightly
+  reproducibility workflow's nondeterministic "147..155/161 files processed"
+  failures.
 - Uploaded sample files can no longer be silently lost to a race with the
   file converter. The upload endpoints wrote bytes directly under the final
   filename inside the watched filestreams folder, so a write that stalled
