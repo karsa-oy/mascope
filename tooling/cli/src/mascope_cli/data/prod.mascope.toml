@@ -29,7 +29,8 @@ shm_size = "20g" # shared_buffers (16GB) + 2GB IPC overhead + 2GB headroom
 # — under max_connections=200 set below.
 pool_size = 3
 max_overflow = 7
-pool_timeout = 30
+# See base.mascope.toml: burst congestion should queue, not fail.
+pool_timeout = 120
 pool_pre_ping = true
 expire_on_commit = false
 
