@@ -4,6 +4,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- GlitchTip events now carry a friendly per-server identity: `server_name` is
+  the runtime env name (e.g. `varrio`) instead of the opaque Docker container
+  id the SDK falls back to under containers.
+
 ### Added
 
 - Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the

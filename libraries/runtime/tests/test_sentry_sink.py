@@ -157,6 +157,21 @@ def test_init_missing_sdk_returns_false(monkeypatch):
     assert rl._init_sentry("prod", None) is False
 
 
+def test_init_server_name_from_env(monkeypatch, fake_sentry):
+    monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
+    monkeypatch.setenv("MASCOPE_ENV", "varrio")
+    assert rl._init_sentry("prod", None) is True
+    assert fake_sentry.init_calls[0]["server_name"] == "varrio"
+
+
+def test_init_server_name_falls_back_to_hostname(monkeypatch, fake_sentry):
+    # No MASCOPE_ENV -> pass None so the SDK falls back to the hostname.
+    monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
+    monkeypatch.delenv("MASCOPE_ENV", raising=False)
+    assert rl._init_sentry("prod", None) is True
+    assert fake_sentry.init_calls[0]["server_name"] is None
+
+
 # --- _sentry_sink ----------------------------------------------------------
 
 
