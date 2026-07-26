@@ -40,7 +40,10 @@ def _raw_dir(version: str | None, source_dir: "Path | None") -> Path:
 
 def _wait_for_backend(url: str, timeout: float = 300.0, poll: float = 2.0) -> bool:
     """
-    Poll the backend until it serves HTTP (its OpenAPI schema returns 200).
+    Poll the backend until it serves HTTP.
+
+    Probes a public, always-present endpoint (the first-owner status route)
+    rather than the OpenAPI schema, which is disabled outside dev mode.
 
     :param url: Backend base URL (e.g. ``http://localhost:8090``).
     :param timeout: Max seconds to wait.
@@ -52,7 +55,7 @@ def _wait_for_backend(url: str, timeout: float = 300.0, poll: float = 2.0) -> bo
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            resp = requests.get(f"{url}/openapi.json", timeout=5)
+            resp = requests.get(f"{url}/api/users/first-owner/status", timeout=5)
             if resp.status_code == 200:
                 return True
         except requests.RequestException:
