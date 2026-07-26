@@ -39,7 +39,12 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      # Render ```mermaid fences as diagrams (Material ships the mermaid runtime).
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   # Lets a page pull in a shared snippet with `--8<-- "_help/<name>.md"`; the
@@ -58,7 +63,9 @@ nav:
       - Peak detection: how-it-works/peak_detection.md
       - Calibration: how-it-works/calibration.md
       - Matching: how-it-works/matching.md
-  - Guides: guides/index.md
+  - Guides:
+      - Overview: guides/index.md
+      - Import data files: guides/import-files.md
   - Instruments & acquisition: instruments/index.md
   - SDK & API: sdk/index.md
   - Reference: reference/index.md
