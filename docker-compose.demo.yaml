@@ -63,6 +63,9 @@ services:
         condition: service_healthy
     environment: &demo_env
       MASCOPE_ENV: demo
+      # Enables the public demo credential seed (demo-init.sh). This is a demo
+      # stack marker; a real deployment never sets it, so the seed fails closed.
+      MASCOPE_ALLOW_DEMO_SEED: "1"
       MASCOPE_DB_NAME: mascope_demo
       MASCOPE_DB_USER: ${MASCOPE_DB_USER:-mascope_user}
       MASCOPE_DEMO_DB_PASSWORD: ${MASCOPE_DEMO_DB_PASSWORD:-mascope_demo_pw}

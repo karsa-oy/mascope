@@ -17,14 +17,19 @@ The demo user is a superuser, so it bypasses workspace-membership checks and
 sees all demo data without extra wiring.
 
 These credentials are intentionally public and for LOCAL demo use only - never
-seed them into a real deployment.
+seed them into a real deployment. As a safeguard the seed refuses to run unless
+``MASCOPE_ALLOW_DEMO_SEED`` is set to a truthy value - the demo stack sets it,
+a real deployment never does, so an accidental run against a production
+database fails closed instead of creating a public-credential superuser.
 
 Usage:
-    mascope dev db script run seed_demo
-    (also invoked automatically by `mascope demo`)
+    MASCOPE_ALLOW_DEMO_SEED=1 mascope dev db script run seed_demo
+    (also invoked automatically by `mascope demo` and the demo compose stack,
+    both of which set the flag for you)
 """
 
 import asyncio
+import os
 from datetime import datetime, timezone
 
 from fastapi_users.password import PasswordHelper
@@ -64,6 +69,20 @@ DEMO_TOKENS = {
 # Back-compat alias for the SDK token (referenced by docs / CLI output).
 DEMO_SERVICE = "mascope_sdk"
 DEMO_TOKEN = DEMO_TOKENS["mascope_sdk"]
+
+# Opt-in flag that must be truthy for the seed to run. The demo entry points
+# (docker-compose.demo.yaml, `mascope demo`) set it; real deployments never do.
+DEMO_SEED_ENV_FLAG = "MASCOPE_ALLOW_DEMO_SEED"
+
+
+def _demo_seed_allowed() -> bool:
+    """Whether public demo seeding has been explicitly enabled."""
+    return os.environ.get(DEMO_SEED_ENV_FLAG, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 async def _ensure_roles(session) -> None:
@@ -132,7 +151,19 @@ async def _refresh_demo_tokens(session, user: User) -> None:
 
 
 async def seed_demo() -> None:
-    """Idempotently seed the demo user, roles, and SDK access token."""
+    """Idempotently seed the demo user, roles, and SDK access token.
+
+    :raises RuntimeError: If ``MASCOPE_ALLOW_DEMO_SEED`` is not set to a truthy
+        value. This blocks accidental execution against a real deployment,
+        where the public demo owner/superuser must never exist.
+    """
+    if not _demo_seed_allowed():
+        raise RuntimeError(
+            "Refusing to seed public demo credentials: this creates a "
+            f"well-known owner+superuser ('{DEMO_EMAIL}') and fixed API tokens "
+            "that must never exist on a real deployment. Set "
+            f"{DEMO_SEED_ENV_FLAG}=1 only for the local demo stack to enable it."
+        )
     await configure_database_engine()
     async with async_session() as session:
         await _ensure_roles(session)
