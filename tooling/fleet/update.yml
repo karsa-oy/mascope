@@ -46,7 +46,10 @@
 
     # prod update refreshes images but not the uv-tool CLI; reinstalling here
     # keeps the CLI in lockstep with the checkout (the stale-CLI drift that
-    # once hid `prod doctor`). ~1 min per server, idempotent.
+    # once hid `prod doctor`). ~1 min per server, idempotent. Unlike
+    # `ubuntu.sh reinstall`, this does NOT clear .runtime/state.json, so the
+    # server's active env is preserved (the reset comes from uninstall's
+    # clear_state, not from the install command).
     - name: Reinstall the mascope CLI to match the checkout
       ansible.builtin.shell:
         cmd: >-
