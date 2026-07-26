@@ -4,6 +4,16 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the
+  sshd hardening drop-in, the ufw ruleset (tailnet-only SSH, Cloudflare-only
+  443, canonical container-NAT block), the load-bearing Docker
+  `iptables: false` setting, and unattended security upgrades - with a
+  check-first drift workflow (`ansible-playbook site.yml --check --diff`).
+  The inventory is deliberately an example file: real addresses stay out of
+  this public repository.
+
 ## [1.4.4] - 2026.07.26
 
 ### Added

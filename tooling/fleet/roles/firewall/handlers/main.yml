@@ -1,0 +1,7 @@
+---
+# Fleet servers run docker with iptables:false, so a ufw reload cannot break
+# container networking here (unlike stock-Docker hosts - see the monitoring
+# runbook's warning for the ops box).
+- name: Reload ufw
+  ansible.builtin.command: ufw reload
+  changed_when: true
