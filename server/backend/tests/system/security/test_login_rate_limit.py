@@ -3,8 +3,12 @@
 Complements the per-IP login limiter: it caps attempts against a single
 identifier regardless of source IP, so a distributed credential-stuffing attack
 on one account is blunted once the network firewall is removed. Fails open on
-Redis errors and no-ops when the request carries no login identifier.
+Redis errors and no-ops when the request carries no login identifier. Keys are
+hashed (never the raw identifier) and a successful login clears the counter so
+only failed attempts count.
 """
+
+import hashlib
 
 import pytest
 from fastapi import Depends, FastAPI, HTTPException
@@ -33,6 +37,9 @@ class FakeRedis:
     async def ttl(self, key: str) -> int:
         return 42
 
+    async def delete(self, key: str) -> int:
+        return 1 if self.counts.pop(key, None) is not None else 0
+
 
 class FakeRequest:
     """Stand-in request whose ``form()`` returns fixed data (or raises)."""
@@ -48,6 +55,9 @@ class FakeRequest:
 
 @pytest.fixture
 def fake_redis(monkeypatch):
+    # Patches the client's private ``_client`` attribute (what the ``client``
+    # property returns) rather than a public seam - if the storage client is
+    # ever refactored, this fixture is why these tests break.
     redis = FakeRedis()
     monkeypatch.setattr(rl.redis_storage_client, "_client", redis)
     return redis
@@ -96,6 +106,64 @@ async def test_identifier_is_normalized(fake_redis):
     await dep(FakeRequest({"username": "victim@test.com"}))
     with pytest.raises(HTTPException):
         await dep(FakeRequest({"username": "VICTIM@TEST.COM"}))
+
+
+@pytest.mark.asyncio
+async def test_redis_key_is_hashed_and_fixed_size(fake_redis):
+    """Keys embed a digest, never the raw (attacker-controlled) identifier.
+
+    Hashing keeps key size fixed no matter how long the submitted username is,
+    and keeps the typed value (occasionally a password) out of Redis keyspace.
+    """
+    dep = rl.rate_limit_login_by_account(times=5, seconds=60)
+    identifier = "victim@test.com" + "x" * 10_000
+    await dep(FakeRequest({"username": identifier}))
+
+    (key,) = fake_redis.counts.keys()
+    assert identifier not in key
+    assert "victim" not in key
+    digest = hashlib.sha256(identifier.strip().lower().encode()).hexdigest()
+    assert key.endswith(digest)
+
+
+@pytest.mark.asyncio
+async def test_successful_login_clears_the_counter(fake_redis):
+    """clear_login_rate_limit resets the account budget (failures-only count).
+
+    Driven over the limit, then cleared as on_after_login does on a successful
+    sign-in: the account may immediately attempt again.
+    """
+    dep = rl.rate_limit_login_by_account(times=2, seconds=60)
+    req = FakeRequest({"username": "victim@test.com", "password": "x"})
+
+    await _call_n(dep, req, 3)  # over the limit
+    with pytest.raises(HTTPException):
+        await dep(req)
+
+    await rl.clear_login_rate_limit("victim@test.com")
+    assert await _call_n(dep, req, 2) is None  # budget restored
+
+
+@pytest.mark.asyncio
+async def test_clear_normalizes_like_the_limiter(fake_redis):
+    """Clearing with a differently-cased identifier hits the same counter."""
+    dep = rl.rate_limit_login_by_account(times=1, seconds=60)
+    await _call_n(dep, FakeRequest({"username": "victim@test.com"}), 2)
+
+    await rl.clear_login_rate_limit("  Victim@Test.com ")
+    assert fake_redis.counts == {}
+
+
+@pytest.mark.asyncio
+async def test_clear_swallows_redis_errors(monkeypatch):
+    """Clearing is best-effort: a Redis outage must not fail the login."""
+    monkeypatch.setattr(rl.redis_storage_client, "_client", FakeRedis(fail=True))
+
+    async def failing_delete(key):
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(rl.redis_storage_client._client, "delete", failing_delete)
+    await rl.clear_login_rate_limit("victim@test.com")  # never raises
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,8 @@ This is intentionally lightweight; it is meant to blunt brute-force and
 credential-stuffing bursts, not to be a precise quota system.
 """
 
+import hashlib
+
 from fastapi import HTTPException, Request, status
 
 from mascope_backend.runtime import runtime
@@ -101,6 +103,28 @@ def rate_limit(*, times: int, seconds: int, scope: str):
     return dependency
 
 
+def _account_digest(identifier: str) -> str:
+    """
+    Normalized, hashed form of a submitted login identifier.
+
+    Hashing (rather than embedding the raw string) keeps Redis keys fixed-size
+    no matter what an attacker submits as the username, and lets log lines
+    reference the account without recording what was typed into the login form
+    (which is occasionally a password). Operators can still correlate a digest
+    to a known address by hashing its lowercased form.
+
+    :param identifier: Raw identifier from the login form ``username`` field.
+    :return: Hex SHA-256 digest of the normalized identifier.
+    """
+    account = identifier.strip().lower()
+    return hashlib.sha256(account.encode("utf-8")).hexdigest()
+
+
+def _account_limit_key(identifier: str, scope: str) -> str:
+    """Redis key for the per-account login counter."""
+    return f"mascope:ratelimit:{scope}:{_account_digest(identifier)}"
+
+
 def rate_limit_login_by_account(
     *, times: int, seconds: int, scope: str = "auth-login-account"
 ):
@@ -112,14 +136,16 @@ def rate_limit_login_by_account(
     does not stop a distributed attack that guesses one account's password from
     many rotating IPs. Keying on the account blunts that.
 
+    The counter effectively tracks only *failed* attempts: a successful login
+    clears it via :func:`clear_login_rate_limit` (wired into the user manager's
+    ``on_after_login``). This keeps a user's own routine logins from consuming
+    the budget and stops an attacker from locking a known address out
+    indefinitely with a trickle of bogus attempts - after the real user signs
+    in, the window resets.
+
     No-ops when the request carries no form identifier (e.g. logout, which
     shares the auth router), and fails open on Redis errors like
     :func:`rate_limit`.
-
-    Trade-off: because it counts by account, sustained bogus attempts against a
-    known address can briefly delay that user's own logins. The window is short
-    and self-expiring, and the threshold is set well above normal use, so this
-    only bites under an actual attack.
 
     :param times: Maximum login attempts allowed per account within the window.
     :param seconds: Window length in seconds.
@@ -136,16 +162,19 @@ def rate_limit_login_by_account(
         identifier = form.get("username")
         if not identifier:
             return
-        account = str(identifier).strip().lower()
-        key = f"mascope:ratelimit:{scope}:{account}"
+        key = _account_limit_key(str(identifier), scope)
         try:
             retry_after = await _over_fixed_window(key, times, seconds)
         except Exception:
             runtime.logger.exception("Account login rate limit check failed")
             return
         if retry_after is not None:
-            # Expected throttling of a noisy client, not a server fault.
-            runtime.logger.info(f"Login rate limit exceeded for account '{account}'")
+            # Expected throttling of a noisy client, not a server fault. Log
+            # the digest, never the submitted identifier (see _account_digest).
+            runtime.logger.info(
+                "Login rate limit exceeded for account "
+                f"sha256:{_account_digest(str(identifier))[:12]}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=(
@@ -156,3 +185,23 @@ def rate_limit_login_by_account(
             )
 
     return dependency
+
+
+async def clear_login_rate_limit(
+    identifier: str, *, scope: str = "auth-login-account"
+) -> None:
+    """
+    Reset the per-account login counter after a successful login.
+
+    Called from the user manager's ``on_after_login`` so the limiter counts
+    only failed attempts. Best-effort: the counter self-expires anyway, so a
+    Redis error here is logged and swallowed rather than failing the login.
+
+    :param identifier: The login identifier as submitted (normalized and
+        hashed the same way as the limiter keys on it).
+    :param scope: Namespacing label; must match the limiter's ``scope``.
+    """
+    try:
+        await redis_storage_client.client.delete(_account_limit_key(identifier, scope))
+    except Exception:
+        runtime.logger.exception("Failed to clear account login rate limit")
