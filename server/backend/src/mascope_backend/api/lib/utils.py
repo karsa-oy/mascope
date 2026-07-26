@@ -120,7 +120,7 @@ async def handle_reloads(
         rooms = resolve_rooms(room_key, kwargs, result)
         if not rooms:
             # INFO: fires on every affected API call while a route's reload
-            # wiring is incomplete - triage via log files, not GlitchTip
+            # wiring is incomplete; triage via the log files
             runtime.logger.info(
                 f"{context}: No room IDs found for '{record_type}_reload' with key '{room_key}'"
             )

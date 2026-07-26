@@ -1,3 +1,21 @@
+"""
+Runtime logging configuration (Loguru).
+
+Level policy: every record at WARNING or above is exported to error
+monitoring when ``MASCOPE_SENTRY_DSN`` is set (see the sink below), so levels
+express operator relevance, not verbosity:
+
+- DEBUG/INFO: routine operation - expected data conditions, per-item
+  progress, client errors, retries that usually succeed. Anything that fires
+  per request, per file, or per loop item belongs here. INFO and above
+  reaches the log files.
+- WARNING: actionable operator signal, expected to be rare and to group into
+  a single monitored issue.
+- ERROR/CRITICAL: faults. Inside an except block use ``logger.exception`` so
+  the traceback travels with the record, and log an incident exactly once -
+  the outermost handler owns the record (no log-then-raise).
+"""
+
 # import type hint w/o circular import error
 from __future__ import annotations
 

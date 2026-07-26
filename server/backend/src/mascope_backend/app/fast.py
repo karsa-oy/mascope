@@ -114,11 +114,10 @@ async def logger_middleware(request: Request, call_next):
             runtime.logger.debug(f"{full_url} [Worker {worker_pid}]")
 
         # Access log, always INFO. 4xx responses are routine client behavior
-        # (expired sessions, validation errors) and 5xx responses were already
-        # logged with their traceback by process_exception; logging either at
-        # WARNING/ERROR here would send a duplicate, traceback-less event to
-        # GlitchTip (the Sentry sink forwards every WARNING+ record). The
-        # status code stays queryable via the contextualized status_code extra.
+        # (expired sessions, validation errors) and 5xx responses are already
+        # logged with their traceback by process_exception - logging either
+        # above INFO here would duplicate that record without the traceback.
+        # The status code stays queryable via the contextualized extra.
         runtime.logger.info(request.url.path)
 
     return response

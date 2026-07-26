@@ -144,9 +144,9 @@ class TestProcessExceptionDoesNotLeakInternals:
 
 class TestProcessExceptionLogLevels:
     """
-    Routine client errors must stay below WARNING - the GlitchTip sink forwards
-    every WARNING+ record as an event - while server-side faults must log at
-    ERROR with their traceback attached.
+    Routine client errors must stay below WARNING (records at WARNING and
+    above are exported to error monitoring), while server-side faults must
+    log at ERROR with their traceback attached.
     """
 
     def _process_and_capture(self, exc: Exception) -> dict:

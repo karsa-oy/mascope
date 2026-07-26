@@ -1117,8 +1117,8 @@ def get_metadata(
     :return: Metadata class instance or None if the file type is not supported
     :rtype: RawFileMetadataLegacy | None
     """
-    # DEBUG: this is called on every metadata request; a per-call WARNING
-    # would emit one GlitchTip event per API call
+    # DEBUG: fires on every metadata request; the migration away from this
+    # helper is tracked at its call sites
     runtime.logger.debug(
         "Metadata retrieval using compute.get_metadata is deprecated and will be "
         "removed in future versions. "
