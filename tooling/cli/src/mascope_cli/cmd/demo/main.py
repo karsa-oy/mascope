@@ -354,8 +354,12 @@ def _ensure_dev_secrets() -> None:
 def _seed_credentials() -> None:
     """Seed the fixed demo user + SDK token into the demo database in-process."""
     import asyncio
+    import os
 
     runtime.logger.info("Seeding demo credentials...")
+    # Explicit opt-in required by the seed as a production safeguard; this is
+    # the local demo flow, so enable it.
+    os.environ["MASCOPE_ALLOW_DEMO_SEED"] = "1"
     try:
         # Lazy import: pulls the backend graph (needs MASCOPE_ENV set above and
         # the postgres secret, both present in the demo flow).
