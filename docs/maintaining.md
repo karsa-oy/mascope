@@ -167,6 +167,45 @@ cat "$(mascope path)/.runtime/update/status.log"   # applied / pending history
 cat "$(mascope path)/.runtime/update/state.json"   # the current pending update
 ```
 
+### Rolling out a release across several servers
+
+When you run more than one server, roll a new release out **canary-first** and
+verify each step rather than updating everything at once. The procedure per
+server (on the server, from the deployment checkout):
+
+```sh
+cd <deployment>            # the mascope checkout, e.g. ~/mascope
+git fetch --tags origin
+git checkout vX.Y.Z        # the release you are rolling out
+mascope prod update        # pulls the tagged images, rolling restart (~30 s)
+```
+
+Recommended sequence:
+
+1. **Canary.** Update one low-stakes server first. Verify it before touching
+   the rest (see the checklist below).
+2. **Roll out** to the remaining servers once the canary is healthy.
+3. **Watch** error reporting / uptime monitoring for a bit after each wave.
+
+Per-server verification checklist:
+
+```sh
+docker ps                                   # mascope_prod_* healthy
+mascope prod doctor                          # stack + disk + backups + migrations
+curl -sI https://<name>/ | head -1           # app serves through its proxy
+```
+
+Two gotchas this procedure exists to avoid:
+
+- **The CLI is not refreshed by `prod update`.** It only pulls images; the
+  `mascope` binary is a `uv` tool installed by `tooling/ubuntu.sh`. If a release
+  adds or changes CLI commands, reinstall the CLI (`ubuntu.sh reinstall`, or the
+  `uv tool install` step it runs) - `prod update` now warns when the running CLI
+  has drifted from the checkout.
+- **Host env vars apply at login.** If a rollout also changes something in
+  `/etc/environment` (e.g. a new `MASCOPE_*` var), start the stack from a
+  **fresh** shell session, or the value interpolates empty.
+
 ## Backups
 
 [`tooling/backup-cron.sh`](../tooling/backup-cron.sh) runs a two-layer nightly

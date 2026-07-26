@@ -6,6 +6,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- Fleet Ansible can retire stale ufw allow rules: set `retired_allow_sources`
+  (in the local inventory) and the firewall role removes those source IPs'
+  allow rules on 22/443 - e.g. a decommissioned office/VPN address. Empty by
+  default (no-op). `docs/maintaining.md` gains a canary-first fleet rollout
+  runbook with a per-server verification checklist.
+
 - Fleet Ansible now supports per-host sudo passwords via Ansible Vault
   (`tooling/fleet/group_vars/fleet/`): the encrypted vault (gitignored, kept
   out of this public repo) holds each server's password, unlocked with a single
