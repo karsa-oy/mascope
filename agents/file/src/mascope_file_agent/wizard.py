@@ -7,6 +7,8 @@ away so typos surface during setup instead of at the first upload.
 """
 
 import os
+import platform
+import time
 
 import requests
 import urllib3
@@ -54,6 +56,20 @@ def verify_connection(host: str, access_token: str) -> tuple[bool, str]:
             f"Details: {e.__class__.__name__}: {e}"
         )
     if resp.status_code == 200:
+        # A 200 alone is not proof of the API: a single-page-app server
+        # (e.g. the Vite frontend dev server, which has no /api proxy)
+        # answers any GET with the app's HTML page and 200. The real API
+        # responds with JSON.
+        content_type = resp.headers.get("content-type", "")
+        if "json" not in content_type.lower():
+            return False, (
+                f"The address {base_url(host)} responded, but it does not "
+                "look like the Mascope API (it returned a web page instead "
+                "of data), so uploads would fail. In a development setup, "
+                "use the backend address (e.g. http://localhost:8090) - the "
+                "frontend dev server cannot receive uploads. In production, "
+                "use the normal Mascope web app address."
+            )
         return True, ""
     if resp.status_code in (401, 403):
         return False, (
@@ -104,6 +120,130 @@ def _prompt_source(default: str) -> str:
                 print(f"  Could not create the folder: {e}")
 
 
+def start_pairing(host: str) -> dict | None:
+    """Request a pairing code from the server.
+
+    :param host: Normalized server host
+    :type host: str
+    :return: The pairing response (user_code, device_code, expires_in,
+        interval), or None with an explanation printed when pairing is
+        unavailable
+    :rtype: dict | None
+    """
+    machine_name = platform.node()[:64] or None
+    try:
+        resp = requests.post(
+            f"{base_url(host)}/api/auth/pairing/start",
+            json={"service_name": "file-agent", "machine_name": machine_name},
+            verify=False,
+            timeout=VERIFY_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as e:
+        print(f"Could not reach the server: {e.__class__.__name__}: {e}")
+        return None
+    if resp.status_code == 404:
+        print("This Mascope server does not support pairing (older version).")
+        return None
+    if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
+        print(f"Unexpected response from the server (HTTP {resp.status_code}).")
+        return None
+    return resp.json()
+
+
+def run_pairing(host: str) -> str | None:
+    """Interactive pairing: display the code and poll until approved.
+
+    :param host: Normalized server host
+    :type host: str
+    :return: The access token, or None to fall back to manual entry
+    :rtype: str | None
+    """
+    started = start_pairing(host)
+    if not started:
+        return None
+    minutes = max(1, round(started["expires_in"] / 60))
+    print(
+        "\n"
+        f"  Pairing code: {started['user_code']}\n"
+        "\n"
+        "  1. Log in to Mascope in your browser (editor role or higher)\n"
+        "  2. Click your profile icon to open the sidebar\n"
+        "  3. Under 'API Access Tokens', click 'Pair an agent'\n"
+        "  4. Enter the code above and approve\n"
+        "\n"
+        f"Waiting for approval (expires in {minutes} min, Ctrl+C to cancel)...",
+        end="",
+        flush=True,
+    )
+    interval = max(1, int(started.get("interval", 5)))
+    try:
+        while True:
+            time.sleep(interval)
+            try:
+                resp = requests.post(
+                    f"{base_url(host)}/api/auth/pairing/poll",
+                    json={"device_code": started["device_code"]},
+                    verify=False,
+                    timeout=VERIFY_TIMEOUT,
+                )
+            except requests.exceptions.RequestException:
+                print("!", end="", flush=True)  # transient; keep polling
+                continue
+            if resp.status_code != 200:
+                print("!", end="", flush=True)
+                continue
+            body = resp.json()
+            if body["status"] == "approved":
+                print("\nPaired - the agent received its access token.\n")
+                return body["access_token"]
+            if body["status"] == "expired":
+                print("\nThe pairing code expired before it was approved.")
+                return None
+            print(".", end="", flush=True)
+    except KeyboardInterrupt:
+        print("\nPairing cancelled.")
+        return None
+
+
+def _obtain_token(host: str, existing: str) -> str:
+    """Get the access token, via pairing (default) or manual entry.
+
+    :param host: Normalized server host
+    :type host: str
+    :param existing: Previously configured token, offered as the manual
+        default
+    :type existing: str
+    :return: The access token
+    :rtype: str
+    """
+    default = "m" if existing else "p"
+    while True:
+        choice = (
+            input(
+                "Get the access token by [p]airing with the web app, "
+                f"or enter it [m]anually? [{default}]: "
+            )
+            .strip()
+            .lower()
+            or default
+        )
+        if choice in ("p", "m"):
+            break
+    if choice == "p":
+        token = run_pairing(host)
+        if token:
+            return token
+        print("Falling back to manual token entry.\n")
+    print(
+        "To create a token manually:\n"
+        "  1. Log in to Mascope in your browser (editor role or higher)\n"
+        "  2. Click your profile icon to open the sidebar\n"
+        "  3. Under 'API Access Tokens', select 'File Agent' and generate\n"
+        "     a token, then copy it (it is shown only once)\n"
+    )
+    return _prompt("Access token", existing)
+
+
 def run_setup_wizard(settings: dict) -> dict:
     """Interactively collect and verify the agent settings.
 
@@ -117,16 +257,11 @@ def run_setup_wizard(settings: dict) -> dict:
         f"=== Mascope File Agent setup ({__version__}) ===\n"
         "\n"
         "The agent watches a folder and uploads new data files to your\n"
-        "Mascope server. You will need an API access token:\n"
-        "\n"
-        "  1. Log in to Mascope in your browser (editor role or higher)\n"
-        "  2. Click your profile icon to open the sidebar\n"
-        "  3. Under 'API Access Tokens', select 'File Agent' and generate\n"
-        "     a token, then copy it (it is shown only once)\n"
+        "Mascope server.\n"
     )
 
     host = normalize_host(_prompt("Mascope server address", settings.get("host", "")))
-    access_token = _prompt("Access token", settings.get("access_token", ""))
+    access_token = _obtain_token(host, settings.get("access_token", ""))
 
     while True:
         print("Checking the connection...")

@@ -30,13 +30,17 @@ async def get_access_token(user: User, service_name: str) -> str:
     :raises: InvalidTokenException if token invalid/missing
     """
     async with async_session() as session:
-        # Query existing token for the user and service
+        # Query existing token for the user and service. Multiple tokens can
+        # exist for the pair (device pairing adds tokens without revoking);
+        # use the newest instead of scalar_one_or_none, which would raise on
+        # duplicates.
         token_query = await session.execute(
             select(AccessToken)
             .where(AccessToken.user_id == user.id)
             .where(AccessToken.service_name == service_name)
+            .order_by(AccessToken.created_at.desc())
         )
-        token = token_query.scalar_one_or_none()
+        token = token_query.scalars().first()
 
         if not token:
             raise InvalidTokenException(
@@ -78,6 +82,41 @@ async def generate_access_token(user, service_name: str):
         f"{user.username} access token for {service_name} is generated"
     )
     return response
+
+
+@api_controller()
+async def create_access_token(
+    user, service_name: str, description: str | None = None
+) -> str:
+    """
+    Creates a new access token WITHOUT removing the user's existing tokens
+    for the service, so several agent machines can hold their own token
+    (used by device pairing; the manual regenerate flow still replaces).
+
+    :param user: The user the token belongs to
+    :type user: User
+    :param service_name: Name of the service (e.g., "file-agent")
+    :type service_name: str
+    :param description: Optional label stamped on the token (e.g. the
+        paired machine's hostname)
+    :type description: str, optional
+    :return: The raw token string
+    :rtype: str
+    """
+    async with get_database_strategy_context() as database_strategy:
+        token = await database_strategy.write_token(user)
+    async with async_session() as session:
+        await session.execute(
+            update(AccessToken)
+            .where(AccessToken.token == token)
+            .values(service_name=service_name, description=description)
+        )
+        await session.commit()
+    runtime.logger.debug(
+        f"{user.username} access token for {service_name} is created"
+        + (f" ({description})" if description else "")
+    )
+    return token
 
 
 @api_controller()

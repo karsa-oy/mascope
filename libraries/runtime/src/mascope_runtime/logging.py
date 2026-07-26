@@ -1,3 +1,21 @@
+"""
+Runtime logging configuration (Loguru).
+
+Level policy: every record at WARNING or above is exported to error
+monitoring when ``MASCOPE_SENTRY_DSN`` is set (see the sink below), so levels
+express operator relevance, not verbosity:
+
+- DEBUG/INFO: routine operation - expected data conditions, per-item
+  progress, client errors, retries that usually succeed. Anything that fires
+  per request, per file, or per loop item belongs here. INFO and above
+  reaches the log files.
+- WARNING: actionable operator signal, expected to be rare and to group into
+  a single monitored issue.
+- ERROR/CRITICAL: faults. Inside an except block use ``logger.exception`` so
+  the traceback travels with the record, and log an incident exactly once -
+  the outermost handler owns the record (no log-then-raise).
+"""
+
 # import type hint w/o circular import error
 from __future__ import annotations
 
@@ -13,8 +31,10 @@ if typing.TYPE_CHECKING:
 
 import datetime
 import glob
+import inspect
 import io
 import json
+import logging as std_logging
 import os
 import re
 import sys
@@ -135,6 +155,38 @@ def _sentry_sink(message) -> None:
     except Exception:
         # A sink must never raise, and must not logger.* here (loop guard).
         pass
+
+
+class InterceptHandler(std_logging.Handler):
+    """
+    Route stdlib ``logging`` records into loguru.
+
+    Installed on the stdlib root logger by ``RuntimeLogging.configure`` so
+    records from libraries that use ``logging.getLogger`` (zarr, thermo
+    reader, ...) reach the loguru handlers - the log files, the terminal,
+    and (for WARNING+) the error-monitoring sink. Based on the recipe from
+    the loguru documentation.
+    """
+
+    def emit(self, record: std_logging.LogRecord) -> None:
+        # Get corresponding loguru level if it exists.
+        level: str | int
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message.
+        frame, depth = inspect.currentframe(), 0
+        while frame and (
+            depth == 0 or frame.f_code.co_filename == std_logging.__file__
+        ):
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
 
 
 highlight = re.compile("SUCCESS|WARNING|ERROR|CRITICAL")
@@ -261,24 +313,31 @@ class RuntimeLogging:
         # is set. Init here (once) so the SDK is live before the backend builds
         # FastAPI() - fast.py imports this Runtime first. Must run BEFORE
         # logger.remove(): its "SDK missing" warning needs a live handler.
-        sentry_on = _init_sentry(
+        # The CLI never reports: its WARNING+ records are user-facing terminal
+        # output (bad arguments, status notices), not operator signal, and a
+        # DSN exported in the shell env would otherwise turn every CLI warning
+        # into a GlitchTip event.
+        is_cli = self.runtime.module.name == "cli"
+        sentry_on = not is_cli and _init_sentry(
             environment=str(self.runtime.mode), release=self.runtime.version
         )
 
         # create fresh config
         logger.remove()  # remove old settings
 
-        handlers = (
-            [file_handler, terminal_handler]
-            if self.runtime.module.name != "cli"
-            else [terminal_handler]
-        )
+        handlers = [terminal_handler] if is_cli else [file_handler, terminal_handler]
         if sentry_on:
             # The callable sink reads the record directly, so it ignores the
             # text `format` used above.
             handlers.append(
                 dict(sink=_sentry_sink, level="WARNING", enqueue=False, catch=True)
             )
+
+        # Bridge stdlib logging into loguru: without this, records emitted via
+        # logging.getLogger reach neither the log files nor the monitoring
+        # sink. force=True replaces handlers from any earlier configure().
+        # The sink's loop guard already skips sentry_sdk/urllib3 records.
+        std_logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
         logger.configure(  # apply new settings
             handlers=handlers,

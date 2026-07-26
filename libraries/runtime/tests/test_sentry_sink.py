@@ -5,10 +5,12 @@ The sink is entirely gated on ``MASCOPE_SENTRY_DSN`` and forwards WARNING+ logur
 records to GlitchTip via ``sentry-sdk``. These tests inject a fake ``sentry_sdk``
 into ``sys.modules`` so they run without the optional ``sentry`` extra installed,
 and cover: the default-OFF gate, init wiring/idempotency, the WARNING+ capture
-paths (message vs exception), the SDK-loop guard, and never-raise behavior. One
-test drives a real loguru logger end to end.
+paths (message vs exception), the SDK-loop guard, never-raise behavior, and the
+CLI exclusion in ``RuntimeLogging.configure``. One test drives a real loguru
+logger end to end.
 """
 
+import logging as std_logging
 import sys
 import types
 
@@ -196,6 +198,100 @@ def test_sink_never_raises(fake_sentry):
     fake_sentry.capture_exception = _boom
     # Must swallow the transport error rather than propagate out of the sink.
     rl._sentry_sink(_msg(level="ERROR", message="x", exc=None))
+
+
+# --- configure() gating -----------------------------------------------------
+# The sink handler is appended for server modules only. The CLI is excluded:
+# its WARNING+ records are user-facing terminal output, and a DSN exported in
+# the shell env must not turn them into GlitchTip events.
+
+
+class _FakeModuleConfig:
+    def __init__(self, log_path):
+        self.log_path = log_path
+        self.log_level = "info"
+
+
+class _FakeModule:
+    def __init__(self, name, log_path):
+        self.name = name
+        self.config = _FakeModuleConfig(log_path)
+
+
+class _FakeEnv:
+    def __init__(self, base):
+        self._base = base
+
+    def path(self):
+        return self._base
+
+
+class _FakeRuntimeConfig:
+    color = "blue"
+
+
+class _FakeRuntime:
+    """Just enough Runtime for RuntimeLogging.configure() and its formatter."""
+
+    def __init__(self, name, base):
+        self._base = base
+        self.module = _FakeModule(name, base)
+        self.mode = "dev"
+        self.version = "0.0.0"
+        self.config = _FakeRuntimeConfig()
+        self.env = _FakeEnv(base)
+
+    def path(self, *args):
+        return self._base
+
+
+@pytest.fixture
+def sink_events(monkeypatch):
+    """Route the sentry sink to a recorder and force _init_sentry to succeed."""
+    events = []
+    monkeypatch.setattr(rl, "_init_sentry", lambda **kwargs: True)
+    monkeypatch.setattr(rl, "_sentry_sink", lambda message: events.append(message))
+    root = std_logging.getLogger()
+    saved_handlers = root.handlers[:]
+    saved_level = root.level
+    yield events
+    rl.logger.remove()
+    # configure() replaces the stdlib root handlers (InterceptHandler);
+    # restore them so later tests see an unmodified logging setup
+    root.handlers[:] = saved_handlers
+    root.setLevel(saved_level)
+
+
+def test_configure_skips_sentry_for_cli(tmp_path, monkeypatch, sink_events):
+    init_calls = []
+    monkeypatch.setattr(
+        rl, "_init_sentry", lambda **kwargs: init_calls.append(kwargs) or True
+    )
+
+    logger = rl.RuntimeLogging(_FakeRuntime("cli", str(tmp_path))).configure()
+    logger.warning("routine CLI warning")
+
+    assert init_calls == []  # the SDK is never even initialized for the CLI
+    assert sink_events == []
+
+
+def test_configure_adds_sentry_sink_for_server_modules(tmp_path, sink_events):
+    logger = rl.RuntimeLogging(_FakeRuntime("backend", str(tmp_path))).configure()
+    logger.warning("server warning")
+    logger.info("below threshold")
+
+    assert [m.record["message"] for m in sink_events] == ["server warning"]
+
+
+def test_configure_bridges_stdlib_logging(tmp_path, sink_events):
+    """WARNING+ records from logging.getLogger must reach the sink too."""
+    rl.RuntimeLogging(_FakeRuntime("backend", str(tmp_path))).configure()
+
+    stdlib_logger = std_logging.getLogger("some.thirdparty")
+    stdlib_logger.warning("stdlib warning")
+    stdlib_logger.info("stdlib info below threshold")
+
+    assert [m.record["message"] for m in sink_events] == ["stdlib warning"]
 
 
 # --- end-to-end through a real loguru logger -------------------------------

@@ -76,7 +76,9 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         try:
             token = auth_header.split(" ")[1]
         except IndexError as e:
-            runtime.logger.error("Malformed Authorization header. Token missing.")
+            # 401-class client condition; the raised HTTPException is logged by
+            # the exception pipeline - this line only adds server-side detail.
+            runtime.logger.info("Malformed Authorization header. Token missing.")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Unauthorized: Missing access token",
@@ -85,7 +87,7 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
         token_service_name = await get_token_service(token)
 
         if token_service_name != request_service_name:
-            runtime.logger.error(
+            runtime.logger.info(
                 f"Token service name '{token_service_name}' "
                 f"mismatch request service name '{request_service_name}'. "
             )
@@ -102,7 +104,7 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
             runtime.logger.debug(f"Using {token_service_name} authentication protocol.")
             return [auth_backend_access_token]
         else:
-            runtime.logger.error(
+            runtime.logger.info(
                 f"This endpoint is not configured for {token_service_name} access."
             )
             raise HTTPException(
@@ -110,8 +112,9 @@ async def get_enabled_backends(request: Request) -> list[AuthenticationBackend]:
                 detail="Access denied. Resource is not available, please contact your administrator.",
             )
 
-    # No valid authentication credentials found
-    runtime.logger.error("Request did not contain a valid authentication credentials.")
+    # No valid authentication credentials found - routine for expired sessions
+    # and unauthenticated probes; the raised 401 is logged by the pipeline.
+    runtime.logger.info("Request did not contain a valid authentication credentials.")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Unauthorized. Please log in through Mascope web interface or provide a valid API token.",

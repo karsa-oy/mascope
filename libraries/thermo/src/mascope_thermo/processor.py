@@ -163,7 +163,9 @@ class RawProcessor(BaseFileProcessor):
         created = self.file_handle.created()
         if created is None:
             created = datetime.fromtimestamp(os.path.getmtime(self.file_to_process))
-            _log.warning(
+            # INFO: expected for readers that do not surface the creation
+            # date; fires per processed file
+            _log.info(
                 "Reader did not provide an acquisition date; using file mtime for %s",
                 self.file_to_process,
             )

@@ -1,5 +1,3 @@
-import traceback
-
 from sqlalchemy import select
 
 from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_sample_controller import (
@@ -124,7 +122,8 @@ async def retrieve_compositions_by_mz(
             ion_mech_str = raw.get("ionization_mechanism", "")
             db_mech = explicit_to_db_mech.get(ion_mech_str)
             if not db_mech:
-                runtime.logger.warning(
+                # INFO per result row: fires inside the composition loop
+                runtime.logger.info(
                     f"No matching DB ionization mechanism "
                     f"for '{ion_mech_str}', skipping result"
                 )
@@ -148,10 +147,8 @@ async def retrieve_compositions_by_mz(
                     "target_isotope_mz_error_ppm": raw["composition_error_ppm"],
                 }
             )
-        except Exception as e:
-            runtime.logger.error(
-                f"Error processing result {raw}:\n{e}: {traceback.format_exc()}"
-            )
+        except Exception:
+            runtime.logger.exception(f"Error processing result {raw}")
             # Skip malformed results rather than failing
             continue
 
@@ -280,7 +277,8 @@ async def match_compositions_by_mz(
             None,
         )
         if match_index is None:
-            runtime.logger.warning(
+            # INFO per result row: fires inside the composition loop
+            runtime.logger.info(
                 (
                     "Match data not found for composition result: ",
                     f"{info['target_compound_formula']}",

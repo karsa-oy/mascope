@@ -16,29 +16,36 @@ uploads them to your Mascope server automatically.
    installer** under **API Access Tokens** (or download
    `Mascope-File-Agent-Setup.exe` from the latest [Mascope release on
    GitHub](https://github.com/karsa-oy/mascope/releases/latest)).
-2. Before you start, generate an access token:
-   1. Log in to Mascope in your browser. Your account needs the *editor* role
-      or higher.
-   2. Click your profile icon to open the sidebar.
-   3. Under **API Access Tokens**, select **File Agent** and generate a token.
-   4. Copy the token — it is shown only once.
-3. Run the installer. It needs no administrator rights and offers a
+2. Run the installer. It needs no administrator rights and offers a
    **Start the File Agent automatically when you sign in to Windows**
    checkbox — leave it enabled so the agent survives reboots.
 
    > The installer is not yet code-signed, so Windows SmartScreen may warn
    > about an unrecognized app. Click **More info** → **Run anyway**.
 
-4. When the agent first starts, a guided setup runs in the console window
-   and asks for:
-   - the **Mascope server address** (for example `mascope.example.com`),
-   - the **access token** you just generated,
-   - the **folder to watch** for new data files,
-   - the **file pattern** to upload (default `*.raw`).
+3. When the agent first starts, a guided setup runs in the console window.
+   It asks for the **Mascope server address** (for example
+   `mascope.example.com`), then connects the agent to your account —
+   choose **pairing** (the default):
+   1. The agent shows a short pairing code, for example `BCD-234`.
+   2. Log in to Mascope in your browser (*editor* role or higher), click
+      your profile icon to open the sidebar, and under **API Access
+      Tokens** click **Pair an agent**.
+   3. Enter the code and approve — the agent picks up its access token
+      automatically within a few seconds.
+
+   (Alternatively, choose manual entry and paste a **File Agent** access
+   token generated under **API Access Tokens**.)
+
+4. Finally the setup asks for the **folder to watch** for new data files
+   and the **file pattern** to upload (default `*.raw`).
 
 The setup checks the server connection and the token immediately, so a typo
 is caught before any data acquisition depends on it. After setup completes,
 the agent starts watching the folder right away.
+
+Each paired machine gets its own token, so pairing a new instrument PC
+never disconnects an existing one.
 
 Leave the console window open while acquiring — closing it stops the agent
 until the next sign-in (or until you start it again from the Start Menu).
@@ -54,7 +61,7 @@ All settings live in one file on the instrument PC:
 | Setting           | Meaning                                                            |
 | ----------------- | ------------------------------------------------------------------ |
 | `host`            | Mascope server address, e.g. `mascope.example.com`                 |
-| `access_token`    | API access token generated in the Mascope web app                  |
+| `access_token`    | API access token (filled automatically when pairing)               |
 | `source`          | Full path of the folder watched for new data files                 |
 | `mask`            | Pattern of the files to upload, e.g. `*.raw`                       |
 | `timeout`         | Seconds a file must be idle before it is uploaded                  |
@@ -82,10 +89,17 @@ The agent prints its version when it starts, and uninstalling (Windows
 - If an upload keeps failing, the file is copied to a `failed_uploads`
   subfolder inside the watched folder. After fixing the cause (network,
   token), copy the file back into the watched folder to retry.
-- *"The server rejected the access token"*: generate a new **File Agent**
-  token in the web app and update `access_token` in the configuration (or
-  re-run `--setup`). Note that generating a new token invalidates your
-  previous File Agent token, including on other machines using it.
+- *"The server rejected the access token"*: re-run the agent with
+  `--setup` and pair it again (or generate a new **File Agent** token in
+  the web app and update `access_token` in the configuration). Note that
+  the **Regenerate** button removes all of your existing File Agent
+  tokens — including those of machines you paired earlier, which then
+  need re-pairing; pairing itself never affects other machines.
+- *Uploads fail with HTTP 404*: the configured `host` is answering but is
+  not the Mascope API. In a production deployment, use the normal Mascope
+  web app address. In a development setup, use the backend address (e.g.
+  `http://localhost:8090`) — the frontend dev server (port 5173) cannot
+  receive uploads.
 - Files larger than 100 MB are not uploaded; they are logged and copied to
   `failed_uploads`.
 

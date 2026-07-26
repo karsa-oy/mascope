@@ -673,10 +673,10 @@ async def rematch_batches(
                 sample_batch_id
             )
 
-        except Exception as e:
+        except Exception:
             batch_collections["failed_batches"].append(sample_batch_id)
-            runtime.logger.error(
-                f"Unexpected error rematching batch {sample_batch_id}: {str(e)}"
+            runtime.logger.exception(
+                f"Unexpected error rematching batch {sample_batch_id}"
             )
 
         # Update proress user notification
@@ -841,7 +841,8 @@ async def rematch_batch(
                 "locked",
                 f"Sample batch '{sample_batch_name}' is currently being processed - rematch is locked.",
             )
-            runtime.logger.warning(message)
+            # Routine concurrency outcome, reported to the user via the response
+            runtime.logger.info(message)
         else:  # ready status without force
             status, message = (
                 "skipped",
@@ -994,7 +995,7 @@ async def rematch_batch(
             status="rematch",
             independent_transaction=True,  # reload UI status icons
         )
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Rematch failed for batch '{sample_batch_name}': {e.user_message}"
         )
         raise
@@ -1220,7 +1221,9 @@ async def match_compute_batch(
             # sample - corrupt file, unreadable metadata, a transient DB error -
             # must fail only that sample, never abort matching for the rest of
             # the batch. CancelledError is a BaseException and is not caught.
-            runtime.logger.warning(
+            # INFO per sample; the batch summary below warns once for the
+            # whole batch.
+            runtime.logger.info(
                 f"Computing match isotopes for sample '{sample.sample_item_name}' "
                 f"failed: {e}"
             )
@@ -1285,7 +1288,7 @@ async def match_compute_batch(
                     else aggregation_scope
                 ),
             )
-        except Exception as e:
+        except Exception:
             aggregation_failed = True
             match_aggregate_result = {}
             # No cleanup needed here: aggregate_and_create_matches clears the
@@ -1293,9 +1296,9 @@ async def match_compute_batch(
             # chunk, so any failure - including a process kill this handler
             # would never see - already leaves the completeness probe above
             # reporting incomplete for the next refresh.
-            runtime.logger.error(
+            runtime.logger.exception(
                 f"Higher-level match aggregation failed for sample batch "
-                f"'{sample_batch_name}': {e}"
+                f"'{sample_batch_name}'"
             )
     match_aggregate_status = match_aggregate_result.get("status")
     if match_aggregate_status in ("success", "partial"):
@@ -1335,7 +1338,12 @@ async def match_compute_batch(
         f"{failed_samples_count} failed, "
         f"{skipped_samples_count} skipped due to missing calibration or no new targets."
     )
-    runtime.logger.debug(message)
+    if failed_samples_count > 0:
+        # One aggregated warning per problem batch; the per-sample failures
+        # above are logged at INFO.
+        runtime.logger.warning(message)
+    else:
+        runtime.logger.debug(message)
 
     return {
         "status": status,

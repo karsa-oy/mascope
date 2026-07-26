@@ -166,9 +166,8 @@ def check_sample_file_db_record(filename: str, access_token: str) -> bool:
             return False
 
     except requests.exceptions.RequestException as e:
-        runtime.logger.error(
-            f"Failed to check sample file existence for {filename}: {e}"
-        )
+        # No log here: the raised exception is logged with its traceback by
+        # the processing loop's handler
         raise Exception(f"Failed to check sample file record: {e}") from e
 
 
@@ -210,9 +209,7 @@ def is_blank_sample_file(filename: str, access_token: str) -> bool:
         return sample_file.get("instrument_function_id") is None
 
     except requests.exceptions.RequestException as e:
-        runtime.logger.error(
-            f"Failed to fetch sample file metadata for {filename}: {e}"
-        )
+        # No log here: the raised exception is logged by the caller's handler
         raise Exception(f"Failed to fetch sample file metadata: {e}") from e
 
 
@@ -247,13 +244,11 @@ def delete_sample_file_by_filename(filename: str, access_token: str) -> bool:
             runtime.logger.debug(f"File not found for deletion: {filename}")
             return False
         else:
-            runtime.logger.error(
-                f"Failed to delete file {filename}: HTTP {response.status_code}"
-            )
+            # No log here: the raised exception is logged by the caller's
+            # handler
             raise Exception(f"Failed to delete file: HTTP {response.status_code}")
 
     except requests.exceptions.RequestException as e:
-        runtime.logger.error(f"Failed to delete file {filename}: {e}")
         raise Exception(f"Failed to delete file: {e}") from e
 
 
@@ -348,6 +343,13 @@ def rematch_sample(
             params=params,
             timeout=timeout,
         )
+        # Callers ignore the return value, so an unchecked non-2xx response
+        # would make a failed rematch completely invisible.
+        if resp.status_code >= 400:
+            raise Exception(
+                f"Failed to request rematch for {sample_item_id}: "
+                f"HTTP {resp.status_code}"
+            )
         return resp.json()
     except requests.exceptions.RequestException as e:
         raise Exception(f"Failed to request rematch for {sample_item_id}: {e}") from e

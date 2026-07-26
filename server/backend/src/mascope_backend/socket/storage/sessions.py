@@ -58,7 +58,7 @@ async def save_user_session(sid: str, user: User, namespace: str = "/") -> None:
         )
 
     except Exception as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Redis session storage client: failed to save session for SID '{sid}': {str(e)} "
             f"[Worker {worker_pid}]"
         )
@@ -93,7 +93,7 @@ async def clear_user_session(sid: str, namespace: str = "/") -> None:
             )
 
     except Exception as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Redis session storage client: failed to clear session for {sid}: {e} [Worker {worker_pid}]"
         )
 
@@ -145,7 +145,7 @@ async def get_session_user(sid: str, namespace: str = "/") -> dict[str, Any]:
         return session
 
     except json.JSONDecodeError as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Redis session storage client: failed to decode session data for {sid}: {e} "
             f"[Worker {worker_pid}]"
         )
@@ -153,7 +153,7 @@ async def get_session_user(sid: str, namespace: str = "/") -> dict[str, Any]:
     except SocketSessionError:
         raise
     except Exception as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Redis session storage client: session error for {sid}: {e} [Worker {worker_pid}]"
         )
         raise SocketSessionError(f"Session error: {e}") from e

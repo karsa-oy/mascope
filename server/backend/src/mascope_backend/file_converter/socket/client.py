@@ -51,8 +51,8 @@ class FileConverterSocketClient:
                 # stickiness), so it must avoid polling itself.
                 transports=["websocket"],
             )
-        except Exception as e:
-            runtime.logger.error(f"Failed to connect: {str(e)}")
+        except Exception:
+            runtime.logger.exception("Failed to connect")
             raise
 
     def emit(self, event: str, data: dict, auth: dict = {}):
@@ -85,5 +85,5 @@ class FileConverterSocketClient:
                         }
                     )
             self.sio.emit(event, data, namespace="/file-converter")
-        except Exception as e:
-            runtime.logger.error(f"Failed to emit {event}: {str(e)}")
+        except Exception:
+            runtime.logger.exception(f"Failed to emit {event}")

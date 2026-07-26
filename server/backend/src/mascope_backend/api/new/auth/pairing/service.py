@@ -1,0 +1,176 @@
+"""
+Agent device-pairing service.
+
+Lets an on-instrument agent obtain an API access token without anyone
+copy-pasting it: the agent requests a short user-facing code, a signed-in
+editor approves the code in the web app, and the agent polls until the
+token is ready. Pairing state is ephemeral and lives in Redis (shared
+across workers, expires automatically); the resulting token is a normal
+service access token row.
+
+Approval intentionally creates a NEW token without revoking the user's
+existing tokens for the service, so pairing a second instrument machine
+does not break the first one (unlike the manual "Regenerate" button,
+which replaces all tokens for the service).
+"""
+
+import json
+import secrets
+
+from mascope_backend.api.new.auth.access_token.service import create_access_token
+from mascope_backend.api.new.auth.pairing.config import pairing_settings
+from mascope_backend.api.new.auth.pairing.exceptions import (
+    PairingCodeAlreadyApprovedException,
+    PairingCodeInvalidException,
+)
+from mascope_backend.db import User
+from mascope_backend.runtime import runtime
+from mascope_backend.socket.storage import redis_storage_client
+
+
+def _code_key(user_code: str) -> str:
+    return f"mascope:pairing:code:{user_code}"
+
+
+def _device_key(device_code: str) -> str:
+    return f"mascope:pairing:device:{device_code}"
+
+
+def _redis():
+    """The shared async Redis client (separate hook for tests)."""
+    return redis_storage_client.client
+
+
+def format_user_code(user_code: str) -> str:
+    """Format a raw code for display, e.g. ``BCD234`` -> ``BCD-234``.
+
+    :param user_code: Raw code, as stored.
+    :type user_code: str
+    :return: Display form with a dash in the middle.
+    :rtype: str
+    """
+    half = len(user_code) // 2
+    return f"{user_code[:half]}-{user_code[half:]}"
+
+
+async def start_pairing(service_name: str, machine_name: str | None) -> dict:
+    """Create a pending pairing and return its codes.
+
+    :param service_name: Agent service requesting a token (pre-validated).
+    :type service_name: str
+    :param machine_name: Optional machine hostname, shown to the approver.
+    :type machine_name: str | None
+    :return: user_code (display form), device_code, expires_in, interval.
+    :rtype: dict
+    """
+    client = _redis()
+    # Retry on the (unlikely) case of a code collision with a pending pairing.
+    for _ in range(5):
+        user_code = "".join(
+            secrets.choice(pairing_settings.CODE_ALPHABET)
+            for _ in range(pairing_settings.CODE_LENGTH)
+        )
+        if not await client.exists(_code_key(user_code)):
+            break
+    device_code = secrets.token_urlsafe(32)
+    record = {
+        "service_name": service_name,
+        "machine_name": machine_name,
+        "status": "pending",
+        "device_code": device_code,
+        "access_token": None,
+    }
+    ttl = pairing_settings.CODE_TTL_SECONDS
+    await client.setex(_code_key(user_code), ttl, json.dumps(record))
+    await client.setex(_device_key(device_code), ttl, user_code)
+    runtime.logger.info(
+        f"Pairing started for {service_name}"
+        + (f" on '{machine_name}'" if machine_name else "")
+    )
+    return {
+        "user_code": format_user_code(user_code),
+        "device_code": device_code,
+        "expires_in": ttl,
+        "interval": pairing_settings.POLL_INTERVAL_SECONDS,
+    }
+
+
+async def approve_pairing(user: User, user_code: str) -> dict:
+    """Approve a pending pairing: create a token for the approving user.
+
+    The token is created in addition to any existing tokens for the
+    service, and stamped with the paired machine's name.
+
+    :param user: The approving user (editor role enforced at the route).
+    :type user: User
+    :param user_code: Normalized pairing code (no dash, uppercase).
+    :type user_code: str
+    :return: service_name and machine_name of the approved pairing.
+    :rtype: dict
+    :raises PairingCodeInvalidException: Unknown or expired code.
+    :raises PairingCodeAlreadyApprovedException: Code approved before.
+    """
+    client = _redis()
+    raw = await client.get(_code_key(user_code))
+    if raw is None:
+        raise PairingCodeInvalidException()
+    record = json.loads(raw)
+    if record["status"] != "pending":
+        raise PairingCodeAlreadyApprovedException()
+
+    token = await create_access_token(
+        user=user,
+        service_name=record["service_name"],
+        description=(
+            f"Paired: {record['machine_name']}" if record["machine_name"] else "Paired"
+        ),
+    )
+
+    record["status"] = "approved"
+    record["access_token"] = token
+    ttl = pairing_settings.PICKUP_TTL_SECONDS
+    await client.setex(_code_key(user_code), ttl, json.dumps(record))
+    await client.setex(_device_key(record["device_code"]), ttl, user_code)
+    runtime.logger.info(
+        f"Pairing {format_user_code(user_code)} approved by {user.username} "
+        f"for {record['service_name']}"
+    )
+    return {
+        "service_name": record["service_name"],
+        "machine_name": record["machine_name"],
+    }
+
+
+async def poll_pairing(device_code: str) -> dict:
+    """Report the pairing status to the polling agent.
+
+    On approval the token is handed out exactly once and the pairing
+    records are deleted.
+
+    :param device_code: The agent's secret device code.
+    :type device_code: str
+    :return: status ("pending" | "approved" | "expired"), with
+        access_token and service_name when approved.
+    :rtype: dict
+    """
+    client = _redis()
+    user_code = await client.get(_device_key(device_code))
+    if user_code is None:
+        return {"status": "expired"}
+    raw = await client.get(_code_key(user_code))
+    if raw is None:
+        return {"status": "expired"}
+    record = json.loads(raw)
+    if record["status"] != "approved":
+        return {
+            "status": "pending",
+            "interval": pairing_settings.POLL_INTERVAL_SECONDS,
+        }
+    # Hand the token out once, then forget the pairing.
+    await client.delete(_code_key(user_code))
+    await client.delete(_device_key(device_code))
+    return {
+        "status": "approved",
+        "access_token": record["access_token"],
+        "service_name": record["service_name"],
+    }

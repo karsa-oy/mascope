@@ -63,7 +63,8 @@ def run_concurrent(
                         results.append(result)
                 except Exception as exc:
                     n_errors += 1
-                    logger.warning("Task failed ({}): {}", desc, exc)
+                    # INFO per task; the summary below warns once for the run
+                    logger.info("Task failed ({}): {}", desc, exc)
                 pbar.update(1)
         except BaseException:
             # Cancel remaining futures so shutdown() doesn't block

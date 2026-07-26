@@ -38,7 +38,7 @@ async def register_service(service_name: str, sid: str) -> None:
             f"Service '{service_name}' registered (sid={sid}) [Worker {worker_pid}]"
         )
     except Exception as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Failed to register service '{service_name}': {e} [Worker {worker_pid}]"
         )
 
@@ -85,7 +85,7 @@ async def unregister_service(service_name: str, sid: str) -> None:
                 f"(disconnecting={sid}) [Worker {worker_pid}]"
             )
     except Exception as e:
-        runtime.logger.error(
+        runtime.logger.exception(
             f"Failed to unregister service '{service_name}': {e} [Worker {worker_pid}]"
         )
 
@@ -107,5 +107,7 @@ async def is_service_connected(service_name: str) -> bool:
     try:
         return bool(await redis_storage_client.client.exists(key))
     except Exception as e:
-        runtime.logger.error(f"Failed to check service '{service_name}' presence: {e}")
+        runtime.logger.exception(
+            f"Failed to check service '{service_name}' presence: {e}"
+        )
         return False

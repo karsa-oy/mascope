@@ -709,6 +709,14 @@ You can write messages using `runtime.logger`, which is a standard Loguru logger
 
 The log levels visible can be configured globally with the CLI (see the next section). You can also be set for each module individually by using the `log_level` option for that module, or globally by setting `log_level` for the `[meta]` configuration block. Module-specific settings will override this `[meta]` setting, while the `--log-level` command line option will override all configuration options. In all cases, they are not case-sensitive.
 
+#### Choosing a level
+
+Every record at WARNING or above is exported to error monitoring when `MASCOPE_SENTRY_DSN` is set (see `RuntimeLogging` in `libraries/runtime/src/mascope_runtime/logging.py`), so levels express operator relevance, not verbosity:
+
+- **DEBUG / INFO** — routine operation: expected data conditions, per-item progress, client errors (4xx), retries that are expected to succeed. Anything that fires per request, per file, or per item in a loop belongs here.
+- **WARNING** — actionable operator signal that is expected to be rare and to group into a single monitored issue (e.g. an agent that can no longer authenticate).
+- **ERROR / CRITICAL** — faults. Inside an `except` block use `logger.exception(...)` so the traceback travels with the record, and log an incident exactly once: the outermost handler owns the record, so don't log-then-raise.
+
 #### Terminal logs
 
 When running `mascope dev run` or `mascope prod up`, the logger will emit formatted log lines to the terminal.
@@ -784,6 +792,8 @@ agents/           # Agent applications
 ### File Agent
 
 The File Agent is responsible for uploading files from instrument machines unchanged to the server. This is designed for use in Orbitrap machines.
+
+Agents authenticate with a service access token, obtained either manually (web app → API Access Tokens) or via device pairing (`server/backend/src/mascope_backend/api/new/auth/pairing/`): the agent requests a short code from `/api/auth/pairing/start`, an editor approves it in the web app, and the agent polls `/api/auth/pairing/poll` for its token. Pairing creates tokens additively — one per machine — while the regenerate endpoint replaces all of a user's tokens for the service.
 
 To run all services needed to emulate the Orbitrap acquisition workflow in development, run `mascope dev run orbi`.
 

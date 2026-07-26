@@ -5,7 +5,6 @@ Handles automated creation of ACQUISITION datasets, batches, and sample items, a
 """
 
 import asyncio
-import traceback
 
 from sqlalchemy import delete, select
 
@@ -68,6 +67,23 @@ from mascope_backend.socket.records.service import (
 # Number of calibration fitting attempts before giving up
 # Chosen so that final m/z error tolerance for TOF would be around 1000 ppm
 CALIBRATION_ITERATIONS = 7
+
+#: Fire-and-forget rematch tasks. asyncio only keeps weak references, so an
+#: unreferenced task can be garbage-collected mid-run; the done-callback below
+#: also surfaces failures that would otherwise die as unretrieved exceptions.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _observe_background_task(task: asyncio.Task) -> None:
+    """Log the failure of a background task and release its reference."""
+    _background_tasks.discard(task)
+    if task.cancelled():
+        return
+    exception = task.exception()
+    if exception is not None:
+        runtime.logger.opt(exception=exception).error(
+            f"Background task '{task.get_name()}' failed"
+        )
 
 
 @api_controller_background_task(
@@ -180,7 +196,9 @@ async def auto_process_sample_file(
             ionization_mode_name = (
                 ionization_mode.ionization_mode_name if ionization_mode else "unknown"
             )
-            runtime.logger.warning(
+            # INFO: reflects the user's collection configuration and fires for
+            # every ingested file while unset
+            runtime.logger.info(
                 f"Skipping m/z calibration for sample '{sample['sample_item_name']}': "
                 "Calibration collection is not set for the ionization mode "
                 f"'{ionization_mode_name}'."
@@ -204,7 +222,7 @@ async def auto_process_sample_file(
     )
 
     if other_affected_sample_item_ids:
-        asyncio.create_task(
+        task = asyncio.create_task(
             rematch_samples(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Handle reloads independently
@@ -212,6 +230,11 @@ async def auto_process_sample_file(
                 process_id=gen_id(8),
             )
         )
+        # asyncio only holds a weak reference to tasks: keep one so the task
+        # cannot be garbage-collected mid-run, and observe its outcome so a
+        # failure is logged instead of dying as an unretrieved exception.
+        _background_tasks.add(task)
+        task.add_done_callback(_observe_background_task)
 
         runtime.logger.info(
             "Started independent rematch task for "
@@ -369,9 +392,9 @@ async def re_process_sample_files(
                     "message": f"Failed to resolve ionization modes: {str(e)}",
                 }
             )
-            runtime.logger.error(
+            runtime.logger.exception(
                 "Unexpected error resolving ionization modes for sample file "
-                f"{sample_file.filename}: {e}\n{traceback.format_exc()}"
+                f"{sample_file.filename}"
             )
             continue
 
@@ -545,7 +568,8 @@ async def create_acquisition_batches_and_items(
             ).get("data", [])
 
             if len(batch_data) > 1:
-                runtime.logger.error(
+                # Recovered data anomaly: worth one grouped warning issue
+                runtime.logger.warning(
                     f"Multiple ACQUISITION batches found for {batch_name} with "
                     f"ionization mode {ion_mode_name}, using first one."
                 )
@@ -571,7 +595,7 @@ async def create_acquisition_batches_and_items(
                     )
 
                 if not target_collection_ids:
-                    runtime.logger.warning(
+                    runtime.logger.info(
                         "No "
                         f"{', '.join(sample_batch_config.ACQUISITION_COLLECTION_TYPES)}"
                         " target collections found for ACQUISITION batch"
@@ -653,7 +677,7 @@ async def calibrate_with_retry(
             break
         except ApiException as e:
             if i == CALIBRATION_ITERATIONS:
-                runtime.logger.error(
+                runtime.logger.exception(
                     "Failed to calibrate m/z with m/z tolerance "
                     f"{mz_calibration_params.mz_error_tolerance} "
                     f"for sample item {sample['sample_item_name']}: {e}"
@@ -669,7 +693,9 @@ async def calibrate_with_retry(
                     mz_calibration_params.refine_window = (
                         mz_calibration_params.mz_error_tolerance + 1
                     )
-                runtime.logger.warning(
+                # INFO: a retry that usually succeeds; the final give-up above
+                # is what logs at ERROR
+                runtime.logger.info(
                     "Not enough calibration peaks with m/z error tolerance "
                     f"{old_tolerance}, retrying m/z calibration for sample "
                     f"{sample['sample_item_name']} with "

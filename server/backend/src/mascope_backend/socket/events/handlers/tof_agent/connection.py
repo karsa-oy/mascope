@@ -62,7 +62,9 @@ async def connect(sid: str, environ: dict, auth: dict) -> bool:
         return True
 
     except SocketUnauthenticatedError as e:
-        runtime.logger.error(
+        # WARNING: a misconfigured agent auto-reconnects, so this repeats
+        # until fixed
+        runtime.logger.warning(
             f"TOF-Agent authentication failed. {str(e)} [Worker {worker_pid}]"
         )
         return False

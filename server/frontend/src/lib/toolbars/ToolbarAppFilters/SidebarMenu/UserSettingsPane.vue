@@ -10,7 +10,7 @@ import { api } from '@/api'
 import { getApiErrorMessage } from '@/api/utils'
 import { useApp } from '@/stores'
 import { BaseCopyableField, BaseEditableField } from '@/lib/base'
-import { DialogUserManagement, DialogPasswordChange } from '@/lib/dialogs'
+import { DialogUserManagement, DialogPasswordChange, DialogAgentPairing } from '@/lib/dialogs'
 import { prettyRoleName, ROLES } from '@/lib/roles'
 
 import { useSidebarMenu } from './state.js'
@@ -22,7 +22,8 @@ const open = computed(() => sidebarMenu.open && sidebarMenu.tab === 'settings')
 
 const dialog = reactive({
   users: false,
-  password: false
+  password: false,
+  pairing: false
 })
 
 // TODO_config API Token Management
@@ -176,7 +177,9 @@ const vHelpLayer = app.ui.help.directive(layer)
       </p>
       <p>
         The File Agent uploads data files from an instrument PC automatically — its
-        Windows installer can be downloaded below.
+        Windows installer can be downloaded below. Agents can be connected without
+        copy-pasting a token: choose pairing in the agent setup, then enter the
+        code it shows via 'Pair an agent'.
       </p>
     `,
       doc: 'https://github.com/karsa-oy/mascope/blob/develop/docs/user/instruments/index.md'
@@ -219,6 +222,15 @@ const vHelpLayer = app.ui.help.directive(layer)
         text
         id="agent-download-button"
       />
+      <Button
+        v-if="app.auth.user.role_id >= ROLES.editor"
+        label="Pair an agent"
+        icon="pi pi-link"
+        severity="secondary"
+        text
+        id="agent-pairing-button"
+        @click="() => (dialog.pairing = true)"
+      />
     </div>
   </section>
   <section
@@ -235,6 +247,7 @@ const vHelpLayer = app.ui.help.directive(layer)
   </section>
   <DialogUserManagement v-model:visible="dialog.users" />
   <DialogPasswordChange v-model:visible="dialog.password" />
+  <DialogAgentPairing v-model:visible="dialog.pairing" />
 </template>
 
 <style scoped>
@@ -263,7 +276,8 @@ const vHelpLayer = app.ui.help.directive(layer)
     }
   }
 
-  #agent-download-button {
+  #agent-download-button,
+  #agent-pairing-button {
     width: fit-content;
   }
 

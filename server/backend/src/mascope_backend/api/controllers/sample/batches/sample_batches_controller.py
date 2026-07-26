@@ -916,8 +916,10 @@ async def sample_batch_export_peaks(
             peak_data_item = get_peaks(sample_file, unit).sum(dim="time").compute()
 
             await send_progress_user_notification(notification, 1)
-        except Exception as e:
-            runtime.logger.error(repr(e))
+        except Exception:
+            runtime.logger.exception(
+                "Failed to compute peak data for a sample file - skipping it"
+            )
             continue
 
         for peak in peak_data_item:

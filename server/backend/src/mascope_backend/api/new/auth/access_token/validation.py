@@ -47,7 +47,9 @@ async def validate_service_access_token(access_token: str, service_name: str):
                 return user
 
     except InvalidTokenException as e:
-        runtime.logger.error(f"User's service token validation failed: {str(e)}")
+        # Routine 401-class condition (expired/mismatched service token, cured
+        # by a token refresh); the raised exception reports it upstream
+        runtime.logger.info(f"User's service token validation failed: {str(e)}")
         raise
     except Exception as e:
         runtime.logger.error(f"Service token validation failed: {str(e)}")

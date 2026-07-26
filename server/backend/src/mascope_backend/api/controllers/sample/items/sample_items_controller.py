@@ -829,7 +829,8 @@ async def sample_item_export_peaks(
 
         await send_progress_user_notification(notification, 0.8)
     except Exception as e:
-        runtime.logger.error(repr(e))
+        # No log here: the re-raised exception is logged with its traceback by
+        # the exception pipeline
         raise e
 
     # File creation timestamp

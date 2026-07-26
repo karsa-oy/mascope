@@ -60,12 +60,12 @@ async def lifespan(app: FastAPI):
     )
     try:
         await redis_storage_client.connect()
-    except ConnectionError as e:
-        runtime.logger.error(
-            f"Fast App startup: Redis storage client failed to connect:"
-            f" {e} [Worker {worker_pid}]"
+    except ConnectionError:
+        # One record with the traceback (not an ERROR + WARNING pair)
+        runtime.logger.exception(
+            f"Fast App startup: Redis storage client failed to connect -"
+            f" multi-worker storage sharing will not work [Worker {worker_pid}]"
         )
-        runtime.logger.warning("Multi-worker storage sharing will not work")
 
     # Yield control back to FastAPI
     yield
@@ -113,13 +113,12 @@ async def logger_middleware(request: Request, call_next):
                 full_url += f"?{request.url.query}"
             runtime.logger.debug(f"{full_url} [Worker {worker_pid}]")
 
-        # Log based on status code
-        if 400 <= response.status_code < 500:
-            runtime.logger.warning(request.url.path)
-        elif response.status_code >= 500:
-            runtime.logger.error(request.url.path)
-        else:
-            runtime.logger.info(request.url.path)
+        # Access log, always INFO. 4xx responses are routine client behavior
+        # (expired sessions, validation errors) and 5xx responses are already
+        # logged with their traceback by process_exception - logging either
+        # above INFO here would duplicate that record without the traceback.
+        # The status code stays queryable via the contextualized extra.
+        runtime.logger.info(request.url.path)
 
     return response
 

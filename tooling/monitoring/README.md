@@ -160,15 +160,22 @@ The backend has an **optional, off-by-default** GlitchTip sink (see
      "import urllib.request; print(urllib.request.urlopen('http://<ops-tailnet-ip>:8000/', timeout=5).status)"
    ```
 2. Make sure the server runs a backend image that ships `sentry-sdk` (builds
-   from 2026-07 onward include the runtime's `[sentry]` extra — check with
-   `docker exec mascope_prod_backend python3 -c "import sentry_sdk"`; update
-   the stack if that fails).
+   from v1.4.3 onward include the runtime's `[sentry]` extra). Check against
+   the app's venv — the image's bare `python3` is a DIFFERENT interpreter and
+   gives a false negative:
+   ```sh
+   docker exec mascope_prod_backend /opt/uv/tools/mascope/bin/python -c "import sentry_sdk"
+   ```
+   Update the stack if that fails.
 3. Set the DSN on the **host** — compose passes it into the backend and
    file-converter containers:
    ```sh
    # append to /etc/environment, then restart the stack (mascope prod up)
    MASCOPE_SENTRY_DSN=http://<public_key>@<ops-tailnet-ip>:8000/<project_id>
    ```
+   `/etc/environment` is applied at **login**: run `mascope prod up` from a
+   fresh SSH session after editing it, or the DSN interpolates as empty and
+   reporting silently stays off.
 4. Smoke-test: `runtime.logger.error("glitchtip smoke test")` on the server (or
    trigger any backend warning) and confirm the event appears in GlitchTip.
    Unset the var and restart to turn reporting back off — it's a complete no-op

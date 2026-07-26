@@ -119,14 +119,16 @@ async def handle_reloads(
     for record_type, room_key in reload_events:
         rooms = resolve_rooms(room_key, kwargs, result)
         if not rooms:
-            runtime.logger.warning(
+            # INFO: fires on every affected API call while a route's reload
+            # wiring is incomplete; triage via the log files
+            runtime.logger.info(
                 f"{context}: No room IDs found for '{record_type}_reload' with key '{room_key}'"
             )
             continue
 
         try:
             await emit_record_reload(record_type=record_type, room=rooms)
-        except Exception as e:
-            runtime.logger.error(
-                f"{context}: Failed to emit '{record_type}_reload': {e}"
+        except Exception:
+            runtime.logger.exception(
+                f"{context}: Failed to emit '{record_type}_reload'"
             )

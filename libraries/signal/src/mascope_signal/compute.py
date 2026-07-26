@@ -164,8 +164,8 @@ def get_sum_signal(
             return sum_signal / averaging_factor
         return sum_signal
     except FileNotFoundError:
-        # case where file doesn't exist in filestore
-        runtime.logger.warning(f"Sample file not found: {base_filename}")
+        # case where file doesn't exist in filestore; no log here - the
+        # raised RuntimeError is logged by the caller's handler
         raise RuntimeError(f"Sample file not found or inaccessible: {base_filename}")
     except (KeyError, AttributeError):
         # proceed if sample_file/dataset exists but is missing target sum_signal
@@ -329,7 +329,8 @@ def _write_cached_sum_signal(
     :rtype: xr.DataArray | None
     """
     filename_sum_signal = m_name.filename_to_zarr_path(base_filename, cached_name)
-    runtime.logger.warning(f"Saving computed sum signal to {filename_sum_signal}")
+    # DEBUG: purely informational cache write, fires on every cache miss
+    runtime.logger.debug(f"Saving computed sum signal to {filename_sum_signal}")
 
     synchronizer = m_io.get_zarr_synchronizer(filename_sum_signal)
     write_lock = m_io.get_zarr_write_lock(filename_sum_signal)
@@ -461,7 +462,13 @@ def load_signal(
             case _:
                 raise NotImplementedError(f"Unsupported sample type: {sample_type}")
     except Exception as e:
-        runtime.logger.error(f"Error loading signal from {base_filename}: {e})")
+        # Both paths return an empty dataset (callers render "no data"), but
+        # expected data conditions (empty range, unsupported type) must not
+        # look like faults, and real faults must carry their traceback.
+        if isinstance(e, (ValueError, NotImplementedError)):
+            runtime.logger.info(f"No signal loaded from {base_filename}: {e}")
+        else:
+            runtime.logger.exception(f"Error loading signal from {base_filename}")
         # Return empty signal dataset with "mz" and "time" coordinates in case of error
         return xr.Dataset(
             {
@@ -528,7 +535,8 @@ def get_tic_per_scan(
                 total_tic = m_io.read_props(base_filename)["tic"]
                 tic_per_scan = tic_per_scan / tic_per_scan.sum() * total_tic
             except KeyError:
-                runtime.logger.warning(
+                # Expected for files whose props carry no "tic" entry
+                runtime.logger.info(
                     "Total TIC value is not available in the sample file"
                 )
 
@@ -1108,7 +1116,9 @@ def get_metadata(
     :return: Metadata class instance or None if the file type is not supported
     :rtype: RawFileMetadataLegacy | None
     """
-    runtime.logger.warning(
+    # DEBUG: fires on every metadata request; the migration away from this
+    # helper is tracked at its call sites
+    runtime.logger.debug(
         "Metadata retrieval using compute.get_metadata is deprecated and will be "
         "removed in future versions. "
         "Please use the new mascope_signal.metadata module."

@@ -3,7 +3,6 @@
 
 import os
 import shutil
-import traceback
 from abc import ABC, ABCMeta, abstractmethod
 from pathlib import Path
 from queue import Empty, Queue
@@ -176,8 +175,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
 
         except RuntimeError:
             raise
-        except Exception as e:
-            runtime.logger.error(f"Error checking orphaned filestore {filename}: {e}")
+        except Exception:
+            runtime.logger.exception(f"Error checking orphaned filestore {filename}")
             return False
 
     def _cleanup_successful_file(self, file_to_process: str, file_basename: str):
@@ -189,22 +188,18 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             runtime.logger.info(f"Successfully deleted file: {file_to_process}")
         except FileNotFoundError:
             # File already deleted - this is not critical
-            runtime.logger.warning(
+            runtime.logger.info(
                 f"File {file_to_process} was already deleted from streams folder"
             )
         except PermissionError as e:
-            # File locked - this indicates a problem with file handle cleanup
+            # File locked - this may indicate an issue with file handle cleanup
+            # in _finalize(); the file remains in the streams folder and may
+            # need manual cleanup.
             runtime.logger.warning(f"Could not delete file {file_to_process}: {e}")
-            runtime.logger.warning(
-                "File will remain in streams folder - manual cleanup may be needed"
-            )
-            runtime.logger.warning(
-                "This may indicate an issue with file handle cleanup in _finalize()"
-            )
-        except Exception as e:
+        except Exception:
             # Other deletion errors - log but don't fail
-            runtime.logger.error(
-                f"Unexpected error during file deletion {file_to_process}: {e}"
+            runtime.logger.exception(
+                f"Unexpected error during file deletion {file_to_process}"
             )
 
         # Always clear context at the end, regardless of file deletion success
@@ -260,8 +255,9 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             )
 
         except Exception as e:
+            # No log here: the raised RuntimeError is logged with its
+            # traceback by the processing loop's handler
             error_msg = f"Failed to create database record: {e}"
-            runtime.logger.error(error_msg)
             # Delete filestore directory on failure
             filename = sample_file_props.filename
             data_path = parse_path_from_item_filename(filename)
@@ -382,14 +378,13 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             shutil.move(file_path, failed_file)
             runtime.logger.info(f"Moved failed file to: {failed_file}")
         except PermissionError as e:
-            # File is locked - this indicates the file is still being processed
+            # File is locked - this indicates the file is still being processed;
+            # it remains in the streams folder and may need manual cleanup.
             runtime.logger.warning(f"Could not move locked file {file_path}: {e}")
-            runtime.logger.warning(
-                "File will remain in streams folder - manual cleanup may be needed"
+        except Exception:
+            runtime.logger.exception(
+                f"Failed to move file {file_path} to the error folder"
             )
-        except Exception as e:
-            runtime.logger.error(f"Failed to move file {file_path} to the error folder")
-            runtime.logger.exception(e)
 
     def _process_as_blank(self, sample_file_props: SampleFileProps) -> None:
         """Ingest a file as a blank measurement.
@@ -417,7 +412,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
             self._emit_progress_notification(10)
 
             if self._is_blank_measurement:
-                runtime.logger.warning(
+                # Routine classification of a measurement, not a fault
+                runtime.logger.info(
                     f"Blank measurement detected: {filename}, skipping peak detection"
                 )
                 self._process_as_blank(sample_file_props)
@@ -432,7 +428,7 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 # Low-signal file just above the blank threshold: the spectrum has
                 # too few quality peaks to fit instrument functions. Treat it as a
                 # blank measurement instead of failing the whole file.
-                runtime.logger.warning(
+                runtime.logger.info(
                     f"Insufficient quality peaks to fit instrument functions for "
                     f"{filename}, treating as blank measurement"
                 )
@@ -470,7 +466,9 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                     sample_file_props, file_path, retry_count=retry_count + 1
                 )
             else:
-                runtime.logger.error(
+                # Routine user mistake (re-uploading an existing file); the
+                # raised FileExistsError is what reports it upstream.
+                runtime.logger.info(
                     f"File already exists in the filestore with valid database record: {filename}"
                 )
                 raise FileExistsError(
@@ -483,8 +481,9 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
         try:
             file_context = self._get_file_context()
             delete_sample_file_by_filename(filename, file_context.access_token)
-        except Exception as e:
-            runtime.logger.error(f"Error removing orphaned filestore {filename}: {e}")
+        except Exception:
+            # No log here: the re-raised exception is logged with its
+            # traceback by the processing loop's handler
             raise
 
     def _strip_filepath(self, filepath: str) -> str:
@@ -538,9 +537,15 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
 
                 except Exception as e:
                     error_msg = describe_exception(e)
-                    runtime.logger.error(
-                        f"Failed to process file {Path(self.file_to_process).name}: {e}\n{traceback.format_exc()}"
-                    )
+                    if isinstance(e, FileExistsError):
+                        # Routine duplicate upload: one warning, no traceback
+                        runtime.logger.warning(
+                            f"Failed to process file {Path(self.file_to_process).name}: {e}"
+                        )
+                    else:
+                        runtime.logger.exception(
+                            f"Failed to process file {Path(self.file_to_process).name}"
+                        )
 
                     # CRITICAL: Finalize BEFORE error emission to ensure file is closed
                     self._finalize()
@@ -564,8 +569,8 @@ class BaseFileProcessor(Thread, ABC, metaclass=FileProcessorMeta):
                 continue
             except Exception as e:
                 # Catch any unexpected errors
-                runtime.logger.error(
-                    f"Unexpected error in {self.__class__.__name__}: {e}"
+                runtime.logger.exception(
+                    f"Unexpected error in {self.__class__.__name__}"
                 )
                 if self.file_to_process is not None and file_basename is not None:
                     # Ensure finalize is called before emission

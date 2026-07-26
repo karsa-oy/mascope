@@ -75,11 +75,6 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
     # short "ref:" prefix of this id so users can quote it to support.
     error_id = uuid.uuid4().hex
     tech_message = {"error_id": error_id}
-    # Unexpected exceptions are logged with their traceback for debugging. For
-    # expected client errors whose exception repr embeds request data (e.g. a
-    # RequestValidationError renders the offending "input" values, which can be
-    # credentials), log only the redacted message - no traceback.
-    log_with_traceback = True
 
     # Use pattern matching to determine user message and status code
     match e:
@@ -167,8 +162,6 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
             combined_error_message = "; ".join(error_messages)
             user_message = f"{context_message}. {combined_error_message}"
             status_code = 422  # Unprocessable entity
-            # The traceback's final line is str(e), which carries the raw input.
-            log_with_traceback = False
 
         case AttributeError():
             # str(e) can name internal attributes/objects; keep it out of the
@@ -188,14 +181,30 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
             user_message = f"{context_message}. Unexpected error (ref: {error_id[:8]})."
             status_code = 500  # Internal Server Error
 
-    # Log the exception with context server-side, correlated by error_id. The
-    # traceback is included for unexpected exceptions but omitted where the
-    # exception repr would leak request data (see log_with_traceback).
+    # Log the exception with context server-side, correlated by error_id.
+    # Routine client-class failures (bad input, auth, not-found, duplicates,
+    # partial-success warnings) are part of normal operation and log at INFO
+    # (see mascope_runtime.logging for the level policy). Everything mapped
+    # to a 5xx status - and 4xx-mapped exception types that signal
+    # server-side faults (SQLAlchemyError, AttributeError) - logs at ERROR
+    # with its traceback. RequestValidationError is always INFO and its
+    # message redacted: its str()/traceback render the offending request
+    # "input" values, which can be credentials.
+    expected_client_error = status_code < 500 and isinstance(
+        e,
+        (
+            ApiException,
+            HTTPException,
+            InvalidPasswordException,
+            RequestValidationError,
+            ValueError,
+        ),
+    )
     with runtime.logger.contextualize(status_code=status_code, error_id=error_id):
-        if log_with_traceback:
-            runtime.logger.exception(error_message)
+        if expected_client_error:
+            runtime.logger.info(error_message)
         else:
-            runtime.logger.error(error_message)
+            runtime.logger.exception(error_message)
 
     return ApiException(user_message, tech_message, status_code)
 
@@ -263,7 +272,9 @@ def raise_api_warning(message: str, tech_message: dict, status_code: int = 200) 
     :type status_code: int
     :raises ApiException: Always raises an ApiException with the provided message and tech details.
     """
-    runtime.logger.warning(message)
+    # INFO on purpose: these are user-facing partial-success notices delivered
+    # to the UI, not operator signal.
+    runtime.logger.info(message)
     raise ApiException(
         user_message=message,
         tech_message=tech_message,

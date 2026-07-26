@@ -96,5 +96,8 @@ async def authenticate_socket_connection(
         if isinstance(e, SocketUnauthenticatedError):
             raise
 
-        runtime.logger.error(f"Socket authentication failed: {str(e)}")
+        # logger.exception: the raised SocketUnauthenticatedError is handled
+        # as a routine rejection upstream, so this is the only record of the
+        # unexpected underlying failure
+        runtime.logger.exception("Socket authentication failed")
         raise SocketUnauthenticatedError("Authentication failed") from e

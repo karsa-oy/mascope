@@ -60,7 +60,8 @@ class RedisStorageClient:
                 f"(session TTL: {ttl_hours:.1f} hours)"
             )
         except Exception as e:
-            runtime.logger.error(f"Failed to connect Redis session client: {e}")
+            # No log here: the raised ConnectionError is logged by the caller
+            # (e.g. the FastAPI lifespan startup handler)
             raise ConnectionError(f"Redis connection failed: {e}") from e
 
     async def disconnect(self) -> None:

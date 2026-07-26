@@ -14,7 +14,6 @@ from mascope_backend.api.models.target.collections.config import (
     target_collection_config,
 )
 from mascope_backend.db import Dataset, SampleBatch, TargetCollection, async_session
-from mascope_backend.runtime import runtime
 
 
 async def fetch_target_collection(target_collection_id: str) -> TargetCollection:
@@ -75,7 +74,7 @@ async def validate_sample_batches_for_collection(
                 f"{target_collection_type} collections can only be assigned to {', '.join(allowed_batch_types)} batches. "
                 f"Found {invalid_count} invalid batch(es)"
             )
-            runtime.logger.warning(message)
+            # No log here: the raised ValueError is logged by the pipeline
             raise ValueError(message)
 
 
@@ -118,7 +117,7 @@ async def validate_collections_scope_for_batch(
             f"the batch's own workspace. Found {invalid_count} collection(s) "
             "scoped to another workspace."
         )
-        runtime.logger.warning(msg)
+        # No log here: the raised ApiException is logged by the pipeline
         raise ApiException(
             user_message=msg,
             tech_message=msg,
@@ -155,5 +154,5 @@ async def validate_collections_for_batch(
                 f"{sample_batch_type} batches can only use {', '.join(allowed_collection_types)} collections. "
                 f"Found {invalid_count} invalid collection(s)"
             )
-            runtime.logger.warning(message)
+            # No log here: the raised ValueError is logged by the pipeline
             raise ValueError(message)

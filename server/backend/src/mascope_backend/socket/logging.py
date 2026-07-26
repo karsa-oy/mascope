@@ -23,6 +23,13 @@ class SocketLoggingHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
+        # python-socketio's plain WARNING/ERROR lines are transport noise (bad
+        # packets, emits to closed sessions), not operator signal: clamp them
+        # to INFO. Records carrying exc_info (e.g. an uncaught event-handler
+        # exception) keep their native level.
+        if record.exc_info is None and record.levelno > logging.INFO:
+            level = "INFO"
+
         logger.opt(depth=depth, exception=record.exc_info).log(
             level, record.getMessage()
         )

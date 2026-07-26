@@ -4,6 +4,64 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.4] - 2026.07.26
+
+### Added
+
+- Agent device pairing: instrument agents can now be connected without
+  copy-pasting an access token. The File Agent's guided setup offers
+  pairing as the default - the agent shows a short code (e.g. `BCD-234`),
+  an editor approves it in the web app under API Access Tokens > "Pair an
+  agent", and the agent picks up its token automatically. Each pairing
+  creates its own token without revoking existing ones, so pairing a new
+  instrument PC never disconnects another (the manual Regenerate button
+  still replaces all of the user's tokens for the service). Backend:
+  `/api/auth/pairing/start|poll|approve` - start/poll are unauthenticated
+  and rate-limited per client IP, codes live in Redis with a 10-minute
+  TTL, and only the authenticated editor-role approval mints a token,
+  which is handed to the agent exactly once. Access tokens gain an
+  optional description stamped with the paired machine's hostname
+  (migration `f2d8b5c3a9e1`).
+
+### Fixed
+
+- The File Agent setup wizard no longer reports a working connection when
+  the configured address is a web server that is not the Mascope API. Any
+  single-page-app server (such as the Vite frontend dev server in
+  development setups, which cannot receive uploads) answers a GET with the
+  app page and HTTP 200; verification now requires a JSON API response and
+  explains which address to use instead. Uploads rejected with 404/422 also
+  fail fast with a pointed error instead of burning ten 30-second retries
+  on a response that cannot change.
+- Error reporting no longer floods GlitchTip with routine events. Expected
+  client errors (failed logins, expired sessions, validation errors) and
+  routine conditions (locked-file retries during acquisition, per-sample
+  failures in batch loops, transient retries, deprecation notices) now log
+  at INFO or below, per-item loops aggregate into a single summary warning,
+  and each incident is reported exactly once - previously one failed login
+  produced two events and an unhandled server error up to three. Failures
+  caught in except blocks now carry their traceback (logger.exception), so
+  GlitchTip groups them as real exceptions instead of one issue per
+  interpolated file name. The CLI no longer reports at all: its warnings
+  and errors are user-facing terminal output, and hosts that export
+  MASCOPE_SENTRY_DSN in the shell no longer get a per-invocation
+  "sentry-sdk not installed" nag. The level policy (WARNING+ is exported
+  to error monitoring, so levels express operator relevance) is documented
+  in the developer guide under "Choosing a level" and in
+  mascope_runtime.logging.
+- Failures that previously died silently are now visible: stdlib logging
+  records (zarr, the Thermo reader) are bridged into loguru and reach the
+  log files and the monitoring sink; the file converter's rematch call
+  checks the HTTP status, so a failed rematch after a peak recompute is
+  reported instead of ignored; socket event-handler bugs are logged with
+  their traceback instead of being swallowed as auth errors; background
+  rematch tasks are kept referenced and observed (previously they could be
+  garbage-collected mid-run or die as unretrieved exceptions); and corrupt
+  CLI state files (auto-update state, instance registry) log a warning
+  instead of being silently treated as empty. Also fixes tofwerk's
+  open_h5_file relabeling exceptions raised inside the caller's with-body
+  as "Failed to open the file".
+
 ## [1.4.3] - 2026.07.25
 
 ### Fixed

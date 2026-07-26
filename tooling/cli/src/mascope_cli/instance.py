@@ -33,6 +33,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator
 
+from loguru import logger
+
 
 # Slot 0 maps to the default single-dev ports (8090/5173); on a shared box use
 # instances consistently rather than mixing a bare `mascope dev run` with them.
@@ -129,7 +131,13 @@ def _read_registry(home: Path) -> dict:
         return {"instances": {}}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as error:
+        # Do not reset the registry silently: treating it as empty can
+        # reallocate slots (envs, databases, ports) already bound to other
+        # worktrees. Warn so the corruption gets investigated.
+        logger.warning(
+            f"Instance registry {path} is unreadable ({error}); treating as empty"
+        )
         return {"instances": {}}
     data.setdefault("instances", {})
     return data
