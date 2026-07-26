@@ -99,6 +99,20 @@ _AUTO_PROCESS_CONCURRENCY = 3
 _auto_process_gate = asyncio.Semaphore(_AUTO_PROCESS_CONCURRENCY)
 
 
+async def _rematch_when_slot_free(**kwargs) -> dict:
+    """
+    Run ``rematch_samples`` under the ingest gate.
+
+    Every completed pipeline fires a rematch task for the samples it affected,
+    so an ingest burst otherwise piles up unbounded concurrent rematches on
+    top of the gated pipelines - the same pool-exhaustion mechanism the gate
+    exists to prevent. Spawned as a task, so waiting for a slot here never
+    blocks the pipeline that scheduled it.
+    """
+    async with _auto_process_gate:
+        return await rematch_samples(**kwargs)
+
+
 @api_controller_background_task(
     success_notification_rooms=["instrument"],
     success_reload=[("match", "affected_sample_batch_ids")],
@@ -254,7 +268,7 @@ async def _auto_process_sample_file(
 
     if other_affected_sample_item_ids:
         task = asyncio.create_task(
-            rematch_samples(
+            _rematch_when_slot_free(
                 sample_item_ids=other_affected_sample_item_ids,
                 independent_transaction=True,  # Handle reloads independently
                 user_id=user_id,
