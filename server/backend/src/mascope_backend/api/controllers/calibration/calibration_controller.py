@@ -602,8 +602,7 @@ async def calibration_mz_calibrate_samples(
             sample = await fetch_sample(sample_item_id=sample_item_id)
 
             # INFO per sample: the failures are aggregated into the batch
-            # result and shown to the user; per-sample WARNINGs would emit one
-            # GlitchTip event per affected sample.
+            # result and shown to the user.
             runtime.logger.info(
                 f"Calibrating sample '{sample.sample_item_name}' "
                 f"failed: {e.user_message}"

@@ -183,11 +183,11 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
 
     # Log the exception with context server-side, correlated by error_id.
     # Routine client-class failures (bad input, auth, not-found, duplicates,
-    # partial-success warnings) are part of normal operation: they log at INFO
-    # so they stay in the log files but out of the WARNING+ GlitchTip sink.
-    # Everything mapped to a 5xx status - and 4xx-mapped exception types that
-    # signal server-side faults (SQLAlchemyError, AttributeError) - logs at
-    # ERROR with its traceback. RequestValidationError is always INFO and its
+    # partial-success warnings) are part of normal operation and log at INFO
+    # (see mascope_runtime.logging for the level policy). Everything mapped
+    # to a 5xx status - and 4xx-mapped exception types that signal
+    # server-side faults (SQLAlchemyError, AttributeError) - logs at ERROR
+    # with its traceback. RequestValidationError is always INFO and its
     # message redacted: its str()/traceback render the offending request
     # "input" values, which can be credentials.
     expected_client_error = status_code < 500 and isinstance(
@@ -273,8 +273,7 @@ def raise_api_warning(message: str, tech_message: dict, status_code: int = 200) 
     :raises ApiException: Always raises an ApiException with the provided message and tech details.
     """
     # INFO on purpose: these are user-facing partial-success notices delivered
-    # to the UI, not operator signal - WARNING would forward each one to
-    # GlitchTip through the Sentry sink.
+    # to the UI, not operator signal.
     runtime.logger.info(message)
     raise ApiException(
         user_message=message,
