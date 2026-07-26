@@ -41,7 +41,7 @@ them all with one prompt.
 
 ```sh
 # Create the encrypted vault (you set a vault password; then paste each
-# server's `karsa` sudo password from your password manager). Structure is in
+# server's sudo password (the deploy user) from your password manager). Structure is in
 # group_vars/fleet/vault.yml.example.
 ansible-vault create group_vars/fleet/vault.yml
 # Later edits:

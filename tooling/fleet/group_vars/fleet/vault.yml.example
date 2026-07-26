@@ -1,7 +1,7 @@
 # EXAMPLE ONLY - shows the structure. The REAL file must be encrypted and is
 # gitignored (never commit it, even encrypted: this repo is public).
 #
-# Create the encrypted file and paste each server's sudo password (the `karsa`
+# Create the encrypted file and paste each server's sudo password (the deploy
 # user's password, from your password manager):
 #     ansible-vault create group_vars/fleet/vault.yml
 # Edit it later with:
