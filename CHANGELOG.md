@@ -4,6 +4,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- Fleet Ansible now supports per-host sudo passwords via Ansible Vault
+  (`tooling/fleet/group_vars/fleet/`): the encrypted vault (gitignored, kept
+  out of this public repo) holds each server's password, unlocked with a single
+  `--ask-vault-pass` prompt so whole-fleet runs no longer need per-host `-K`.
+
 ### Fixed
 
 - GlitchTip events now carry a friendly per-server identity: `server_name` is

@@ -32,19 +32,47 @@ cp inventory.example.yml inventory.local.yml
 # `tailscale status` on any tailnet machine)
 ```
 
-## Workflow: check first, apply deliberately
+## Sudo passwords: the vault (recommended)
 
-**Drift check** (read-only, safe anytime; `-K` prompts once for sudo):
+The fleet has **no NOPASSWD sudo** and each server has its **own** sudo
+password, so a single `-K` prompt cannot drive a whole-fleet run. Ansible Vault
+solves this: store the per-host passwords once in an encrypted file, then unlock
+them all with one prompt.
 
 ```sh
-ansible-playbook site.yml --check --diff -K
+# Create the encrypted vault (you set a vault password; then paste each
+# server's `karsa` sudo password from your password manager). Structure is in
+# group_vars/fleet/vault.yml.example.
+ansible-vault create group_vars/fleet/vault.yml
+# Later edits:
+ansible-vault edit group_vars/fleet/vault.yml
+```
+
+The real `vault.yml` is **gitignored** — never commit it, even encrypted (this
+repo is public). Keep a copy of the vault password in your password manager;
+losing it means recreating the vault, not a lockout (the servers are unchanged).
+
+## Workflow: check first, apply deliberately
+
+**Drift check** (read-only, safe anytime). With the vault, one vault-password
+prompt covers the whole fleet:
+
+```sh
+ansible-playbook site.yml --check --diff --ask-vault-pass
 ```
 
 **Apply** — always canary-first, then the rest:
 
 ```sh
-ansible-playbook site.yml -K --limit <canary-host>   # one server first
-ansible-playbook site.yml -K                         # fleet
+ansible-playbook site.yml --ask-vault-pass --limit <canary-host>   # one server first
+ansible-playbook site.yml --ask-vault-pass                         # fleet
+```
+
+*No vault?* Drop `--ask-vault-pass`, add `-K`, and always `--limit <host>` so
+the single sudo prompt matches exactly one server:
+
+```sh
+ansible-playbook site.yml --check --diff -K --limit <host>
 ```
 
 ## Apply-time cautions
