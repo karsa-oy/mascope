@@ -16,6 +16,7 @@ from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import select
 
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.lib.rate_limit import clear_login_rate_limit
 from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users import exceptions
@@ -270,6 +271,21 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         :param response: Optional response built by the transport.
         Defaults to None
         """
+        # A successful login resets the per-account limiter so it only counts
+        # failed attempts (the user's own logins must not consume the budget,
+        # and bogus attempts against a known address must not outlast a real
+        # sign-in). Keyed on the submitted form identifier, exactly as the
+        # limiter keys it; request.form() is cached by Starlette, so re-reading
+        # it here is free. Done before the sid early-return below so API-only
+        # logins (SDK, scripts) also clear the counter.
+        if request is not None:
+            try:
+                identifier = (await request.form()).get("username")
+            except Exception:
+                identifier = None
+            if identifier:
+                await clear_login_rate_limit(str(identifier))
+
         worker_pid = os.getpid()
         try:
             # Step 1: Socket authentication
