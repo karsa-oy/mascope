@@ -244,15 +244,16 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        runtime.logger.info(
-            f"User {user.username} has forgot the password. Reset token: {token}"
-        )
+        # Never log the token: it grants a password reset. Deliver it to the
+        # user out of band (e.g. email) instead.
+        runtime.logger.info(f"Password reset requested for user {user.username}")
 
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ):
+        # Never log the token: it grants email verification.
         runtime.logger.info(
-            f"Verification requested for user {user.username}. Verification token: {token}"
+            f"Email verification requested for user {user.username}"
         )
 
     async def on_after_login(
