@@ -19,6 +19,24 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Uploaded sample files can no longer be silently lost to a race with the
+  file converter. The upload endpoints wrote bytes directly under the final
+  filename inside the watched filestreams folder, so a write that stalled
+  for a couple of seconds (I/O contention) looked size-stable to the
+  converter's watcher and was ingested truncated - the upload still returned
+  success, the sample just never appeared. Uploads now land under a
+  non-watched temp name and are published with an atomic rename. This was
+  the cause of the nightly reproducibility workflow's nondeterministic
+  "pipeline did not settle: 147..155/161 files processed" failures.
+- The file converter's watcher now queues stream files already present when
+  it starts (e.g. left behind by a converter restart) instead of silently
+  ignoring them forever.
+- The reproducibility test now fails fast when the pipeline stalls (10 min
+  with no counter movement instead of idling out the full 45-min timeout)
+  and reports which stage lost files: streams never picked up, streams
+  quarantined in failed_files, or files converted without sample items. The
+  workflow now uploads full stack logs and container restart/OOM states as
+  an artifact on failure, instead of dumping the last 300 log lines.
 - GlitchTip events now carry a friendly per-server identity: `server_name` is
   the runtime env name (e.g. `site1`) instead of the opaque Docker container
   id the SDK falls back to under containers.
