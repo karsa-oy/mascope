@@ -1,0 +1,17 @@
+---
+- name: Ensure sshd includes the drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: Include /etc/ssh/sshd_config.d/*.conf
+    insertbefore: BOF
+    state: present
+
+- name: Install the tailnet hardening drop-in
+  ansible.builtin.copy:
+    src: 00-tailnet-hardening.conf
+    dest: /etc/ssh/sshd_config.d/00-tailnet-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: sshd -t -f %s
+  notify: Reload sshd

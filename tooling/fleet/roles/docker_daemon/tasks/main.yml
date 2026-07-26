@@ -1,0 +1,15 @@
+---
+# LOAD-BEARING: with stock Docker, published container ports (the app's 443)
+# bypass ufw entirely and the Cloudflare-only rules are cosmetic. See
+# docs/maintaining.md and the July 2026 incident notes in the fleet docs.
+- name: Docker must not manage iptables
+  ansible.builtin.copy:
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+
+# The restart handler recreates the Mascope stack (~30 s outage). It only
+# fires when daemon.json changed - which is a migration event, not routine.

@@ -1,0 +1,85 @@
+---
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 86400
+
+- name: Default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Forward policy ACCEPT (containers route through the host)
+  ansible.builtin.lineinfile:
+    path: /etc/default/ufw
+    regexp: ^DEFAULT_FORWARD_POLICY=
+    line: DEFAULT_FORWARD_POLICY="ACCEPT"
+  notify: Reload ufw
+
+- name: Allow SSH on the tailnet interface only
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: tailscale0
+    port: "22"
+    proto: tcp
+    comment: SSH via Tailscale
+
+- name: Fetch current Cloudflare ranges (v4 + v6)
+  ansible.builtin.uri:
+    url: "https://www.cloudflare.com/{{ item }}"
+    return_content: true
+  loop:
+    - ips-v4
+    - ips-v6
+  register: cf_raw
+  delegate_to: localhost
+  run_once: true
+  become: false
+  check_mode: false
+  changed_when: false
+
+- name: Allow Cloudflare ranges to 443
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+    port: "443"
+    proto: tcp
+    comment: Cloudflare
+  loop: "{{ cf_raw.results | map(attribute='content') | map('split') | flatten | select | list }}"
+
+# --- canonical container NAT --------------------------------------------
+# One block, ansible-managed. Masquerades container egress via BOTH the WAN
+# interface (internet) and tailscale0 (GlitchTip event delivery to the ops
+# box). Replaces the hand-written July 2026 blocks.
+
+- name: Remove the legacy hand-written MASCOPE NAT block
+  ansible.builtin.replace:
+    path: /etc/ufw/before.rules
+    regexp: '(?ms)^# MASCOPE NAT:.*?^COMMIT\n'
+    replace: ""
+  notify: Reload ufw
+
+- name: Install the canonical MASCOPE NAT block
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/before.rules
+    marker: "# {mark} MASCOPE NAT (ansible)"
+    block: |
+      *nat
+      :POSTROUTING ACCEPT [0:0]
+      -A POSTROUTING -s 172.17.0.0/16 -o {{ ansible_default_ipv4.interface }} -j MASQUERADE
+      -A POSTROUTING -s 172.18.0.0/16 -o {{ ansible_default_ipv4.interface }} -j MASQUERADE
+      -A POSTROUTING -s 172.18.0.0/16 -o tailscale0 -j MASQUERADE
+      COMMIT
+  notify: Reload ufw
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
