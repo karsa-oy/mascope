@@ -164,8 +164,7 @@ class RawProcessor(BaseFileProcessor):
         if created is None:
             created = datetime.fromtimestamp(os.path.getmtime(self.file_to_process))
             # INFO: expected for readers that do not surface the creation
-            # date (fires per processed file, and stdlib records now reach
-            # the GlitchTip sink through the loguru bridge)
+            # date; fires per processed file
             _log.info(
                 "Reader did not provide an acquisition date; using file mtime for %s",
                 self.file_to_process,

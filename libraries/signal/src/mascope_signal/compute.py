@@ -464,8 +464,7 @@ def load_signal(
     except Exception as e:
         # Both paths return an empty dataset (callers render "no data"), but
         # expected data conditions (empty range, unsupported type) must not
-        # look like faults, and real faults must carry their traceback -
-        # a flat ERROR string here used to be the only trace of either.
+        # look like faults, and real faults must carry their traceback.
         if isinstance(e, (ValueError, NotImplementedError)):
             runtime.logger.info(f"No signal loaded from {base_filename}: {e}")
         else:

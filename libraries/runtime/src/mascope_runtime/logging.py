@@ -164,8 +164,8 @@ class InterceptHandler(std_logging.Handler):
     Installed on the stdlib root logger by ``RuntimeLogging.configure`` so
     records from libraries that use ``logging.getLogger`` (zarr, thermo
     reader, ...) reach the loguru handlers - the log files, the terminal,
-    and (for WARNING+) the GlitchTip sink, which would otherwise never see
-    them. Based on the recipe from the loguru documentation.
+    and (for WARNING+) the error-monitoring sink. Based on the recipe from
+    the loguru documentation.
     """
 
     def emit(self, record: std_logging.LogRecord) -> None:
@@ -334,7 +334,7 @@ class RuntimeLogging:
             )
 
         # Bridge stdlib logging into loguru: without this, records emitted via
-        # logging.getLogger reach neither the log files nor the GlitchTip
+        # logging.getLogger reach neither the log files nor the monitoring
         # sink. force=True replaces handlers from any earlier configure().
         # The sink's loop guard already skips sentry_sdk/urllib3 records.
         std_logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
