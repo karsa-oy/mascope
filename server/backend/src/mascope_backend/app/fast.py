@@ -77,8 +77,30 @@ async def lifespan(app: FastAPI):
     await redis_storage_client.disconnect()
 
 
-# Initialize FastAPI with the lifespan
-fast = FastAPI(lifespan=lifespan)
+def _docs_kwargs(mode: str) -> dict[str, str | None]:
+    """
+    FastAPI docs kwargs for the given runtime mode.
+
+    The interactive API docs and the OpenAPI schema are dev-only: they expose
+    the full API surface and are never proxied to users, so they stay off in
+    prod to remove needless recon value for a directly-reachable backend.
+    ``openapi_url=None`` also disables ``/docs`` and ``/redoc``, which depend
+    on it, but all three are set explicitly for clarity.
+
+    :param mode: Runtime mode ("dev" or "prod").
+    :return: Kwargs to pass to ``FastAPI(...)``.
+    """
+    if mode == "dev":
+        return {
+            "docs_url": "/docs",
+            "redoc_url": "/redoc",
+            "openapi_url": "/openapi.json",
+        }
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
+# Initialize FastAPI with the lifespan.
+fast = FastAPI(lifespan=lifespan, **_docs_kwargs(runtime.mode))
 
 
 # Logging middleware
