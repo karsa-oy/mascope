@@ -252,9 +252,7 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         self, user: User, token: str, request: Optional[Request] = None
     ):
         # Never log the token: it grants email verification.
-        runtime.logger.info(
-            f"Email verification requested for user {user.username}"
-        )
+        runtime.logger.info(f"Email verification requested for user {user.username}")
 
     async def on_after_login(
         self,
