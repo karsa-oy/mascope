@@ -50,10 +50,16 @@ def socket_auth(minimum_role: str, service_name: Optional[str] = None):
                 return await handler(sid, *args, **kwargs)
 
             except SocketAuthError as e:
-                runtime.logger.error(f"Socket auth error for {sid}: {str(e)}")
+                # Expected rejection (expired session, insufficient role)
+                runtime.logger.info(f"Socket auth error for {sid}: {str(e)}")
 
-            except Exception as e:
-                runtime.logger.error(f"Unexpected socket error: {str(e)}")
+            except Exception:
+                # Not an auth rejection: this broad catch also swallows
+                # exceptions from the handler itself, so record the traceback
+                # or the bug would be invisible
+                runtime.logger.exception(
+                    f"Unexpected socket error in '{handler.__name__}' for {sid}"
+                )
 
         return wrapper
 
@@ -98,14 +104,18 @@ def file_converter_socket_auth(minimum_role: str):
 
                 return await handler(sid, data, *args, **kwargs)
             except InvalidTokenException as e:
-                runtime.logger.error(f"File converter auth error: {str(e)}")
+                # Expected 401-class rejection; the raise carries it upstream
+                runtime.logger.info(f"File converter auth error: {str(e)}")
                 raise SocketUnauthenticatedError(str(e)) from e
             except SocketAuthError as e:
-                runtime.logger.error(f"File converter auth error: {str(e)}")
+                runtime.logger.info(f"File converter auth error: {str(e)}")
                 raise
-            except Exception as e:
-                runtime.logger.error(
-                    f"Unexpected file-converter socket auth error: {str(e)}"
+            except Exception:
+                # Not an auth rejection: this broad catch also swallows
+                # exceptions from the handler itself, so record the traceback
+                # or the bug would be invisible
+                runtime.logger.exception(
+                    f"Unexpected file-converter socket error in '{handler.__name__}'"
                 )
 
         return wrapper

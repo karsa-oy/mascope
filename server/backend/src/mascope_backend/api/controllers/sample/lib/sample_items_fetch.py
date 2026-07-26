@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 
+from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
 from mascope_backend.db import (
     SampleBatch,
     SampleItem,
@@ -30,7 +31,9 @@ async def fetch_sample_item_ids(
         if sample_item_id:
             sample_item = await session.get(SampleItem, sample_item_id)
             if not sample_item:
-                runtime.logger.warning(
+                # Raise instead of warn-and-continue: the next line would
+                # crash on the None with an AttributeError masking the cause
+                raise NotFoundException(
                     f"No sample item found with ID '{sample_item_id}'"
                 )
             sample_item_ids.append(sample_item_id)
