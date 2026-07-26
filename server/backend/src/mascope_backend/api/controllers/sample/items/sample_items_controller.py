@@ -47,6 +47,7 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemRead,
     SampleItemUpdate,
 )
+from mascope_backend.api.new.temp.storage import user_temp_path
 from mascope_backend.db import (
     Sample,
     SampleFile,
@@ -892,7 +893,7 @@ async def sample_item_export_peaks(
     )
     runtime.logger.info(f"Writing peak data to file {peakfile_filename}")
     sample_peak_df.to_csv(
-        runtime.env.path("temp", peakfile_filename), index=False, sep=";"
+        user_temp_path(user_id, peakfile_filename), index=False, sep=";"
     )
     message = f"Peak data for sample item '{sample.sample_item_name}' was exported to file '{peakfile_filename}'."
     runtime.logger.info(message)
