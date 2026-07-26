@@ -31,7 +31,8 @@ async def get_temp_file_route(temp_file: str, user=Depends(guest_user)):
     :rtype: FileResponse
     """
     try:
-        file_path = user_temp_path(user.id, temp_file)
+        # create=False: reading must not mint empty per-user directories.
+        file_path = user_temp_path(user.id, temp_file, create=False)
     except ValueError as e:
         raise NotFoundException("File not found") from e
     if not os.path.isfile(file_path):
