@@ -23,6 +23,29 @@ from mascope_backend.socket.notifications import (
 )
 
 
+def _binds_auth_dependency(param: inspect.Parameter) -> bool:
+    """
+    Whether a route parameter binds a FastAPI dependency, in either of the
+    styles FastAPI accepts: a ``Depends(...)`` default value
+    (``user=Depends(guest_user)``) or ``Annotated`` metadata
+    (``user: Annotated[User, Depends(guest_user)]``).
+
+    Note: the ``Annotated`` check inspects the evaluated annotation object;
+    under ``from __future__ import annotations`` (string annotations) it cannot
+    see the metadata and the guard rejects the route. That failure is loud and
+    at import time - fail closed, never silently unauthenticated.
+
+    :param param: The ``user`` parameter from the route handler's signature.
+    :return: ``True`` if an auth dependency is bound to the parameter.
+    """
+    if isinstance(param.default, params.Depends):
+        return True
+    return any(
+        isinstance(meta, params.Depends)
+        for meta in getattr(param.annotation, "__metadata__", ())
+    )
+
+
 def api_controller():
     """
     A decorator for controller functions to handle exceptions and standardize error responses.
@@ -133,16 +156,17 @@ def api_route(
         if not public:
             signature = inspect.signature(func)
             user_param = signature.parameters.get("user")
-            if user_param is None or not isinstance(user_param.default, params.Depends):
+            if user_param is None or not _binds_auth_dependency(user_param):
                 runtime.logger.error("Please check the route definition")
                 error_message = (
                     f"Configuration error in route '{func.__name__}'\n"
                     f"All routes must either:\n"
-                    f"1. Bind an auth dependency to a `user` parameter "
-                    f"(e.g., user=Depends(guest_user))\n"
+                    f"1. Bind an auth dependency to a `user` parameter, e.g. "
+                    f"user=Depends(guest_user) or "
+                    f"user: Annotated[User, Depends(guest_user)]\n"
                     f"2. Be explicitly marked as public with @api_route(public=True)\n"
-                    f"A `user` parameter without Depends(...) leaves the route "
-                    f"unauthenticated; update the route definition accordingly."
+                    f"A `user` parameter without a bound Depends(...) leaves the "
+                    f"route unauthenticated; update the route definition accordingly."
                 )
                 raise ValueError(error_message)
 
