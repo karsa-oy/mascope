@@ -14,7 +14,7 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 ### Fixed
 
 - GlitchTip events now carry a friendly per-server identity: `server_name` is
-  the runtime env name (e.g. `varrio`) instead of the opaque Docker container
+  the runtime env name (e.g. `site1`) instead of the opaque Docker container
   id the SDK falls back to under containers.
 
 ### Added

@@ -104,7 +104,7 @@ def _init_sentry(environment: str, release: str | None) -> bool:
         dsn=dsn,
         environment=environment,
         # Friendly per-server identity in events/alerts: the runtime env name
-        # (e.g. "varrio"). Without this the SDK falls back to the container
+        # (e.g. "site1"). Without this the SDK falls back to the container
         # hostname, which under Docker is an opaque container id.
         server_name=os.environ.get("MASCOPE_ENV") or None,
         release=release,
