@@ -170,8 +170,11 @@ cat "$(mascope path)/.runtime/update/state.json"   # the current pending update
 ### Rolling out a release across several servers
 
 When you run more than one server, roll a new release out **canary-first** and
-verify each step rather than updating everything at once. The procedure per
-server (on the server, from the deployment checkout):
+verify each step rather than updating everything at once.
+[`tooling/fleet/update.yml`](../tooling/fleet/update.yml) automates the whole
+sequence below (serial, fail-fast, doctor-verified, CLI kept in sync); this
+section documents the manual per-server equivalent. The procedure per server
+(on the server, from the deployment checkout):
 
 ```sh
 cd <deployment>            # the mascope checkout, e.g. ~/mascope

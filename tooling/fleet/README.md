@@ -91,6 +91,22 @@ ansible-playbook site.yml --check --diff -K --limit <host>
   has *withdrawn* are not auto-pruned (same behavior as
   `tooling/ufw-allow-cf.sh`) — prune manually on the rare CF delisting.
 
+## Rolling out a release
+
+`site.yml` owns host *configuration*; `update.yml` performs the recurring
+*operation* of deploying a release — one server at a time, verifying each with
+`mascope prod doctor` and stopping the rollout on the first failure. It also
+reinstalls the `mascope` CLI so it cannot drift behind the checkout. No sudo
+(and therefore no vault password) is needed:
+
+```sh
+ansible-playbook update.yml -e mascope_version=vX.Y.Z --limit <canary-host>
+ansible-playbook update.yml -e mascope_version=vX.Y.Z    # rest of the fleet
+```
+
+The manual per-server equivalent (and its verification checklist) is in
+`docs/maintaining.md` → "Rolling out a release across several servers".
+
 ## Suggested cadence
 
 Weekly `--check --diff` (eyeball the diff, expect empty), plus a check run
