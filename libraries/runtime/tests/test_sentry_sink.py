@@ -159,9 +159,9 @@ def test_init_missing_sdk_returns_false(monkeypatch):
 
 def test_init_server_name_from_env(monkeypatch, fake_sentry):
     monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
-    monkeypatch.setenv("MASCOPE_ENV", "varrio")
+    monkeypatch.setenv("MASCOPE_ENV", "site1")
     assert rl._init_sentry("prod", None) is True
-    assert fake_sentry.init_calls[0]["server_name"] == "varrio"
+    assert fake_sentry.init_calls[0]["server_name"] == "site1"
 
 
 def test_init_server_name_falls_back_to_hostname(monkeypatch, fake_sentry):

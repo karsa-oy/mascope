@@ -187,7 +187,7 @@ There is no supported config API, so add monitors in the UI. **For each Mascope
 server:**
 
 1. **Add New Monitor** → Type **HTTP(s)**.
-2. **URL** = the server's public app URL, e.g. `https://tuni.mascope.app`
+2. **URL** = the server's public app URL, e.g. `https://example.mascope.app`
    (goes through Cloudflare — exactly the path users take). TLS-expiry checks
    require an `https://` target and *"Ignore TLS/SSL error"* **off**.
 3. Set a friendly name, heartbeat interval, retries.
