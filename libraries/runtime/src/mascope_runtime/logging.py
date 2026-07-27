@@ -68,8 +68,35 @@ def _duckdb():
 # sentry_sdk.init, no sink, i.e. zero behavior change. Set it to a GlitchTip
 # project DSN to forward WARNING+ log records as events. Needs the optional
 # dependency: `pip install mascope_runtime[sentry]`.
+# MASCOPE_SENTRY_TRACES_RATE (0..1) additionally samples request transactions
+# for GlitchTip's per-endpoint performance view; it does nothing without a DSN.
 _SENTRY_LEVELS = {"WARNING": "warning", "ERROR": "error", "CRITICAL": "fatal"}
 _sentry_ready = False
+
+
+def _traces_sample_rate() -> float:
+    """
+    Read ``MASCOPE_SENTRY_TRACES_RATE`` as the transaction sample rate.
+
+    Unset (the default) means 0.0: errors only, no performance tracing. A
+    value that is not a number in [0, 1] logs a warning and keeps tracing off
+    rather than raising - a typo in ``/etc/environment`` must not break the
+    backend at import time.
+    """
+    raw = os.environ.get("MASCOPE_SENTRY_TRACES_RATE")
+    if not raw:
+        return 0.0
+    try:
+        rate = float(raw)
+    except ValueError:
+        rate = None
+    if rate is None or not 0.0 <= rate <= 1.0:
+        logger.warning(
+            f"MASCOPE_SENTRY_TRACES_RATE={raw!r} is not a number in [0, 1]; "
+            "performance tracing stays OFF."
+        )
+        return 0.0
+    return rate
 
 
 def _init_sentry(environment: str, release: str | None) -> bool:
@@ -108,8 +135,10 @@ def _init_sentry(environment: str, release: str | None) -> bool:
         # hostname, which under Docker is an opaque container id.
         server_name=os.environ.get("MASCOPE_ENV") or None,
         release=release,
-        traces_sample_rate=0.0,  # errors only, no performance tracing
-        profiles_sample_rate=0.0,
+        # 0.0 unless MASCOPE_SENTRY_TRACES_RATE opts this server into
+        # performance tracing (per-endpoint latency in GlitchTip).
+        traces_sample_rate=_traces_sample_rate(),
+        profiles_sample_rate=0.0,  # GlitchTip does not consume profiles
         send_default_pii=False,  # no cookies / auth headers / client IPs
         max_request_body_size="never",
         auto_session_tracking=False,  # GlitchTip does not consume sessions

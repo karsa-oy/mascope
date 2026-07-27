@@ -361,6 +361,23 @@ reporting. The event `environment` is the runtime mode and `release` follows
 creating the project, copying the DSN, and the Uptime Kuma monitors - is in the
 [monitoring runbook](../tooling/monitoring/README.md).
 
+### Performance tracing (opt-in, needs the DSN)
+
+With the DSN set, `MASCOPE_SENTRY_TRACES_RATE` additionally samples that
+fraction of backend requests as transactions, giving per-endpoint latency and
+a slowest-transactions list under GlitchTip's **Performance** tab - the
+cheapest answer to "which API got slow after the release":
+
+```sh
+# next to the DSN in /etc/environment; 0.1 = trace 10% of requests
+MASCOPE_SENTRY_TRACES_RATE=0.1
+```
+
+Unset or `0` (the default) keeps the errors-only behavior; values outside
+`[0, 1]` log a warning and keep tracing off. Start low (`0.05`-`0.1`) and watch
+GlitchTip's Postgres growth on the monitoring box before raising it -
+transactions are far more numerous than errors.
+
 ## Files and secrets
 
 | Path | What |

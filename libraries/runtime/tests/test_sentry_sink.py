@@ -164,6 +164,27 @@ def test_init_server_name_from_env(monkeypatch, fake_sentry):
     assert fake_sentry.init_calls[0]["server_name"] == "site1"
 
 
+def test_init_traces_off_by_default(monkeypatch, fake_sentry):
+    monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
+    monkeypatch.delenv("MASCOPE_SENTRY_TRACES_RATE", raising=False)
+    assert rl._init_sentry("prod", None) is True
+    assert fake_sentry.init_calls[0]["traces_sample_rate"] == 0.0
+
+
+def test_init_traces_rate_from_env(monkeypatch, fake_sentry):
+    monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
+    monkeypatch.setenv("MASCOPE_SENTRY_TRACES_RATE", "0.1")
+    assert rl._init_sentry("prod", None) is True
+    assert fake_sentry.init_calls[0]["traces_sample_rate"] == 0.1
+
+
+@pytest.mark.parametrize("raw", ["banana", "1.5", "-0.1", "nan", ""])
+def test_traces_rate_rejects_bad_values(monkeypatch, raw):
+    """Anything but a number in [0, 1] keeps tracing off (and must not raise)."""
+    monkeypatch.setenv("MASCOPE_SENTRY_TRACES_RATE", raw)
+    assert rl._traces_sample_rate() == 0.0
+
+
 def test_init_server_name_falls_back_to_hostname(monkeypatch, fake_sentry):
     # No MASCOPE_ENV -> pass None so the SDK falls back to the hostname.
     monkeypatch.setenv("MASCOPE_SENTRY_DSN", "http://key@host:8000/1")
