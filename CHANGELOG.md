@@ -18,6 +18,18 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- Two `mascope` commands starting at the same moment no longer crash with
+  `json.JSONDecodeError: Expecting value`. Every invocation rewrites
+  `.runtime/state.json` during startup (the entrypoint clears the env
+  override), and the write truncated the file in place, so a concurrent
+  reader could parse an empty or half-written file - a backup cron and a
+  monitoring cron firing the same second was enough. Runtime state is now
+  written to a temp file and moved into place atomically, so a reader sees
+  either the old file or the new one; an unreadable file is retried once and
+  then falls back to defaults with a warning instead of raising. The
+  auto-update state file is written atomically for the same reason: a
+  partial read there is reported as "nothing pending", which would silently
+  hide a pending migration.
 - `mascope logs query --grep` no longer crashes on patterns containing
   quotes; user-provided filter values are bound as query parameters instead
   of being interpolated into the SQL.
