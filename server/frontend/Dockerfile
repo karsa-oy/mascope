@@ -23,9 +23,17 @@ RUN npm run build
 # build on broken links, so a bad doc link breaks the image, not just CI.
 FROM python:3.12-alpine AS docs-build
 
+# Same uv version as CI (.github/workflows/tests.yaml).
+COPY --from=ghcr.io/astral-sh/uv:0.11.2 /uv /usr/local/bin/uv
+
 WORKDIR /docs-src
 
-RUN pip install --no-cache-dir "mkdocs-material>=9.7,<10"
+# Install the exact docs toolchain from the lockfile (hash-checked), so the
+# image builds the docs with the same mkdocs-material version CI validated.
+# The root pyproject + lock are enough: the docs group has no workspace deps.
+COPY pyproject.toml uv.lock ./
+RUN uv export --frozen --only-group docs --no-emit-project -o requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY mkdocs.yml ./
 COPY docs ./docs
