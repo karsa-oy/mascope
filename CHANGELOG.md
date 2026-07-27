@@ -6,6 +6,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- `mascope logs query` is now agent/script-friendly: `--json` prints the raw
+  NDJSON records (no ANSI colors, no summary line), and `--service`/`-s`
+  narrows the query to one service's log files (e.g. `-s backend`).
+
+### Changed
+
+- `mascope logs query --max N` now returns the N *most recent* matching
+  lines (still printed oldest-first) instead of the N oldest, matching the
+  "show me the last N errors" intent.
+
+### Fixed
+
+- `mascope logs query --grep` no longer crashes on patterns containing
+  quotes; user-provided filter values are bound as query parameters instead
+  of being interpolated into the SQL.
+- The pretty log printout now decodes JSON escape sequences in messages
+  (previously quotes inside messages rendered as `\"`).
+
+### Added
+
 - Opt-in backend performance tracing: with the GlitchTip DSN set,
   `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
   requests as transactions, surfacing per-endpoint latency in GlitchTip's
