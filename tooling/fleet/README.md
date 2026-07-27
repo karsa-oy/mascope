@@ -41,16 +41,22 @@ them all with one prompt.
 
 ```sh
 # Create the encrypted vault (you set a vault password; then paste each
-# server's sudo password (the deploy user) from your password manager). Structure is in
-# group_vars/fleet/vault.yml.example.
-ansible-vault create group_vars/fleet/vault.yml
+# server's sudo password (the deploy user) from your password manager).
+# Structure is in vault.local.example.yml.
+ansible-vault create vault.local.yml
 # Later edits:
-ansible-vault edit group_vars/fleet/vault.yml
+ansible-vault edit vault.local.yml
 ```
 
-The real `vault.yml` is **gitignored** — never commit it, even encrypted (this
-repo is public). Keep a copy of the vault password in your password manager;
-losing it means recreating the vault, not a lockout (the servers are unchanged).
+The real `vault.local.yml` is **gitignored** — never commit it, even encrypted
+(this repo is public). Keep a copy of the vault password in your password
+manager; losing it means recreating the vault, not a lockout (the servers are
+unchanged).
+
+The vault lives **next to the playbooks, not under `group_vars/`**, and is
+loaded explicitly by `site.yml`. This is deliberate: `group_vars` files are
+auto-decrypted for *every* play, which would force a vault prompt even on
+sudo-less playbooks like `update.yml`.
 
 ## Workflow: check first, apply deliberately
 

@@ -209,6 +209,29 @@ Two gotchas this procedure exists to avoid:
   `/etc/environment` (e.g. a new `MASCOPE_*` var), start the stack from a
   **fresh** shell session, or the value interpolates empty.
 
+### Expect a burst of restart noise
+
+Each server's rolling restart briefly tears down Postgres, container DNS and
+the backend/file-converter socket link, so error monitoring reliably lights up
+for ~30 s per server: `the database system is shutting down`,
+`Name or service not known`, `... not registered in file converter`,
+`/file-converter is not a connected namespace`, and a cluster of socket
+token-validation failures as clients reconnect.
+
+This is expected and self-healing - the converter retries, and files are
+ingested normally. What matters is whether it **stops**:
+
+```sh
+# on a server, a few minutes after its restart - expect 0
+docker logs mascope_prod_backend --since 30m 2>&1 | grep -c "not registered in file converter"
+# and nothing quarantined anywhere under the filestore
+find "$(mascope path)"/.runtime/env/*/filestore -type d -name failed_files
+```
+
+Errors that keep arriving after the restart window, or any `failed_files`
+directory with contents, are real and worth investigating. Resolve the
+restart-window issues in the error tracker so a recurrence stands out.
+
 ## Backups
 
 [`tooling/backup-cron.sh`](../tooling/backup-cron.sh) runs a two-layer nightly

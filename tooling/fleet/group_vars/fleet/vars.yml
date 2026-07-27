@@ -1,12 +1,6 @@
 ---
-# Per-host privilege-escalation (sudo) passwords come from the ENCRYPTED vault
-# file group_vars/fleet/vault.yml (gitignored - this repo is public). Each host
-# looks up its own password by name, so the fleet keeps distinct per-server sudo
-# passwords instead of a shared one.
-#
-# Set up once:  ansible-vault create group_vars/fleet/vault.yml   (see vault.yml.example)
-# Run playbooks: ansible-playbook site.yml --ask-vault-pass       (one prompt, all hosts)
-#
-# Without a vault, omit --ask-vault-pass and pass -K (prompts once) with
-# --limit <host> so the single password matches one server.
-ansible_become_password: "{{ vault_become_passwords[inventory_hostname] }}"
+# Per-host sudo passwords come from the encrypted vault.local.yml, loaded by
+# site.yml via vars_files (NOT from group_vars, so sudo-less playbooks like
+# update.yml never trigger a vault prompt). The lookup is lazy and falls back
+# to omit, so -K (--ask-become-pass) still works without any vault.
+ansible_become_password: "{{ (vault_become_passwords | default({}))[inventory_hostname] | default(omit) }}"

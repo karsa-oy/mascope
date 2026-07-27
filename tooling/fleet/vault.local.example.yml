@@ -1,0 +1,13 @@
+---
+# Fallback loaded by site.yml when no real vault exists (first-found list).
+# The REAL file is vault.local.yml: encrypted, gitignored, created with
+#     ansible-vault create vault.local.yml
+# and containing one sudo password per inventory host, e.g.:
+#     vault_become_passwords:
+#       server1: "..."
+#       server2: "..."
+# Edit later with: ansible-vault edit vault.local.yml
+# It lives OUTSIDE group_vars/ on purpose: group_vars files are auto-loaded
+# (and auto-decrypted) for every play, which would force a vault prompt even
+# for playbooks that need no sudo (e.g. update.yml).
+vault_become_passwords: {}
