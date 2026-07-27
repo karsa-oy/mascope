@@ -28,7 +28,8 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
   const dialog = reactive({
     op: null,
     delete: useBatchDeleteDialog(),
-    calibration: false
+    calibration: false,
+    assign: false
   })
 
   // actions
@@ -225,30 +226,9 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
           command: () => {
             // Batch assignment is the most expensive thing this menu can start:
             // one run per sample, each writing a row per detected peak, with no
-            // way to stop it once it is going. Confirm, and say so.
-            confirm.require({
-              icon: 'pi pi-exclamation-triangle',
-              header: 'Assign peaks for batch',
-              message:
-                `Assign peaks for every sample in "${row.value.sample_batch_name}"? ` +
-                'This runs in the background and can take a long time on a large ' +
-                'batch. It cannot be cancelled once started. Blank and uncalibrated ' +
-                'samples are skipped.',
-              accept: async () => {
-                await app.data.batch.assign({
-                  sample_batch_id: row.value.sample_batch_id
-                })
-              },
-              acceptProps: {
-                icon: 'pi ph ph-atom',
-                label: 'Assign'
-              },
-              rejectProps: {
-                icon: 'pi pi-times',
-                label: 'Cancel',
-                severity: 'secondary'
-              }
-            })
+            // way to stop it once it is going. The dialog states that and lets
+            // the run be configured, rather than committing on a single click.
+            dialog.assign = true
           },
           // Gated with the rest of the peak-assignment surfaces: without the
           // feature there is no assignment UI to view the results in, so the

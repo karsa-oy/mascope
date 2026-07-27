@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, inject, onMounted } from 'vue'
+import { ref, reactive, computed, inject } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -7,15 +7,12 @@ import Dialog from 'primevue/dialog'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import ProgressSpinner from 'primevue/progressspinner'
-import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import ToggleSwitch from 'primevue/toggleswitch'
-import FloatLabel from 'primevue/floatlabel'
 
 import { BaseTabbedPanel, BaseTierTag, BaseVerdictBadge } from '@/lib/base'
+import { PeakAssignConfigForm } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
 import { formatIsotopeFormula } from '@/lib/chem'
-import { api } from '@/api'
 import { useApp } from '@/stores'
 
 const app = useApp()
@@ -69,28 +66,17 @@ const selectedRun = computed({
 
 const configVisible = ref(false)
 const submitting = ref(false)
+// A per-sample run is cheap and the user is looking at one spectrum, so the
+// untargeted stage starts on here - unlike a batch, where cost scales with the
+// number of samples. The rest is left unset for PeakAssignConfigForm to fill
+// from the server defaults.
 const config = reactive({
   run_untargeted: true,
-  mz_precision_ppm: 5,
-  formula_ranges: '',
-  max_untargeted_peaks: 300,
-  peak_intensity_threshold: 0,
-  max_alternatives: 5
-})
-
-// Prefill m/z precision and formula range from the cheminfo defaults, matching
-// the single-peak search in PanePeakAssign.
-onMounted(() => {
-  api.http
-    .get('/params', { type: 'read_params' })
-    .then(({ data }) => {
-      const cheminfo = data?.data?.params?.cheminfo_config
-      if (cheminfo) {
-        config.mz_precision_ppm = cheminfo.DEFAULT_MZ_PRECISION ?? config.mz_precision_ppm
-        config.formula_ranges = cheminfo.DEFAULT_FORMULA_RANGE ?? config.formula_ranges
-      }
-    })
-    .catch(() => {})
+  mz_precision_ppm: null,
+  formula_ranges: null,
+  max_untargeted_peaks: null,
+  peak_intensity_threshold: null,
+  max_alternatives: null
 })
 
 async function launch() {
@@ -98,9 +84,11 @@ async function launch() {
   if (!sampleItemId) return
   submitting.value = true
   try {
-    // Omit an empty formula range so the backend default applies.
-    const payload = { ...config }
-    if (!payload.formula_ranges) delete payload.formula_ranges
+    // Drop anything still unset so the backend default applies rather than a
+    // null overriding it.
+    const payload = Object.fromEntries(
+      Object.entries(config).filter(([, value]) => value !== null && value !== '')
+    )
     await runs.value.assign(sampleItemId, payload)
     configVisible.value = false
   } finally {
@@ -497,56 +485,7 @@ const isoCount = (row) => assignments.value.childrenOf(row.peak_assignment_id).l
       header="Assign peaks"
       :style="{ width: '26rem' }"
     >
-      <div class="col config-form" style="gap: 1.25rem; align-items: stretch">
-        <div class="toggle-row">
-          <ToggleSwitch v-model="config.run_untargeted" inputId="run_untargeted" />
-          <label for="run_untargeted">
-            Untargeted search
-            <small>Search compositions for peaks the library leaves unassigned.</small>
-          </label>
-        </div>
-        <FloatLabel>
-          <InputNumber
-            v-model="config.mz_precision_ppm"
-            inputId="mz_precision_ppm"
-            :min="1"
-            :max="100"
-            fluid
-          />
-          <label for="mz_precision_ppm">m/z precision (ppm)</label>
-        </FloatLabel>
-        <FloatLabel>
-          <InputText v-model="config.formula_ranges" id="formula_ranges" fluid />
-          <label for="formula_ranges">Formula range</label>
-        </FloatLabel>
-        <FloatLabel>
-          <InputNumber
-            v-model="config.max_untargeted_peaks"
-            inputId="max_untargeted_peaks"
-            :min="1"
-            fluid
-          />
-          <label for="max_untargeted_peaks">Max untargeted peaks</label>
-        </FloatLabel>
-        <FloatLabel>
-          <InputNumber
-            v-model="config.peak_intensity_threshold"
-            inputId="peak_intensity_threshold"
-            :min="0"
-            fluid
-          />
-          <label for="peak_intensity_threshold">Peak intensity threshold</label>
-        </FloatLabel>
-        <FloatLabel>
-          <InputNumber
-            v-model="config.max_alternatives"
-            inputId="max_alternatives"
-            :min="0"
-            fluid
-          />
-          <label for="max_alternatives">Max alternatives kept</label>
-        </FloatLabel>
-      </div>
+      <PeakAssignConfigForm :config="config" :pinned="['run_untargeted']" />
       <template #footer>
         <Button label="Cancel" text severity="secondary" @click="configVisible = false" />
         <Button label="Assign" icon="pi ph ph-magic-wand" :loading="submitting" @click="launch" />

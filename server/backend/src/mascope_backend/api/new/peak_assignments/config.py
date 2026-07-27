@@ -23,6 +23,21 @@ MAX_FORMULA_RANGE_SPECIES = 12
 MAX_ALTERNATIVES_CEILING = 50
 
 
+class PeakAssignmentLimits(BaseModel):
+    """The run-config bounds, published so a client can enforce the same ones.
+
+    The config form needs min/max for its inputs, and hardcoding them in the
+    frontend is how a form drifts from the validation behind it: the input would
+    happily accept a value the API then rejects. Serving them from the same
+    constants ``PeakAssignmentConfig`` validates against keeps the two honest.
+    """
+
+    max_untargeted_peaks_ceiling: int = MAX_UNTARGETED_PEAKS_CEILING
+    max_mz_precision_ppm: float = MAX_MZ_PRECISION_PPM
+    max_formula_range_species: int = MAX_FORMULA_RANGE_SPECIES
+    max_alternatives_ceiling: int = MAX_ALTERNATIVES_CEILING
+
+
 def peak_assignment_enabled() -> bool:
     """Whether the peak-centric assignment feature is switched on for this env.
 

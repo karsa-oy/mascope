@@ -140,3 +140,26 @@ def test_grace_cutoff_is_in_the_past():
     cutoff = datetime.now(timezone.utc) - timedelta(hours=DEFAULT_KEEP_FAILED_HOURS)
     assert cutoff < datetime.now(timezone.utc)
     assert DEFAULT_KEEP_FAILED_HOURS > 0
+
+
+class TestReaperResilience:
+    """The startup reaper must never be able to stop the server booting."""
+
+    @pytest.mark.asyncio
+    async def test_missing_table_is_swallowed(self, monkeypatch):
+        """A database without the table (not yet migrated) must not break boot.
+
+        The reaper runs in init_main_process alongside the other startup tasks,
+        which share one try block - so a raise here aborts startup entirely.
+        """
+        from mascope_backend.db.admin.peak_assignments import reset_running_runs
+
+        def _boom(*_args, **_kwargs):
+            raise RuntimeError('relation "peak_assignment_run" does not exist')
+
+        monkeypatch.setattr(reset_running_runs, "async_session", _boom)
+
+        result = await reset_running_runs.reset_running_peak_assignment_runs()
+
+        assert result["status"] == "skipped"
+        assert result["data"]["reset_count"] == 0

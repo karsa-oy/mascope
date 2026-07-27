@@ -47,38 +47,51 @@ async def reset_running_peak_assignment_runs() -> dict:
     Called at application startup to recover from abnormal termination during a
     run. Safe to call when there is nothing to reset.
 
+    Never raises. This is housekeeping on a table that a recent migration added,
+    so it can legitimately be absent - a database not yet upgraded to this head,
+    or one rolled back past it - and startup runs it in the same try block as the
+    other init tasks. Reclaiming stale rows is not worth refusing to boot over,
+    so a failure is logged and swallowed.
+
     :return: Operation results with the count of reset runs
     :rtype: dict
     """
-    async with async_session() as session:
-        update_result = await session.execute(
-            update(PeakAssignmentRun)
-            .where(PeakAssignmentRun.status == "running")
-            .values(
-                status="failed",
-                error=STUCK_RUN_ERROR,
-                peak_assignment_run_utc_completed=datetime.now(timezone.utc),
+    try:
+        async with async_session() as session:
+            update_result = await session.execute(
+                update(PeakAssignmentRun)
+                .where(PeakAssignmentRun.status == "running")
+                .values(
+                    status="failed",
+                    error=STUCK_RUN_ERROR,
+                    peak_assignment_run_utc_completed=datetime.now(timezone.utc),
+                )
             )
-        )
 
-        reset_count = update_result.rowcount
-        await session.commit()
-
-        if reset_count == 0:
-            message = "No interrupted peak assignment runs found"
-        else:
-            message = (
-                f"Reset {reset_count} interrupted peak assignment run(s) to 'failed'"
-            )
-        runtime.logger.debug(message)
-
+            reset_count = update_result.rowcount
+            await session.commit()
+    except Exception as error:
+        message = f"Could not reset interrupted peak assignment runs: {error}"
+        runtime.logger.warning(message)
         return {
-            "status": "success",
+            "status": "skipped",
             "message": message,
-            "data": {
-                "reset_count": reset_count,
-            },
+            "data": {"reset_count": 0},
         }
+
+    if reset_count == 0:
+        message = "No interrupted peak assignment runs found"
+    else:
+        message = f"Reset {reset_count} interrupted peak assignment run(s) to 'failed'"
+    runtime.logger.debug(message)
+
+    return {
+        "status": "success",
+        "message": message,
+        "data": {
+            "reset_count": reset_count,
+        },
+    }
 
 
 def run_reset_running_peak_assignment_runs() -> dict:
