@@ -113,8 +113,8 @@ Validated `rule_senior` against the 92 demo target compounds:
    `arbitration_eval.py --fit-calibration`. Wired into the engine → `provenance.p_correct /
    calibrated / calibration`. Labels = reference-confirmed identities (Schymanski L1) vs
    decoys — the reference-dataset link + basis for future user self-calibration. See
-   `assignment_confidence.md` §4 + `how-it-works/peak_assignment.md`.
-8. ✅ **How-it-works docs** — new user-facing `how-it-works/peak_assignment.md` (fit score,
+   `assignment_confidence.md` §4 + `how-it-works/peak-assignment.md`.
+8. ✅ **How-it-works docs** — new user-facing `how-it-works/peak-assignment.md` (fit score,
    plausibility, arbitration, calibration, tiers) with citations; `matching.md` TODO
    resolved.
 9. ✅ **Peak-ownership tolerance fix** — a peak is only OWNED by an isotopologue whose

@@ -86,6 +86,7 @@ nav:
       - Peak detection: how-it-works/peak-detection.md
       - Calibration: how-it-works/calibration.md
       - Matching: how-it-works/matching.md
+      - Peak assignment: how-it-works/peak-assignment.md
   - Guides:
       - Overview: guides/index.md
       - Import data files: guides/import-files.md

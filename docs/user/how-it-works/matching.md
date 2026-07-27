@@ -4,7 +4,7 @@
 > the sample?), which remains the default for the target-matching workflow. The peak-first
 > question — assign a composition and a confidence to *every* peak — and the consolidated
 > **fit score** that scores it are described in
-> [Peak Assignment & Identification Confidence](peak_assignment.md). The isotope-level
+> [Peak Assignment & Identification Confidence](peak-assignment.md). The isotope-level
 > scoring below is being superseded by that fit score (see
 > [the "Fit score" note](#a-note-on-scoring-the-fit-score) at the end of this page).
 
@@ -117,6 +117,6 @@ Orbitrap and TOF), an intensity likelihood scaled by each peak's signal-to-noise
 detectability gate that only penalises an absent peak when it should have been seen, and an
 abundance-weighted geometric-mean aggregation. On the reference dataset this improves both
 ranking (ROC-AUC) and calibration over v1. The fit score is the scoring engine of
-[peak assignment](peak_assignment.md); its full model, parameters and literature references
-are in the [developer reference](../../../libraries/tools/docs/fit_score.md). The legacy v1
+[peak assignment](peak-assignment.md); its full model, parameters and literature references
+are in the developer reference, `libraries/tools/docs/fit_score.md`. The legacy v1
 score is retained for the targeted path and documented above for reference.

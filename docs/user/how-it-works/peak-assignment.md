@@ -6,6 +6,16 @@ observed peak, what is the most likely chemical composition, and how confident a
 Each peak gets exactly one assignment per run, together with a **fit score** and a
 **confidence tier**.
 
+!!! note "Peak assignment is opt-in"
+
+    It is switched **off** by default, and a deployment that has not enabled it behaves
+    exactly as before: no assignment runs when a sample is processed, the composition
+    search keeps reporting the familiar match score, and the Sample tab keeps its peak
+    ledger. To turn it on, set `peak_assignment = true` under `[meta]` in the
+    environment's config toml (or export `MASCOPE_PEAK_ASSIGNMENT=1`) and restart the
+    stack. Targeted matching keeps working either way — peak assignment is an addition,
+    not a replacement.
+
 The design rests on a foundational result of the field: **accurate mass alone — even at
 sub-ppm — cannot uniquely determine an elemental composition**, and isotope-pattern
 information is worth more than another order of magnitude of mass accuracy
@@ -66,7 +76,8 @@ below the noise is simply excluded. The per-peak likelihoods are combined as an
 abundance-weighted geometric mean. This construction follows the probabilistic
 isotope-pattern matching of **SIRIUS** ([Böcker et al. 2009][bo09]; [Dührkop et al.
 2019][du19]), adapted to centroided industrial spectra by adding detection-limit
-awareness. The full mathematical model is in the [developer reference][fit_score_dev].
+awareness. The full mathematical model is in the developer reference,
+`libraries/tools/docs/fit_score.md`.
 
 **A consequence users see:** a lone mass-only match (one peak, no isotopic corroboration)
 scores *low* by design, while a fully corroborated isotope envelope scores near 1.0. This
@@ -200,4 +211,3 @@ communicates identification certainty.
 [sch14]: #sch14
 [sum07]: #sum07
 [platt]: #platt
-[fit_score_dev]: ../../../libraries/tools/docs/fit_score.md

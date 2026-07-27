@@ -378,6 +378,27 @@ Unset or `0` (the default) keeps the errors-only behavior; values outside
 GlitchTip's Postgres growth on the monitoring box before raising it -
 transactions are far more numerous than errors.
 
+## Optional features
+
+**Peak assignment** (assign a chemical composition to every peak - see
+[the user docs](user/how-it-works/peak-assignment.md)) ships **off**. A server
+that leaves it off is unaffected by it: samples process exactly as before and
+the UI is unchanged. To enable it on a deployment, set it in the env's config
+toml and restart the stack:
+
+```toml
+[meta]
+peak_assignment = true
+```
+
+`MASCOPE_PEAK_ASSIGNMENT=1` in `/etc/environment` does the same without editing
+the toml (remember host env vars apply at login - start the stack from a fresh
+shell). Enabling it means every newly processed sample also gets a
+database-stage assignment run, which adds processing time and one database row
+per detected peak per run, so watch disk after turning it on (see
+[Disk space](#disk-space)). Existing samples are not assigned retroactively;
+run assignment explicitly from the UI for those.
+
 ## Files and secrets
 
 | Path | What |
