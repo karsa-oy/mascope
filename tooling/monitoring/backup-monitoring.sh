@@ -55,6 +55,15 @@ on_error() {
 }
 trap 'on_error $LINENO' ERR
 
+# The Postgres dump relies on `restic backup --stdin-from-command` (restic
+# >= 0.16). Ubuntu's apt ships older; probe the feature so the failure is a
+# clear message (and a /fail ping) instead of "unknown flag" mid-backup.
+if ! restic backup --help 2>/dev/null | grep -q -- --stdin-from-command; then
+    log "ERROR: restic >= 0.16 required (--stdin-from-command missing; found: $(restic version 2>/dev/null | head -1))"
+    log "       install the current binary from https://github.com/restic/restic/releases"
+    false  # routes through the ERR trap -> /fail ping + exit 1
+fi
+
 # Initialize the repo on first use (idempotent).
 if ! restic cat config >/dev/null 2>&1; then
     log "restic repository not initialized - running restic init..."

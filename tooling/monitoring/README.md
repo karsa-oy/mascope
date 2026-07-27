@@ -107,6 +107,12 @@ IP from a non-tailnet LAN machine) and create the admin account on first load
 Copy `backup-monitoring.sh` to the box (e.g. `/opt/monitoring/`), point it at your
 restic repo, and schedule it nightly **in root's crontab** (`sudo crontab -e` —
 the script needs docker, `/var/lib/docker/volumes`, and `/root/.restic-pass`).
+
+> **restic >= 0.16 required** (`--stdin-from-command` for the Postgres dump).
+> Ubuntu's apt ships an older restic — install the current binary from
+> [restic releases](https://github.com/restic/restic/releases) into
+> `/usr/local/bin`, and give root's crontab a `PATH=/usr/local/bin:/usr/bin:/bin`
+> line so cron finds it (cron's default PATH does not include /usr/local/bin).
 It logically dumps GlitchTip's Postgres, backs up GlitchTip uploads, and takes a
 quiesced copy of Uptime Kuma's SQLite.
 
