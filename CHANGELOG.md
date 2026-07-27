@@ -32,6 +32,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   so residual congestion queues instead of failing. Together with the upload
   race below, this caused the nightly reproducibility workflow's
   nondeterministic "144..155/161 files processed" failures.
+- The file converter no longer quarantines a raw file because the backend
+  was momentarily too busy to answer. Connection-pool starvation now answers
+  503 Service Unavailable (previously a misleading 400 "Database operation
+  failed"), and the converter's backend API calls retry transport errors and
+  5xx responses with backoff (15/30/60s) before giving up. Client-side
+  request timeouts were also raised above the server's pool patience so a
+  slow-but-successful call is no longer killed from the client side.
 - Uploaded sample files can no longer be silently lost to a race with the
   file converter. The upload endpoints wrote bytes directly under the final
   filename inside the watched filestreams folder, so a write that stalled
