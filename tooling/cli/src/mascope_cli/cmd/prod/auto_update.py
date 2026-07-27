@@ -144,12 +144,26 @@ def load_pending(mascope_path: str) -> Optional[PendingUpdate]:
 
 
 def save_pending(mascope_path: str, pending: PendingUpdate) -> None:
-    """Persist the pending update, creating the update dir if needed."""
+    """
+    Persist the pending update, creating the update dir if needed.
+
+    Written via a temp file and an atomic replace: `load_pending` treats an
+    unparseable file as "nothing pending", so a reader catching this write
+    half-done (a doctor cron overlapping an update) would silently forget a
+    pending migration rather than report it.
+    """
     d = update_dir(mascope_path)
     d.mkdir(parents=True, exist_ok=True)
-    (d / "state.json").write_text(
-        json.dumps({"pending": pending.to_dict()}, indent=2) + "\n", encoding="utf-8"
-    )
+    path = d / "state.json"
+    tmp = path.parent / f".{path.name}.{os.getpid()}.tmp"
+    try:
+        tmp.write_text(
+            json.dumps({"pending": pending.to_dict()}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)  # atomic on POSIX and Windows
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def clear_pending(mascope_path: str) -> None:

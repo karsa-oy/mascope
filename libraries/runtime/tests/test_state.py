@@ -7,6 +7,10 @@ clobber each other's state — the paths/dicts used to be module globals, so
 the most recently constructed instance hijacked every other instance.
 """
 
+import json
+import os
+import threading
+
 import pytest
 
 from mascope_runtime.state import RuntimeJsonState, RuntimeTempState
@@ -68,6 +72,130 @@ def test_json_states_do_not_share_paths(tmp_path):
 
     assert a.env == "env-a"
     assert b.env == "env-b"
+
+
+# --- Concurrent access ---
+#
+# The state file is shared by every process using one MASCOPE_PATH, and each
+# CLI invocation writes it at startup (the entrypoint clears the env
+# override). A backup cron and a monitoring cron starting the same second used
+# to be enough for one to read the file while the other had truncated it,
+# killing the reader with an unhandled JSONDecodeError.
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    ["", '{"env": {"acti', "\x00\x00\x00", "not json at all"],
+    ids=["empty", "partial", "nul-bytes", "garbage"],
+)
+def test_unreadable_state_falls_back_to_defaults(tmp_path, corrupt):
+    state = _make_state(tmp_path)
+    state.env = "tof1"
+    (tmp_path / ".runtime" / "state.json").write_text(corrupt)
+
+    assert state.env == "default"
+    assert state.mode == "dev"
+
+
+def test_unreadable_state_is_repaired_by_the_next_write(tmp_path):
+    state = _make_state(tmp_path)
+    (tmp_path / ".runtime" / "state.json").write_text('{"env": {"acti')
+
+    state.env = "tof1"
+
+    assert state.env == "tof1"
+    assert json.loads((tmp_path / ".runtime" / "state.json").read_text())
+
+
+def test_fallback_does_not_mutate_the_module_defaults(tmp_path):
+    state = _make_state(tmp_path)
+    (tmp_path / ".runtime" / "state.json").write_text("")
+
+    state.env = "tof1"
+
+    assert RuntimeJsonState(str(tmp_path)).env == "tof1"
+    # A second, unrelated home must still start from a pristine "default".
+    assert _make_state(tmp_path / "other").env == "default"
+
+
+def test_readers_never_observe_a_partial_file(tmp_path, monkeypatch):
+    """The destination holds valid JSON at every moment during a write."""
+    state = _make_state(tmp_path)
+    state_path = tmp_path / ".runtime" / "state.json"
+    assert state.env == "default"  # materialize the file before spying
+    seen = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        # Whatever a reader would find in the instant before the swap.
+        seen.append(state_path.read_text())
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", spy)
+    state.env = "tof1"
+
+    assert seen and all(json.loads(text) for text in seen)
+    assert seen[-1] != state_path.read_text()  # the swap did happen
+
+
+def test_writes_leave_no_temp_files_behind(tmp_path):
+    state = _make_state(tmp_path)
+
+    for i in range(5):
+        state.env = f"env-{i}"
+        state.override("mode", "prod")
+
+    assert [p.name for p in (tmp_path / ".runtime").iterdir()] == ["state.json"]
+
+
+def test_failed_write_leaves_neither_temp_files_nor_damage(tmp_path, monkeypatch):
+    state = _make_state(tmp_path)
+    state.env = "tof1"
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(json, "dump", boom)
+    with pytest.raises(OSError):
+        state.env = "tof2"
+
+    monkeypatch.undo()
+    assert [p.name for p in (tmp_path / ".runtime").iterdir()] == ["state.json"]
+    assert state.env == "tof1"  # the previous good state is untouched
+
+
+def test_concurrent_readers_and_writers_do_not_crash(tmp_path):
+    """Regression test for the crons-in-the-same-second production crash."""
+    state = _make_state(tmp_path)
+    state.env = "default"
+    errors = []
+    start = threading.Barrier(6)
+
+    def write():
+        start.wait()
+        for i in range(30):
+            try:
+                state.override("env", f"env-{i}")
+            except Exception as error:  # noqa: BLE001 - the test is the assert
+                errors.append(error)
+
+    def read():
+        start.wait()
+        for _ in range(30):
+            try:
+                assert state.env
+            except Exception as error:  # noqa: BLE001
+                errors.append(error)
+
+    threads = [threading.Thread(target=write) for _ in range(2)]
+    threads += [threading.Thread(target=read) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors
+    assert json.loads((tmp_path / ".runtime" / "state.json").read_text())
 
 
 # --- RuntimeTempState ---
