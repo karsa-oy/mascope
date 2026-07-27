@@ -11,7 +11,21 @@ socket/notification, join keys — and keeps net-new UI deliberately small.*
 > onward) is kept below as design record; where they disagree, this wins. The work went past the
 > "keep a separate Fit view" plan and **consolidated everything onto the Sample view**.
 
-**The Sample tab is the single workspace.** [`PaneTabSample.vue`](../../server/frontend/src/lib/panes/PaneTabSample.vue)
+> **Everything below is behind the feature flag.** The consolidation replaced the Sample tab
+> rather than adding to it, which changed the app for users who never opened the feature. So
+> all of it is gated on `peakAssignmentEnabled`
+> ([`features.js`](../../server/frontend/src/lib/features.js)), read from `runtime.meta` — the
+> same `peak_assignment` switch the backend reads
+> ([paradigm doc §5.1](peak_assignment_paradigm.md)). **With the flag off the UI is the
+> pre-feature app:** the Sample tab is spectrum-over-(peak ledger | composition search),
+> `PaneBrowserPeak` is mounted again, the spectrum keeps its single grey peak trace, the
+> Targets/Assignments toggle is hidden, the Match tab keeps its name, and the search reports
+> the legacy match score (the backend omits fit/tier/plausibility when the feature is off).
+> The two layouts keep **separate saved splitter positions** — the legacy layout stays on the
+> original `sample-tab-split` key so an existing user's stored layout survives; the assignment
+> layout uses `sample-tab-assign-split`.
+
+**The Sample tab is the single workspace** (flag on). [`PaneTabSample.vue`](../../server/frontend/src/lib/panes/PaneTabSample.vue)
 is a 3-pane nested splitter:
 
 - **top-left — inspector** ([`PanePeakAssign.vue`](../../server/frontend/src/lib/panes/PanePeakAssign/PanePeakAssign.vue)):
@@ -45,7 +59,8 @@ tier-histogram filter strip, and a virtual-scrolled table (m/z · intensity · f
 rows (children inherit the parent's tier rank so the stable sort keeps families grouped; rows stay
 fixed-height so virtual scrolling holds). Row↔peak selection is two-way. The old
 [`PaneBrowserPeak.vue`](../../server/frontend/src/lib/panes/PaneBrowserPeak/PaneBrowserPeak.vue) ledger
-is **unmounted dead code** now.
+is not mounted **while the flag is on** — but it is still the Sample tab's ledger with the flag
+off, so it is live code, not dead. Retiring it depends on the feature becoming the default.
 
 **Stores** ([`peakAssignment/`](../../server/frontend/src/stores/data/modules/peakAssignment/)):
 `run` (auto-focus latest completed via a list-membership watcher; `peak_assignment_reload` event) and
@@ -403,7 +418,7 @@ below records the original plan items plus the consolidation that followed.
 | ID | Status | Notes |
 |---|---|---|
 | **F1** store spine + tier tag | ✅ done | `peakAssignment/{run,assignment}.js` + `BaseTierTag`. |
-| **F2** peak ledger | ✅ done, then **relocated** | The ledger now lives in the Assignments tab (`PaneBrowserAssignment`); the original `PaneBrowserPeak` is dead code. |
+| **F2** peak ledger | ✅ done, then **relocated** | With the flag on the ledger lives in the Assignments tab (`PaneBrowserAssignment`); `PaneBrowserPeak` is still the Sample-tab ledger with the flag off, so it stays live code. |
 | **F3** peak inspector | ✅ done, since trimmed | `PanePeakAssign` is a compact card (no header, no Verify-fit); Re-search is a bottom-pane takeover. |
 | **F4** annotated spectrum | ✅ done | Per-tier traces + theoretical envelope; instrument-aware focus zoom. |
 | **F5** assignments browser + config dialog | ✅ done | + auto-select latest run, P(correct) column, unfold-isotopologues toggle. |

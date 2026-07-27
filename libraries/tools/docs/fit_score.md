@@ -62,6 +62,13 @@ existing targeted match behaviour is unchanged; the fit score (`=2`) is adopted
 legacy default. It also degrades gracefully: where a lighter aggregation path lacks the
 per-isotopologue evidence, scoring falls back to v1.
 
+One path used to escape that switch: the on-demand composition search
+(`api/new/cheminfo`) scored every candidate with `ion_score_v2` unconditionally, so an
+existing user-facing feature reported fit/tier/plausibility instead of the legacy match
+score regardless of `MASCOPE_MATCH_SCORE_VERSION`. It is now gated on the peak-assignment
+feature flag, which is off by default — see
+[`peak_assignment_paradigm.md`](../../../docs/dev/peak_assignment_paradigm.md) §5.1.
+
 ## 2. Scientific rationale
 
 High mass accuracy alone is insufficient to determine elemental composition: even at
@@ -88,7 +95,8 @@ window. It (a) ignored predicted peaks that should have been visible but were no
 judged intensities without reference to noise, and (c) used an instrument-agnostic mass
 window. v2 fixes all three. On the demo golden set, ranking ROC-AUC improves 0.876→0.890
 and held-out calibration ECE 0.020→0.0069 (see
-[`tooling/score_eval/DESIGN.md`](../../../tooling/score_eval/DESIGN.md)).
+`tooling/score_eval/DESIGN.md`, which is untracked scratch — it lives in the author's
+worktree, not the repo).
 
 ## 3. The model
 

@@ -614,6 +614,22 @@ The configuration includes:
 - **Module-specific settings** for each [runtime module](#runtime-modules) (backend, file-converter, frontend, etc.)
 - **Infrastructure settings** (Redis, database paths, worker counts)
 
+#### Feature flags
+
+`[meta]` is also where cross-cutting feature flags live, because it is the one section
+serialized to **both** sides: the backend reads it from `runtime.meta`, and the frontend
+gets it in `MASCOPE_RUNTIME` at build time (`src/lib/runtime.js`). A flag added anywhere
+else can only gate one half of a feature.
+
+| Flag | Default | What it gates |
+|---|---|---|
+| `peak_assignment` | `false` | [Peak-centric assignment](peak_assignment_paradigm.md): assignment on sample ingest, the rescored composition search, and the reworked Sample view. Env override: `MASCOPE_PEAK_ASSIGNMENT=1`. |
+
+Read it via `peak_assignment_enabled()`
+(`api/new/peak_assignments/config.py`) on the backend and `peakAssignmentEnabled`
+(`src/lib/features.js`) on the frontend rather than touching `runtime.meta` directly, so
+the env override and the default both apply in one place.
+
 ### Mode-Specific Defaults
 
 The git-tracked mode configurations provide defaults for development vs production:
