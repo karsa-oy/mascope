@@ -26,8 +26,13 @@ document makes the seam a **single, explicitly-owned piece of work** with one
 narrow interface, so the two tracks stop entangling. It supersedes the phrasing
 of reference-DB Phase 3 and the "reference set" arm of peak-centric Phase 1.
 
-> Status: planning. Written after both initiatives' phase-0-2 PRs; to be applied
-> once both are merged.
+> Status: **being applied.** The seam described here is implemented in PR #1633
+> (`feat/reference-stage-a`): `iter_known_compositions` (Section 2.1) plus its
+> consumption in Stage A, with the reference set bounded to an atmospheric window
+> — which settles open decision 3 (Section 7). Sequencing steps 1-2 (Section 5)
+> are done: the reference work and the peak-centric epic both sit on
+> `epic/peak-centric-assignment`, which has been rebased onto `develop` with its
+> Alembic chain re-parented onto develop's head.
 
 ---
 

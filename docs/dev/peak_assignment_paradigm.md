@@ -225,10 +225,36 @@ Each phase is intended to land independently and leave the system shippable.
 These are the forks that shape the work. Current recommendations are recorded so
 the plan is actionable; revisit as phases land.
 
-1. **Coexist vs. replace targeted.** *Recommend coexist.* Peak-centric assignment
-   becomes the substrate; targeted analysis becomes a filtered view
-   (`target_compound_id IS NOT NULL`). Targeted alarms/collections keep working
-   and are not rewritten up front.
+1. **Coexist vs. replace targeted.** *Decided: coexist, and enforced by a flag.*
+   Peak-centric assignment becomes the substrate; targeted analysis becomes a
+   filtered view (`target_compound_id IS NOT NULL`). Targeted alarms/collections
+   keep working and are not rewritten up front.
+
+   The whole feature is **off by default**, behind `peak_assignment` in the
+   runtime `[meta]` config (env override `MASCOPE_PEAK_ASSIGNMENT`). Backend
+   reads it via `peak_assignment_enabled()`
+   ([config.py](../../server/backend/src/mascope_backend/api/new/peak_assignments/config.py)),
+   frontend via `runtime.meta`
+   ([features.js](../../server/frontend/src/lib/features.js)) — one switch, both
+   sides. This exists because "coexist" is easy to claim and easy to lose: three
+   parts of the first iteration changed behaviour for users who never opened the
+   feature, and are now gated on it:
+
+   - assignment ran on **every sample ingest**, creating a run per sample
+     (`auto_assign_sample_peaks`);
+   - the on-demand composition search was rescored to fit/tier/plausibility,
+     bypassing the `MASCOPE_MATCH_SCORE_VERSION` switch meant to keep legacy
+     scoring intact (`api/new/cheminfo`);
+   - `rule_senior` went from a no-op placeholder to a real filter, silently
+     narrowing that same search's results — now opt-in via
+     `HeuristicFilterConfig.use_senior`, which Stage B sets and the legacy
+     search does not.
+
+   The Sample-view rework is gated the same way, so with the flag off the UI is
+   the pre-feature layout (see
+   [peak_assignment_frontend.md](peak_assignment_frontend.md)). The explicit
+   assign/read API routes stay reachable regardless, so the engine can be
+   exercised deliberately without switching it on globally.
 
 2. **Peaky: harvest vs. depend-on vs. reimplement.** *Recommend harvest.* Build
    on `mascope_tools.assign_compositions` as the spine and pull peaky's

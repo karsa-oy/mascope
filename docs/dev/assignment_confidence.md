@@ -31,6 +31,20 @@ score. The dependency points one way — confidence builds on fit, not the rever
 peak-centric engine's scoring, per the epic's "coexist, don't replace" principle — it is
 not a silent flip of the legacy default.
 
+Coexistence is enforced by a feature flag rather than left to discipline: the whole
+peak-centric feature is **off by default** (`peak_assignment` in the runtime `[meta]`
+config; see [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §5.1 for what it
+gates and why). Two consequences for the confidence layers specifically:
+
+- **`rule_senior` is opt-in** (`HeuristicFilterConfig.use_senior`). It replaced a no-op
+  placeholder, so applying it to every caller would silently narrow the results of the
+  pre-existing composition search. Stage B sets it; the legacy search does not. The
+  *graded* `chemical_plausibility` is unaffected — it only ever fed arbitration, which is
+  peak-centric-only code.
+- **The on-demand search is only rescored when the feature is on.** With it off,
+  `api/new/cheminfo` reports the legacy match score and category, and the fit /
+  plausibility / tier fields are absent from the response.
+
 ## 1. The core premise
 
 A mass spectrometer measures *mass and intensity*, not *identity*. The foundational

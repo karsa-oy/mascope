@@ -47,7 +47,15 @@ stages; the confidence layers are the paradigm's **Phase 3** (tiers/arbitration)
   v1 where a lighter aggregation path lacks per-isotopologue columns.
 - **`rule_senior` (Golden Rule 2) fails open on radicals.** It rejects only the impossible
   (over-saturated / disconnectable) neutrals; odd-electron species can be genuine
-  (APCI/APPI). Applies to NEUTRAL formulas only.
+  (APCI/APPI). Applies to NEUTRAL formulas only. It is also **opt-in**
+  (`HeuristicFilterConfig.use_senior`): it replaced a no-op placeholder, so enabling it for
+  every caller would silently narrow the pre-existing composition search. Stage B sets it.
+- **The whole feature is off by default**, behind `peak_assignment` in the runtime
+  `[meta]` config (env override `MASCOPE_PEAK_ASSIGNMENT`), read by backend
+  (`peak_assignment_enabled()`) and frontend (`runtime.meta`) alike. "Coexist, don't
+  replace" turned out to need enforcing: ingest-time assignment, the rescored composition
+  search, and the Sample-view rework all changed behaviour for users who never opened the
+  feature. See [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §5.1.
 
 ## 4. Data-quality findings to revisit (chemistry review)
 
@@ -59,17 +67,33 @@ Validated `rule_senior` against the 92 demo target compounds:
 
 ## 5. Current state
 
-- **Branch:** `epic/peak-centric-assignment`, tip `7ac10e2c`. This work is the range
-  `ffe43123..7ac10e2c` (22 commits). **Not yet pushed** (do `git push origin
-  epic/peak-centric-assignment`).
-- **Tests:** `88 passed` across `server/backend/tests/unit/api/match`,
-  `libraries/tools/tests`, and epic's `.../api/peak_assignments`.
+*Keep this section honest — it is the first thing the next person reads. Describe the
+branch's shape, not a commit hash that goes stale within a day.*
+
+- **Branch:** `epic/peak-centric-assignment`, the integration branch. It was **rebased
+  onto `develop`** (2026-07-27), which rewrote every commit on it, so any branch cut from
+  the old history has to be rebased too — `feat/reference-stage-a` (PR #1633) already was.
+  The rebase re-parented the branch's Alembic chain onto develop's head; the migration
+  chain is linear with a single head.
+- **Opt-in:** the feature is **off by default** (§3). Work stacks on
+  `feat/peak-assignment-opt-in`.
+- **Tests:** the full suite is green — libraries, CLI, backend unit + integration +
+  migrations, frontend unit, lint/format. Two gotchas when running them from a worktree:
+  - the backend suite is gated on Postgres at *import* time
+    (`server/backend/tests/conftest.py`), so even the pure-unit tests need `mascope dev up`;
+  - the **migration** tests resolve Alembic from `$MASCOPE_PATH`, the shared runtime home
+    — from a worktree they silently test the *main* checkout's migrations and can report a
+    bogus model-drift failure. Run them with `MASCOPE_PATH` pointed at the worktree and
+    `POSTGRES_TEST_PASSWORD` set (the password otherwise resolves under `MASCOPE_PATH`
+    too). This is the "worktree/main alembic split" of roadmap item E8.
 - **Code map:**
   - Fit score: `libraries/tools/src/mascope_tools/composition/heuristic_filter.py`
     (`score_pattern_v2`, `calibrate_score`, `rule_senior`).
   - Backend adapter: `.../api/controllers/match/lib/match_score_v2.py` (`ion_score_v2`,
     `match_score_version`) and the dispatch in `.../match/lib/match_aggregate.py`.
   - Peak-centric engine (epic): `server/backend/src/mascope_backend/api/new/peak_assignments/`.
+  - Feature flag: `.../peak_assignments/config.py` (`peak_assignment_enabled`) and
+    `server/frontend/src/lib/features.js`.
   - Eval harness: `tooling/score_eval/` (`make_candidates.py`, `score_eval.py`).
 
 ## 6. Next steps (priority order)
