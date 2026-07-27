@@ -11,6 +11,7 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 
 import { ToolbarAppFilters } from '@/lib/toolbars'
+import { peakAssignmentEnabled } from '@/lib/features'
 import {
   PaneProgress,
   PaneBrowserSample,
@@ -81,7 +82,10 @@ const tabs = computed(() => [
     `
   },
   {
-    label: 'Fit',
+    // Renamed to "Fit" only where peak-centric assignment is on: there the
+    // Sample view owns assignment and this tab is purely fit verification.
+    // Without the feature it is the long-standing Match tab.
+    label: peakAssignmentEnabled ? 'Fit' : 'Match',
     // Internal tab value stays 'match' so existing app.ui.tab.active === 'match'
     // callers and the TabPanel value keep working; only the label is renamed.
     value: 'match',

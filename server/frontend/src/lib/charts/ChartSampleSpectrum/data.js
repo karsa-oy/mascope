@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { useApp } from '@/stores'
 import { api } from '@/api'
 import { usePreview } from '@/lib/panes'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 // Peak coloring by confidence tier for the annotated spectrum. One Plotly trace
 // per tier; role reagent/artifact is grouped separately (orthogonal to tier).
@@ -127,7 +128,10 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
     // add peak traces, colored by assignment tier
     if (!app.data.peak.pending && app.data.peak.list.length > 0) {
       const assignments = app.data.peakAssignment.peak
-      if (!assignments.run) {
+      // Tier colouring is part of the peak-centric feature; with it off the
+      // spectrum stays the single grey trace even if a run exists from an
+      // explicit assignment.
+      if (!peakAssignmentEnabled || !assignments.run) {
         // No assignment run: keep the original single grey peak trace.
         traces.push(peakTrace('Peak', 'grey', app.data.peak.list))
       } else {

@@ -6,6 +6,7 @@ import { useWindowSize } from '@vueuse/core'
 import SelectButton from 'primevue/selectbutton'
 
 import { useApp } from '@/stores'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import MatchCollectionTable from './MatchCollectionTable.vue'
 import MatchIonTable from './MatchIonTable.vue'
@@ -16,7 +17,11 @@ const app = useApp()
 // Coexistence toggle: the legacy targeted view vs. the peak-centric assignment
 // ledger. Targeted is on a retire path (docs/dev/peak_assignment_frontend.md).
 const MODE_KEY = 'mascope.browserMatch.mode'
-const mode = ref(localStorage.getItem(MODE_KEY) || 'targets')
+// With peak-centric assignment off there is only the targeted view, so the
+// toggle is hidden and the mode is pinned regardless of any stored preference.
+const mode = ref(
+  peakAssignmentEnabled ? localStorage.getItem(MODE_KEY) || 'targets' : 'targets'
+)
 const modeOptions = [
   { label: 'Targets', value: 'targets' },
   { label: 'Assignments', value: 'assignments' }
@@ -108,7 +113,7 @@ provide('match-table-height', tableHeight)
 
 <template>
   <div class="browser-switch">
-    <div class="switch-bar">
+    <div v-if="peakAssignmentEnabled" class="switch-bar">
       <SelectButton
         v-model="mode"
         :options="modeOptions"
