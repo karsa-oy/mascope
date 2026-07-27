@@ -170,7 +170,8 @@ detected, ready to calibrate and match) and places it in a batch.
 Once a batch has samples, you can:
 
 - **Attach a target collection** and run **matching** to find and score your
-  compounds in each sample — see [Concepts → Matching](../concepts/index.md#matching-and-match-scores).
+  compounds in each sample — see
+  [Build a target collection and run matching](target-collections.md).
 - **Calibrate** the batch so *m/z* errors are meaningful — see
   [How it works → Calibration](../how-it-works/calibration.md).
 - **Compare and visualise** samples in the **Batch** and **Sample** views.
