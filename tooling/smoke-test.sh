@@ -39,6 +39,16 @@ curl -fsS "$BASE_URL" | grep -qi "<!doctype html" || {
   exit 1
 }
 
+echo "[smoke] bundled docs are served at /docs/..."
+curl -fsS "$BASE_URL/docs/" | grep -qi "Mascope" || {
+  echo "[smoke] FAIL: /docs/ does not serve the documentation site" >&2
+  exit 1
+}
+curl -fsS "$BASE_URL/docs/help-content.json" | grep -q "{" || {
+  echo "[smoke] FAIL: /docs/help-content.json is missing (in-app help popovers)" >&2
+  exit 1
+}
+
 echo "[smoke] login as $EMAIL..."
 jar=$(mktemp)
 trap 'rm -f "$jar"' EXIT
