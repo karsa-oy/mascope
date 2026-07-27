@@ -1585,6 +1585,7 @@ demo = [
 dev = [
     { name = "alembic" },
     { name = "psycopg2-binary" },
+    { name = "pyyaml" },
     { name = "sqlalchemy" },
 ]
 
@@ -1594,6 +1595,7 @@ requires-dist = [
     { name = "mascope-runtime", extras = ["logs"], editable = "libraries/runtime" },
     { name = "pandas", marker = "extra == 'demo'", specifier = ">=2.0.0" },
     { name = "psycopg2-binary", marker = "extra == 'dev'", specifier = ">=2.9.11" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6,<7" },
     { name = "requests", marker = "extra == 'demo'", specifier = ">=2.32.0,<3" },
     { name = "rich", specifier = ">=15.0.0,<16" },
     { name = "sqlalchemy", marker = "extra == 'dev'", specifier = "~=2.0" },

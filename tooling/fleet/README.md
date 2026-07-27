@@ -32,6 +32,29 @@ cp inventory.example.yml inventory.local.yml
 # `tailscale status` on any tailnet machine)
 ```
 
+## Log access from the workstation: `mascope fleet`
+
+The inventory doubles as the server list for the CLI's fleet commands — no
+Ansible required, so they run natively on Windows (Ansible itself stays in
+WSL):
+
+```sh
+mascope fleet list                                        # servers from the inventory
+mascope fleet logs <host> -l error --interval '1 day'     # remote `mascope logs query`
+mascope fleet logs <host> -m 50 --json                    # NDJSON for scripts/agents
+```
+
+`fleet logs` SSHes to the server over the tailnet (using the inventory's
+user/key) and runs `mascope logs query --prod` there, passing every extra flag
+through — so agents can pull filtered production logs with one command and no
+private fleet knowledge in their prompts.
+
+The CLI looks for `tooling/fleet/inventory.local.yml` in its own checkout
+first, then under `$MASCOPE_PATH` (so agent worktrees resolve the main
+checkout's copy), or wherever `MASCOPE_FLEET_INVENTORY` points. If your
+inventory lives only inside WSL, drop a copy into the main checkout — it is
+gitignored there too.
+
 ## Sudo passwords: the vault (recommended)
 
 The fleet has **no NOPASSWD sudo** and each server has its **own** sudo
