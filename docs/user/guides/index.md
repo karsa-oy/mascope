@@ -5,11 +5,11 @@ Task-oriented how-tos, one task per page. Each guide links to
 
 - [Import data files](import-files.md) — upload raw instrument files and process
   them into samples in a batch.
+- [Build a target collection and run matching](target-collections.md) — define
+  the compounds to look for and score every sample against them.
 
 <!-- TODO Phase 2. Further candidate pages (one task each):
 - Browse samples and a batch
-- Build a target collection
-- Run targeted matching
 - Calibrate a batch
 - Compare stages within a sample
 - Export results
