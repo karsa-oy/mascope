@@ -54,6 +54,7 @@ from mascope_backend.api.new.peak_assignments.calibration_store import (
 from mascope_backend.api.new.peak_assignments.config import (
     PEAK_ASSIGNMENT_ENGINE_VERSION,
     PeakAssignmentConfig,
+    peak_assignment_enabled,
 )
 from mascope_backend.api.new.peak_assignments.engine import (
     REFERENCE_IDENTITIES_COL,
@@ -84,7 +85,7 @@ from mascope_backend.socket.notifications import (
 from mascope_file.name import get_instrument_type
 from mascope_match import compute_match_isotopes
 from mascope_reference import iter_known_compositions
-from mascope_tools.composition import CompositionSearchConfig
+from mascope_tools.composition import CompositionSearchConfig, HeuristicFilterConfig
 from mascope_tools.composition.calibration import (
     InsufficientCalibrationData,
     recalibrate,
@@ -919,10 +920,16 @@ async def assign_sample_peaks(
                 # runs as a background task on the API event loop, so offload it
                 # to a worker thread to avoid blocking every other request and
                 # the progress notifications for the duration of the search.
+                # Stage B opts into the Senior/RDBE feasibility cut: the
+                # peak-centric engine wants chemically impossible formulas gone
+                # before arbitration. It stays off for the legacy composition
+                # search, which predates the rule being implemented.
+                heuristics_config = HeuristicFilterConfig(use_senior=True)
                 matches_df, _ = await asyncio.to_thread(
                     assign_compositions,
                     remainder_df[["mz", "intensity"]].reset_index(drop=True),
                     search_config,
+                    heuristics_config,
                 )
                 peak_lookup = {
                     float(row.mz): (str(row.sample_peak_id), float(row.intensity))
@@ -1023,10 +1030,18 @@ async def auto_assign_sample_peaks(
     the parent process and no per-sample success toast is emitted; the parent
     orchestrator owns the ``peak_assignment_reload`` UI refresh.
 
+    Does nothing unless the peak-assignment feature is enabled for this
+    environment: ingest is the one path that would create assignment runs for
+    every sample without anyone asking for them, so an env that has not opted in
+    processes samples exactly as it did before the feature landed. An explicit
+    sample or batch run stays available regardless.
+
     :param sample_item_id: ID of the sample item to assign
     :param user_id: Current user triggered operation (for user notifications)
     :param parent_id: Parent process identifier for progress nesting
     """
+    if not peak_assignment_enabled():
+        return
     try:
         await assign_sample_peaks(
             sample_item_id=sample_item_id,

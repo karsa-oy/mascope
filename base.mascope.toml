@@ -9,6 +9,11 @@
 description = "The default runtime env"
 api_port = 8090
 filestore = './filestore'
+# Peak-centric assignment (assign a composition to every peak) - see
+# docs/user/how-it-works/peak_assignment.md. Off by default: the targeted
+# workflow is unchanged until you opt in. Enabling it turns on assignment at
+# sample ingest and the assignment views in the UI.
+peak_assignment = false
 
 [cli]
 color = "blue"

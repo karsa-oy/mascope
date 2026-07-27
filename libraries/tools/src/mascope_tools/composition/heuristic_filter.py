@@ -183,10 +183,20 @@ def rule_senior(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[str
 
     Applies to NEUTRAL formulas only (as produced by ``find_compositions`` before
     ionization). See Kind & Fiehn 2007, BMC Bioinformatics 8:105 (Rule 2).
+
+    Opt-in via ``HeuristicFilterConfig.use_senior``. This rule was previously a
+    no-op placeholder, so applying it unconditionally would silently drop
+    candidates the existing composition search used to return; callers that want
+    the cut ask for it.
     """
     log_messages: list[str] = []
     if candidates.is_empty():
         return pl.Series([], dtype=pl.Boolean), log_messages
+
+    heuristics_config = kwargs.get("heuristics_config") or HeuristicFilterConfig()
+    if not heuristics_config.use_senior:
+        # Disabled: pass everything through, preserving pre-Rule-2 behaviour.
+        return pl.Series([True] * candidates.height, dtype=pl.Boolean), log_messages
 
     mask: list[bool] = []
     for formula in candidates.get_column("formula").to_list():
