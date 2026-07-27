@@ -62,6 +62,11 @@ def _request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
         )
         time.sleep(delay)
     if response is None:
+        if last_exc is None:
+            # Unreachable: the loop always runs, and a missing response means
+            # the last attempt raised. Guard so a logic change here can never
+            # turn into `raise None` (TypeError).
+            raise RuntimeError(f"{method} {url}: retry loop exited without result")
         raise last_exc
     return response
 
