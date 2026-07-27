@@ -4,6 +4,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Fixed
+
+- Socket payloads no longer kill the frontend socket with a "parse error"
+  disconnect. Two defects produced the identical symptom: a NaN/Infinity
+  float anywhere in an emitted payload was serialized as a bare literal
+  (invalid JSON the browser's parser rejects), e.g. a NaN isotope height
+  in an ion-focus visualization trace; and a large ion-focus payload could
+  exceed the client decoder's 200-attachment cap ("too many attachments"),
+  since target ions store all isotopes above 0.001% abundance and each
+  isotope contributes up to four binary arrays. The socket server now
+  renders non-finite floats as null in every emitted payload (mirroring
+  the REST-side sanitation), and the client decoder no longer caps binary
+  attachments from Mascope's own backend.
+- A socket payload that fails to decode client-side no longer reloads the
+  whole app. The automatic reload-on-reconnect could not recover the lost
+  packet and used to loop: reload -> auto-fired request -> same bad
+  payload -> parse error -> reload. After a parse-error disconnect the
+  client now just reconnects and re-subscribes its rooms; network-level
+  reconnects keep the reload as the stale-data safety net.
+
 ## [1.4.5] - 2026.07.27
 
 ### Added
