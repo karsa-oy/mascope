@@ -746,6 +746,8 @@ The log files are named in the form `<date>.<module>.log` and placed in the acti
 > To query these logs with the CLI, you can run `mascope logs query`. To delete old or empty log files, use `mascope logs gc`.
 >
 > Useful filters: `-l error` (minimum level), `--from`/`--to`/`--interval` (time range), `-g <pattern>` (grep with surrounding context), `-s backend` (one service only), and `-m 50` (the 50 most recent matches). For scripts and agents, `--json` emits the raw NDJSON records without colors — e.g. `mascope logs query --prod -l warning --interval '1 day' --json`.
+>
+> To run the same query on a production server from your workstation, use `mascope fleet logs <host> ...` — it SSHes over the tailnet using the fleet's Ansible inventory (see `tooling/fleet/README.md`).
 
 #### Structured logging
 
