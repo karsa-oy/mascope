@@ -1,7 +1,14 @@
 ---
 # Fleet configuration. Run with --check --diff first; see README.md.
+#
+# The become-password vault is loaded HERE (first found wins), not from
+# group_vars: group_vars files are auto-decrypted for every play, which would
+# force a vault prompt even on sudo-less playbooks like update.yml. The
+# committed example (empty dict) is the fallback so -K runs work vault-less.
 - name: Mascope production fleet
   hosts: fleet
+  vars_files:
+    - ["vault.local.yml", "vault.local.example.yml"]
   roles:
     - sshd_hardening
     - firewall
