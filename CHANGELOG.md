@@ -6,9 +6,19 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- `mascope fleet` (source checkouts only): `fleet list` shows the production
+  servers from the fleet's Ansible inventory, and `fleet logs <host> ...`
+  runs `mascope logs query --prod` on that server over SSH (tailnet),
+  passing all query flags through — one command for agents and scripts to
+  pull filtered production logs, with the inventory as the single source of
+  truth for addresses and credentials.
 - `mascope logs query` is now agent/script-friendly: `--json` prints the raw
   NDJSON records (no ANSI colors, no summary line), and `--service`/`-s`
   narrows the query to one service's log files (e.g. `-s backend`).
+- Opt-in backend performance tracing: with the GlitchTip DSN set,
+  `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
+  requests as transactions, surfacing per-endpoint latency in GlitchTip's
+  Performance tab. Invalid values log a warning and keep tracing off.
 
 ### Changed
 
@@ -35,13 +45,6 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   of being interpolated into the SQL.
 - The pretty log printout now decodes JSON escape sequences in messages
   (previously quotes inside messages rendered as `\"`).
-
-### Added
-
-- Opt-in backend performance tracing: with the GlitchTip DSN set,
-  `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
-  requests as transactions, surfacing per-endpoint latency in GlitchTip's
-  Performance tab. Invalid values log a warning and keep tracing off.
 
 ## [1.4.6] - 2026.07.27
 
