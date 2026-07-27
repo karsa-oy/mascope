@@ -4,4 +4,5 @@ inventory.local.yml
 
 # Encrypted vault of per-host sudo passwords - stays LOCAL only (public repo).
 # Even encrypted, production sudo passwords do not belong in a public repo.
+vault.local.yml
 group_vars/*/vault.yml
