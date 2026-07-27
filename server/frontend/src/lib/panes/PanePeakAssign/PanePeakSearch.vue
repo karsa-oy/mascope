@@ -13,9 +13,10 @@ import Button from 'primevue/button'
 
 import { useApp } from '@/stores'
 import { api } from '@/api'
-import { BaseTierTag } from '@/lib/base'
+import { BaseTierTag, BaseMatchTag } from '@/lib/base'
 import { PopoverTargetCompoundAdd } from '@/lib/dialogs'
 import { num } from '@/lib/formatters'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import { usePreview } from './preview.js'
 
@@ -31,6 +32,13 @@ defineProps({
   height: {
     type: Number,
     required: true
+  },
+  // Mounted as a permanent pane (the legacy Sample layout) rather than as a
+  // takeover of the time-series pane, so there is nothing to close and the
+  // title says what the pane is instead of what dismisses it.
+  embedded: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -267,7 +275,7 @@ const formatFit = (value) =>
     <header class="search-head">
       <div class="search-title">
         <span class="pi ph ph-magnifying-glass" />
-        <span>Re-search</span>
+        <span>{{ embedded ? 'Peak Assign' : 'Re-search' }}</span>
         <span v-if="app.data.peak.focused" class="search-sub">
           peak {{ num.mz.format(app.data.peak.focused.mz) }} &middot; showing
           {{ displayedMatches }} / {{ totalMatches }}
@@ -275,6 +283,7 @@ const formatFit = (value) =>
         </span>
       </div>
       <Button
+        v-if="!embedded"
         icon="pi pi-times"
         size="small"
         text
@@ -319,7 +328,7 @@ const formatFit = (value) =>
       v-if="!loading && results.length > 0"
       :value="results"
       dataKey="target_compound_formula"
-      sortField="fit_score"
+      :sortField="peakAssignmentEnabled ? 'fit_score' : 'match_score'"
       :sortOrder="-1"
       scrollable
       :scrollHeight="`${Math.max(120, height - 120)}px`"
@@ -349,7 +358,7 @@ const formatFit = (value) =>
           {{ num.mzError.format(data.cheminfo.target_isotope_mz_error_ppm) }}
         </template>
       </Column>
-      <Column field="fit_score" sortable>
+      <Column v-if="peakAssignmentEnabled" field="fit_score" sortable>
         <template #header>
           <span
             class="pi ph ph-seal-check"
@@ -360,7 +369,7 @@ const formatFit = (value) =>
           <BaseTierTag :tier="data.tier" :fit-score="data.fit_score" :source="data.source" />
         </template>
       </Column>
-      <Column field="plausibility" sortable>
+      <Column v-if="peakAssignmentEnabled" field="plausibility" sortable>
         <template #header>
           <span
             class="pi ph ph-atom"
@@ -369,6 +378,24 @@ const formatFit = (value) =>
         </template>
         <template #body="{ data }">
           {{ data.plausibility != null ? formatFit(data.plausibility) : '—' }}
+        </template>
+      </Column>
+      <!-- Legacy scoring: what this search has always reported. The backend
+           only computes fit/tier/plausibility when the feature is enabled. -->
+      <Column v-else field="match_score" sortable>
+        <template #header>
+          <span
+            class="pi ph ph-seal-percent"
+            v-tooltip="{ value: 'Match score', showDelay: 500 }"
+          />
+        </template>
+        <template #body="{ data }">
+          <BaseMatchTag
+            :match-score="data?.match_score"
+            :match-category="data?.match_category"
+            :alarming="data?.alarming"
+            nofade
+          />
         </template>
       </Column>
       <Column field="existing" sortable>
