@@ -1,16 +1,31 @@
 """
 Batch-level peak assignment orchestration.
 
-Runs the peak-centric assignment engine over every sample in a sample batch,
-mirroring the targeted ``match_compute_batch`` controller. Each sample gets its
-own PeakAssignmentRun (the engine is per-sample); this layer only sequences the
-samples, isolates per-sample failures, tracks progress, and aggregates a batch
-status.
+Runs the peak-centric assignment engine over every eligible sample in a sample
+batch, mirroring the targeted ``match_compute_batch`` controller. Each sample
+gets its own PeakAssignmentRun (the engine is per-sample); this layer sequences
+the samples, filters the ones the engine cannot usefully assign, isolates
+per-sample failures, tracks progress, and aggregates a batch status.
 
 Deliberately orthogonal to the targeted-match batch-status machine: assignment
 is additive and does NOT take the SampleBatch 'processing' lock, so it can run
-alongside (or independently of) matching.
+alongside (or independently of) matching. It does take its own admission
+control (below), which is what the lock would otherwise have provided.
+
+**Cost.** A batch multiplies every per-sample cost by the number of samples, so
+it is the one entry point where an unconsidered default is expensive. Two things
+bound it:
+
+- ``default_batch_config`` runs **Stage A only**. The untargeted stage is the
+  documented scaling risk and is opt-in per batch, exactly as it is for ingest
+  (``auto_assign_sample_peaks``). A caller that wants Stage B across a batch has
+  to ask for it.
+- The batch holds a slot in a semaphore for its whole duration and registers
+  itself in an in-flight set, so a second assignment of the same batch is
+  refused outright rather than silently queued behind a multi-minute run.
 """
+
+import asyncio
 
 from sqlalchemy import select
 
@@ -27,6 +42,54 @@ from mascope_backend.socket.notifications import (
     UserNotification,
     send_progress_user_notification,
 )
+
+
+# Batch assignments allowed to run concurrently in this worker. Each one holds a
+# slot for its entire duration (tens of minutes on a large batch) while running
+# per-sample work that opens database sessions in turn, so more than one at a
+# time competes for the same pool the interactive request path needs. Mirrors
+# `_auto_process_gate` in the sample auto-processing controller, which exists for
+# the same reason.
+_BATCH_ASSIGNMENT_CONCURRENCY = 1
+_batch_assignment_gate = asyncio.Semaphore(_BATCH_ASSIGNMENT_CONCURRENCY)
+
+# Batches with an assignment in flight in this worker. The semaphore alone would
+# make a duplicate request wait silently for the whole first run; this refuses it
+# immediately instead, which is what a double-clicked menu item deserves.
+_batch_assignments_in_flight: set[str] = set()
+
+
+def default_batch_config() -> PeakAssignmentConfig:
+    """Configuration a batch assignment uses when the caller supplies none.
+
+    Stage A only. Batch cost scales with the number of samples, and Stage B
+    (untargeted composition enumeration) is the documented scaling risk, so it is
+    something a caller opts into per batch rather than the default a menu click
+    resolves to. The per-sample default stays the full two-stage engine, where
+    the user is looking at one spectrum and the cost is seconds.
+
+    :return: The default batch run configuration.
+    :rtype: PeakAssignmentConfig
+    """
+    return PeakAssignmentConfig(run_untargeted=False)
+
+
+def _ineligible_reason(sample: Sample) -> str | None:
+    """Why this sample cannot usefully be assigned, or None if it can.
+
+    Mirrors the eligibility checks the targeted batch controller applies
+    (``match_compute_batch``): a blank sample carries no peaks, and a sample
+    whose m/z calibration exists but is unverified would produce mass errors -
+    and therefore fit scores and tiers - that mean nothing.
+
+    :param sample: Sample to test.
+    :return: A short reason string, or None when the sample is eligible.
+    """
+    if sample.instrument_function_id is None:
+        return "blank sample (no peaks)"
+    if sample.mz_calibration and not sample.mz_calibration.get("verified", False):
+        return "m/z calibration not verified"
+    return None
 
 
 @api_controller_background_task(
@@ -52,9 +115,10 @@ async def assign_sample_batch_peaks(
     skipped by the engine and counted as skipped here.
 
     :param sample_batch_id: ID of the sample batch to assign
-    :param config: Optional run configuration applied to every sample; engine
-        defaults (Stage A + Stage B) are used when omitted, since a batch
-        assignment is a deliberate user-initiated operation
+    :param config: Optional run configuration applied to every sample. Resolved
+        once here (see ``default_batch_config``) and passed to every sample, so
+        one decision is recorded on every run rather than each sample
+        re-resolving its own defaults.
     :param independent_transaction: Flag for transaction/event handling
     :param user_id: Current user triggered operation (for user notifications)
     :param process_id: Process identifier for progress tracking
@@ -64,20 +128,11 @@ async def assign_sample_batch_peaks(
     sample_batch = await fetch_sample_batch(sample_batch_id)
     sample_batch_name = sample_batch.sample_batch_name
 
-    async with async_session() as session:
-        samples = (
-            (
-                await session.execute(
-                    select(Sample).where(Sample.sample_batch_id == sample_batch_id)
-                )
-            )
-            .scalars()
-            .all()
+    if sample_batch_id in _batch_assignments_in_flight:
+        message = (
+            f"Peak assignment is already running for sample batch "
+            f"'{sample_batch_name}'."
         )
-
-    total_samples_count = len(samples)
-    if total_samples_count == 0:
-        message = f"Sample batch '{sample_batch_name}' has no samples to assign."
         runtime.logger.info(message)
         return {
             "status": "skipped",
@@ -91,14 +146,114 @@ async def assign_sample_batch_peaks(
             "_notification_data": {"sample_batch_id": sample_batch_id},
         }
 
+    # Resolve the configuration once, so every sample of the batch runs - and
+    # records - the same decision.
+    config = config or default_batch_config()
+
+    async with async_session() as session:
+        all_samples = (
+            (
+                await session.execute(
+                    select(Sample)
+                    .where(Sample.sample_batch_id == sample_batch_id)
+                    # Deterministic order, so progress ("sample 3 of 50") maps to
+                    # something stable and a re-run visits samples the same way.
+                    .order_by(Sample.sample_item_name, Sample.sample_item_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    # Partition up front: samples the engine cannot usefully assign are counted
+    # as skipped rather than driven through a full run that fails. The engine
+    # raises an ApiWarning for a blank sample, which the loop below would
+    # otherwise record as a failure.
+    samples = []
+    skipped_samples: list[str] = []
+    for sample in all_samples:
+        reason = _ineligible_reason(sample)
+        if reason is None:
+            samples.append(sample)
+        else:
+            skipped_samples.append(sample.sample_item_id)
+            runtime.logger.debug(
+                f"Skipping sample '{sample.sample_item_name}' for assignment: {reason}."
+            )
+
+    total_samples_count = len(samples)
+    if total_samples_count == 0:
+        message = (
+            f"Sample batch '{sample_batch_name}' has no samples to assign "
+            f"({len(skipped_samples)} skipped)."
+            if skipped_samples
+            else f"Sample batch '{sample_batch_name}' has no samples to assign."
+        )
+        runtime.logger.info(message)
+        return {
+            "status": "skipped",
+            "message": message,
+            "data": {
+                "assigned_samples_count": 0,
+                "failed_samples_count": 0,
+                "skipped_samples_count": len(skipped_samples),
+                "total_samples_count": len(all_samples),
+            },
+            "_notification_data": {"sample_batch_id": sample_batch_id},
+        }
+
     runtime.logger.info(
         f"Assigning peaks for sample batch '{sample_batch_name}' "
-        f"({total_samples_count} samples)"
+        f"({total_samples_count} eligible of {len(all_samples)} samples, "
+        f"untargeted stage {'on' if config.run_untargeted else 'off'})"
     )
 
     assigned_samples: list[str] = []
     failed_samples: list[str] = []
-    skipped_samples: list[str] = []
+    _batch_assignments_in_flight.add(sample_batch_id)
+    try:
+        async with _batch_assignment_gate:
+            await _assign_eligible_samples(
+                samples=samples,
+                sample_batch_id=sample_batch_id,
+                sample_batch_name=sample_batch_name,
+                config=config,
+                user_id=user_id,
+                process_id=process_id,
+                parent_id=parent_id,
+                assigned_samples=assigned_samples,
+                failed_samples=failed_samples,
+            )
+    finally:
+        _batch_assignments_in_flight.discard(sample_batch_id)
+
+    return _batch_result(
+        sample_batch_id=sample_batch_id,
+        sample_batch_name=sample_batch_name,
+        assigned_samples=assigned_samples,
+        failed_samples=failed_samples,
+        skipped_samples=skipped_samples,
+        total_samples_count=len(all_samples),
+    )
+
+
+async def _assign_eligible_samples(
+    samples: list,
+    sample_batch_id: str,
+    sample_batch_name: str,
+    config: PeakAssignmentConfig,
+    user_id: int | None,
+    process_id: str | None,
+    parent_id: str | None,
+    assigned_samples: list[str],
+    failed_samples: list[str],
+) -> None:
+    """Assign each eligible sample in turn, isolating per-sample failures.
+
+    Appends to ``assigned_samples`` / ``failed_samples`` in place so a cancelled
+    batch still reports what it managed before it stopped.
+    """
+    total_samples_count = len(samples)
     for item_index, sample in enumerate(samples):
         notification = UserNotification(
             process_id=process_id,
@@ -120,7 +275,7 @@ async def assign_sample_batch_peaks(
         await send_progress_user_notification(notification)
 
         try:
-            result = await assign_sample_peaks(
+            await assign_sample_peaks(
                 sample_item_id=sample.sample_item_id,
                 config=config,
                 independent_transaction=False,
@@ -128,13 +283,11 @@ async def assign_sample_batch_peaks(
                 process_id=gen_id(8),
                 parent_id=process_id,
             )
-            if result.get("status") == "skipped":
-                skipped_samples.append(sample.sample_item_id)
-            else:
-                assigned_samples.append(sample.sample_item_id)
+            assigned_samples.append(sample.sample_item_id)
         except Exception as e:
             # A per-sample failure must not abort assignment for the rest of the
-            # batch. CancelledError is a BaseException and is not caught.
+            # batch. CancelledError is a BaseException and is not caught, so a
+            # cancelled batch stops here rather than being logged as N failures.
             runtime.logger.warning(
                 f"Peak assignment for sample '{sample.sample_item_name}' failed: {e}"
             )
@@ -142,6 +295,16 @@ async def assign_sample_batch_peaks(
 
         await send_progress_user_notification(notification, 1.0)
 
+
+def _batch_result(
+    sample_batch_id: str,
+    sample_batch_name: str,
+    assigned_samples: list[str],
+    failed_samples: list[str],
+    skipped_samples: list[str],
+    total_samples_count: int,
+) -> dict:
+    """Aggregate per-sample outcomes into the batch response."""
     assigned_count = len(assigned_samples)
     failed_count = len(failed_samples)
     skipped_count = len(skipped_samples)

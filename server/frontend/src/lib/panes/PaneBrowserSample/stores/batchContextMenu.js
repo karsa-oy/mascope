@@ -6,6 +6,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useApp } from '@/stores'
 import { useBatchDeleteDialog } from '@/lib/dialogs'
 import { generateCopyName } from '@/api/utils'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import { useSampleContextMenu } from './sampleContextMenu.js'
 import { useCustomizerPopover } from './customizerPopover.js'
@@ -221,12 +222,38 @@ export const useBatchContextMenu = defineStore('browser.sample.batchCtxMenu', ()
         {
           label: `Assign peaks`,
           icon: 'pi ph ph-atom',
-          command: async () => {
-            await app.data.batch.assign({
-              sample_batch_id: row.value.sample_batch_id
+          command: () => {
+            // Batch assignment is the most expensive thing this menu can start:
+            // one run per sample, each writing a row per detected peak, with no
+            // way to stop it once it is going. Confirm, and say so.
+            confirm.require({
+              icon: 'pi pi-exclamation-triangle',
+              header: 'Assign peaks for batch',
+              message:
+                `Assign peaks for every sample in "${row.value.sample_batch_name}"? ` +
+                'This runs in the background and can take a long time on a large ' +
+                'batch. It cannot be cancelled once started. Blank and uncalibrated ' +
+                'samples are skipped.',
+              accept: async () => {
+                await app.data.batch.assign({
+                  sample_batch_id: row.value.sample_batch_id
+                })
+              },
+              acceptProps: {
+                icon: 'pi ph ph-atom',
+                label: 'Assign'
+              },
+              rejectProps: {
+                icon: 'pi pi-times',
+                label: 'Cancel',
+                severity: 'secondary'
+              }
             })
           },
-          visible: row.value !== null
+          // Gated with the rest of the peak-assignment surfaces: without the
+          // feature there is no assignment UI to view the results in, so the
+          // entry would only offer a way to start expensive invisible work.
+          visible: peakAssignmentEnabled && row.value !== null
         }
       ]
     }
