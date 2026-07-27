@@ -1,13 +1,52 @@
 """Configuration for the peak-centric assignment engine."""
 
-from pydantic import BaseModel, Field
+import os
+
+from pydantic import BaseModel, Field, field_validator
 
 from mascope_backend.api.new.cheminfo.config import cheminfo_config
+from mascope_backend.runtime import runtime
 
 
 # Bump when the assignment algorithm changes in a way that affects results.
 # Stored on every PeakAssignmentRun so runs stay reproducible and comparable.
 PEAK_ASSIGNMENT_ENGINE_VERSION = "0.2.0"
+
+# Ceilings on the user-supplied run config. The untargeted stage is the
+# documented scaling risk: cost grows with the number of peaks fed to it, with
+# the mass window (more candidates per peak), and exponentially with the number
+# of element species. These bounds keep one API call from scheduling unbounded
+# work; they are deliberately generous, well above any sane analysis.
+MAX_UNTARGETED_PEAKS_CEILING = 5000
+MAX_MZ_PRECISION_PPM = 100.0
+MAX_FORMULA_RANGE_SPECIES = 12
+MAX_ALTERNATIVES_CEILING = 50
+
+
+def peak_assignment_enabled() -> bool:
+    """Whether the peak-centric assignment feature is switched on for this env.
+
+    Off by default: peak-centric assignment coexists with the targeted workflow
+    rather than replacing it, so a deployment that has not opted in must behave
+    exactly as it did before the feature landed. This gates the parts that would
+    otherwise change unasked - assignment on sample ingest, the rescored
+    composition search, and the reworked Sample view.
+
+    Resolution order:
+    - ``MASCOPE_PEAK_ASSIGNMENT`` env var (``1``/``true``/``yes``/``on``), which
+      lets an operator flip it without editing the env toml;
+    - the ``peak_assignment`` flag in the runtime ``[meta]`` config, which is the
+      durable setting and is also what the frontend reads.
+
+    The explicit API routes stay reachable regardless, so the feature can be
+    exercised deliberately (and its tests run) without switching it on globally.
+
+    :return: True when the feature is enabled for this environment.
+    """
+    override = os.environ.get("MASCOPE_PEAK_ASSIGNMENT")
+    if override is not None:
+        return override.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(getattr(runtime.meta, "peak_assignment", False))
 
 
 class PeakAssignmentConfig(BaseModel):
@@ -26,15 +65,23 @@ class PeakAssignmentConfig(BaseModel):
     )
     mz_precision_ppm: float = Field(
         cheminfo_config.DEFAULT_MZ_PRECISION,
+        gt=0.0,
+        le=MAX_MZ_PRECISION_PPM,
         description="m/z tolerance in ppm for the untargeted composition search.",
     )
     formula_ranges: str = Field(
         cheminfo_config.DEFAULT_FORMULA_RANGE,
-        description="Element count ranges permitted in untargeted candidates.",
+        description=(
+            "Element count ranges permitted in untargeted candidates, e.g. "
+            "'C0-100 H0-100 O0-100 N0-100'. Enumeration is a tree search whose "
+            "depth is the number of element species, so the species count is "
+            "capped."
+        ),
     )
     max_untargeted_peaks: int = Field(
         300,
         gt=0,
+        le=MAX_UNTARGETED_PEAKS_CEILING,
         description=(
             "Upper bound on the number of (most intense) unassigned peaks fed "
             "to the untargeted stage. Composition enumeration is the scaling "
@@ -51,8 +98,13 @@ class PeakAssignmentConfig(BaseModel):
     max_alternatives: int = Field(
         5,
         ge=0,
-        description="Maximum number of runner-up candidates stored per peak.",
+        le=MAX_ALTERNATIVES_CEILING,
+        description=(
+            "Maximum number of runner-up candidates stored per peak. Sizes a "
+            "JSON column on the highest-volume table, so it is capped."
+        ),
     )
+
     # Confidence-tier bands on the FIT-SCORE scale (score_pattern_v2), not the legacy
     # match_params scale. The fit score demotes lone mass-only matches by design, so its
     # bands sit lower than v1's 0.8/0.7; these are the DESIGN.md v2 estimates
@@ -69,3 +121,22 @@ class PeakAssignmentConfig(BaseModel):
         le=1.0,
         description="Fit score at or above which a peak is tiered 'candidate'.",
     )
+
+    @field_validator("formula_ranges")
+    @classmethod
+    def _bound_formula_ranges(cls, value: str) -> str:
+        """Cap the number of element species the untargeted search enumerates.
+
+        ``find_compositions`` is a depth-first search whose depth is the number
+        of element species, so widening the range string is the cheapest way to
+        make a run combinatorially expensive. Parsing the ranges belongs to
+        ``mascope_tools``; this only bounds the species count.
+        """
+        species = [token for token in value.split() if token]
+        if len(species) > MAX_FORMULA_RANGE_SPECIES:
+            raise ValueError(
+                f"formula_ranges lists {len(species)} element species; at most "
+                f"{MAX_FORMULA_RANGE_SPECIES} are allowed because untargeted "
+                "enumeration is exponential in the number of species."
+            )
+        return value

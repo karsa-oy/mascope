@@ -4,23 +4,41 @@ Contract: the rule judges NEUTRAL formulas (as produced by `find_compositions` b
 ionization) and rejects ONLY the impossible (over-saturated, negative-RDBE) ones. It
 deliberately FAILS OPEN on odd-electron radicals, which can be genuine in APCI/APPI.
 See docs/dev/assignment_confidence.md (P1).
+
+The rule is opt-in (`HeuristicFilterConfig.use_senior`) because it replaced a no-op
+placeholder; these tests enable it explicitly, and `test_disabled_by_default` pins the
+off-by-default behaviour that keeps the legacy composition search unchanged.
 """
 
 import polars as pl
 
 from mascope_tools.composition.heuristic_filter import rule_senior
+from mascope_tools.composition.models import HeuristicFilterConfig
 
 
-def _mask(formulas):
-    mask, _ = rule_senior(pl.DataFrame({"formula": formulas}))
+def _mask(formulas, use_senior=True):
+    mask, _ = rule_senior(
+        pl.DataFrame({"formula": formulas}),
+        heuristics_config=HeuristicFilterConfig(use_senior=use_senior),
+    )
     return list(mask)
+
+
+def test_disabled_by_default():
+    """Off by default: an impossible formula still passes, as it did pre-Rule-2."""
+    formulas = ["C6H17NO4", "C6H12O6"]
+    assert _mask(formulas, use_senior=False) == [True, True]
+    # And the default config (no explicit use_senior) is likewise off.
+    mask, _ = rule_senior(pl.DataFrame({"formula": formulas}))
+    assert list(mask) == [True, True]
 
 
 def test_valid_molecules_pass():
     # benzene (RDBE 4), glucose (1), caffeine (6), water, ammonia, methane, acetic acid
-    assert _mask(
-        ["C6H6", "C6H12O6", "C8H10N4O2", "H2O", "NH3", "CH4", "C2H4O2"]
-    ) == [True] * 7
+    assert (
+        _mask(["C6H6", "C6H12O6", "C8H10N4O2", "H2O", "NH3", "CH4", "C2H4O2"])
+        == [True] * 7
+    )
 
 
 def test_oversaturated_formulas_rejected():

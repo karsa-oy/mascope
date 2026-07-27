@@ -19,7 +19,10 @@ from mascope_backend.api.new.cheminfo.utils import (
     to_custom_element_format,
     to_explicit_isotope_format,
 )
-from mascope_backend.api.new.peak_assignments.config import PeakAssignmentConfig
+from mascope_backend.api.new.peak_assignments.config import (
+    PeakAssignmentConfig,
+    peak_assignment_enabled,
+)
 from mascope_backend.api.new.peak_assignments.engine import tier_for_score
 from mascope_backend.api.new.reference import service as reference_service
 from mascope_backend.db import (
@@ -423,7 +426,11 @@ async def match_compositions_by_mz(
 
     # Harmonize scoring with the peak-centric engine: fit (v2) + plausibility +
     # tier per candidate, so the search speaks the same language as assignments.
-    _annotate_assignment_scores(data)
+    # Only when the feature is on - otherwise this long-standing search keeps
+    # reporting the legacy match score and category it always has, and the extra
+    # fields stay absent so the UI falls back to the legacy columns.
+    if peak_assignment_enabled():
+        _annotate_assignment_scores(data)
 
     # Return formatted response with notification data
     result_data = {
