@@ -13,8 +13,8 @@ mascope = MascopeClient(workspace="My Workspace")
 peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 ```
 
-Full reference, configuration, and tutorial notebooks: see the SDK readme
-(`libraries/sdk/README.md`).
+Full reference, configuration, and tutorial notebooks: see the
+[SDK readme on GitHub](https://github.com/karsa-oy/mascope/blob/master/libraries/sdk/README.md).
 
 <!-- TODO Phase 3: publish the SDK README content into this section as the single
 source, or keep this page thin and deep-link. See the roadmap. -->

@@ -69,7 +69,7 @@ const tabs = computed(() => [
     label: 'Sample',
     icon: 'pi pi-chart-bar',
     disabled: !app.data.sample.focused,
-    doc: app.ui.help.docUrl('how-it-works/peak_detection/'),
+    doc: app.ui.help.docUrl('how-it-works/peak-detection/'),
     help: `
       <h1>Sample View</h1>
 

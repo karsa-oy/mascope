@@ -20,8 +20,6 @@ graph LR
     E --> F["Match<br/>to targets"]
 ```
 
-![Signal Processing Pipeline](images/signal_processin_pipeline.png)
-
 ## Processing Stages and Data Flow
 
 ### Signal Aggregation and Summation
@@ -30,15 +28,15 @@ To maximize the signal-to-noise ratio for peak detection, the scans are aggregat
 
 ### Empirical Instrument Function Estimation
 To account for instrument characteristics, empirical peak shapes and resolution profiles are extracted directly from the experimental spectrum rather than relying on idealized mathematical assumptions.
-Detailed methodologies for these calculations are provided in [instrument function documentation](instrument_functions.md).
+Detailed methodologies for these calculations are provided in [instrument function documentation](instrument-functions.md).
 
 ### Peak Detection
 Following instrument characterization, the pipeline executes specialized peak detection routines to extract discrete ion signals (peaks) from the sum signal.
-The mathematical implementation of these routines is documented in [peak detection documentation](peak_detection.md).
+The mathematical implementation of these routines is documented in [peak detection documentation](peak-detection.md).
 
 ### Quality Control and Artifact Filtering
 To safeguard downstream calibration steps against false or distorted signals, the resolved peak candidates undergo multi-layered quality control filtering.
-The exact filters are described in [quality control documentation](peak_detection.md#quality-control-filtering).
+The exact filters are described in [quality control documentation](peak-detection.md#quality-control-filtering).
 
 ### Mass Calibration
 The mass calibration corrects systematic mass errors by using known peaks as anchor points to adjust the mass axis.
