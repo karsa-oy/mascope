@@ -186,6 +186,12 @@ The backend has an **optional, off-by-default** GlitchTip sink (see
    trigger any backend warning) and confirm the event appears in GlitchTip.
    Unset the var and restart to turn reporting back off — it's a complete no-op
    when absent.
+5. **Optional — performance tracing.** Next to the DSN, set
+   `MASCOPE_SENTRY_TRACES_RATE=0.1` (fraction of requests to trace, `0`–`1`)
+   and restart the stack; sampled requests show up under the GlitchTip
+   project's **Performance** tab as per-endpoint latency. Start at `0.05`–`0.1`
+   and watch GlitchTip's Postgres volume before raising it — transactions
+   vastly outnumber errors. Unset/`0` (default) means errors only.
 
 ## 8. Uptime Kuma monitors
 
