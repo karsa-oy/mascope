@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.6] - 2026.07.27
+
 ### Fixed
 
 - Socket payloads no longer kill the frontend socket with a "parse error"
