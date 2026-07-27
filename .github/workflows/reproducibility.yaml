@@ -76,6 +76,28 @@ jobs:
           echo "test_postgres_password_for_testing_only" > "$POSTGRES_PASSWORD_FILE"
           uv run pytest server/backend/tests/system/reproducibility/ -v
 
-      - name: Dump stack logs on failure
+      - name: Collect stack diagnostics on failure
         if: failure()
-        run: docker compose -f docker-compose.demo.yaml logs --tail 300
+        run: |
+          # Full logs as an artifact - a 65-minute pipeline run's failure is
+          # rarely in the last few hundred lines. Restart counts and OOM flags
+          # distinguish a crashed container from a silently idle one.
+          mkdir -p diagnostics
+          docker compose -f docker-compose.demo.yaml logs --no-color \
+            > diagnostics/stack-logs.txt 2>&1
+          docker ps -a > diagnostics/docker-ps.txt 2>&1
+          docker inspect --format \
+            '{{.Name}} restarts={{.RestartCount}} oom={{.State.OOMKilled}} exit={{.State.ExitCode}}' \
+            $(docker ps -aq) > diagnostics/container-states.txt 2>&1
+          echo "=== container states ==="
+          cat diagnostics/container-states.txt
+          echo "=== last 50 stack log lines ==="
+          tail -50 diagnostics/stack-logs.txt
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repro-diagnostics
+          path: diagnostics/
+          retention-days: 14

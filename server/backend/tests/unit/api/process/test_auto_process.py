@@ -511,3 +511,40 @@ async def test_return_structure():
     assert notif["instrument"] == "Orbion"
     assert "batch-ret" in notif["affected_sample_batch_ids"]
     assert "si-ret" in notif["affected_sample_item_ids"]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_pipelines_are_bounded():
+    """
+    A burst of auto-process calls runs at most _AUTO_PROCESS_CONCURRENCY
+    pipelines at once - an unbounded burst exhausts the worker's database
+    connection pool and kills pipelines with pool timeouts.
+    """
+    import asyncio
+
+    from mascope_backend.api.controllers.sample.files.process import service
+
+    peak = 0
+    running = 0
+
+    async def fake_body(**kwargs):
+        nonlocal peak, running
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return {"_notification_data": {}}
+
+    with (
+        patch(f"{_SVC}._auto_process_sample_file", new=fake_body),
+        patch(f"{_NOTIF}.handle_notifications", new_callable=AsyncMock),
+        patch(f"{_UTILS}.handle_reloads", new_callable=AsyncMock),
+    ):
+        await asyncio.gather(
+            *(
+                service.auto_process_sample_file(sample_file_id=f"sf-{i}")
+                for i in range(10)
+            )
+        )
+
+    assert peak == service._AUTO_PROCESS_CONCURRENCY

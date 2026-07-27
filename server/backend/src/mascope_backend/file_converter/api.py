@@ -5,6 +5,7 @@ This module provides functions to interact with the sample file database
 and filestore records via HTTP requests to the API service.
 """
 
+import time
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -20,6 +21,54 @@ from .schema import SampleFileProps
 
 HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
 URL = f"http://{HOST}:{runtime.meta.api_port}"
+
+# The backend can be saturated during an ingest burst (connection-pool
+# congestion answers 503 once its pool_timeout expires). The converter is a
+# batch worker: transient server trouble should be waited out - quarantining
+# a raw file is only right when processing that file itself fails. The client
+# timeout must exceed the server's pool_timeout (120s) so a slow-but-
+# successful request is not killed from this side first.
+_REQUEST_TIMEOUT_S = 180
+_RETRY_BACKOFF_S = (15, 30, 60)
+
+
+def _request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
+    """
+    Issue an HTTP request, retrying transport errors and 5xx responses.
+
+    Retries with the ``_RETRY_BACKOFF_S`` delays, then returns the last 5xx
+    response or re-raises the last transport error. 2xx-4xx responses return
+    immediately: client-class statuses are not transient, retrying them only
+    hides real bugs.
+    """
+    kwargs.setdefault("timeout", _REQUEST_TIMEOUT_S)
+    last_exc: requests.exceptions.RequestException | None = None
+    response: requests.Response | None = None
+    for delay in (*_RETRY_BACKOFF_S, None):
+        try:
+            response = requests.request(method, url, **kwargs)
+        except requests.exceptions.RequestException as e:
+            response = None
+            last_exc = e
+            failure = f"{type(e).__name__}: {e}"
+        else:
+            if response.status_code < 500:
+                return response
+            failure = f"HTTP {response.status_code}"
+        if delay is None:
+            break
+        runtime.logger.warning(
+            f"{method} {url} failed ({failure}), retrying in {delay}s"
+        )
+        time.sleep(delay)
+    if response is None:
+        if last_exc is None:
+            # Unreachable: the loop always runs, and a missing response means
+            # the last attempt raised. Guard so a logic change here can never
+            # turn into `raise None` (TypeError).
+            raise RuntimeError(f"{method} {url}: retry loop exited without result")
+        raise last_exc
+    return response
 
 
 def fetch_instrument_functions(
@@ -46,10 +95,10 @@ def fetch_instrument_functions(
     }
 
     try:
-        response = requests.get(
+        response = _request_with_retry(
+            "GET",
             f"{URL}/api/instrument_configs/by_filename/{filename}",
             headers=headers,
-            timeout=30,
         )
         if response.status_code != 200:
             raise ValueError(
@@ -115,11 +164,11 @@ def create_sample_file_db_record(
     }
 
     try:
-        response = requests.post(
+        response = _request_with_retry(
+            "POST",
             f"{URL}/api/sample/files",
             headers=headers,
             json=sample_file_db_record,
-            timeout=180,
         )
 
         if response.status_code != 201:
@@ -152,8 +201,8 @@ def check_sample_file_db_record(filename: str, access_token: str) -> bool:
     params = {"filename": filename, "limit": 1}
 
     try:
-        response = requests.get(
-            f"{URL}/api/sample/files", headers=headers, params=params, timeout=10
+        response = _request_with_retry(
+            "GET", f"{URL}/api/sample/files", headers=headers, params=params
         )
 
         if response.status_code == 200:
@@ -191,8 +240,8 @@ def is_blank_sample_file(filename: str, access_token: str) -> bool:
     params = {"filename": filename, "limit": 1}
 
     try:
-        response = requests.get(
-            f"{URL}/api/sample/files", headers=headers, params=params, timeout=10
+        response = _request_with_retry(
+            "GET", f"{URL}/api/sample/files", headers=headers, params=params
         )
 
         if response.status_code != 200:
@@ -297,11 +346,11 @@ def create_instrument_config_db_record(
     }
 
     try:
-        response = requests.post(
+        response = _request_with_retry(
+            "POST",
             f"{URL}/api/instrument_configs",
             headers=headers,
             json=data,
-            timeout=180,
         )
 
         if response.status_code != 201:

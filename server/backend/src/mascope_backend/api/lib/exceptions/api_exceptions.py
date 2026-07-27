@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
 from mascope_backend.api.new.roles.exceptions import InvalidRoleException
 from mascope_backend.runtime import runtime
@@ -78,6 +79,18 @@ def process_exception(e: Exception, context_message: str) -> ApiException:
 
     # Use pattern matching to determine user message and status code
     match e:
+        case SQLAlchemyTimeoutError():
+            # Connection-pool starvation (QueuePool wait exceeded
+            # pool_timeout) is transient server congestion, not a client
+            # fault. Report 503 so callers - the file converter in
+            # particular - know to retry instead of giving up on the file.
+            # Must precede SQLAlchemyError: TimeoutError subclasses it.
+            user_message = (
+                f"{context_message}. Server is busy, please try again "
+                f"(ref: {error_id[:8]})."
+            )
+            status_code = 503  # Service Unavailable
+
         case SQLAlchemyError():
             user_message = (
                 f"{context_message}. Database operation failed (ref: {error_id[:8]})."

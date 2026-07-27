@@ -269,3 +269,20 @@ def test_status_codes_and_opaque_detail(exc, expected_status):
     api_exc = _raise_and_process(exc)
     assert api_exc.status_code == expected_status
     assert set(api_exc.tech_message) == {"error_id"}
+
+
+def test_pool_timeout_maps_to_503():
+    """
+    Connection-pool starvation is transient server congestion: it must answer
+    503 (retryable) rather than the generic SQLAlchemyError 400, so batch
+    clients like the file converter retry instead of quarantining files.
+    """
+    from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
+
+    api_exc = _raise_and_process(
+        SQLAlchemyTimeoutError("QueuePool limit of size 3 overflow 7 reached")
+    )
+
+    assert api_exc.status_code == 503
+    assert "busy" in api_exc.user_message.lower()
+    assert "QueuePool" not in api_exc.user_message

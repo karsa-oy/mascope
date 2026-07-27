@@ -61,6 +61,11 @@ POLL_S = 15
 # after all batches settle, so matching that trails the batch status flip
 # cannot produce a premature export.
 STABLE_POLLS = 3
+# Fail early when every counter has been frozen this long without the settle
+# condition being met - dropped files never finish, and waiting out the full
+# timeout only delays the diagnosis. Generous (10 min) so a slow but live
+# aggregation is never mistaken for a stall.
+STALL_POLLS = 40
 
 # Python of the in-image mascope uv tool (same path tooling/demo-init.sh uses).
 CONTAINER_PYTHON = "/opt/uv/tools/mascope/bin/python"
@@ -243,6 +248,8 @@ def _wait_for_pipeline(n_files: int) -> None:
     deadline = time.monotonic() + TIMEOUT_S
     last_matched = -1
     stable = 0
+    last_state: tuple | None = None
+    stalled = 0
 
     while time.monotonic() < deadline:
         failed = int(_psql("SELECT count(*) FROM sample_batch WHERE status = 'failed'"))
@@ -271,14 +278,88 @@ def _wait_for_pipeline(n_files: int) -> None:
                 return
         else:
             stable = 0
+
+        # An unfinished pipeline whose counters have all stopped moving will
+        # not finish by waiting: files were dropped somewhere. Fail early with
+        # the stage breakdown instead of idling to the full timeout.
+        state = (files_done, batches, processing, matched)
+        stalled = stalled + 1 if state == last_state else 0
+        if stalled >= STALL_POLLS:
+            pytest.fail(
+                f"pipeline stalled with no progress for {STALL_POLLS * POLL_S}s: "
+                f"{files_done}/{n_files} files processed, {batches} batch(es), "
+                f"{processing} still processing, {matched} matched peak(s)\n"
+                + _diagnose_missing_files()
+            )
+        last_state = state
         last_matched = matched
         time.sleep(POLL_S)
 
     pytest.fail(
         f"pipeline did not settle within {TIMEOUT_S}s: "
         f"{files_done}/{n_files} files processed, {batches} batch(es), "
-        f"{processing} still processing, {matched} matched peak(s)"
+        f"{processing} still processing, {matched} matched peak(s)\n"
+        + _diagnose_missing_files()
     )
+
+
+def _diagnose_missing_files() -> str:
+    """
+    Best-effort breakdown of where files fell out of the pipeline.
+
+    Attributes the shortfall to a stage: raw streams never picked up (still in
+    the filestreams folder), streams quarantined by the converter
+    (``failed_files``), or files converted whose auto-processing never
+    produced sample items. Diagnostic only - never raises.
+    """
+    lines = []
+    try:
+        n_sample_files = _psql("SELECT count(*) FROM sample_file")
+        lines.append(f"sample_file rows (files converted): {n_sample_files}")
+        no_items = _psql(
+            "SELECT sf.filename FROM sample_file sf "
+            "LEFT JOIN sample_item si ON si.sample_file_id = sf.sample_file_id "
+            "WHERE si.sample_file_id IS NULL ORDER BY sf.filename"
+        )
+        if no_items:
+            names = no_items.splitlines()
+            shown = ", ".join(names[:20]) + (" ..." if len(names) > 20 else "")
+            lines.append(
+                f"{len(names)} file(s) converted but auto-processing produced "
+                f"no sample items: {shown}"
+            )
+        # The filestreams volume is shared with the backend container; list
+        # the pending and quarantined stream files from there.
+        probe = (
+            "import json, os\n"
+            "from mascope_backend.runtime import runtime\n"
+            "d = runtime.config.filestreams\n"
+            "def ls(p):\n"
+            "    if not os.path.isdir(p):\n"
+            "        return []\n"
+            "    # files only - subfolders like failed_files are not streams\n"
+            "    return sorted(\n"
+            "        f for f in os.listdir(p) if os.path.isfile(os.path.join(p, f))\n"
+            "    )\n"
+            "print(json.dumps({'pending': ls(d),"
+            " 'failed': ls(os.path.join(d, 'failed_files'))}))\n"
+        )
+        res = _docker("exec", BACKEND_CONTAINER, CONTAINER_PYTHON, "-c", probe)
+        if res.returncode == 0 and res.stdout.strip():
+            folders = json.loads(res.stdout.strip().splitlines()[-1])
+            for key, label in (
+                ("pending", "stream file(s) never picked up by the converter"),
+                ("failed", "stream file(s) quarantined in failed_files"),
+            ):
+                if folders.get(key):
+                    lines.append(
+                        f"{len(folders[key])} {label}: " + ", ".join(folders[key][:20])
+                    )
+        else:
+            lines.append(f"(filestreams listing failed: {res.stderr.strip()[:200]})")
+    except Exception as e:  # noqa: BLE001 - diagnostics must never mask the failure
+        lines.append(f"(diagnostics unavailable: {e})")
+    return "\n".join(lines)
 
 
 def _export_actual_peaks() -> list[dict]:

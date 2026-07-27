@@ -1,0 +1,64 @@
+---
+# Roll a Mascope release across the fleet: one server at a time, fail-fast.
+#
+#   ansible-playbook update.yml -e mascope_version=vX.Y.Z --limit <canary>
+#   ansible-playbook update.yml -e mascope_version=vX.Y.Z
+#
+# No sudo is needed (the deploy user drives docker and the checkout), so no
+# vault password is required either. serial + any_errors_fatal mean a failing
+# server stops the rollout before the rest are touched; run the canary first
+# anyway so a bad release is caught on the least critical server.
+#
+# The manual per-server procedure and verification checklist live in
+# docs/maintaining.md -> "Rolling out a release across several servers".
+- name: Roll out a Mascope release
+  hosts: fleet
+  become: false
+  serial: 1
+  any_errors_fatal: true
+  vars:
+    mascope_checkout: "{{ ansible_env.HOME }}/mascope"
+  tasks:
+    - name: Require an explicit release tag
+      ansible.builtin.assert:
+        that:
+          - mascope_version is defined
+          - mascope_version is match('^v')
+        fail_msg: "Pass the release to deploy: -e mascope_version=vX.Y.Z"
+
+    - name: Fetch tags
+      ansible.builtin.command:
+        cmd: git fetch --tags origin
+        chdir: "{{ mascope_checkout }}"
+      changed_when: false
+
+    - name: Check out the release tag
+      ansible.builtin.command:
+        cmd: git checkout {{ mascope_version }}
+        chdir: "{{ mascope_checkout }}"
+      register: checkout
+      changed_when: "'HEAD is now at' in (checkout.stderr + checkout.stdout)"
+
+    - name: Update the stack (pull images, rolling restart)
+      ansible.builtin.shell:
+        cmd: bash -lc "cd {{ mascope_checkout }} && PYTHONUTF8=1 mascope prod update"
+      changed_when: true
+
+    # prod update refreshes images but not the uv-tool CLI; reinstalling here
+    # keeps the CLI in lockstep with the checkout (the stale-CLI drift that
+    # once hid `prod doctor`). ~1 min per server, idempotent. Unlike
+    # `ubuntu.sh reinstall`, this does NOT clear .runtime/state.json, so the
+    # server's active env is preserved (the reset comes from uninstall's
+    # clear_state, not from the install command).
+    - name: Reinstall the mascope CLI to match the checkout
+      ansible.builtin.shell:
+        cmd: >-
+          bash -lc "cd {{ mascope_checkout }} && CFLAGS='-std=c17'
+          uv tool install --force --reinstall --python 3.12 .
+          --with-executables-from mascope-cli"
+      changed_when: true
+
+    - name: Verify with doctor (fails the rollout if unhealthy)
+      ansible.builtin.shell:
+        cmd: bash -lc "cd {{ mascope_checkout }} && PYTHONUTF8=1 mascope prod doctor"
+      changed_when: false

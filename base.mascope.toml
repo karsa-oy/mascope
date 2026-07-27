@@ -36,7 +36,10 @@ shm_size = "1g"
 # --- SQLAlchemy pool (per worker) ---
 pool_size = 3
 max_overflow = 2
-pool_timeout = 30
+# Patience for a free connection during bursts. 30s made ingest bursts FAIL
+# under congestion (converter API calls got errors, auto-process pipelines
+# died mid-file) instead of queueing; congestion should serialize, not fail.
+pool_timeout = 120
 pool_pre_ping = true
 expire_on_commit = false
 

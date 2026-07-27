@@ -187,7 +187,7 @@ There is no supported config API, so add monitors in the UI. **For each Mascope
 server:**
 
 1. **Add New Monitor** → Type **HTTP(s)**.
-2. **URL** = the server's public app URL, e.g. `https://tuni.mascope.app`
+2. **URL** = the server's public app URL, e.g. `https://example.mascope.app`
    (goes through Cloudflare — exactly the path users take). TLS-expiry checks
    require an `https://` target and *"Ignore TLS/SSL error"* **off**.
 3. Set a friendly name, heartbeat interval, retries.
@@ -204,6 +204,49 @@ its **public IP**, ports **22** and **443**, with **Upside Down Mode** enabled
 (healthy = connection *fails*). If a firewall regresses or Docker starts
 bypassing ufw again, the "port reachable" alert fires within minutes instead of
 being discovered months later.
+
+## 9. Stack-health push monitors (`mascope prod doctor`)
+
+The HTTP monitors above prove "users can load the app"; they cannot see a
+filling disk, a stale backup, a pending migration, or an unhealthy container
+hiding behind a still-green frontend. `mascope prod doctor` sees all of that
+(exit 0 healthy / 1 unhealthy), and [`doctor-push.sh`](doctor-push.sh) feeds it
+into a Kuma **Push** monitor per server (dead-man's switch: a missed heartbeat
+also alerts, catching servers too broken to even run cron).
+
+Per Mascope server:
+
+1. In Kuma: **Add New Monitor** → type **Push**, name `doctor-<server>`,
+   heartbeat interval `3600`, retries `1`, notification ticked. Copy the token
+   from the generated push URL.
+2. Copy `doctor-push.sh` to the server (e.g. `~/doctor-push.sh`), replace
+   `__TOKEN__` with that monitor's token, and `chmod 700` it (the token is a
+   write credential to the monitor).
+3. Install the deploy user's cron (no sudo needed — doctor only needs docker
+   access): `*/30 * * * * /bin/bash $HOME/doctor-push.sh`
+
+Pinging every 30 min against a 60-min window tolerates a single blip without a
+false alarm. The script prefers `doctor`; on a release that predates it, it
+falls back to a direct container-health check. Two extras ride along in each
+heartbeat: the message carries current disk usage (visible in the heartbeat
+tooltip), and the numeric `ping` field carries disk-used %, so the monitor's
+"response time" chart doubles as a disk-usage trend graph — a deliberate,
+lightweight stand-in for a real metrics stack until trend questions justify
+one.
+
+> The `doctor` command requires an up-to-date `mascope` CLI. `mascope prod
+> update` refreshes images but **not** the CLI binary — if `doctor` is missing,
+> rerun the `uv tool install` step from `tooling/ubuntu.sh` (or
+> `ubuntu.sh reinstall`).
+
+**Deliberate overlap with the disk-check timer.** `mascope-disk-check.timer`
+(see `tooling/systemd/`) also watches the disk and pings healthchecks.io. That
+is layering, not redundancy: doctor->Kuma is the rich aggregate but depends on
+Python, Docker, the tailnet, and the monitoring box; the disk check is bash +
+`df` + one HTTPS call to an external service — the dumbest reporter survives
+the disk-full scenario that wedges everything else. Keep both, and stagger the
+thresholds so the simple tier warns early and a doctor "down" means it is
+serious.
 
 ## Notes & caveats
 

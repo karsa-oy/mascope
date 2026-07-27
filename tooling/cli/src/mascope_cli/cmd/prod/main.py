@@ -33,7 +33,7 @@ from typing import Annotated, Optional
 import typer
 
 from mascope_cli.cmd import lib
-from mascope_cli.cmd.prod import auto_update, preflight, release_manifest
+from mascope_cli.cmd.prod import auto_update, cli_drift, preflight, release_manifest
 from mascope_cli.cmd.prod import doctor as prod_doctor
 from mascope_cli.cmd.prod.db import prod_db_app
 from mascope_cli.pg.utils import check_data_dirs, is_container_running
@@ -324,6 +324,48 @@ def _prune_images() -> None:
     runtime.logger.success(f"Pruned unused images. {summary}".rstrip())
 
 
+def _warn_if_cli_stale(*, auto: bool) -> None:
+    """
+    Warn (never fix) when the running CLI has drifted behind the checkout.
+
+    ``prod update`` refreshes the images but not the ``mascope`` tool itself, so
+    after the operator moves the checkout forward the running CLI keeps executing
+    the code it was last installed from - hiding new commands and fixes until the
+    tool is reinstalled. This surfaces that with the exact reinstall command
+    rather than replacing the binary in place: the update may be running *from*
+    the stale tool, and ``uv tool install --force --reinstall`` rebuilds native
+    extensions (minutes) and overwrites the files backing the running process, so
+    a self-reinstall mid-run is risky - worse under ``--auto`` (unattended,
+    systemd oneshot), where a failed reinstall could break the tool the update
+    timer itself depends on. The operator runs the command when ready.
+
+    Under ``--auto`` the warning is also written to the updater's status log (the
+    audit trail an operator already watches). Best-effort: any failure while
+    checking must never fail an otherwise-healthy update, so it is swallowed.
+    """
+    try:
+        result = cli_drift.detect(os.environ["MASCOPE_PATH"])
+    except OSError as exc:
+        runtime.logger.warning(f"Skipped CLI staleness check (non-fatal): {exc}")
+        return
+    if result is None or not result.drifted:
+        return
+
+    message = (
+        "The installed 'mascope' CLI is OLDER than this checkout - 'prod update' "
+        "refreshed the images but not the CLI itself. New CLI commands and fixes "
+        "in the checkout take effect only after you reinstall the tool:\n\n"
+        f"    {result.reinstall}\n"
+    )
+    runtime.logger.warning(message)
+    if auto:
+        auto_update.record_status(
+            os.environ["MASCOPE_PATH"],
+            "Installed CLI is stale after update - reinstall the tool: "
+            f"{result.reinstall}",
+        )
+
+
 # --- Commands ---
 
 
@@ -563,6 +605,9 @@ def _apply_update(
         runtime.logger.success(message)
         auto_update.record_status(mascope_path, message)
         _run_compose(["ps"])
+        # Images moved; the unattended tool cannot safely reinstall itself, so
+        # record + log if the CLI now trails the checkout for the operator.
+        _warn_if_cli_stale(auto=True)
         raise typer.Exit(auto_update.AUTO_OK)
 
     message = (
@@ -861,6 +906,9 @@ def update(
     _prune_images()  # reclaim the superseded release's images
     _run_compose(["ps"])
     runtime.logger.success(f"Production stack updated to '{target}'")
+    # Last, so it is the final thing the operator sees: the images moved but the
+    # CLI tool did not - warn if it now trails the checkout.
+    _warn_if_cli_stale(auto=False)
 
 
 @prod_app.command()

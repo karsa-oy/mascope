@@ -4,6 +4,80 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.5] - 2026.07.27
+
+### Added
+
+- Fleet release rollouts as a playbook: `tooling/fleet/update.yml` deploys a
+  release across the fleet one server at a time (fail-fast, verified with
+  `mascope prod doctor`, and reinstalls the CLI so it cannot drift behind the
+  checkout). `docs/maintaining.md` gains the matching canary-first rollout
+  runbook with a per-server verification checklist.
+
+- Fleet Ansible now supports per-host sudo passwords via Ansible Vault
+  (`tooling/fleet/group_vars/fleet/`): the encrypted vault (gitignored, kept
+  out of this public repo) holds each server's password, unlocked with a single
+  `--ask-vault-pass` prompt so whole-fleet runs no longer need per-host `-K`.
+
+- Stack-health push monitoring: `tooling/monitoring/doctor-push.sh` reports
+  `mascope prod doctor` results to an Uptime Kuma push monitor per server
+  (dead-man's switch), carrying disk usage in each heartbeat; runbook section
+  in `tooling/monitoring/README.md`. The systemd README now also documents the
+  disk-space monitor units (`mascope-disk-check.service`/`.timer`), which its
+  unit table previously omitted.
+
+- Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the
+  sshd hardening drop-in, the ufw ruleset (tailnet-only SSH, Cloudflare-only
+  443, canonical container-NAT block), the load-bearing Docker
+  `iptables: false` setting, and unattended security upgrades - with a
+  check-first drift workflow (`ansible-playbook site.yml --check --diff`).
+  The inventory is deliberately an example file: real addresses stay out of
+  this public repository.
+
+### Fixed
+
+- Acquisition ingest bursts no longer exhaust the backend's database
+  connection pool. Auto-processing pipelines (batch creation, calibration,
+  matching for each converted file) and the follow-up rematch tasks they
+  spawn now run at most three at a time per worker; an unbounded burst - a
+  whole folder of raw files converted back to back - stacked enough
+  concurrent sessions that everything waiting longer than `pool_timeout`
+  died with "QueuePool limit reached, connection timed out": the converter's
+  API calls failed with 400 (raw files quarantined in `failed_files`),
+  service-token validations failed, and pipelines died between creating the
+  sample file and its sample items. `pool_timeout` is also raised 30s -> 120s
+  so residual congestion queues instead of failing. Together with the upload
+  race below, this caused the nightly reproducibility workflow's
+  nondeterministic "144..155/161 files processed" failures.
+- The file converter no longer quarantines a raw file because the backend
+  was momentarily too busy to answer. Connection-pool starvation now answers
+  503 Service Unavailable (previously a misleading 400 "Database operation
+  failed"), and the converter's backend API calls retry transport errors and
+  5xx responses with backoff (15/30/60s) before giving up. Client-side
+  request timeouts were also raised above the server's pool patience so a
+  slow-but-successful call is no longer killed from the client side.
+- Uploaded sample files can no longer be silently lost to a race with the
+  file converter. The upload endpoints wrote bytes directly under the final
+  filename inside the watched filestreams folder, so a write that stalled
+  for a couple of seconds (I/O contention) looked size-stable to the
+  converter's watcher and was ingested truncated - the upload still returned
+  success, the sample just never appeared. Uploads now land under a
+  non-watched temp name and are published with an atomic rename. This was
+  the cause of the nightly reproducibility workflow's nondeterministic
+  "pipeline did not settle: 147..155/161 files processed" failures.
+- The file converter's watcher now queues stream files already present when
+  it starts (e.g. left behind by a converter restart) instead of silently
+  ignoring them forever.
+- The reproducibility test now fails fast when the pipeline stalls (10 min
+  with no counter movement instead of idling out the full 45-min timeout)
+  and reports which stage lost files: streams never picked up, streams
+  quarantined in failed_files, or files converted without sample items. The
+  workflow now uploads full stack logs and container restart/OOM states as
+  an artifact on failure, instead of dumping the last 300 log lines.
+- GlitchTip events now carry a friendly per-server identity: `server_name` is
+  the runtime env name (e.g. `site1`) instead of the opaque Docker container
+  id the SDK falls back to under containers.
+
 ## [1.4.4] - 2026.07.26
 
 ### Added

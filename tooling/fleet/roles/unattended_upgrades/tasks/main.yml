@@ -1,0 +1,18 @@
+---
+- name: Install unattended-upgrades
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+    update_cache: true
+    cache_valid_time: 86400
+
+- name: Enable periodic unattended security upgrades
+  ansible.builtin.copy:
+    src: 20auto-upgrades
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+# Kernel updates still need the monthly reboot window (see the fleet
+# management roadmap); unattended-upgrades does not reboot by itself.
