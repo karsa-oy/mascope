@@ -31,14 +31,20 @@ def test_good_match_high_fit():
 
 def test_detectable_missing_isotopologue_penalized():
     perfect = ion_score_v2(_ion(110.0, snr=[500, 55]), sigma_ppm=0.5)
-    missing = ion_score_v2(_ion(0.0, snr=[500, 0]), sigma_ppm=0.5)  # M+1 should be visible
+    missing = ion_score_v2(
+        _ion(0.0, snr=[500, 0]), sigma_ppm=0.5
+    )  # M+1 should be visible
     assert missing < perfect
 
 
 def test_absent_monoisotopic_scores_zero():
     g = pd.DataFrame(
-        {"relative_abundance": [1.0, 0.11], "match_mz_error": [0.0, 0.0],
-         "sample_peak_intensity": [0.0, 0.0], "signal_to_noise": [0.0, 0.0]}
+        {
+            "relative_abundance": [1.0, 0.11],
+            "match_mz_error": [0.0, 0.0],
+            "sample_peak_intensity": [0.0, 0.0],
+            "signal_to_noise": [0.0, 0.0],
+        }
     )
     # Absent monoisotopic -> fit score 0 (no match); this is the default/headline value.
     assert ion_score_v2(g, sigma_ppm=0.5) == 0.0
@@ -65,7 +71,10 @@ def test_raw_vs_calibrated():
 def test_fit_sample_mass_accuracy():
     rng = np.random.default_rng(0)
     df = pd.DataFrame(
-        {"match_mz_error": rng.normal(0.1, 0.3, 50), "sample_peak_intensity": [100.0] * 50}
+        {
+            "match_mz_error": rng.normal(0.1, 0.3, 50),
+            "sample_peak_intensity": [100.0] * 50,
+        }
     )
     mu, sigma = fit_sample_mass_accuracy(df)
     assert abs(mu - 0.1) < 0.2 and 0.1 < sigma < 0.6
@@ -80,9 +89,13 @@ def test_sample_noise_floor_positive():
 
 def test_satellite_matched_isotopologue_treated_as_absent():
     base = dict(_ion(110.0, snr=[500, 55]))
-    normal = ion_score_v2(pd.DataFrame({**base, "is_satellite": [False, False]}), sigma_ppm=0.5)
+    normal = ion_score_v2(
+        pd.DataFrame({**base, "is_satellite": [False, False]}), sigma_ppm=0.5
+    )
     # M+1 "matched" a satellite artifact -> treated as absent -> detectability penalty
-    sat = ion_score_v2(pd.DataFrame({**base, "is_satellite": [False, True]}), sigma_ppm=0.5)
+    sat = ion_score_v2(
+        pd.DataFrame({**base, "is_satellite": [False, True]}), sigma_ppm=0.5
+    )
     assert sat < normal
 
 

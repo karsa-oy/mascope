@@ -29,7 +29,10 @@ def upgrade() -> None:
     op.create_table(
         "assignment_calibration",
         sa.Column(
-            "assignment_calibration_id", sa.Integer(), autoincrement=True, nullable=False
+            "assignment_calibration_id",
+            sa.Integer(),
+            autoincrement=True,
+            nullable=False,
         ),
         sa.Column("instrument", sa.String(length=32), nullable=False),
         sa.Column("score_version", sa.Integer(), nullable=False),

@@ -63,9 +63,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["peak_assignment_id"],
             ["peak_assignment.peak_assignment_id"],
-            name=op.f(
-                "fk_assignment_verification_peak_assignment_id_peak_assignment"
-            ),
+            name=op.f("fk_assignment_verification_peak_assignment_id_peak_assignment"),
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(

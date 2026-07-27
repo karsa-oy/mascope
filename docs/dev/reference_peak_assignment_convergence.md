@@ -72,7 +72,7 @@ Proposed addition to `mascope_reference.query`:
 def iter_known_compositions(
     session,
     *,
-    licenses: set[str] | None = None,   # commercial gating; None = all
+    licenses: set[str] | None = None,  # commercial gating; None = all
 ) -> Iterator[KnownComposition]: ...
 ```
 

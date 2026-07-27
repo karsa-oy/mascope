@@ -21,9 +21,6 @@ from mascope_backend.api.controllers.match.match_controller import (
     match_compute_sample,
     rematch_samples,
 )
-from mascope_backend.api.new.peak_assignments.service import (
-    auto_assign_sample_peaks,
-)
 from mascope_backend.api.controllers.sample.batches.sample_batches_controller import (
     create_sample_batch,
     get_sample_batches,
@@ -51,6 +48,9 @@ from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
 )
 from mascope_backend.api.new.ionization.modes.util import (
     resolve_ionization_modes_by_tokens,
+)
+from mascope_backend.api.new.peak_assignments.service import (
+    auto_assign_sample_peaks,
 )
 from mascope_backend.db import (
     IonizationMode,

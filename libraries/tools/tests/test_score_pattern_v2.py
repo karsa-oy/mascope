@@ -13,6 +13,7 @@ from mascope_tools.composition.heuristic_filter import (
     score_pattern_v2,
 )
 
+
 # A two-isotopologue ion: M0 (rel 1.0) + M+1 (rel 0.11), base SNR 500.
 PRED = np.array([1.0, 0.11])
 ME = np.array([0.2, 0.3])  # ppm errors
@@ -33,7 +34,9 @@ def test_perfect_match_scores_high():
 
 def test_detectable_missing_isotopologue_is_penalized():
     # M+1 predicted at 0.11 -> expected SNR 0.11*500 = 55 >= 3 -> should be visible
-    missing = score_pattern_v2(ME, np.array([1000.0, 0.0]), np.array([500.0, 0.0]), PRED)
+    missing = score_pattern_v2(
+        ME, np.array([1000.0, 0.0]), np.array([500.0, 0.0]), PRED
+    )
     assert missing < _perfect() - 0.05
 
 

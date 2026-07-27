@@ -113,10 +113,16 @@ def test_nan_and_negative_fit_treated_as_no_evidence():
 def test_deterministic_order_on_equal_evidence():
     # identical evidence -> stable tie-break by fit desc then formula
     r1 = arbitrate_candidates(
-        [{"formula": "C9H14", "fit_score": 0.8}, {"formula": "C6H12O6", "fit_score": 0.8}]
+        [
+            {"formula": "C9H14", "fit_score": 0.8},
+            {"formula": "C6H12O6", "fit_score": 0.8},
+        ]
     )
     r2 = arbitrate_candidates(
-        [{"formula": "C6H12O6", "fit_score": 0.8}, {"formula": "C9H14", "fit_score": 0.8}]
+        [
+            {"formula": "C6H12O6", "fit_score": 0.8},
+            {"formula": "C9H14", "fit_score": 0.8},
+        ]
     )
     assert [c.formula for c in r1] == [c.formula for c in r2]
 

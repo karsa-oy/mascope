@@ -495,8 +495,12 @@ async def aggregate_sample_match_compounds(
             _mu, _sigma = fit_sample_mass_accuracy(filtered_match_isotope_df)
             _noise = sample_noise_floor(filtered_match_isotope_df)
             _v2 = (
-                filtered_match_isotope_df.groupby("target_ion_id", sort=False, dropna=False)
-                .apply(lambda g: ion_score_v2(g, sigma_ppm=_sigma, mu=_mu, noise=_noise))
+                filtered_match_isotope_df.groupby(
+                    "target_ion_id", sort=False, dropna=False
+                )
+                .apply(
+                    lambda g: ion_score_v2(g, sigma_ppm=_sigma, mu=_mu, noise=_noise)
+                )
                 .rename("match_score_v2")
                 .reset_index()
             )

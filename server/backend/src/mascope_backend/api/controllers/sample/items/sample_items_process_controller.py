@@ -11,11 +11,11 @@ from mascope_backend.api.controllers.samples.samples_controller import get_sampl
 from mascope_backend.api.lib.api_features import (
     api_controller_background_task,
 )
-from mascope_backend.api.new.peak_assignments.service import (
-    auto_assign_sample_peaks,
-)
 from mascope_backend.api.models.sample.items.sample_item_pydantic_model import (
     SampleItemCreate,
+)
+from mascope_backend.api.new.peak_assignments.service import (
+    auto_assign_sample_peaks,
 )
 from mascope_backend.db.id import gen_id
 from mascope_backend.socket.notifications import (

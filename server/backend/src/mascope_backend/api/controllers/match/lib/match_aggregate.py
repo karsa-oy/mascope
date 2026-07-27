@@ -203,12 +203,8 @@ async def set_ions_match_category(
         else:
             default_probable = DEFAULT_PROBABLE_MATCH_THRESHOLD
             default_possible = DEFAULT_POSSIBLE_MATCH_THRESHOLD
-        probable = pd.Series(
-            default_probable, index=match_ions_df.index, dtype=float
-        )
-        possible = pd.Series(
-            default_possible, index=match_ions_df.index, dtype=float
-        )
+        probable = pd.Series(default_probable, index=match_ions_df.index, dtype=float)
+        possible = pd.Series(default_possible, index=match_ions_df.index, dtype=float)
         if "filter_params" in match_ions_df.columns:
             for i, (instrument, filter_params) in enumerate(
                 zip(match_ions_df["instrument"], match_ions_df["filter_params"])

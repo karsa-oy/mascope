@@ -31,6 +31,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+
 MZ_PPM = 5.0
 INT_TOL = 0.4  # mascope_tools ISOTOPE_MATCHING_INTENSITY_TOLERANCE
 # Correct matches spread WIDER than the calibration-anchor precision (centroiding +
@@ -39,7 +40,9 @@ INT_TOL = 0.4  # mascope_tools ISOTOPE_MATCHING_INTENSITY_TOLERANCE
 PRED_SIGMA_PPM = 0.5
 
 
-def load_filestore_peaks(bundle_dir: str, filename: str, _cache: dict = {}) -> "pd.DataFrame | None":
+def load_filestore_peaks(
+    bundle_dir: str, filename: str, _cache: dict = {}
+) -> "pd.DataFrame | None":
     """Full detected-peak list for a sample from its `peak_timeseries.zarr` in the
     filestore: m/z, summed height, real `signal_to_noise`, and `is_satellite`. This
     is the COMPLETE spectrum (not the matched-target subset) WITH SNR — so it
@@ -74,7 +77,9 @@ def load_filestore_peaks(bundle_dir: str, filename: str, _cache: dict = {}) -> "
     return df
 
 
-def fit_mass_accuracy(bundle_dir: str, filename: str, _cache: dict = {}, _exp: list = [None]) -> tuple:
+def fit_mass_accuracy(
+    bundle_dir: str, filename: str, _cache: dict = {}, _exp: list = [None]
+) -> tuple:
     """Robust (mu, sigma, n) of the ppm mass error for a sample, fit from its TRUE
     M0 assignments (the seeded targets, observed m/z vs theoretical) — i.e. the
     instrument's MEASURED mass accuracy. mu = median ppm error, sigma = 1.4826*MAD.
@@ -97,7 +102,9 @@ def fit_mass_accuracy(bundle_dir: str, filename: str, _cache: dict = {}, _exp: l
         if not ion or ion[-1] not in "+-":
             continue
         try:
-            theo = float(predict_isotopes(ion[:-1], 1 if ion[-1] == "+" else -1, None)[0][0])
+            theo = float(
+                predict_isotopes(ion[:-1], 1 if ion[-1] == "+" else -1, None)[0][0]
+            )
         except Exception:
             continue
         errs.append((float(r.mz) - theo) / theo * 1e6)
@@ -112,11 +119,16 @@ def fit_mass_accuracy(bundle_dir: str, filename: str, _cache: dict = {}, _exp: l
     return res
 
 
-def score_ion(mzs: np.ndarray, ints: np.ndarray, ion: str, *, ppm: float) -> float | None:
+def score_ion(
+    mzs: np.ndarray, ints: np.ndarray, ion: str, *, ppm: float
+) -> float | None:
     """Score one ion formula (e.g. 'C10H13O+') against a sorted observed peak list,
     mirroring peaky's validated local_scoring matching loop. Returns the
     mascope_tools score, or None if the monoisotopic peak isn't present."""
-    from mascope_tools.composition.heuristic_filter import predict_isotopes, score_pattern
+    from mascope_tools.composition.heuristic_filter import (
+        predict_isotopes,
+        score_pattern,
+    )
 
     sign = ion[-1] if ion and ion[-1] in "+-" else ""
     if not sign:
@@ -223,12 +235,32 @@ def score_ion_v2(
     if arrs is None:
         return None
     obs_me, obs_int, obs_snr, pred_rel = arrs
-    return score_pattern_v2(obs_me, obs_int, obs_snr, pred_rel,
-                            k_detect=k_detect, miss_penalty=miss_penalty, sigma_ppm=sigma_ppm)
+    return score_pattern_v2(
+        obs_me,
+        obs_int,
+        obs_snr,
+        pred_rel,
+        k_detect=k_detect,
+        miss_penalty=miss_penalty,
+        sigma_ppm=sigma_ppm,
+    )
 
 
-def score_v2_resample_std(mzs, ints, snrs, ion, *, ppm, mu=0.0, noise=0.0,
-                          sigma_ppm=None, k_detect=3.0, miss_penalty=0.3, n=16, rng=None):
+def score_v2_resample_std(
+    mzs,
+    ints,
+    snrs,
+    ion,
+    *,
+    ppm,
+    mu=0.0,
+    noise=0.0,
+    sigma_ppm=None,
+    k_detect=3.0,
+    miss_penalty=0.3,
+    n=16,
+    rng=None,
+):
     """ROBUSTNESS metric: std of the v2 score when each matched peak's intensity is
     resampled within its own measurement noise (Gaussian, sigma = intensity/SNR). A
     robust score barely moves under noise. None if the ion can't be scored."""
@@ -240,15 +272,27 @@ def score_v2_resample_std(mzs, ints, snrs, ion, *, ppm, mu=0.0, noise=0.0,
     obs_me, obs_int, obs_snr, pred_rel = arrs
     rng = rng or np.random.default_rng(0)
     matched = obs_int > 0
-    sigma_int = np.where(matched & (obs_snr > 0), obs_int / np.maximum(obs_snr, 1e-9), 0.0)
+    sigma_int = np.where(
+        matched & (obs_snr > 0), obs_int / np.maximum(obs_snr, 1e-9), 0.0
+    )
     scores = []
     for _ in range(n):
-        pert = np.where(matched, np.maximum(obs_int + rng.normal(0.0, sigma_int), 0.0), 0.0)
+        pert = np.where(
+            matched, np.maximum(obs_int + rng.normal(0.0, sigma_int), 0.0), 0.0
+        )
         if pert[0] <= 0:  # base perturbed below zero -> skip this draw
             continue
-        scores.append(score_pattern_v2(obs_me, pert, obs_snr, pred_rel,
-                                       k_detect=k_detect, miss_penalty=miss_penalty,
-                                       sigma_ppm=sigma_ppm))
+        scores.append(
+            score_pattern_v2(
+                obs_me,
+                pert,
+                obs_snr,
+                pred_rel,
+                k_detect=k_detect,
+                miss_penalty=miss_penalty,
+                sigma_ppm=sigma_ppm,
+            )
+        )
     return float(np.std(scores)) if len(scores) >= 2 else None
 
 
@@ -270,7 +314,10 @@ def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
         if j > i:
             ranks[order[i : j + 1]] = (i + 1 + j + 1) / 2
         i = j + 1
-    return float((ranks[y_true == 1].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
+    return float(
+        (ranks[y_true == 1].sum() - len(pos) * (len(pos) + 1) / 2)
+        / (len(pos) * len(neg))
+    )
 
 
 def _platt_fit(s: np.ndarray, y: np.ndarray) -> tuple:
@@ -295,7 +342,9 @@ def _ece(scores: np.ndarray, correct: np.ndarray, bins: int = 10) -> float:
     edges = np.linspace(0, 1, bins + 1)
     ece = 0.0
     for b in range(bins):
-        m = (scores >= edges[b]) & (scores < edges[b + 1] if b < bins - 1 else scores <= 1.0)
+        m = (scores >= edges[b]) & (
+            scores < edges[b + 1] if b < bins - 1 else scores <= 1.0
+        )
         if m.sum():
             ece += m.mean() * abs(correct[m].mean() - scores[m].mean())
     return float(ece)
@@ -305,28 +354,64 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("bundle_dir")
     ap.add_argument("--ppm", type=float, default=MZ_PPM)
-    ap.add_argument("--scorer", choices=["v1", "v2"], default="v1",
-                    help="v1 = current mascope_tools; v2 = detectability-gated")
-    ap.add_argument("--k-detect", type=float, default=3.0, help="v2: min expected SNR to call an absent isotopologue 'missing'")
-    ap.add_argument("--miss-penalty", type=float, default=0.3, help="v2: likelihood for a detectable-but-absent isotopologue")
-    ap.add_argument("--fit-sigma", action=argparse.BooleanOptionalAction, default=True,
-                    help="v2: fit per-sample mass accuracy (mu,sigma) from true assignments "
-                         "and use it (resolution-correct); --no-fit-sigma uses --sigma-ppm")
-    ap.add_argument("--sigma-ppm", type=float, default=None,
-                    help="v2: fixed mass-error width when --no-fit-sigma (else fitted)")
-    ap.add_argument("--match-k", type=float, default=6.0,
-                    help="v2: match window in units of sigma (scales with resolution)")
-    ap.add_argument("--intensity", choices=["snr", "linear"], default="snr",
-                    help="v2: intensity term — snr-normalised (default) or linear")
-    ap.add_argument("--dump-calibration", action="store_true",
-                    help="print the full-set Platt (a,b) for DEFAULT_CALIBRATION_V2")
+    ap.add_argument(
+        "--scorer",
+        choices=["v1", "v2"],
+        default="v1",
+        help="v1 = current mascope_tools; v2 = detectability-gated",
+    )
+    ap.add_argument(
+        "--k-detect",
+        type=float,
+        default=3.0,
+        help="v2: min expected SNR to call an absent isotopologue 'missing'",
+    )
+    ap.add_argument(
+        "--miss-penalty",
+        type=float,
+        default=0.3,
+        help="v2: likelihood for a detectable-but-absent isotopologue",
+    )
+    ap.add_argument(
+        "--fit-sigma",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="v2: fit per-sample mass accuracy (mu,sigma) from true assignments "
+        "and use it (resolution-correct); --no-fit-sigma uses --sigma-ppm",
+    )
+    ap.add_argument(
+        "--sigma-ppm",
+        type=float,
+        default=None,
+        help="v2: fixed mass-error width when --no-fit-sigma (else fitted)",
+    )
+    ap.add_argument(
+        "--match-k",
+        type=float,
+        default=6.0,
+        help="v2: match window in units of sigma (scales with resolution)",
+    )
+    ap.add_argument(
+        "--intensity",
+        choices=["snr", "linear"],
+        default="snr",
+        help="v2: intensity term — snr-normalised (default) or linear",
+    )
+    ap.add_argument(
+        "--dump-calibration",
+        action="store_true",
+        help="print the full-set Platt (a,b) for DEFAULT_CALIBRATION_V2",
+    )
     ap.add_argument("--baseline", help="JSON to compare against (regression gate)")
     ap.add_argument("--out", help="write metrics JSON here")
     a = ap.parse_args()
 
     cand_path = f"{a.bundle_dir}/expected/candidates.parquet"
-    filenames = pd.read_parquet(cand_path, columns=["filename"])["filename"].unique() \
-        if __import__("os").path.exists(cand_path) else []
+    filenames = (
+        pd.read_parquet(cand_path, columns=["filename"])["filename"].unique()
+        if __import__("os").path.exists(cand_path)
+        else []
+    )
 
     # Observed peaks per file: prefer the FULL spectrum + real SNR from the
     # filestore's peak_timeseries.zarr (satellites dropped); fall back to the
@@ -339,16 +424,23 @@ def main() -> int:
         df = load_filestore_peaks(a.bundle_dir, f)
         if df is not None:
             df = df[~df["is_satellite"]]
-            obs[f] = (df["mz"].to_numpy(float), df["height"].to_numpy(float),
-                      df["snr"].to_numpy(float), 0.0)
+            obs[f] = (
+                df["mz"].to_numpy(float),
+                df["height"].to_numpy(float),
+                df["snr"].to_numpy(float),
+                0.0,
+            )
             n_fs += 1
         else:
             g = matched[matched["filename"] == f].sort_values("mz")
             h = g["height"].to_numpy(float)
             noise = float(np.percentile(h, 2)) if len(h) else 1.0
             obs[f] = (g["mz"].to_numpy(float), h, None, noise)
-    src = "filestore peak_timeseries.zarr (real SNR, full spectrum)" if n_fs else \
-        "matched-target proxy (no SNR)"
+    src = (
+        "filestore peak_timeseries.zarr (real SNR, full spectrum)"
+        if n_fs
+        else "matched-target proxy (no SNR)"
+    )
     print(f"scorer={a.scorer}  peaks: {n_fs}/{len(filenames)} files from {src}")
 
     # Per-sample fitted mass accuracy (mu, sigma) for the resolution-correct mass term.
@@ -358,12 +450,16 @@ def main() -> int:
             cal[f] = fit_mass_accuracy(a.bundle_dir, f)
         sig = [v[1] for v in cal.values() if v[1] is not None]
         if sig:
-            print(f"fitted mass accuracy sigma: median {np.median(sig):.2f} ppm "
-                  f"(range {min(sig):.2f}-{max(sig):.2f}) over {len(sig)} files; "
-                  f"match window = {a.match_k}*sigma")
+            print(
+                f"fitted mass accuracy sigma: median {np.median(sig):.2f} ppm "
+                f"(range {min(sig):.2f}-{max(sig):.2f}) over {len(sig)} files; "
+                f"match window = {a.match_k}*sigma"
+            )
     elif a.scorer == "v2":
         fb = a.sigma_ppm if a.sigma_ppm is not None else "FALLBACK"
-        print(f"v2 mass term: FIXED sigma_ppm={fb}, match window={a.ppm} ppm (--no-fit-sigma)")
+        print(
+            f"v2 mass term: FIXED sigma_ppm={fb}, match window={a.ppm} ppm (--no-fit-sigma)"
+        )
 
     try:
         cands = pd.read_parquet(cand_path)
@@ -390,9 +486,19 @@ def main() -> int:
             mzs, ints, snrs, noise = rec
             if a.scorer == "v2":
                 window, sigma, mu = _v2_params(r.filename)
-                s = score_ion_v2(mzs, ints, snrs, r.candidate_ion, ppm=window, noise=noise,
-                                 k_detect=a.k_detect, miss_penalty=a.miss_penalty,
-                                 sigma_ppm=sigma, mu=mu, snr_intensity=(a.intensity == "snr"))
+                s = score_ion_v2(
+                    mzs,
+                    ints,
+                    snrs,
+                    r.candidate_ion,
+                    ppm=window,
+                    noise=noise,
+                    k_detect=a.k_detect,
+                    miss_penalty=a.miss_penalty,
+                    sigma_ppm=sigma,
+                    mu=mu,
+                    snr_intensity=(a.intensity == "snr"),
+                )
             else:
                 s = score_ion(mzs, ints, r.candidate_ion, ppm=a.ppm)
             if s is not None:
@@ -401,7 +507,9 @@ def main() -> int:
 
     s1 = score_all()
     s2 = score_all()
-    reproducible = bool(np.array_equal(np.nan_to_num(s1, nan=-1), np.nan_to_num(s2, nan=-1)))
+    reproducible = bool(
+        np.array_equal(np.nan_to_num(s1, nan=-1), np.nan_to_num(s2, nan=-1))
+    )
     cands = cands.assign(score=s1)
 
     # ---- ranking: per anchor, is the true candidate the argmax? ----
@@ -428,7 +536,10 @@ def main() -> int:
                     bool(gp.loc[gp["score"].idxmax(), "is_true"])
                 )
 
-    auc = _roc_auc(cands["is_true"].to_numpy(int), np.nan_to_num(cands["score"].to_numpy(), nan=0.0))
+    auc = _roc_auc(
+        cands["is_true"].to_numpy(int),
+        np.nan_to_num(cands["score"].to_numpy(), nan=0.0),
+    )
 
     # ---- calibration over the candidate pool (raw, in-sample) ----
     valid = cands.dropna(subset=["score"]).copy()
@@ -469,8 +580,17 @@ def main() -> int:
             mzs, ints, snrs, noise = rec
             window, sigma, mu = _v2_params(r.filename)
             sd = score_v2_resample_std(
-                mzs, ints, snrs, r.candidate_ion, ppm=window, mu=mu, noise=noise,
-                sigma_ppm=sigma, k_detect=a.k_detect, miss_penalty=a.miss_penalty, rng=rrng,
+                mzs,
+                ints,
+                snrs,
+                r.candidate_ion,
+                ppm=window,
+                mu=mu,
+                noise=noise,
+                sigma_ppm=sigma,
+                k_detect=a.k_detect,
+                miss_penalty=a.miss_penalty,
+                rng=rrng,
             )
             if sd is not None:
                 stds.append(sd)
@@ -482,18 +602,25 @@ def main() -> int:
         "n_contested": int(n_contested),
         "reproducible": reproducible,
         "rank_top1_all": round(float(np.mean(top1)), 4) if top1 else None,
-        "rank_top1_contested": round(float(np.mean(top1_contested)), 4) if top1_contested else None,
+        "rank_top1_contested": round(float(np.mean(top1_contested)), 4)
+        if top1_contested
+        else None,
         "rank_top1_contested_plausible": (
             round(float(np.mean(top1_contested_plausible)), 4)
-            if top1_contested_plausible else None
+            if top1_contested_plausible
+            else None
         ),
         "n_contested_plausible": int(n_contested_plaus),
         "roc_auc": round(auc, 4),
         "ece": round(ece, 4),
         "ece_calibrated": round(float(ece_cal), 4) if ece_cal is not None else None,
         "robustness_score_std": robustness,
-        "true_score_median": round(float(np.median(true_scores)), 4) if len(true_scores) else None,
-        "true_score_p10": round(float(np.percentile(true_scores, 10)), 4) if len(true_scores) else None,
+        "true_score_median": round(float(np.median(true_scores)), 4)
+        if len(true_scores)
+        else None,
+        "true_score_p10": round(float(np.percentile(true_scores, 10)), 4)
+        if len(true_scores)
+        else None,
     }
 
     print("=== match-score evaluation (mascope_tools baseline) ===")

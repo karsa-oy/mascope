@@ -1357,7 +1357,9 @@ class AssignmentCalibration(Base):
     provisional: Mapped[bool] = mapped_column(Boolean, default=True)
     corroboration_weights: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    fit_utc: Mapped[Optional[dt]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    fit_utc: Mapped[Optional[dt]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     created_utc: Mapped[dt] = mapped_column(
         TIMESTAMP(timezone=True), default=lambda: dt.now(timezone.utc)
     )
@@ -1393,7 +1395,9 @@ class AssignmentVerification(Base):
 
     __tablename__ = "assignment_verification"
 
-    assignment_verification_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    assignment_verification_id: Mapped[str] = mapped_column(
+        String(32), primary_key=True
+    )
     sample_item_id: Mapped[str] = mapped_column(
         String(16),
         ForeignKey("sample_item.sample_item_id", ondelete="CASCADE"),
@@ -1406,7 +1410,9 @@ class AssignmentVerification(Base):
         nullable=True,
         index=True,
     )
-    peak_assignment_run_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    peak_assignment_run_id: Mapped[Optional[str]] = mapped_column(
+        String(16), nullable=True
+    )
     # Stable identity (survives re-runs): observed peak + judged formula/adduct.
     sample_peak_id: Mapped[str] = mapped_column(String(20), index=True)
     assigned_formula: Mapped[Optional[str]] = mapped_column(String(256))
