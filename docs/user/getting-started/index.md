@@ -1,4 +1,7 @@
-# Getting started
+# Run the demo
+
+Already have a Mascope to log in to? Start with
+[First steps in the app](first-steps.md) instead.
 
 The fastest way to see Mascope is to run it on your own machine with Docker,
 preloaded with the demo dataset. This is a local, single-machine setup served
@@ -35,6 +38,7 @@ To run Mascope for real - with your own data, on a server, over HTTPS - see
 
 ## Next steps
 
+- [First steps in the app](first-steps.md) - find your way around the UI the demo just opened.
 - [Concepts](../concepts/index.md) - the domain model (samples, batches, matching, calibration).
 - [Guides](../guides/index.md) - task-by-task how-tos.
 - Sharing Mascope with a team on a LAN, or production deployment: see

@@ -8,7 +8,8 @@ calibration, and explore results in the web UI or via the Python SDK.
 
 | You are... | Start here |
 | --- | --- |
-| **Curious** - want to see it with real data | [Getting started](getting-started/index.md) - run Mascope on your machine with a demo dataset |
+| **New here** - your organisation runs Mascope and you have an account | [First steps in the app](getting-started/first-steps.md) - sign in, find your way around, set up a workspace |
+| **Curious** - want to see it with real data | [Run the demo](getting-started/index.md) - Mascope on your machine with a demo dataset |
 | **A scientist** - want to analyse your data | [Concepts](concepts/index.md), then [Guides](guides/index.md) |
 | **An instrument operator** | [Instruments & acquisition](instruments/index.md) |
 | **An SDK / notebook user** | [SDK & API](sdk/index.md) |

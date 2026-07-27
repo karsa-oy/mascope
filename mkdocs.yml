@@ -73,7 +73,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started/index.md
+  - Getting started:
+      - Run the demo: getting-started/index.md
+      - First steps in the app: getting-started/first-steps.md
   - Concepts: concepts/index.md
   - How it works:
       - Overview: how-it-works/index.md
@@ -84,6 +86,7 @@ nav:
   - Guides:
       - Overview: guides/index.md
       - Import data files: guides/import-files.md
+      - Target collections & matching: guides/target-collections.md
   - Instruments & acquisition: instruments/index.md
   - SDK & API: sdk/index.md
   - Reference: reference/index.md
