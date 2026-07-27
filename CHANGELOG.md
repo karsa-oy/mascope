@@ -4,6 +4,13 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in backend performance tracing: with the GlitchTip DSN set,
+  `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
+  requests as transactions, surfacing per-endpoint latency in GlitchTip's
+  Performance tab. Invalid values log a warning and keep tracing off.
+
 ## [1.4.6] - 2026.07.27
 
 ### Fixed
