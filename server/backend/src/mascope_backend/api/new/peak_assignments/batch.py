@@ -107,44 +107,79 @@ async def assign_sample_batch_peaks(
     parent_id: str | None = None,
 ) -> dict:
     """
-    Run the peak assignment engine over every sample in a sample batch.
+    Run the peak assignment engine over every eligible sample in a sample batch.
 
-    Each sample is assigned in sequence with its own PeakAssignmentRun. A single
-    failing sample (corrupt file, unreadable metadata, transient DB error) fails
-    only that sample, never the rest of the batch. Blank samples (no peaks) are
-    skipped by the engine and counted as skipped here.
+    Eligible samples are assigned in sequence, each with its own
+    PeakAssignmentRun. A single failing sample (corrupt file, unreadable
+    metadata, transient DB error) fails only that sample, never the rest of the
+    batch. Samples the engine cannot usefully assign - blank ones, and ones whose
+    m/z calibration is unverified - are filtered out by ``_ineligible_reason``
+    before the engine is called, and counted as skipped.
+
+    Refuses immediately if this worker is already assigning the same batch.
 
     :param sample_batch_id: ID of the sample batch to assign
     :param config: Optional run configuration applied to every sample. Resolved
-        once here (see ``default_batch_config``) and passed to every sample, so
-        one decision is recorded on every run rather than each sample
-        re-resolving its own defaults.
+        once here (see ``default_batch_config``, which is Stage A only) and
+        passed to every sample, so one decision is recorded on every run rather
+        than each sample re-resolving its own defaults.
     :param independent_transaction: Flag for transaction/event handling
     :param user_id: Current user triggered operation (for user notifications)
     :param process_id: Process identifier for progress tracking
     :param parent_id: Parent process identifier
     :return: Batch data with per-sample counts and a status message
     """
+    # Claim the batch before the first await. Checking here and adding after the
+    # sample query would let two concurrent requests - the double-clicked menu
+    # item - both pass the check, and the first to finish would then clear the
+    # marker out from under the second.
+    if sample_batch_id in _batch_assignments_in_flight:
+        return await _already_running_result(sample_batch_id)
+    _batch_assignments_in_flight.add(sample_batch_id)
+    try:
+        return await _run_batch_assignment(
+            sample_batch_id=sample_batch_id,
+            config=config,
+            user_id=user_id,
+            process_id=process_id,
+            parent_id=parent_id,
+        )
+    finally:
+        _batch_assignments_in_flight.discard(sample_batch_id)
+
+
+async def _already_running_result(sample_batch_id: str) -> dict:
+    """Refusal payload for a batch this worker is already assigning."""
+    # Safe to await now: the decision to refuse is already made.
+    sample_batch = await fetch_sample_batch(sample_batch_id)
+    message = (
+        f"Peak assignment is already running for sample batch "
+        f"'{sample_batch.sample_batch_name}'."
+    )
+    runtime.logger.info(message)
+    return {
+        "status": "skipped",
+        "message": message,
+        "data": {
+            "assigned_samples_count": 0,
+            "failed_samples_count": 0,
+            "skipped_samples_count": 0,
+            "total_samples_count": 0,
+        },
+        "_notification_data": {"sample_batch_id": sample_batch_id},
+    }
+
+
+async def _run_batch_assignment(
+    sample_batch_id: str,
+    config: PeakAssignmentConfig | None,
+    user_id: int | None,
+    process_id: str | None,
+    parent_id: str | None,
+) -> dict:
+    """Body of a batch assignment, run with the in-flight marker already held."""
     sample_batch = await fetch_sample_batch(sample_batch_id)
     sample_batch_name = sample_batch.sample_batch_name
-
-    if sample_batch_id in _batch_assignments_in_flight:
-        message = (
-            f"Peak assignment is already running for sample batch "
-            f"'{sample_batch_name}'."
-        )
-        runtime.logger.info(message)
-        return {
-            "status": "skipped",
-            "message": message,
-            "data": {
-                "assigned_samples_count": 0,
-                "failed_samples_count": 0,
-                "skipped_samples_count": 0,
-                "total_samples_count": 0,
-            },
-            "_notification_data": {"sample_batch_id": sample_batch_id},
-        }
 
     # Resolve the configuration once, so every sample of the batch runs - and
     # records - the same decision.
@@ -210,22 +245,18 @@ async def assign_sample_batch_peaks(
 
     assigned_samples: list[str] = []
     failed_samples: list[str] = []
-    _batch_assignments_in_flight.add(sample_batch_id)
-    try:
-        async with _batch_assignment_gate:
-            await _assign_eligible_samples(
-                samples=samples,
-                sample_batch_id=sample_batch_id,
-                sample_batch_name=sample_batch_name,
-                config=config,
-                user_id=user_id,
-                process_id=process_id,
-                parent_id=parent_id,
-                assigned_samples=assigned_samples,
-                failed_samples=failed_samples,
-            )
-    finally:
-        _batch_assignments_in_flight.discard(sample_batch_id)
+    async with _batch_assignment_gate:
+        await _assign_eligible_samples(
+            samples=samples,
+            sample_batch_id=sample_batch_id,
+            sample_batch_name=sample_batch_name,
+            config=config,
+            user_id=user_id,
+            process_id=process_id,
+            parent_id=parent_id,
+            assigned_samples=assigned_samples,
+            failed_samples=failed_samples,
+        )
 
     return _batch_result(
         sample_batch_id=sample_batch_id,

@@ -243,9 +243,13 @@ async def assign_sample_batch_peaks_route(
     Assigns a composition to every observed peak of each sample: first from the
     known target library (Stage A), then via untargeted composition search for
     the remainder (Stage B, configurable). Each sample gets its own
-    PeakAssignmentRun, readable via the sample GET endpoints. A batch run is a
-    deliberate, potentially heavy operation, so it defaults to the full two-stage
-    engine unless the body narrows the config.
+    PeakAssignmentRun, readable via the sample GET endpoints.
+
+    Because a batch multiplies per-sample cost by the number of samples, it
+    defaults to **Stage A only**; pass a config with ``run_untargeted: true`` to
+    include the untargeted stage. Blank samples and samples whose m/z
+    calibration is unverified are skipped. A batch already being assigned by
+    this worker is refused rather than queued.
 
     :param sample_batch_id: The unique identifier of the sample batch.
     :param body: Optional run configuration overrides applied to every sample.

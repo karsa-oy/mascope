@@ -98,9 +98,11 @@ export const useBatch = defineStore('app.data.batch', () => {
           type: 'rematch_batches'
         }
       ),
-    // Launch a peak assignment run for every sample in the batch. Explicit batch
-    // runs default to the full two-stage engine (Stage A + untargeted Stage B);
-    // pass a config to narrow it. Completion arrives via peak_assignment_reload.
+    // Launch a peak assignment run for every eligible sample in the batch.
+    // Batch runs default to Stage A only, since cost scales with the number of
+    // samples; pass a config with run_untargeted to widen it. Blank and
+    // uncalibrated samples are skipped. Completion arrives via
+    // peak_assignment_reload.
     assign: async ({ sample_batch_id, config = null }) =>
       api.http.post(
         `/peak-assignments/batch/${sample_batch_id}/assign`,

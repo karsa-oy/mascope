@@ -247,16 +247,54 @@ class TestLedgerCompleteness:
 
     @pytest.mark.asyncio
     async def test_owners_are_inserted_before_their_children(self):
-        """A child's owner must already exist: the self-FK is validated per row."""
+        """A child's owner must already exist: the self-FK is validated per row.
+
+        The child's peak id deliberately sorts *before* its owner's, so the
+        natural per-peak ordering puts the child first and only the explicit
+        owners-first sort can fix it. With the ids the other way round this test
+        would pass whether or not that sort existed.
+        """
         from mascope_backend.api.new.peak_assignments.config import (
             PeakAssignmentConfig,
         )
 
-        peaks = _peaks_df([("p1", 181.0707, 10000.0), ("p2", 182.0741, 660.0)])
+        # "a-child" sorts before "b-owner", and the M0 (owner) is the
+        # higher-abundance isotopologue, i.e. b-owner.
+        rows = [
+            _isotope_row(
+                target_isotope_id="ti-1",
+                target_ion_id="ion-1",
+                target_compound_id="tc-1",
+                compound_formula="C6H12O6",
+                ion_formula="C6H13O6+",
+                mz=181.0707,
+                relative_abundance=1.0,
+                sample_peak_id="b-owner",
+                sample_peak_intensity=10000.0,
+            ),
+            _isotope_row(
+                target_isotope_id="ti-2",
+                target_ion_id="ion-1",
+                target_compound_id="tc-1",
+                compound_formula="C6H12O6",
+                ion_formula="C6H13O6+",
+                mz=182.0741,
+                relative_abundance=0.066,
+                sample_peak_id="a-child",
+                sample_peak_intensity=660.0,
+            ),
+        ]
+        peaks = _peaks_df(
+            [("b-owner", 181.0707, 10000.0), ("a-child", 182.0741, 660.0)]
+        )
         recorder = _Recorder()
-        _start(_patches(recorder, peaks, _stage_a_rows()))
+        _start(_patches(recorder, peaks, rows))
 
         await _run(PeakAssignmentConfig(run_untargeted=False))
+
+        # Guard against the fixture silently losing its point.
+        owners = [r for r in recorder.rows if r.get("owner_peak_assignment_id")]
+        assert owners, "fixture produced no iso_child row to order"
 
         seen_ids: set[str] = set()
         for row in recorder.rows:

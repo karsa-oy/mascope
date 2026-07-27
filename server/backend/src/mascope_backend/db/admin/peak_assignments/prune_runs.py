@@ -65,6 +65,13 @@ async def _select_prunable_run_ids(
     # each sample. Ranked in Python over an ordered scan rather than a window
     # function, so the same code path works on any supported Postgres and stays
     # readable; the run table is small relative to the assignment table.
+    #
+    # NULLS LAST is load-bearing, not cosmetic. The timestamp column is nullable
+    # and Postgres orders DESC as NULLS FIRST, so a run with no timestamp would
+    # rank as the *newest*, take a keep slot, and push a genuinely-newest run
+    # past the cutoff - deleting a live ledger. The run id breaks ties so two
+    # invocations agree on which run survives, which is what lets the dry run
+    # promise what a real run will do.
     completed = (
         await session.execute(
             select(
@@ -74,7 +81,8 @@ async def _select_prunable_run_ids(
             .where(PeakAssignmentRun.status == "completed")
             .order_by(
                 PeakAssignmentRun.sample_item_id,
-                PeakAssignmentRun.peak_assignment_run_utc_created.desc(),
+                PeakAssignmentRun.peak_assignment_run_utc_created.desc().nullslast(),
+                PeakAssignmentRun.peak_assignment_run_id.desc(),
             )
         )
     ).all()

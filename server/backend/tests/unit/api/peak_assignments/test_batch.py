@@ -334,3 +334,57 @@ async def test_in_flight_marker_is_released_after_a_failing_batch():
             pass
 
     assert "batch-1" not in batch_module._batch_assignments_in_flight
+
+
+@pytest.mark.asyncio
+async def test_two_concurrent_requests_for_one_batch_refuse_one():
+    """The real double-click case: two tasks racing for the same batch.
+
+    The guard has to claim the batch before its first await. Checking early and
+    marking late lets both requests past the check, and then the first to finish
+    clears the marker while the second is still running. This test drives both
+    concurrently rather than pre-seeding the set, so it fails if the claim is not
+    atomic.
+    """
+    import asyncio
+
+    from mascope_backend.api.new.peak_assignments import batch as batch_module
+    from mascope_backend.api.new.peak_assignments.batch import (
+        assign_sample_batch_peaks,
+    )
+
+    samples = [_make_sample("si-1"), _make_sample("si-2")]
+    patches = _base_patches(samples)
+    mocks = _start(patches, samples)
+
+    # Make each sample slow enough that the two calls genuinely overlap.
+    async def slow_assign(**_kwargs):
+        await asyncio.sleep(0.05)
+        return {"status": "success"}
+
+    mocks["assign"].side_effect = slow_assign
+
+    batch_module._batch_assignments_in_flight.discard("batch-1")
+    first, second = await asyncio.gather(
+        assign_sample_batch_peaks(
+            sample_batch_id="batch-1",
+            independent_transaction=True,
+            user_id=42,
+            process_id="proc-1",
+        ),
+        assign_sample_batch_peaks(
+            sample_batch_id="batch-1",
+            independent_transaction=True,
+            user_id=42,
+            process_id="proc-2",
+        ),
+    )
+
+    statuses = sorted(r["status"] for r in (first, second))
+    assert statuses == ["skipped", "success"], (
+        f"expected exactly one refusal, got {statuses}"
+    )
+    # Only the winning run assigned; the refused one did no work.
+    assert mocks["assign"].call_count == len(samples)
+    # And the marker is clean afterwards.
+    assert "batch-1" not in batch_module._batch_assignments_in_flight
