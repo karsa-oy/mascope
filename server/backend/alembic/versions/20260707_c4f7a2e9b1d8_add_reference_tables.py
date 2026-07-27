@@ -7,7 +7,7 @@ database integration. reference_compound indexes formula and monoisotopic_mass
 is ingested by this migration - schema only.
 
 Revision ID: c4f7a2e9b1d8
-Revises: c7a1e5d9b2f4
+Revises: f2d8b5c3a9e1
 Create Date: 2026-07-07 12:00:00.000000
 
 """
@@ -20,7 +20,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c4f7a2e9b1d8"
-down_revision: Union[str, Sequence[str], None] = "c7a1e5d9b2f4"
+down_revision: Union[str, Sequence[str], None] = "f2d8b5c3a9e1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
