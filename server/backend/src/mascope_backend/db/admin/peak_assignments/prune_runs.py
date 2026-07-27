@@ -30,7 +30,7 @@ Entry Points:
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 
 from mascope_backend.db import PeakAssignment, PeakAssignmentRun, async_session
 from mascope_backend.runtime import runtime
@@ -87,18 +87,20 @@ async def _select_prunable_run_ids(
             prunable.append(run_id)
 
     # Non-completed runs past the grace period. Falls back to the created
-    # timestamp because an interrupted run may never have been given a
-    # completed timestamp.
+    # timestamp because an interrupted run may never have been given a completed
+    # one. A run with neither is treated as ancient rather than skipped: both
+    # columns are nullable, and `NULL < cutoff` is NULL, so comparing alone would
+    # make such a row immortal - invisible to the read model yet never reclaimed.
     cutoff = datetime.now(timezone.utc) - timedelta(hours=keep_failed_hours)
+    age = func.coalesce(
+        PeakAssignmentRun.peak_assignment_run_utc_completed,
+        PeakAssignmentRun.peak_assignment_run_utc_created,
+    )
     stale = (
         await session.execute(
             select(PeakAssignmentRun.peak_assignment_run_id).where(
                 PeakAssignmentRun.status != "completed",
-                func.coalesce(
-                    PeakAssignmentRun.peak_assignment_run_utc_completed,
-                    PeakAssignmentRun.peak_assignment_run_utc_created,
-                )
-                < cutoff,
+                or_(age < cutoff, age.is_(None)),
             )
         )
     ).scalars()
