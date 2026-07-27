@@ -68,12 +68,22 @@ Open the **Raw files** tab and click **Edit ionizations** to open the *Edit
 Ionization Settings* dialog. It has two tabs: **Ionization Modes** and
 **Ionization Mechanisms**.
 
-**1. Define the mechanisms first (Ionization Mechanisms tab).** A mechanism is a
-single charge-forming reaction, written as `[modification][polarity]` — the
-composition change followed by the ion polarity. For example `+H+` is protonation
-in positive mode, `-H-` is deprotonation in negative mode, and `+Br-` is a
-bromide adduct in negative mode. A mode can only use mechanisms of its own
-polarity, so make sure the ones you need exist.
+**1. Define the mechanisms first (Ionization Mechanisms tab).** A mechanism
+describes a single charge-forming reaction as an operation, a modification
+formula, and the charge of the transferred species: a leading `+` (add) or `-`
+(remove), the formula added or removed (for example `H` or `Br`), and a trailing
+`+` or `-` giving that species' charge. The *ion* polarity is not written
+directly — it follows from the two signs: adding a positively charged species or
+removing a negatively charged one yields a positive ion, and vice versa. For
+example:
+
+- `+H+` — protonation, `[M+H]+` (positive)
+- `-H+` — deprotonation, i.e. removal of a proton (`H+`), giving `[M-H]-` (negative)
+- `+Br-` — bromide adduct, `[M+Br]-` (negative)
+- a bare `+` or `-` — electron transfer
+
+A mode can only use mechanisms of its own polarity, so make sure the ones you
+need exist.
 
 **2. Create the mode (Ionization Modes tab).** Fill in the *Create New Ionization
 Mode* form:
