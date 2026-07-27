@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.4.5] - 2026.07.27
+
 ### Added
 
 - Fleet release rollouts as a playbook: `tooling/fleet/update.yml` deploys a
@@ -16,6 +18,21 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   (`tooling/fleet/group_vars/fleet/`): the encrypted vault (gitignored, kept
   out of this public repo) holds each server's password, unlocked with a single
   `--ask-vault-pass` prompt so whole-fleet runs no longer need per-host `-K`.
+
+- Stack-health push monitoring: `tooling/monitoring/doctor-push.sh` reports
+  `mascope prod doctor` results to an Uptime Kuma push monitor per server
+  (dead-man's switch), carrying disk usage in each heartbeat; runbook section
+  in `tooling/monitoring/README.md`. The systemd README now also documents the
+  disk-space monitor units (`mascope-disk-check.service`/`.timer`), which its
+  unit table previously omitted.
+
+- Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the
+  sshd hardening drop-in, the ufw ruleset (tailnet-only SSH, Cloudflare-only
+  443, canonical container-NAT block), the load-bearing Docker
+  `iptables: false` setting, and unattended security upgrades - with a
+  check-first drift workflow (`ansible-playbook site.yml --check --diff`).
+  The inventory is deliberately an example file: real addresses stay out of
+  this public repository.
 
 ### Fixed
 
@@ -60,23 +77,6 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - GlitchTip events now carry a friendly per-server identity: `server_name` is
   the runtime env name (e.g. `site1`) instead of the opaque Docker container
   id the SDK falls back to under containers.
-
-### Added
-
-- Stack-health push monitoring: `tooling/monitoring/doctor-push.sh` reports
-  `mascope prod doctor` results to an Uptime Kuma push monitor per server
-  (dead-man's switch), carrying disk usage in each heartbeat; runbook section
-  in `tooling/monitoring/README.md`. The systemd README now also documents the
-  disk-space monitor units (`mascope-disk-check.service`/`.timer`), which its
-  unit table previously omitted.
-
-- Fleet configuration as code under `tooling/fleet/` (Ansible): roles for the
-  sshd hardening drop-in, the ufw ruleset (tailnet-only SSH, Cloudflare-only
-  443, canonical container-NAT block), the load-bearing Docker
-  `iptables: false` setting, and unattended security upgrades - with a
-  check-first drift workflow (`ansible-playbook site.yml --check --diff`).
-  The inventory is deliberately an example file: real addresses stay out of
-  this public repository.
 
 ## [1.4.4] - 2026.07.26
 
