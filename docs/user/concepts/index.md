@@ -116,9 +116,9 @@ graph TD
 
 Two related concepts describe how neutral molecules become the ions you measure:
 
-- An **ionization mechanism** is a single charge-forming reaction — an addition
-  (adduct) or an abstraction, with a polarity. Each target ion is tied to one
-  mechanism.
+- An **ionization mechanism** is a single charge-forming reaction — the addition
+  or abstraction of a charged species (protonation, deprotonation, adduct
+  formation, or electron transfer). Each target ion is tied to one mechanism.
 - An **ionization mode** is the higher-level scheme you select for a measurement.
   It bundles a set of mechanisms together with a designated **calibrant
   collection** and **diagnostic collection**, and carries a short **token** used
