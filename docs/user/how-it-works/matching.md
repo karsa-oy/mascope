@@ -115,5 +115,5 @@ detectability gate that only penalises an absent peak when it should have been s
 abundance-weighted geometric-mean aggregation. On the reference dataset this improves both
 ranking (ROC-AUC) and calibration over v1. The fit score is the scoring engine of
 [peak assignment](peak_assignment.md); its full model, parameters and literature references
-are in the [developer reference](../../../libraries/tools/docs/fit_score.md). The legacy v1
+are in the developer reference, `libraries/tools/docs/fit_score.md`. The legacy v1
 score is retained for the targeted path and documented above for reference.

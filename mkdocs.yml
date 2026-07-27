@@ -48,6 +48,7 @@ nav:
       - Peak detection: how-it-works/peak_detection.md
       - Calibration: how-it-works/calibration.md
       - Matching: how-it-works/matching.md
+      - Peak assignment: how-it-works/peak_assignment.md
   - Guides: guides/index.md
   - Instruments & acquisition: instruments/index.md
   - SDK & API: sdk/index.md
