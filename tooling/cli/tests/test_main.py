@@ -10,7 +10,10 @@ The callback tests pin down the version/env-var contract that `mascope prod`
 deploys rely on (MASCOPE_VERSION pinning, log level/grep propagation).
 """
 
+import json
 import os
+
+import pytest
 
 from mascope_cli.main import app
 
@@ -86,3 +89,30 @@ def test_stale_log_grep_is_cleared(cli_runner, monkeypatch):
     result = cli_runner.invoke(app, ["path"])
     assert result.exit_code == 0
     assert "MASCOPE_LOGGREP" not in os.environ
+
+
+@pytest.mark.parametrize(
+    "corrupt", ["", '{"env": {"acti'], ids=["truncated", "partial"]
+)
+def test_entrypoint_survives_an_unreadable_state_file(
+    cli_runner, mascope_home, corrupt
+):
+    """
+    A concurrent writer must not be able to kill the CLI during startup.
+
+    The callback clears the env override on every invocation, so any two
+    commands starting at the same moment read and write `.runtime/state.json`
+    concurrently. A backup cron (`mascope prod db backup create`) and a
+    monitoring cron (`mascope prod doctor`) firing the same second used to be
+    enough: the truncating write left the reader with an unhandled
+    JSONDecodeError before its command ever ran.
+    """
+    state_path = mascope_home / ".runtime" / "state.json"
+    state_path.write_text(corrupt)
+
+    result = cli_runner.invoke(app, ["path"])
+
+    assert result.exit_code == 0, result.output
+    assert str(mascope_home) in result.output
+    # The startup write repaired the file instead of leaving it corrupt.
+    assert json.loads(state_path.read_text())["env"]["override"] is None

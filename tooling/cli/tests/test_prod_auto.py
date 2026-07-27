@@ -10,6 +10,7 @@ classification and window state.
 import datetime
 import importlib
 import json
+import os
 import urllib.error
 
 import pytest
@@ -75,6 +76,34 @@ def test_record_load_clear_pending(tmp_path):
 
     au.clear_pending(root)
     assert au.load_pending(root) is None
+
+
+def test_save_pending_is_atomic(tmp_path, monkeypatch):
+    """
+    A reader must never catch this write half-done.
+
+    `load_pending` reports an unparseable file as "nothing pending", so a
+    partial write would make a doctor cron overlapping an update silently
+    forget a pending migration.
+    """
+    root = str(tmp_path)
+    au.record_pending(root, "v1.3.0", _HEAD)
+    state_path = au.update_dir(root) / "state.json"
+    seen = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        # What a concurrent reader would find just before the swap.
+        seen.append(au.load_pending(root))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", spy)
+    au.record_pending(root, "v1.4.0", "def456abc123")
+    monkeypatch.undo()
+
+    assert [p.version for p in seen] == ["v1.3.0"]  # old file intact until swap
+    assert au.load_pending(root).version == "v1.4.0"
+    assert [p.name for p in state_path.parent.iterdir()] == ["state.json"]
 
 
 def test_record_pending_preserves_first_seen(tmp_path, monkeypatch):
