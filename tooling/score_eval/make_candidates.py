@@ -26,10 +26,10 @@ import sys
 
 import pandas as pd
 
-from mascope_tools.composition import CompositionSearchConfig
+from mascope_tools.composition import CompositionSearchConfig, utils
 from mascope_tools.composition.finder import find_compositions
 from mascope_tools.composition.heuristic_filter import apply_heuristic_rules
-from mascope_tools.composition import utils
+
 
 # Ionization channels + grid element ranges per polarity. '-H-' is deprotonation as a
 # charge-−1 anion (mascope_tools notation), '+Br-' bromide adduct, etc.
@@ -101,7 +101,9 @@ def candidates_for_peak(mz: float, polarity: str, *, ppm: float, cap: int) -> di
                 key = _norm_ion(ion)
                 is_plaus = neutral in plausible_neutrals
                 prev = out.get(key)
-                out[key] = (mech, is_plaus) if prev is None else (prev[0], prev[1] or is_plaus)
+                out[key] = (
+                    (mech, is_plaus) if prev is None else (prev[0], prev[1] or is_plaus)
+                )
         except Exception:
             continue
     return out
@@ -112,13 +114,19 @@ def main() -> int:
     ap.add_argument("bundle_dir")
     ap.add_argument("--ppm", type=float, default=3.0, help="enumeration m/z window")
     ap.add_argument("--max-per-channel", type=int, default=25)
-    ap.add_argument("--limit", type=int, default=0, help="cap peaks (0 = all; for smoke)")
+    ap.add_argument(
+        "--limit", type=int, default=0, help="cap peaks (0 = all; for smoke)"
+    )
     a = ap.parse_args()
 
     peaks = pd.read_parquet(f"{a.bundle_dir}/expected/peaks.parquet")
     # M0 anchors only: the assigned ion's monoisotopic row (no [isotope] label).
-    m0 = peaks[~peaks["target_isotope_formula"].astype(str).str.contains(r"\[", regex=True)]
-    m0 = m0.drop_duplicates(["filename", "target_isotope_formula"]).reset_index(drop=True)
+    m0 = peaks[
+        ~peaks["target_isotope_formula"].astype(str).str.contains(r"\[", regex=True)
+    ]
+    m0 = m0.drop_duplicates(["filename", "target_isotope_formula"]).reset_index(
+        drop=True
+    )
     if a.limit:
         m0 = m0.head(a.limit)
     print(f"M0 anchors: {len(m0)} (of {len(peaks)} isotopologue rows)")
@@ -156,7 +164,6 @@ def main() -> int:
     out = pd.DataFrame(rows)
     dst = f"{a.bundle_dir}/expected/candidates.parquet"
     out.to_parquet(dst, index=False)
-    n_anchor = out["filename"].nunique() if len(out) else 0
     per = (len(out) / len(m0)) if len(m0) else 0
     print(
         f"\nwrote {dst}\n"

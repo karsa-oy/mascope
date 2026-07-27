@@ -210,8 +210,7 @@ async def send_progress_user_notification(
             inc = increment if increment is not None else 0.0
             notification_copy.progress = ((item_index + inc) / total_samples) * 100
             notification_copy.message = (
-                f"Assigning peaks, processing sample "
-                f"{item_index + 1}/{total_samples}"
+                f"Assigning peaks, processing sample {item_index + 1}/{total_samples}"
             )
 
     # Emit to all specified rooms with optional smart routing

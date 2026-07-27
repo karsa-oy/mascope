@@ -51,9 +51,7 @@ def test_distinct_adducts_are_deduped_and_sorted():
 
 def test_untargeted_and_unassigned_rows_are_skipped():
     # rows with no compound id (untargeted / unassigned) contribute nothing
-    out = adduct_corroboration(
-        [_rec("cmp1", "H+"), _rec(None, "H+"), _rec("", "Na+")]
-    )
+    out = adduct_corroboration([_rec("cmp1", "H+"), _rec(None, "H+"), _rec("", "Na+")])
     assert set(out) == {"cmp1"}
 
 

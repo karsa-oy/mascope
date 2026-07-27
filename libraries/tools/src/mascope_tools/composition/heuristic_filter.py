@@ -156,10 +156,20 @@ def rule_valence(candidates: pl.DataFrame, **kwargs) -> tuple[pl.Series, list[st
 # molecule. Any element OUTSIDE this table makes the check fail-open (the candidate is
 # never rejected on valence grounds) so unusual chemistry is never wrongly cut.
 _SENIOR_VALENCE = {
-    "H": 1, "D": 1, "T": 1,
-    "B": 3, "C": 4, "N": 3, "O": 2, "F": 1,
-    "Si": 4, "P": 3, "S": 2, "Cl": 1,
-    "Br": 1, "I": 1,
+    "H": 1,
+    "D": 1,
+    "T": 1,
+    "B": 3,
+    "C": 4,
+    "N": 3,
+    "O": 2,
+    "F": 1,
+    "Si": 4,
+    "P": 3,
+    "S": 2,
+    "Cl": 1,
+    "Br": 1,
+    "I": 1,
 }
 
 

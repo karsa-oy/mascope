@@ -133,7 +133,9 @@ def test_corroboration_is_capped():
 
 
 def test_corroboration_noops_when_uncalibrated_or_empty():
-    assert apply_corroboration(None, ["+Br-"], WEIGHTS) is None  # uncalibrated stays None
+    assert (
+        apply_corroboration(None, ["+Br-"], WEIGHTS) is None
+    )  # uncalibrated stays None
     assert apply_corroboration(0.7, [], WEIGHTS) == 0.7  # nothing corroborating
     assert apply_corroboration(0.7, ["+Br-"], None) == 0.7  # no weights configured
     assert apply_corroboration(0.7, ["unknown"], WEIGHTS) == 0.7  # unweighted adduct
@@ -150,10 +152,12 @@ def test_provisional_orbitrap_carries_corroboration_weights():
 
 def test_recalibrate_fits_and_reports_change():
     scores, labels = _separated_labels(n=400, seed=1)
-    current = Calibration(a=1.0, b=0.0, instrument="orbi",
-                          corroboration_weights={"+Br-": 2.28})
-    out = recalibrate(scores, labels, instrument="orbi", source="user verifications",
-                      current=current)
+    current = Calibration(
+        a=1.0, b=0.0, instrument="orbi", corroboration_weights={"+Br-": 2.28}
+    )
+    out = recalibrate(
+        scores, labels, instrument="orbi", source="user verifications", current=current
+    )
     assert out["calibration"].instrument == "orbi"
     assert 0.0 <= out["after_ece"] <= 1.0
     assert out["before_ece"] is not None  # current curve scored on these labels
@@ -176,8 +180,9 @@ def test_recalibrate_graduates_with_enough_strong_positives():
     scores, labels = _separated_labels(n=400, seed=3)
     # give the positives reference-standard evidence; negatives carry none
     levels = ["reference_standard" if y == 1 else None for y in labels]
-    out = recalibrate(scores, labels, levels, instrument="orbi", source="s",
-                      provisional_min_strong=5)
+    out = recalibrate(
+        scores, labels, levels, instrument="orbi", source="s", provisional_min_strong=5
+    )
     assert out["n_strong_positives"] >= 5
     assert out["provisional"] is False
     assert out["calibration"].provisional is False

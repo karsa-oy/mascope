@@ -124,9 +124,7 @@ def _base_patches():
         ),
         "calibrate": patch(f"{_SVC}.calibrate_with_retry", new_callable=AsyncMock),
         "match": patch(f"{_SVC}.match_compute_sample", new_callable=AsyncMock),
-        "assign": patch(
-            f"{_SVC}.auto_assign_sample_peaks", new_callable=AsyncMock
-        ),
+        "assign": patch(f"{_SVC}.auto_assign_sample_peaks", new_callable=AsyncMock),
         "fetch_affected": patch(
             f"{_SVC}.fetch_affected_sample_data", new_callable=AsyncMock
         ),

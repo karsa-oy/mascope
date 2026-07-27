@@ -36,9 +36,10 @@ import sys
 
 import numpy as np
 import pandas as pd
-
 import score_eval as se
+
 from mascope_tools.composition import utils
+
 
 # Adduct channels ACTUALLY operative in the demo -- the mechanisms that appear in the
 # peak_assignment table (verified against the ionization_mechanism library), not the guessed
@@ -68,7 +69,11 @@ def neutral_of(ion: str, ionization: str) -> str:
     try:
         ic = utils.parse_composition(body)
         im = utils.parse_ionization(ionization)
-        add = utils.parse_composition(im.formula) if im.formula else utils.parse_composition("")
+        add = (
+            utils.parse_composition(im.formula)
+            if im.formula
+            else utils.parse_composition("")
+        )
         return utils.to_hill_order(ic - add if im.addition else ic + add)
     except Exception:
         return body
@@ -79,7 +84,9 @@ def ion_mono_mz(neutral: str, mech: str) -> float | None:
     from mascope_tools.composition.heuristic_filter import predict_isotopes
 
     try:
-        ion = utils.combine_formula_and_ionization(neutral, utils.parse_ionization(mech))
+        ion = utils.combine_formula_and_ionization(
+            neutral, utils.parse_ionization(mech)
+        )
     except Exception:
         return None
     if not ion or ion[-1] not in "+-":
@@ -101,11 +108,15 @@ def peak_present(mzs, snrs, target, *, tol_da, snr_min) -> bool:
     return bool(np.max(snrs[lo:hi]) >= snr_min)
 
 
-def score_primary(mzs, ints, snrs, neutral, mech, *, ppm, sigma_ppm, mu) -> float | None:
+def score_primary(
+    mzs, ints, snrs, neutral, mech, *, ppm, sigma_ppm, mu
+) -> float | None:
     """Envelope fit of the primary adduct (defines a real detection)."""
     ion = None
     try:
-        ion = utils.combine_formula_and_ionization(neutral, utils.parse_ionization(mech))
+        ion = utils.combine_formula_and_ionization(
+            neutral, utils.parse_ionization(mech)
+        )
     except Exception:
         return None
     if not ion:
@@ -117,18 +128,32 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("bundle_dir")
     ap.add_argument("--samples", type=int, default=0, help="cap files (0 = all)")
-    ap.add_argument("--tau-primary", type=float, default=0.5,
-                    help="primary-adduct fit >= this = a real detection (the analysis anchor)")
-    ap.add_argument("--snr", type=float, default=3.0, help="min SNR for a slot to count as present")
-    ap.add_argument("--per-neutral", type=int, default=0, help="cap true neutrals per file (smoke)")
-    ap.add_argument("--decoys-per-adduct", type=int, default=3,
-                    help="random offset draws per real adduct slot")
+    ap.add_argument(
+        "--tau-primary",
+        type=float,
+        default=0.5,
+        help="primary-adduct fit >= this = a real detection (the analysis anchor)",
+    )
+    ap.add_argument(
+        "--snr", type=float, default=3.0, help="min SNR for a slot to count as present"
+    )
+    ap.add_argument(
+        "--per-neutral", type=int, default=0, help="cap true neutrals per file (smoke)"
+    )
+    ap.add_argument(
+        "--decoys-per-adduct",
+        type=int,
+        default=3,
+        help="random offset draws per real adduct slot",
+    )
     a = ap.parse_args()
     rng = np.random.default_rng(0)
 
     cands = pd.read_parquet(f"{a.bundle_dir}/expected/candidates.parquet")
     true = cands[cands["is_true"]].copy()
-    true["neutral"] = [neutral_of(i, z) for i, z in zip(true["candidate_ion"], true["ionization"])]
+    true["neutral"] = [
+        neutral_of(i, z) for i, z in zip(true["candidate_ion"], true["ionization"])
+    ]
     by_file = {f: sorted(set(g["neutral"])) for f, g in true.groupby("filename")}
 
     files = list(by_file)
@@ -137,8 +162,8 @@ def main() -> int:
         neg = [f for f in files if _polarity(f) == "neg"][: a.samples - len(pos)]
         files = pos + neg
 
-    slots = []      # per adduct-slot: null_type (real|random|swap), present (bool)
-    per_cmpd = []   # per detection: n_real_present, n_decoy_present
+    slots = []  # per adduct-slot: null_type (real|random|swap), present (bool)
+    per_cmpd = []  # per detection: n_real_present, n_decoy_present
     for fi, f in enumerate(files, 1):
         pol = _polarity(f)
         if pol is None:
@@ -169,8 +194,9 @@ def main() -> int:
             if p is None:
                 continue
             # require a real primary detection (envelope fit) as the anchor
-            fit = score_primary(mzs, ints, snrs, neutral, primary,
-                                ppm=window, sigma_ppm=sigma, mu=mu)
+            fit = score_primary(
+                mzs, ints, snrs, neutral, primary, ppm=window, sigma_ppm=sigma, mu=mu
+            )
             if fit is None or fit < a.tau_primary:
                 continue
             tol = p * window * 1e-6
@@ -182,9 +208,17 @@ def main() -> int:
                     continue
                 off = q - p
                 real_offsets.append((m, off))
-                present = peak_present(mzs, snrs, q, tol_da=max(tol, q * window * 1e-6),
-                                       snr_min=a.snr)
-                slots.append({"null_type": "real", "adduct": m, "present": present, "polarity": pol})
+                present = peak_present(
+                    mzs, snrs, q, tol_da=max(tol, q * window * 1e-6), snr_min=a.snr
+                )
+                slots.append(
+                    {
+                        "null_type": "real",
+                        "adduct": m,
+                        "present": present,
+                        "polarity": pol,
+                    }
+                )
                 n_real += int(present)
             # null 1 -- RANDOM offset: same count, similar magnitude, not a real offset/isotope
             n_dec = 0
@@ -195,14 +229,26 @@ def main() -> int:
                         off = rng.uniform(*OFFSET_RANGE)
                         if any(abs(off - ro) < 0.2 for _, ro in real_offsets):
                             continue
-                        if abs((off % ISOTOPE_STEP)) < 0.1 or abs((off % ISOTOPE_STEP) - ISOTOPE_STEP) < 0.1:
+                        if (
+                            abs((off % ISOTOPE_STEP)) < 0.1
+                            or abs((off % ISOTOPE_STEP) - ISOTOPE_STEP) < 0.1
+                        ):
                             continue
                         break
                     q = p + off
                     if q <= mzs[0] or q >= mzs[-1]:
                         continue
-                    present = peak_present(mzs, snrs, q, tol_da=q * window * 1e-6, snr_min=a.snr)
-                    slots.append({"null_type": "random", "adduct": None, "present": present, "polarity": pol})
+                    present = peak_present(
+                        mzs, snrs, q, tol_da=q * window * 1e-6, snr_min=a.snr
+                    )
+                    slots.append(
+                        {
+                            "null_type": "random",
+                            "adduct": None,
+                            "present": present,
+                            "polarity": pol,
+                        }
+                    )
                     n_dec += int(present)
                     n_dec_slots += 1
             # null 2 -- ANCHOR SWAP (harder): the SAME real adduct offset, re-anchored on a
@@ -216,11 +262,26 @@ def main() -> int:
                         q = pp + off
                         if q <= mzs[0] or q >= mzs[-1]:
                             continue
-                        present = peak_present(mzs, snrs, q, tol_da=q * window * 1e-6, snr_min=a.snr)
-                        slots.append({"null_type": "swap", "adduct": m, "present": present, "polarity": pol})
-            per_cmpd.append({"filename": f, "neutral": neutral, "n_others": len(real_offsets),
-                             "n_real_present": n_real,
-                             "decoy_rate": (n_dec / n_dec_slots) if n_dec_slots else np.nan})
+                        present = peak_present(
+                            mzs, snrs, q, tol_da=q * window * 1e-6, snr_min=a.snr
+                        )
+                        slots.append(
+                            {
+                                "null_type": "swap",
+                                "adduct": m,
+                                "present": present,
+                                "polarity": pol,
+                            }
+                        )
+            per_cmpd.append(
+                {
+                    "filename": f,
+                    "neutral": neutral,
+                    "n_others": len(real_offsets),
+                    "n_real_present": n_real,
+                    "decoy_rate": (n_dec / n_dec_slots) if n_dec_slots else np.nan,
+                }
+            )
         if fi % 5 == 0:
             print(f"  {fi}/{len(files)} files  ({len(slots)} slots)", file=sys.stderr)
 
@@ -244,34 +305,52 @@ def main() -> int:
     print(f"  RANDOM offset (null 1)  P={rand_p:.4f}  (n={n_rand})")
     print(f"  ANCHOR-SWAP (null 2)    P={swap_p:.4f}  (n={n_swap})")
     if 0 < rand_p < 1:
-        print(f"  --> LR vs random  = {odds(real_p)/odds(rand_p):.1f}x per corroborating adduct")
+        print(
+            f"  --> LR vs random  = {odds(real_p) / odds(rand_p):.1f}x per corroborating adduct"
+        )
     if 0 < swap_p < 1:
-        print(f"  --> LR vs swap    = {odds(real_p)/odds(swap_p):.1f}x  (the defensible, harder null)")
+        print(
+            f"  --> LR vs swap    = {odds(real_p) / odds(swap_p):.1f}x  (the defensible, harder null)"
+        )
 
     print("\n=== by polarity (LR vs anchor-swap null) ===")
     for pol, g in S.groupby("polarity"):
         rp = g[g["null_type"] == "real"]["present"].mean()
         sp = g[g["null_type"] == "swap"]["present"].mean()
         lr = odds(rp) / odds(sp) if 0 < sp < 1 and 0 < rp < 1 else float("nan")
-        print(f"  {pol}: real={rp:.3f}  swap={sp:.3f}  LR={lr:.1f}x  "
-              f"(n_real={int((g['null_type']=='real').sum())})")
+        print(
+            f"  {pol}: real={rp:.3f}  swap={sp:.3f}  LR={lr:.1f}x  "
+            f"(n_real={int((g['null_type'] == 'real').sum())})"
+        )
 
-    print("\n=== per-adduct LR (real vs anchor-swap null) -- the weight is adduct-specific ===")
-    for m in [x for pol in CHANNELS.values() for x in pol["adducts"] if x != pol["primary"]]:
+    print(
+        "\n=== per-adduct LR (real vs anchor-swap null) -- the weight is adduct-specific ==="
+    )
+    for m in [
+        x for pol in CHANNELS.values() for x in pol["adducts"] if x != pol["primary"]
+    ]:
         gm = S[S["adduct"] == m]
         rp = gm[gm["null_type"] == "real"]["present"]
         sp = gm[gm["null_type"] == "swap"]["present"]
         if len(rp) < 20:
             continue
-        lr = odds(rp.mean()) / odds(sp.mean()) if 0 < sp.mean() < 1 and 0 < rp.mean() < 1 else float("nan")
-        print(f"  {m:14s} real={rp.mean():.3f}  swap={sp.mean():.3f}  "
-              f"LR={lr:.2f}x  log-odds={np.log(lr):+.2f}  (n={len(rp)})")
+        lr = (
+            odds(rp.mean()) / odds(sp.mean())
+            if 0 < sp.mean() < 1 and 0 < rp.mean() < 1
+            else float("nan")
+        )
+        print(
+            f"  {m:14s} real={rp.mean():.3f}  swap={sp.mean():.3f}  "
+            f"LR={lr:.2f}x  log-odds={np.log(lr):+.2f}  (n={len(rp)})"
+        )
 
     # co-occurrence distribution among real detections
     print("\n=== #real adducts present per detection ===")
     print(C["n_real_present"].value_counts().sort_index().to_string())
-    print(f"  mean real adducts co-present = {C['n_real_present'].mean():.3f} "
-          f"of up to {C['n_others'].max()}")
+    print(
+        f"  mean real adducts co-present = {C['n_real_present'].mean():.3f} "
+        f"of up to {C['n_others'].max()}"
+    )
     print(f"  mean random-offset presence rate = {C['decoy_rate'].mean():.4f}")
     return 0
 

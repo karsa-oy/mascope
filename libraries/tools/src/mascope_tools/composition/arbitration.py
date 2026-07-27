@@ -105,7 +105,8 @@ def arbitrate_candidates(
         # is not the sole contender. When there is no evidence at all, everything ties.
         near_best = (best_evidence - evidence) <= tie_tol
         is_tie = near_best and (
-            total <= 0 or sum(1 for t in scored if (best_evidence - t[3]) <= tie_tol) > 1
+            total <= 0
+            or sum(1 for t in scored if (best_evidence - t[3]) <= tie_tol) > 1
         )
         out.append(
             ArbitratedCandidate(
