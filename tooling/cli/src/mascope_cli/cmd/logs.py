@@ -71,9 +71,25 @@ def query(
         typer.Option(
             "--max",
             "-m",
-            help="The limit of the number of lines to print",
+            help="Print only the N most recent matching lines",
         ),
     ] = None,
+    service: Annotated[
+        str | None,
+        typer.Option(
+            "--service",
+            "-s",
+            help="Only logs of one service/module (e.g. 'backend', 'file-converter')",
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            "-j",
+            help="Print raw NDJSON log records (machine-readable, no colors)",
+        ),
+    ] = False,
     dev: Annotated[
         bool | None,
         typer.Option(help="Query the 'dev' mode logs of the active environment"),
@@ -113,6 +129,8 @@ def query(
         grep_context=grep_context,
         mode=mode,
         interval=interval,
+        service=service,
+        json_output=json_output,
     )
 
 
