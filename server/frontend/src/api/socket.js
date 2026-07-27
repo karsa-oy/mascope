@@ -5,13 +5,18 @@ import { useApp } from '@/stores'
 import { runtime } from '@/lib/runtime.js'
 import { ref } from 'vue'
 
-// Custom parser to increase maxAttachments limit (default 10 in socket.io-parser 4.2.6+).
-// Visualization events send binary numpy arrays for each trace (x + y), easily exceeding 10.
+// Custom parser to lift the decoder's attachment limit (default 10 in
+// socket.io-parser 4.2.6+, a guard against untrusted servers). Visualization
+// events send two binary numpy arrays (x + y) per trace and an ion's isotope
+// count is unbounded, so any fixed cap is a cliff where the decoder throws
+// "too many attachments" and the whole socket dies with a parse error
+// disconnect. This client only ever connects to Mascope's own backend, so the
+// untrusted-server guard buys nothing here.
 const parser = {
   Encoder,
   Decoder: class extends Decoder {
     constructor() {
-      super({ maxAttachments: 200 })
+      super({ maxAttachments: Infinity })
     }
   }
 }
@@ -45,8 +50,10 @@ export async function initSocket() {
     console.debug(`📬 [api:sio] ${eventName} received:`, event)
   })
   // connection status handlers
+  let lastDisconnectReason = null
   socket.on('disconnect', (reason) => {
     console.warn('⚠️ [api:sio] Socket disconnected:', reason)
+    lastDisconnectReason = reason
     socketConnected.value = false
   })
   socket.io.on('reconnect_attempt', () => {
@@ -74,6 +81,16 @@ export async function initSocket() {
       message: 'Reconnected to server'
     })
     socketConnected.value = true
+    if (lastDisconnectReason === 'parse error') {
+      // A server payload failed to decode on this client and killed the socket.
+      // Reloading cannot repair the lost packet and used to loop: reload ->
+      // auto-fired request -> same bad payload -> parse error -> reload. Stay
+      // up instead; subscriptions were already restored above.
+      console.error('🐞 [api:sio] Reconnected after a payload decode failure, skipping page reload')
+      return
+    }
+    // Reload to refetch state that went stale while disconnected (missed
+    // socket events); the URL mirror restores the current view on load.
     window.location.reload()
   })
 
