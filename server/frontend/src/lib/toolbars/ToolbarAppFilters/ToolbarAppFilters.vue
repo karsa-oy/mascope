@@ -20,7 +20,8 @@ const filtering = ref(false)
   <Toolbar
     class="filters"
     :pt="
-      app.ui.help.bottom(`
+      app.ui.help.bottom(
+        `
         <h1>Topbar</h1>
         <p>
           On the left, there is dataset navigation and home menu with settings
@@ -29,7 +30,9 @@ const filtering = ref(false)
         <p>
           On the right, there are filter chips reflecting the current data selection.
         </p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('getting-started/first-steps/#the-dashboard-at-a-glance') }
+      )
     "
   >
     <template #start>

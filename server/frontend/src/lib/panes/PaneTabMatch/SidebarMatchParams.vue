@@ -184,8 +184,8 @@ const isotopeAbundanceThresholdPercent = computed({
       "
     />
     <section
-      v-help-layer.right="
-        `
+      v-help-layer.right="{
+        message: `
           <h1>Match Parameters: Isotope settings</h1>
           <p>
             Configure the parameters used for isotope matching.
@@ -195,8 +195,9 @@ const isotopeAbundanceThresholdPercent = computed({
               <li><strong>Isotope ratio tolerance:</strong> The maximum allowed deviation in expected isotope ratios.</li>
             </ul>
           </p>
-        `
-      "
+        `,
+        doc: app.ui.help.docUrl('guides/target-collections/#tune-the-match-parameters')
+      }"
     >
       <h3>Isotope settings</h3>
       <BaseParamField
@@ -226,14 +227,15 @@ const isotopeAbundanceThresholdPercent = computed({
       />
     </section>
     <section
-      v-help-layer.right="
-        `
+      v-help-layer.right="{
+        message: `
           <h1>Match Parameters: Peak settings</h1>
           <p>
             Configure peak filtering parameters used when matching.
           </p>
-        `
-      "
+        `,
+        doc: app.ui.help.docUrl('guides/target-collections/#tune-the-match-parameters')
+      }"
     >
       <h3>Peak settings</h3>
       <BaseParamField
@@ -246,14 +248,15 @@ const isotopeAbundanceThresholdPercent = computed({
       />
     </section>
     <section
-      v-help-layer.right="
-        `
+      v-help-layer.right="{
+        message: `
           <h1>Match Parameters: Match score thresholds</h1>
           <p>
             Configure the match score thresholds for match categorization.
           </p>
-        `
-      "
+        `,
+        doc: app.ui.help.docUrl('guides/target-collections/#tune-the-match-parameters')
+      }"
     >
       <h3>Match score thresholds</h3>
       <div class="col" style="gap: 0">
