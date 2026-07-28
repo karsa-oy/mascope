@@ -30,10 +30,12 @@ const tabs = computed(() => [
   {
     label: 'Raw files',
     icon: 'pi pi-hourglass',
+    doc: app.ui.help.docUrl('guides/import-files/'),
     help: `
       <h1>Raw files</h1>
       <p>
         View data files uploaded to the Mascope server, and import files from your computer.
+        Uploaded files are processed automatically into the instrument's acquisition workspace.
       </p>
       <p>
         Process files retrospectively into samples and batches.
@@ -44,7 +46,7 @@ const tabs = computed(() => [
     label: 'Batch',
     icon: 'pi pi-hashtag',
     disabled: !app.data.batch.focused || app.data.sample.list.length === 0,
-    doc: app.ui.help.docUrl('concepts/'),
+    doc: app.ui.help.docUrl('guides/target-collections/#read-the-results'),
     help: `
       <h1>Batch View</h1>
 

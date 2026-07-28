@@ -942,7 +942,7 @@ watch(
                 </p>
                 <p>The type determines which batches the collection can be assigned to.</p>
               `,
-              { layer }
+              { layer, doc: app.ui.help.docUrl('concepts/#targeted-analysis') }
             )
           "
         />
@@ -1024,7 +1024,7 @@ watch(
                           when you save.
                         </p>
                       `,
-                      { layer }
+                      { layer, doc: app.ui.help.docUrl('guides/target-collections/#add-compounds') }
                     )
                   "
                 >
@@ -1192,7 +1192,7 @@ watch(
                           required; name and CAS number are optional.
                         </p>
                       `,
-                      { layer }
+                      { layer, doc: app.ui.help.docUrl('guides/target-collections/#add-compounds') }
                     )
                   "
                 >

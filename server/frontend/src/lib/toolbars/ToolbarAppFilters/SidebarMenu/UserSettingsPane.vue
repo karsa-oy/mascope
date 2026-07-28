@@ -182,7 +182,7 @@ const vHelpLayer = app.ui.help.directive(layer)
         code it shows via 'Pair an agent'.
       </p>
     `,
-      doc: 'https://github.com/karsa-oy/mascope/blob/develop/docs/user/instruments/index.md'
+      doc: app.ui.help.docUrl('instruments/#the-file-agent')
     }"
   >
     <h3>API Access Tokens</h3>

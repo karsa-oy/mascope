@@ -217,7 +217,8 @@ const submit = () => {
         <TabPanel
           value="data"
           :pt="
-            app.ui.help.top(`
+            app.ui.help.top(
+              `
               <b>Paste sample metadata from a spreadsheet.</b>
               <ul>
               <li>Required fields are 'name' and 'type'.</li>
@@ -230,7 +231,9 @@ const submit = () => {
                 ${allowedSampleTypes}
               </li>
               </ul>
-            `)
+            `,
+              { doc: app.ui.help.docUrl('guides/import-files/#alternative-process-raw-files-by-hand') }
+            )
           "
         >
           <BaseClipboardContext :parse="parse" :persistMessage="imported.items.length == 0">
