@@ -23,11 +23,14 @@ const shareable = computed(() => !isEmptyLocation(location.read()))
     aria-label="Copy link to this view"
     v-tooltip.bottom="'Copy link to this view'"
     :pt="
-      app.ui.help.bottom(`
+      app.ui.help.bottom(
+        `
         <h1>Share this view</h1>
         <p>Copy a link that reopens Mascope at the current selection. Anyone you
         share it with lands here, provided they can access the same data.</p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('getting-started/first-steps/#the-dashboard-at-a-glance') }
+      )
     "
     @click="location.copyShareLink()"
   />

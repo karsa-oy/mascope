@@ -63,13 +63,16 @@ onBeforeUnmount(() => {
     class="browser"
     style="border: none; min-width: 280px; max-width: 400px; width: 100%"
     :pt="
-      app.ui.help.top(`
+      app.ui.help.top(
+        `
         <h1>Peak Browser</h1>
 
         <p>
         List of detected peaks in the currently selected sample. Click on a peak to assign a composition.
         </p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('how-it-works/peak-detection/') }
+      )
     "
   >
     <template #header>

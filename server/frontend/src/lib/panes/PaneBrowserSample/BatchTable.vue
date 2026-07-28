@@ -80,7 +80,9 @@ const onStatusAction = (batch) => {
         <p>Click on a batch to open it and see the samples within.</p>
 
         <p>Right click on a batch to perform actions.</p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('concepts/#the-data-hierarchy') }
+      )
     "
   >
     <template #menu>

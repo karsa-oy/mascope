@@ -75,7 +75,7 @@ watch(visible, () => {
                   matching with an ionization mode configured here.
                 </p>
           `,
-              { layer }
+              { layer, doc: app.ui.help.docUrl('guides/import-files/#set-up-ionization-modes') }
             )
           "
         >
@@ -114,7 +114,7 @@ watch(visible, () => {
                   <li>a bare <code>+</code> or <code>-</code> &mdash; electron transfer</li>
                 </ul>
           `,
-              { layer }
+              { layer, doc: app.ui.help.docUrl('concepts/#ionization-modes-and-mechanisms') }
             )
           "
           >Ionization Mechanisms</Tab

@@ -45,21 +45,22 @@ const vHelpLayer = app.ui.help.directive(layer)
 
 <template>
   <div
-    v-help-layer.right="
-      `
+    v-help-layer.right="{
+      message: `
       <b>Workspaces</b>
       <p>
         Select and manage workspaces. Workspaces group datasets together
         and serve as the access control boundary. Click on a workspace to select it.
       </p>
       <p>
-        The access control boundary ensures that only members of a workspace can access it. 
+        The access control boundary ensures that only members of a workspace can access it.
         The role of each member determines their level of access (read/write/manage).
       </p>
       <p>Right click on a workspace to manage its members, edit its details, or delete it.</p>
       <p>Click on the Create button to create a new workspace. Then add members to it if desired.</p>
-      `
-    "
+      `,
+      doc: app.ui.help.docUrl('concepts/#workspaces-and-sharing')
+    }"
   >
     <div class="row" style="align-items: center">
       <h2>Workspaces</h2>
