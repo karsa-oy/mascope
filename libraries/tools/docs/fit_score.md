@@ -41,9 +41,11 @@ threshold*. The value persists as the `PeakAssignment` fit column; the identific
 unconditionally, not via the legacy `MASCOPE_MATCH_SCORE_VERSION` switch:
 - **Stage A** (`engine.score_ions_by_fit`): the per-ion fit score (`ion_score_v2` →
   `score_pattern_v2`) over each ion's full isotopologue envelope with the sample's fitted
-  mass accuracy and real per-peak SNR, replacing the targeted matcher's per-isotopologue
+  mass accuracy, replacing the targeted matcher's per-isotopologue
   `abundance_term · mz_term`. Run after `apply_match_params`, so tolerance / intensity-floor
-  gating carries into the fit.
+  gating carries into the fit. It scores with **real per-peak SNR** because it computes the
+  isotopologue rows itself; the paths that *read* them back from the database have no SNR
+  and score in the no-SNR mode of §3.3a (see §6).
 - **Stage B** (`engine.untargeted_matches_to_peak_assignments`): uses the isotope-pattern
   fit score `assign_compositions` already computes (`match_isotopic_pattern`), i.e. the fit
   score's **v1 degradation** — the untargeted path carries no SNR — instead of the crude

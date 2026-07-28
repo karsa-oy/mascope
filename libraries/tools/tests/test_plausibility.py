@@ -1,10 +1,12 @@
 """Unit tests for the graded chemical plausibility (Seven Golden Rules, Phase 3 / P1).
 
 Contract: `chemical_plausibility` / `formula_plausibility` return a per-candidate
-plausibility in [0, 1] -- the product of the Senior/RDBE (Rule 2), element-ratio
-(Rules 4-5) and heteroatom co-occurrence (Rule 6) factors. It is graded (weighs
-candidates) rather than a boolean gate, and is conservative / fail-open: unusual
-chemistry is never driven to 0, only a *provably impossible* neutral graph is.
+plausibility in [0, 1]. It is 0.0 **iff** the Senior/RDBE check (Rule 2) proves the
+neutral graph impossible -- under a multi-state, ligand-gated valence model, so a
+hypervalent SF6/H2SO4 is feasible and only a genuinely over-saturated formula is cut --
+and otherwise it is the element-ratio (Rules 4-5) x heteroatom co-occurrence (Rule 6)
+product FLOORED at `PLAUSIBILITY_FLOOR`. It is graded (weighs candidates) rather than a
+boolean gate, and is conservative / fail-open: unusual chemistry is never driven to 0.
 Numbers are from Kind & Fiehn 2007 (BMC Bioinformatics 8:105), Tables 2-3.
 See docs/dev/assignment_confidence.md (P1).
 """
@@ -147,6 +149,18 @@ def test_senior_unknown_elements_fail_open():
         assert senior_plausibility(element_counts(f)) == 1.0
 
 
+def test_senior_hypervalent_full():
+    # S/P/halogen reach 6/5/7 when the formula supplies electronegative ligands
+    for f in ["SF6", "PF5", "IF5", "SF5CF3", "PCl5", "IF7", "S2F10"]:
+        assert senior_plausibility(element_counts(f)) == 1.0
+
+
+def test_senior_hypervalent_without_ligands_zero():
+    # ... and only then: there is no SH6 or PH6, so the promotion must not be free
+    for f in ["SH4", "PH6", "CH6S", "C2H7Cl", "C5H14S"]:
+        assert senior_plausibility(element_counts(f)) == 0.0
+
+
 # --- Element-ratio factor (Rules 4-5) --------------------------------------
 
 
@@ -185,6 +199,13 @@ def test_ratio_extreme_hydrogen_low_but_floored():
     assert PLAUSIBILITY_FLOOR <= s < 0.5
 
 
+def test_ratio_factor_floored():
+    # Four ratios in the tail multiply to 2e-4 -- 500x below the per-ratio floor and
+    # indistinguishable from an impossible formula. The product is floored too.
+    counts = {"C": 1, "H": 20, "O": 6, "N": 6, "S": 6}
+    assert element_ratio_plausibility(counts) == PLAUSIBILITY_FLOOR
+
+
 # --- Heteroatom co-occurrence factor (Rule 6) ------------------------------
 
 
@@ -207,6 +228,17 @@ def test_rule6_within_caps_is_one():
     assert heteroatom_probability_plausibility(counts) == 1.0
 
 
+def test_rule6_element_penalised_once():
+    # Four of the five nested checks fire on this formula, so multiplying every triggered
+    # cap penalised N three times, O three, P four and S three (composite 0.0038). Each
+    # element must be penalised once, by the tightest cap placed on it.
+    counts = {"C": 20, "H": 20, "N": 12, "O": 25, "P": 7, "S": 4}
+    tightest = (4 / 12) * (14 / 25) * (3 / 7) * (3 / 4)
+    assert heteroatom_probability_plausibility(counts) == max(
+        PLAUSIBILITY_FLOOR, tightest
+    )
+
+
 # --- Combined plausibility --------------------------------------------------
 
 
@@ -220,14 +252,39 @@ def test_unparseable_fails_open():
     assert formula_plausibility("???") == 1.0
 
 
-def test_combined_is_product_of_factors():
+def test_combined_is_the_floored_product_of_the_graded_factors():
+    # Senior is not a factor but a switch: 0.0 for an impossible graph, otherwise the two
+    # graded factors multiply and the result is floored.
     counts = element_counts("CH2O2")
-    expected = (
-        senior_plausibility(counts)
-        * element_ratio_plausibility(counts)
-        * heteroatom_probability_plausibility(counts)
+    assert formula_plausibility("CH2O2") == max(
+        PLAUSIBILITY_FLOOR,
+        element_ratio_plausibility(counts)
+        * heteroatom_probability_plausibility(counts),
     )
-    assert formula_plausibility("CH2O2") == expected
+    assert formula_plausibility("C6H17NO4") == 0.0
+    assert senior_plausibility(element_counts("C6H17NO4")) == 0.0
+
+
+def test_composite_never_below_floor_unless_impossible():
+    # The reported over-count: possible chemistry that scored 0.0037, i.e. 27x BELOW the
+    # floor and effectively a hard reject by a layer that only grades.
+    counts = {"C": 20, "H": 20, "N": 12, "O": 25, "P": 7, "S": 4}
+    formula = "C20H20N12O25P7S4"
+    assert element_counts(formula) == counts
+    assert heteroatom_probability_plausibility(counts) == PLAUSIBILITY_FLOOR
+    assert formula_plausibility(formula) == PLAUSIBILITY_FLOOR
+    # 0.0 is still reachable -- it is reserved for a provably impossible graph.
+    assert formula_plausibility(DEMO_DATA_ERROR) == 0.0
+
+
+def test_atmospheric_tracers_are_plausible():
+    # SF6/PF5/IF5/PCl5 scored 0.0 -- a hard chemistry veto on real tracers, which in
+    # `evidence = fit x plausibility` deletes the assignment however well it fits.
+    for f in ["SF6", "PF5", "IF5", "PCl5"]:
+        assert formula_plausibility(f) == 1.0
+    # SF5CF3 is graded down (F/C = 8 is past Table 2's extended max of 6), not rejected:
+    # correct behaviour for a perfluoro species.
+    assert formula_plausibility("SF5CF3") > PLAUSIBILITY_FLOOR
 
 
 # --- Golden validation: nothing real is wrongly rejected -------------------
