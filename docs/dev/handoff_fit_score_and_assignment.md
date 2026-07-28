@@ -209,11 +209,21 @@ branch's shape, not a commit hash that goes stale within a day.*
   open:** active-learning queue, evidence-level weighting in the fit, Schymanski surfacing.
 
 **E — ops**
-- **E8. Run the rename migration in prod/CI** and the migration test suite
-  (`server/backend/tests/migrations/`, ephemeral drift DB — passed locally). Resolve the
-  **worktree/main alembic split**: the CLI migration check (`mascope dev migrate`) runs
-  alembic from the *main* checkout's venv, so it cannot see this branch's migrations
-  (locally applied via a direct alembic run against the worktree code).
+- **E8. Resolve the worktree/main alembic split.** The CLI resolves alembic from
+  `$MASCOPE_PATH` — the *main* checkout — so from a worktree it applies **develop's**
+  chain and then reports "Database up to date". Consequences, both observed: the
+  migration tests silently verify the wrong migrations (run them with `MASCOPE_PATH`
+  pointed at the worktree and `POSTGRES_TEST_PASSWORD` set, §5), and **`mascope dev run
+  --instance` cannot create this feature's tables at all**, so a worktree stack comes up
+  without them. This is a developer-experience blocker for anyone trying the feature from
+  a worktree, not just a testing annoyance. (The startup reaper tolerates the resulting
+  missing-table state rather than failing the boot, but that is damage control, not a fix.)
+- **E8b. Schedule the retention prune.** `prune_peak_assignment_runs` exists and is
+  documented for operators, but nothing runs it — there is no timer or cron entry, so
+  unattended growth is unchanged until one exists.
+- **E8c. Cross-process admission control.** The batch semaphore and in-flight set are
+  per-worker; prod runs several. A real bound (and cancellation, and resume) needs batch
+  run state in the database.
 
 **F — later phases**
 - **F9. P3 — spectral-neighbourhood corroboration.** ✅ *First increment landed:*

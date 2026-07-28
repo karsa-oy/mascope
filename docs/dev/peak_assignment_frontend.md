@@ -83,6 +83,23 @@ the Sample view; its composition-fit entry point (`useMatchVisualized.verifyAssi
 `/fit/aggregate` and `/fit/visualize` endpoints) is **dead code** on the UI side. The B2 endpoints still
 work and could power an inline verify later.
 
+**Launching a run.** Two launchers share one form
+([`PeakAssignConfigForm.vue`](../../server/frontend/src/lib/dialogs/PeakAssignConfigForm.vue)):
+the per-sample dialog in the Assignments browser, and
+[`DialogPeakAssignBatch.vue`](../../server/frontend/src/lib/dialogs/DialogPeakAssignBatch.vue)
+opened from the sample browser's batch context menu (`dialog.assign`, rendered in
+`BatchContextMenu.vue` beside the other batch dialogs). They differ only in where the
+untargeted stage starts: **on** per sample, where the user is looking at one spectrum and
+the cost is seconds; **off** per batch, matching `default_batch_config()` on the backend,
+because batch cost scales with the number of samples. The batch dialog says so, and warns
+again if the untargeted stage is switched on.
+
+The form's bounds come from `GET /params` (`peak_assignment` defaults +
+`peak_assignment_limits`), which publishes the same constants `PeakAssignmentConfig`
+validates against - so an input cannot offer a value the API then rejects. Both launchers
+leave untouched fields `null` and strip them before posting, so the backend default
+applies rather than a null overriding it.
+
 ## 0. Decisions settled
 
 | Question | Decision |
@@ -421,7 +438,7 @@ below records the original plan items plus the consolidation that followed.
 | **F2** peak ledger | ✅ done, then **relocated** | With the flag on the ledger lives in the Assignments tab (`PaneBrowserAssignment`); `PaneBrowserPeak` is still the Sample-tab ledger with the flag off, so it stays live code. |
 | **F3** peak inspector | ✅ done, since trimmed | `PanePeakAssign` is a compact card (no header, no Verify-fit); Re-search is a bottom-pane takeover. |
 | **F4** annotated spectrum | ✅ done | Per-tier traces + theoretical envelope; instrument-aware focus zoom. |
-| **F5** assignments browser + config dialog | ✅ done | + auto-select latest run, P(correct) column, unfold-isotopologues toggle. |
+| **F5** assignments browser + config dialog | ✅ done | + auto-select latest run, P(correct) column, unfold-isotopologues toggle. The config form was later extracted to `dialogs/PeakAssignConfigForm.vue` and shared with the batch launcher (below). |
 | **F6** Fit-view rename + composition wiring | ✅ done, now **superseded** | Renamed + wired to B2, but the Fit view is redundant post-consolidation and slated for removal. |
 | **B1** `peak_assignment_reload` event | ✅ done | `success_reload=[("peak_assignment","sample_batch_id")]`. |
 | **B2** composition Fit visualization | ✅ done | `visualization.py`: `aggregate_composition_fit` + `visualize_composition_focus`; currently unused by the UI. |

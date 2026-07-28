@@ -280,3 +280,42 @@ proven out in peaky. The genuinely new engineering is:
 Everything else is wiring existing engines into a persisted, queryable,
 reproducible result and progressively harvesting peaky's assignment quality
 logic into the backend.
+
+## 7. Operating the engine
+
+The design above says what a run computes. This is what running it costs and
+how that is bounded - the parts that are easy to leave implicit and expensive to
+discover later.
+
+**A run's size is the sample's peak count, not its assignment count.** The
+ledger is deliberately complete: unexplained peaks are persisted as `unassigned`
+rows rather than omitted, so one run writes one row per observed peak. Runs are
+never superseded automatically either, so re-assigning a sample n times leaves
+n full ledgers. `db/admin/peak_assignments/prune_runs.py` (exposed as the
+`prune_peak_assignment_runs` maintenance script) reclaims them: newest few
+completed runs per sample kept, the rest and stale failures dropped, cascading
+to their rows. **Nothing schedules it** - see `docs/maintaining.md`.
+
+**Batch cost is per-sample cost times N**, which makes the batch entry point the
+one place a default matters. `batch.default_batch_config()` is therefore Stage A
+only; the untargeted stage is opt-in per batch, exactly as it is for ingest. The
+batch also filters samples the engine cannot usefully assign - blank ones, and
+ones whose m/z calibration is unverified - mirroring `match_compute_batch`,
+rather than driving them through a run that fails.
+
+**Admission control.** Background work runs on the API worker's event loop, so a
+batch competes with interactive requests for the same connection pool. Batch
+assignment holds a semaphore slot for its duration (mirroring `_auto_process_gate`
+in the sample auto-processing controller) and refuses a batch already in flight
+instead of queueing it silently behind a multi-minute run. Both are **per
+worker**: with several uvicorn workers, N workers still permit N concurrent batch
+runs. A cross-process bound needs run state in the database - which is also what
+cancellation and resume would need, and is the main reason to add it.
+
+**Interrupted runs.** A run is created `running` and finalized by the engine's
+own success and failure paths, neither of which survives the process dying - and
+`CancelledError` is a `BaseException`, so it bypasses the `except Exception`
+finalizer too. `reset_running_peak_assignment_runs` reconciles those at startup.
+It is deliberately best-effort: it operates on a table a recent migration added,
+so on a database not yet upgraded to this head it must warn and continue rather
+than take the server down with it.

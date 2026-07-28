@@ -399,6 +399,33 @@ per detected peak per run, so watch disk after turning it on (see
 [Disk space](#disk-space)). Existing samples are not assigned retroactively;
 run assignment explicitly from the UI for those.
 
+### Reclaiming assignment runs
+
+Each assignment run writes **one row per observed peak** of its sample -
+including peaks it could not assign, because the ledger is deliberately
+complete - and re-assigning a sample adds a whole new run beside the old one.
+Nothing removes them automatically, so on a server where assignment is re-run
+routinely `peak_assignment` grows without bound.
+
+```sh
+MASCOPE_PRUNE_DRY_RUN=1 mascope prod db script run prune_peak_assignment_runs
+mascope prod db script run prune_peak_assignment_runs
+```
+
+The dry run reports what it would delete and changes nothing. A real run keeps
+the newest few completed runs per sample (so a result can still be compared
+against the one it replaced) and drops the rest, plus failed runs past a short
+grace period; deleting a run cascades to its rows. Tune with
+`MASCOPE_PRUNE_KEEP_PER_SAMPLE` (default 3) and `MASCOPE_PRUNE_KEEP_FAILED_HOURS`
+(default 24).
+
+Deleting rows returns space to Postgres for reuse but not to the filesystem;
+`VACUUM FULL peak_assignment` (or `pg_repack`) afterwards does that, and takes
+an exclusive lock while it runs.
+
+There is no timer for this yet - run it when the disk monitor flags growth, or
+add it to your own cron alongside the backup job.
+
 ## Files and secrets
 
 | Path | What |
