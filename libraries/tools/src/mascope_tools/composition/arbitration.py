@@ -31,9 +31,22 @@ from typing import Any, Iterable, Sequence
 from mascope_tools.composition.heuristic_filter import formula_plausibility
 
 
-# Two candidates whose evidence differs by at most this are reported as a tie rather
-# than ranked as a confident winner/loser. Absolute tolerance on evidence (in [0, 1]).
-DEFAULT_TIE_TOL = 0.05
+# Two candidates whose evidence is within this gap of the best are reported as a tie
+# rather than ranked as a confident winner/loser. The gap is RELATIVE (a fraction of the
+# best evidence), not absolute: evidence is a product of two [0, 1] factors and spans
+# orders of magnitude between a well-supported peak and a marginal one, so one absolute
+# gap means different things at different points on the scale. An absolute 0.05 called
+# 0.02 vs 0.01 a tie -- one candidate with twice the support of the other -- while
+# separating 0.95 from 0.89, which are 6% apart and genuinely ambiguous. 0.10 keeps the
+# behaviour where winners actually live: at evidence 0.5-1.0 the old absolute 0.05 was
+# 5-10% relative.
+DEFAULT_TIE_TOL = 0.10
+
+# ...floored in absolute terms, because a relative gap stops meaning anything once the
+# evidence itself is noise: 0.0002 vs 0.0001 is a 100% relative gap between two
+# candidates that both have essentially no support, and declaring a resolved winner
+# there is exactly the overconfidence the tie report exists to prevent.
+TIE_ABS_FLOOR = 0.005
 
 
 @dataclass(frozen=True)
@@ -77,17 +90,32 @@ def arbitrate_candidates(
     :param candidates: The peak's candidates, each a ``{"formula", "fit_score"}``
         mapping (``match_score`` accepted as an alias) or a ``(formula, fit_score)``
         pair. ``formula`` is the NEUTRAL formula (plausibility is a neutral-chemistry
-        judgement, as produced by ``find_compositions`` before ionization).
-    :param tie_tol: Evidence gap at or below which the runner-up is flagged a tie.
-    :returns: The candidates as :class:`ArbitratedCandidate`, best evidence first.
-        ``confidence`` sums to 1 across candidates with positive evidence; when no
-        candidate has any evidence every ``confidence`` is 0 and every ``is_tie`` is
-        True (nothing to distinguish). Deterministic; ties broken by descending fit
-        then formula for a stable order.
+        judgement, as produced by ``find_compositions`` before ionization). Repeats of
+        the same formula are collapsed (see below).
+    :param tie_tol: Gap below the best evidence, as a FRACTION of that best evidence
+        and floored at :data:`TIE_ABS_FLOOR`, at or below which a candidate is flagged
+        a tie.
+    :returns: The candidates as :class:`ArbitratedCandidate`, best evidence first, one
+        entry per distinct formula. ``confidence`` sums to 1 across candidates with
+        positive evidence; when no candidate has any evidence every ``confidence`` is 0
+        and every ``is_tie`` is True (nothing to distinguish). Deterministic; ties
+        broken by descending fit then formula for a stable order.
+
+    The same neutral formula can reach one peak more than once -- via two adducts, or
+    listed in two target collections -- and those are not competitors, they are one
+    hypothesis arriving twice. Left uncollapsed they split the normalisation between
+    themselves and then tie against each other, so a peak whose assignment is not in
+    doubt reports 50% confidence and an unresolved tie with itself. Only the strongest
+    arrival of each formula is kept; since plausibility is a pure function of the
+    formula, that is the same as keeping its best evidence.
     """
-    scored: list[tuple[str, float, float, float]] = []
+    best_fit: dict[str, float] = {}
     for cand in candidates:
         formula, fit = _as_formula_fit(cand)
+        if formula not in best_fit or fit > best_fit[formula]:
+            best_fit[formula] = fit
+    scored: list[tuple[str, float, float, float]] = []
+    for formula, fit in best_fit.items():
         plaus = formula_plausibility(formula)
         scored.append((formula, fit, plaus, fit * plaus))
     if not scored:
@@ -97,16 +125,17 @@ def arbitrate_candidates(
     scored.sort(key=lambda t: (-t[3], -t[1], t[0]))
     total = sum(t[3] for t in scored)
     best_evidence = scored[0][3]
+    tie_gap = max(tie_tol * best_evidence, TIE_ABS_FLOOR)
 
     out: list[ArbitratedCandidate] = []
     for rank, (formula, fit, plaus, evidence) in enumerate(scored, start=1):
         confidence = evidence / total if total > 0 else 0.0
-        # A candidate is "tied" when it sits within tie_tol of the best evidence and
+        # A candidate is "tied" when it sits within tie_gap of the best evidence and
         # is not the sole contender. When there is no evidence at all, everything ties.
-        near_best = (best_evidence - evidence) <= tie_tol
+        near_best = (best_evidence - evidence) <= tie_gap
         is_tie = near_best and (
             total <= 0
-            or sum(1 for t in scored if (best_evidence - t[3]) <= tie_tol) > 1
+            or sum(1 for t in scored if (best_evidence - t[3]) <= tie_gap) > 1
         )
         out.append(
             ArbitratedCandidate(
@@ -153,8 +182,9 @@ def fdr_curve(
     At each cut the accepted set is the confidence-ordered prefix; ``fdr`` is the
     share of those winners that are wrong. ``q_value`` is the running minimum FDR
     from the largest acceptance upward, so it is monotone in the threshold and safe
-    to threshold on (the standard target-decoy q-value). Ties in confidence keep a
-    stable order (correct before wrong) so a cut through a tie is not optimistic.
+    to threshold on (the standard target-decoy q-value). Winners tied on confidence
+    are ordered WRONG FIRST, so a cut landing inside a tie charges it the wrong ones
+    it cannot exclude rather than crediting it the corrects it cannot claim.
     """
     if len(confidences) != len(is_correct):
         raise ValueError("confidences and is_correct must be the same length")

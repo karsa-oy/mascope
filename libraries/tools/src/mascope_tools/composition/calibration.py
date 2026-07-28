@@ -112,11 +112,27 @@ def calibration_error(
 ) -> float:
     """Expected calibration error: the average gap between predicted probability and
     observed correctness, over equal-width probability bins (weighted by bin count).
-    0 = perfectly calibrated."""
+    0 = perfectly calibrated.
+
+    ``probs`` must be PROBABILITIES, not raw scores: the bins tile [0, 1] exactly, so a
+    value outside that range falls in no bin. Silently dropping such points would make
+    the ECE an average over a subset while still reading as an average over everything --
+    an understatement of exactly the miscalibration the number exists to expose -- so it
+    raises instead. Calibrated output (a sigmoid) can never trip this; feeding raw
+    evidence in by mistake always will.
+
+    :raises ValueError: any probability is non-finite or outside [0, 1].
+    """
     p = np.asarray(probs, float)
     y = np.asarray(is_correct, float)
     if len(p) == 0:
         return float("nan")
+    if not np.all(np.isfinite(p)) or p.min() < 0.0 or p.max() > 1.0:
+        raise ValueError(
+            "calibration_error expects probabilities in [0, 1] "
+            f"(got min={np.nanmin(p)}, max={np.nanmax(p)}); "
+            "apply the calibration before measuring its error"
+        )
     edges = np.linspace(0.0, 1.0, bins + 1)
     ece = 0.0
     for k in range(bins):
@@ -127,8 +143,14 @@ def calibration_error(
     return float(ece)
 
 
-def _platt_fit(scores: np.ndarray, labels: np.ndarray) -> tuple[float, float]:
-    """Fit ``P = sigmoid(a*score + b)`` by minimising log-loss (Platt scaling)."""
+def _platt_fit(scores: np.ndarray, labels: np.ndarray) -> tuple[float, float, bool]:
+    """Fit ``P = sigmoid(a*score + b)`` by minimising log-loss (Platt scaling).
+
+    Returns ``(a, b, converged)``. Convergence is reported rather than assumed: when the
+    optimize fails, ``res.x`` is simply wherever the simplex happened to stop, which is a
+    pair of numbers and not a curve. Callers must not turn that into a
+    :class:`Calibration`.
+    """
     from scipy.optimize import minimize
 
     s = np.asarray(scores, float)
@@ -142,16 +164,121 @@ def _platt_fit(scores: np.ndarray, labels: np.ndarray) -> tuple[float, float]:
         )
 
     res = minimize(nll, np.array([3.0, -1.5]), method="Nelder-Mead")
-    return float(res.x[0]), float(res.x[1])
+    return float(res.x[0]), float(res.x[1]), bool(res.success)
 
 
-# Fewer than this many labelled points (or a single class) is too little to fit a
-# meaningful curve; callers should keep the assignment uncalibrated instead.
+# Fewer than this many labelled points is too little to fit a meaningful curve;
+# callers should keep the assignment uncalibrated instead.
 MIN_CALIBRATION_LABELS = 30
 
+# ...and this many of EACH class. A total-only floor is not the same requirement: 31
+# labels with a single positive clears it, yet that curve's intercept -- and the held-out
+# ECE that is supposed to certify it -- rest on one point. The floor is per class because
+# Platt scaling fits two parameters against the balance between the classes, and the ECE
+# is then estimated on roughly half the labels, so each class has to survive the split
+# with several points left. Deliberately well below MIN_CALIBRATION_LABELS: demanding 30
+# rejections before a user's confirmations can be used would put recalibration out of
+# reach in normal use, which is a different way of getting the wrong curve (the stale one).
+MIN_CALIBRATION_CLASS_LABELS = 10
 
-class InsufficientCalibrationData(ValueError):
+# A calibration must be MONOTONE INCREASING: more evidence, more probability. A fit with
+# a <= 0 is inverted and would report high confidence for weak evidence across the whole
+# instrument. This is the ONLY guard that catches it -- on anti-correlated labels
+# Nelder-Mead converges cleanly (res.success is True) and the inverted curve's held-out
+# ECE beats the incumbent's, so neither a convergence check nor an ECE gate refuses it.
+MIN_CALIBRATION_SLOPE = 0.0
+
+# The curve must also DISCRIMINATE. Noise labels fit a ~ 0 with an excellent ECE (a
+# constant predictor is perfectly calibrated and perfectly useless), passing both the sign
+# and ECE gates while flattening every p_correct to the base rate. Held-out AUC is the
+# honest test: because sigmoid(a*s+b) is monotone in s for a > 0, this measures whether the
+# LABELS carry any signal about the score, which is the precondition for Platt-scaling them.
+MIN_CALIBRATION_AUC = 0.6
+
+# A refit must not be WORSE than the curve it replaces, measured on the same held-out
+# points. Zero tolerance (float slop only) is not arbitrary strictness: on synthetic labels
+# it accepts 94% of refits at n=200 and 100% at n>=400 when the incumbent is genuinely
+# wrong, while refusing most refits that would replace an already-correct curve with a
+# noisier estimate of itself. Refusing is recoverable (gather more labels, retry);
+# activating a bad curve is instrument-wide and silent.
+ECE_REGRESSION_TOL = 1e-9
+
+
+class CalibrationRefused(ValueError):
+    """A calibration could not be fit, or the fit is not usable as a calibration.
+
+    Carries a stable ``reason`` code so an API can report *why* without parsing the
+    message.
+    """
+
+    reason = "refused"
+
+    def __init__(self, message: str, reason: str | None = None):
+        super().__init__(message)
+        if reason is not None:
+            self.reason = reason
+
+
+class InsufficientCalibrationData(CalibrationRefused):
     """Raised when there are too few / single-class labels to fit a calibration."""
+
+    reason = "insufficient_labels"
+
+
+class DegenerateCalibration(CalibrationRefused):
+    """Raised when the fit converged on something that is not a usable curve.
+
+    Three ways this happens, all of which would otherwise be activated silently: the
+    optimizer failed; the slope is non-positive (the curve is INVERTED -- it reports high
+    confidence for weak evidence); or the labels do not separate on the score at all, so
+    the fitted curve is flat and every probability collapses to the base rate.
+    """
+
+
+def holdout_split(
+    n: int, *, holdout: float = 0.5, seed: int = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """Deterministic ``(test_idx, train_idx)`` split of ``n`` points.
+
+    Shared by :func:`fit_calibration` and :func:`recalibrate` so a refit's held-out ECE
+    and the incumbent curve's ECE are measured on the SAME points. Comparing a held-out
+    half against an all-label baseline is not a comparison: the ECE estimator is biased
+    upward on fewer points, so the new curve loses a gate it should win (measured on
+    labels drawn from the incumbent itself: 92% refused with an all-label baseline vs
+    55-71% with this one).
+    """
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(n)
+    n_test = max(1, int(n * holdout))
+    return idx[:n_test], idx[n_test:]
+
+
+def discrimination_auc(scores: Sequence[float], is_correct: Sequence[bool]) -> float:
+    """Rank-based AUC (Mann-Whitney U) of ``scores`` against binary labels.
+
+    0.5 = the score carries no information about correctness on these labels; 1.0 = every
+    correct assignment outscores every wrong one. ``NaN`` when only one class is present
+    (an AUC is undefined without both). Ties get averaged ranks, so a score that is
+    constant across the labels lands on exactly 0.5 rather than on the order the rows
+    happened to arrive in. numpy only -- no new dependency.
+    """
+    s = np.asarray(scores, float)
+    y = np.asarray(is_correct, int)
+    pos = y == 1
+    n_pos, n_neg = int(pos.sum()), int((~pos).sum())
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(s, kind="mergesort")
+    ranks_sorted = np.arange(1, len(s) + 1, dtype=float)
+    s_sorted = s[order]
+    start = 0
+    for i in range(1, len(s) + 1):
+        if i == len(s) or s_sorted[i] != s_sorted[start]:
+            ranks_sorted[start:i] = ranks_sorted[start:i].mean()
+            start = i
+    ranks = np.empty(len(s), float)
+    ranks[order] = ranks_sorted
+    return float((ranks[pos].sum() - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg))
 
 
 def fit_calibration(
@@ -170,8 +297,16 @@ def fit_calibration(
     curve's quality, so a calibration carries an honest, out-of-sample calibration error.
     ``instrument`` / ``source`` / ``provisional`` are recorded as provenance.
 
-    :raises InsufficientCalibrationData: fewer than ``MIN_CALIBRATION_LABELS`` labels, or
-        only one class present (nothing to separate).
+    Refusal is by exception, never by returning a degraded object: a curve that is not
+    monotone increasing, or that carries no information, is not a *worse* calibration --
+    it is not one. Returning it would mean every caller has to remember to check, and the
+    one that forgets rewrites P(correct) for a whole instrument.
+
+    :raises InsufficientCalibrationData: fewer than ``MIN_CALIBRATION_LABELS`` labels in
+        total or fewer than ``MIN_CALIBRATION_CLASS_LABELS`` of either class.
+    :raises DegenerateCalibration: the optimize did not converge, the fitted slope is not
+        positive (an inverted curve), or the labels do not separate on the score
+        (held-out AUC below ``MIN_CALIBRATION_AUC``).
     """
     from datetime import datetime, timezone
 
@@ -179,19 +314,43 @@ def fit_calibration(
     y = np.asarray(is_correct, int)
     mask = np.isfinite(s)
     s, y = s[mask], y[mask]
-    if len(s) < MIN_CALIBRATION_LABELS or y.sum() == 0 or (y == 0).sum() == 0:
+    n_pos, n_neg = int(y.sum()), int((y == 0).sum())
+    if (
+        len(s) < MIN_CALIBRATION_LABELS
+        or n_pos < MIN_CALIBRATION_CLASS_LABELS
+        or n_neg < MIN_CALIBRATION_CLASS_LABELS
+    ):
         raise InsufficientCalibrationData(
-            f"need >= {MIN_CALIBRATION_LABELS} labels of both classes "
-            f"(got n={len(s)}, pos={int(y.sum())}, neg={int((y == 0).sum())})"
+            f"need >= {MIN_CALIBRATION_LABELS} labels with >= "
+            f"{MIN_CALIBRATION_CLASS_LABELS} of each class "
+            f"(got n={len(s)}, pos={n_pos}, neg={n_neg})"
         )
-    rng = np.random.default_rng(seed)
-    idx = rng.permutation(len(s))
-    n_test = max(1, int(len(s) * holdout))
-    test, train = idx[:n_test], idx[n_test:]
+    test, train = holdout_split(len(s), holdout=holdout, seed=seed)
     # Guard: if the split leaves a single class in train, fit on all data instead.
     if y[train].sum() == 0 or (y[train] == 0).sum() == 0:
-        train = idx
-    a, b = _platt_fit(s[train], y[train])
+        train = np.arange(len(s))
+    a, b, converged = _platt_fit(s[train], y[train])
+    if not converged or not (np.isfinite(a) and np.isfinite(b)):
+        raise DegenerateCalibration(
+            f"Platt fit did not converge (a={a}, b={b})", reason="fit_not_converged"
+        )
+    if a <= MIN_CALIBRATION_SLOPE:
+        raise DegenerateCalibration(
+            f"fitted curve is not monotone increasing (a={a:.4f}, b={b:.4f}): it would "
+            f"report higher confidence for weaker evidence",
+            reason="non_monotonic_fit",
+        )
+    auc = discrimination_auc(s[test], y[test])
+    if not np.isfinite(auc):
+        # A single-class holdout says nothing; fall back to all labels (both classes are
+        # guaranteed present by the InsufficientCalibrationData check above).
+        auc = discrimination_auc(s, y)
+    if auc < MIN_CALIBRATION_AUC:
+        raise DegenerateCalibration(
+            f"labels do not separate on the score (held-out AUC {auc:.3f} < "
+            f"{MIN_CALIBRATION_AUC}); the fitted curve carries no information",
+            reason="no_discrimination",
+        )
     ece = calibration_error(apply_calibration(s[test], (a, b)), y[test])
     return Calibration(
         a=a,
@@ -221,6 +380,8 @@ def recalibrate(
     current: "Calibration | None" = None,
     strong_evidence: Sequence[str] = STRONG_EVIDENCE,
     provisional_min_strong: int = MIN_CALIBRATION_LABELS,
+    holdout: float = 0.5,
+    seed: int = 0,
 ) -> dict:
     """Fit a fresh calibration from labelled ``(score, is_correct)`` pairs and report the change.
 
@@ -233,20 +394,45 @@ def recalibrate(
     ``provisional_min_strong`` positives carry *strong* evidence (``strong_evidence`` — reference
     standard / MS-MS by default), so a pile of visual-only confirmations can't graduate it to "real".
 
-    :returns: ``{calibration, before_ece, after_ece, n_pos, n_neg, n_strong_positives, provisional}``
-        where ``before_ece`` is ``current`` applied to *these* labels (None if no current curve).
-    :raises InsufficientCalibrationData: fewer than ``MIN_CALIBRATION_LABELS`` labels of each class.
+    ``activate`` is the second half of that honesty and the division of labour with the caller:
+    this function decides whether the curve is *usable* (by raising) and whether it *beats the
+    incumbent* (by comparing the two held-out ECEs); the caller decides whether to persist it.
+    A refit that is worse than the curve it would replace is reported, not raised -- the caller
+    legitimately wants to see the params and the two errors before dropping it on the floor.
+
+    :returns: ``{calibration, before_ece, after_ece, n_pos, n_neg, n_strong_positives, provisional,
+        activate, refusal}`` where ``before_ece`` is ``current`` scored on the same held-out points
+        as ``after_ece`` (None if no current curve), and ``refusal`` names the failed gate when
+        ``activate`` is False.
+    :raises CalibrationRefused: the labels cannot be fit (:class:`InsufficientCalibrationData`) or
+        the fit is not a usable curve (:class:`DegenerateCalibration`). Not swallowed: a caller
+        that gets a dict back must be able to trust it.
     """
     s = np.asarray(scores, float)
     y = np.asarray(labels, int)
     before_ece = None
     if current is not None:
+        # Score the incumbent on exactly the points the new curve is held out on. The
+        # finite mask has to be applied FIRST because fit_calibration masks before it
+        # splits, so anything else indexes into a different array. Comparing a held-out
+        # half against an all-label baseline would not be a comparison at all -- see
+        # holdout_split.
         finite = np.isfinite(s)
-        if finite.any():
+        s_f, y_f = s[finite], y[finite]
+        if len(s_f):
+            test, _ = holdout_split(len(s_f), holdout=holdout, seed=seed)
             before_ece = calibration_error(
-                apply_calibration(s[finite], current), y[finite]
+                apply_calibration(s_f[test], current), y_f[test]
             )
-    cal = fit_calibration(s, y, instrument=instrument, source=source, provisional=True)
+    cal = fit_calibration(
+        s,
+        y,
+        instrument=instrument,
+        source=source,
+        provisional=True,
+        holdout=holdout,
+        seed=seed,
+    )
     n_strong = 0
     if evidence_levels is not None:
         strong = set(strong_evidence)
@@ -261,14 +447,24 @@ def recalibrate(
             current.corroboration_weights if current is not None else None
         ),
     )
+    before_ece = round(float(before_ece), 4) if before_ece is not None else None
+    refusal = None
+    if (
+        before_ece is not None
+        and cal.ece is not None
+        and cal.ece > before_ece + ECE_REGRESSION_TOL
+    ):
+        refusal = "ece_regression"
     return {
         "calibration": cal,
-        "before_ece": round(float(before_ece), 4) if before_ece is not None else None,
+        "before_ece": before_ece,
         "after_ece": cal.ece,
         "n_pos": cal.n_pos,
         "n_neg": cal.n_neg,
         "n_strong_positives": n_strong,
         "provisional": provisional,
+        "activate": refusal is None,
+        "refusal": refusal,
     }
 
 
@@ -308,7 +504,13 @@ PROVISIONAL_ORBITRAP = Calibration(
     n_pos=17329,
     n_neg=81754,
     ece=0.0289,
-    fit_utc=None,
+    # The one curve that actually ships must carry the provenance the class exists for;
+    # a null here says "nobody knows when this was fit", which for the default Orbitrap
+    # calibration is the field that decides whether it is stale. Date-only precision is
+    # deliberate: the eval run's wall clock was not recorded, so this is the date the
+    # fitted parameters landed in the tree, and ISO-8601 lets us say exactly that rather
+    # than invent a time of day.
+    fit_utc="2026-07-08",
     source="demo goldens (Br/Ur, preliminary)",
     provisional=True,
     corroboration_weights=PROVISIONAL_ORBITRAP_CORROBORATION,

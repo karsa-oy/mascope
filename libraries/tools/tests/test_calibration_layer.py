@@ -13,14 +13,20 @@ import pytest
 from mascope_tools.composition.calibration import (
     DEFAULT_CORROBORATION_CAP,
     INSTRUMENT_CALIBRATIONS,
+    MIN_CALIBRATION_CLASS_LABELS,
     MIN_CALIBRATION_LABELS,
     Calibration,
+    CalibrationRefused,
+    DegenerateCalibration,
     InsufficientCalibrationData,
+    _platt_fit,
     apply_calibration,
     apply_corroboration,
     calibration_error,
     calibration_for,
+    discrimination_auc,
     fit_calibration,
+    holdout_split,
     recalibrate,
 )
 
@@ -31,6 +37,35 @@ def _separated_labels(n=400, seed=0):
     scores = rng.uniform(0, 1, n)
     # P(correct) truly ~ score -> a good curve should recover calibration
     correct = rng.uniform(0, 1, n) < scores
+    return scores, correct.astype(int)
+
+
+def _anticorrelated_labels(n=400, seed=7):
+    """Scores where correctness FALLS with the score.
+
+    The pathological case for a Platt fit: the optimizer happily converges on a
+    monotone *decreasing* curve, which is not a worse calibration but an inverted one.
+    """
+    rng = np.random.default_rng(seed)
+    scores = rng.uniform(0, 1, n)
+    correct = rng.uniform(0, 1, n) < (1 - scores)
+    return scores, correct.astype(int)
+
+
+def _noise_labels(n=400, seed=13):
+    """Correctness independent of the score -- nothing for a curve to learn."""
+    rng = np.random.default_rng(seed)
+    scores = rng.uniform(0, 1, n)
+    correct = rng.uniform(0, 1, n) < 0.5
+    return scores, correct.astype(int)
+
+
+def _curve_labels(cal, n=400, seed=0):
+    """Labels drawn from a KNOWN curve, so "the incumbent is already right" and
+    "the incumbent is wrong" can be set up as separate, controlled situations."""
+    rng = np.random.default_rng(seed)
+    scores = rng.uniform(0, 1, n)
+    correct = rng.uniform(0, 1, n) < apply_calibration(scores, cal)
     return scores, correct.astype(int)
 
 
@@ -79,6 +114,35 @@ def test_fit_calibration_refuses_single_class():
     scores = list(np.linspace(0, 1, MIN_CALIBRATION_LABELS + 10))
     with pytest.raises(InsufficientCalibrationData):
         fit_calibration(scores, [1] * len(scores))  # all correct, nothing to separate
+
+
+def test_fit_calibration_requires_a_minimum_of_each_class():
+    """A total-only floor is not the gate the docstring promises.
+
+    Enough labels overall but a single negative is exactly the shape that used to slip
+    through: two parameters fit against one point of one class, certified by an ECE
+    measured on a holdout that may not contain that class at all.
+    """
+    n = MIN_CALIBRATION_LABELS + 10
+    scores = list(np.linspace(0, 1, n))
+    labels = [0] + [1] * (n - 1)
+    with pytest.raises(InsufficientCalibrationData) as exc:
+        fit_calibration(scores, labels)
+    assert exc.value.reason == "insufficient_labels"
+    assert str(MIN_CALIBRATION_CLASS_LABELS) in str(exc.value)
+
+
+def test_calibration_error_rejects_values_outside_zero_one():
+    """The bins tile [0, 1]; anything outside falls in none of them.
+
+    Dropping those silently would report an ECE averaged over a subset while reading as
+    an average over everything -- an understatement of the very miscalibration the
+    number exists to expose. Raw evidence fed in by mistake must be loud.
+    """
+    with pytest.raises(ValueError):
+        calibration_error([0.5, 1.7], [1, 0])
+    with pytest.raises(ValueError):
+        calibration_error([0.5, float("nan")], [1, 0])
 
 
 def test_calibration_for_returns_provisional_orbitrap():
@@ -147,6 +211,14 @@ def test_provisional_orbitrap_carries_corroboration_weights():
     assert cal.corroboration_weights["+Br-"] > cal.corroboration_weights["+NH4+"] > 0
 
 
+def test_provisional_orbitrap_records_when_it_was_fit():
+    # The one curve that actually ships must carry the provenance the class exists for;
+    # fit_utc is what tells an operator whether the default Orbitrap curve is stale.
+    cal = calibration_for("orbi")
+    assert cal.fit_utc is not None
+    assert cal.source is not None
+
+
 # --- recalibrate (V2 loop: labels -> new calibration) ---------------------------------
 
 
@@ -198,3 +270,143 @@ def test_recalibrate_no_current_curve_has_no_before_ece():
     out = recalibrate(scores, labels, instrument="tof", source="s", current=None)
     assert out["before_ece"] is None
     assert out["calibration"].corroboration_weights is None
+
+
+# --- the activation guards --------------------------------------------------------
+#
+# A recalibration rewrites P(correct) for every assignment on an instrument, from one
+# batch of user verdicts, with nothing downstream able to tell that it happened. These
+# tests pin the three ways a fit can be unusable and the one way it can be merely worse.
+
+
+def test_calibration_refusals_share_a_base():
+    """One `except` at the call site has to cover every refusal, or the caller that
+    forgets a branch activates the curve the guard was written to stop."""
+    assert issubclass(InsufficientCalibrationData, CalibrationRefused)
+    assert issubclass(DegenerateCalibration, CalibrationRefused)
+    assert InsufficientCalibrationData("x").reason == "insufficient_labels"
+    assert DegenerateCalibration("x", reason="non_monotonic_fit").reason == (
+        "non_monotonic_fit"
+    )
+
+
+def test_fit_calibration_refuses_an_inverted_curve():
+    """Anti-correlated labels fit a MONOTONE DECREASING curve (measured: a=-6.39,
+    b=+3.17, i.e. P(0.1)=0.93 and P(0.9)=0.07 -- highest confidence for the weakest
+    evidence, instrument-wide).
+
+    The second half of this test is the point: the optimizer reports success on exactly
+    these labels, so a convergence check would wave the inverted curve through. Only the
+    sign of the slope catches it.
+    """
+    scores, labels = _anticorrelated_labels()
+    with pytest.raises(DegenerateCalibration) as exc:
+        fit_calibration(scores, labels, instrument="orbi", source="synthetic")
+    assert exc.value.reason == "non_monotonic_fit"
+
+    a, _b, converged = _platt_fit(scores, labels)
+    assert converged is True
+    assert a < 0
+
+
+def test_inverted_curve_would_pass_the_ece_gate():
+    """The regression guard against "simplifying" the guards down to the ECE gate.
+
+    On its own labels the inverted curve is BETTER calibrated than a healthy incumbent
+    (measured: 0.087 vs 0.540), so an ECE-only gate would activate it enthusiastically.
+    The sign check has to run first.
+    """
+    scores, labels = _anticorrelated_labels()
+    a, b, _ = _platt_fit(scores, labels)
+    inverted = Calibration(a=a, b=b, instrument="orbi")
+    healthy = Calibration(a=6.0, b=-3.0, instrument="orbi")
+    inverted_ece = calibration_error(apply_calibration(scores, inverted), labels)
+    healthy_ece = calibration_error(apply_calibration(scores, healthy), labels)
+    assert inverted_ece < healthy_ece
+
+
+def test_recalibrate_refuses_an_inverted_curve_and_reports_the_reason():
+    scores, labels = _anticorrelated_labels()
+    current = Calibration(a=6.0, b=-3.0, instrument="orbi")
+    with pytest.raises(CalibrationRefused) as exc:
+        recalibrate(scores, labels, instrument="orbi", source="s", current=current)
+    assert exc.value.reason == "non_monotonic_fit"
+    # the incumbent is a frozen dataclass; nothing about it was touched
+    assert current.params() == (6.0, -3.0)
+
+
+def test_fit_calibration_refuses_uninformative_labels():
+    """Noise labels fit a ~ 0: positive (so the sign check passes) with an excellent
+    ECE (a constant predictor is perfectly calibrated and perfectly useless), while
+    flattening every p_correct on the instrument to the base rate.
+
+    Held-out AUC is the only guard that sees it. If this guard is ever dropped for
+    scope, this test must be dropped WITH IT and the gap recorded in
+    docs/dev/verification_calibration_loop.md S5 -- not quietly omitted.
+    """
+    scores, labels = _noise_labels()
+    with pytest.raises(DegenerateCalibration) as exc:
+        fit_calibration(scores, labels, instrument="orbi", source="synthetic")
+    assert exc.value.reason == "no_discrimination"
+    assert discrimination_auc(scores, labels) < 0.6
+
+
+def test_discrimination_auc_is_the_rank_statistic():
+    # perfect separation, no separation, and the undefined single-class case
+    assert discrimination_auc([0.1, 0.2, 0.9, 1.0], [0, 0, 1, 1]) == pytest.approx(1.0)
+    assert discrimination_auc([0.5] * 4, [0, 1, 0, 1]) == pytest.approx(0.5)
+    assert np.isnan(discrimination_auc([0.1, 0.9], [1, 1]))
+
+
+def test_recalibrate_refuses_an_ece_regression():
+    """The incumbent is already the curve the labels came from, so a refit on 80 points
+    is a noisier estimate of it, not an improvement (measured: 0.111 -> 0.137).
+
+    It is a perfectly usable curve -- it passes the sign and discrimination guards --
+    so it is reported rather than raised, and the caller gets the params and both errors
+    to look at before dropping it.
+    """
+    current = Calibration(a=6.0, b=-3.0, instrument="orbi")
+    scores, labels = _curve_labels(current, n=80, seed=0)
+    out = recalibrate(scores, labels, instrument="orbi", source="s", current=current)
+    assert out["activate"] is False
+    assert out["refusal"] == "ece_regression"
+    assert out["after_ece"] > out["before_ece"]
+    assert out["calibration"] is not None
+    assert out["calibration"].a > 0
+
+
+def test_recalibrate_activates_when_it_beats_the_active_curve():
+    """The situation recalibration exists for: the active curve is wrong for this
+    instrument and enough labels are in to say so."""
+    truth = Calibration(a=6.0, b=-3.0, instrument="orbi")
+    scores, labels = _curve_labels(truth, n=400, seed=0)
+    current = Calibration(a=1.2, b=-0.4, instrument="orbi")
+    out = recalibrate(scores, labels, instrument="orbi", source="s", current=current)
+    assert out["activate"] is True
+    assert out["refusal"] is None
+    assert out["after_ece"] < out["before_ece"]
+
+
+def test_recalibrate_measures_both_eces_on_the_same_holdout():
+    """The gate only means something if the two numbers are measured on the same
+    points: the ECE estimator is biased upward on fewer points, so scoring the new
+    curve on a held-out half against an incumbent scored on ALL the labels would fail
+    refits that are genuinely better."""
+    truth = Calibration(a=6.0, b=-3.0, instrument="orbi")
+    scores, labels = _curve_labels(truth, n=400, seed=0)
+    current = Calibration(a=1.2, b=-0.4, instrument="orbi")
+    out = recalibrate(scores, labels, instrument="orbi", source="s", current=current)
+    test, _train = holdout_split(len(scores))
+    expected = calibration_error(
+        apply_calibration(np.asarray(scores)[test], current),
+        np.asarray(labels)[test],
+    )
+    assert out["before_ece"] == pytest.approx(round(float(expected), 4))
+
+
+def test_holdout_split_is_deterministic_and_partitions():
+    test, train = holdout_split(100, holdout=0.5, seed=0)
+    assert len(test) == 50 and len(train) == 50
+    assert sorted(np.concatenate([test, train]).tolist()) == list(range(100))
+    assert np.array_equal(test, holdout_split(100, holdout=0.5, seed=0)[0])
