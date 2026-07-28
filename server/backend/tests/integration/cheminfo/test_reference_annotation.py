@@ -117,8 +117,36 @@ def _by_formula(data, formula):
     return next((r for r in data if r["target_compound_formula"] == formula), None)
 
 
+@pytest.fixture
+def reference_in_play(monkeypatch):
+    """Opt this deployment into the peak-centric surfaces.
+
+    The mirror is only consulted when it is in play - either the caller asked for
+    the suspect-screening prior (``known_only``) or the deployment enabled peak
+    assignment. A search that does neither must keep the pre-feature response, which
+    `test_annotation_is_gated_off_by_default` pins.
+    """
+    monkeypatch.setenv("MASCOPE_PEAK_ASSIGNMENT", "1")
+
+
 @pytest.mark.asyncio
-async def test_results_are_annotated_with_known_compounds(seeded):
+async def test_annotation_is_gated_off_by_default(seeded, monkeypatch):
+    """With the feature off and no known_only, the response is left untouched."""
+    monkeypatch.delenv("MASCOPE_PEAK_ASSIGNMENT", raising=False)
+    resp = await retrieve_compositions_by_mz(
+        mz=_ASPIRIN_MZ,
+        ionization_mechanism_ids=[seeded],
+        mz_precision=5,
+        formula_ranges=_FORMULA_RANGES,
+    )
+    data = resp["data"]
+    assert data, "de novo engine returned no candidates"
+    # No new key, so an existing SDK client sees exactly the pre-feature shape.
+    assert all("known_compounds" not in r for r in data)
+
+
+@pytest.mark.asyncio
+async def test_results_are_annotated_with_known_compounds(seeded, reference_in_play):
     """Every candidate carries known_compounds; the matching formula is named."""
     resp = await retrieve_compositions_by_mz(
         mz=_ASPIRIN_MZ,
@@ -141,7 +169,7 @@ async def test_results_are_annotated_with_known_compounds(seeded):
 
 
 @pytest.mark.asyncio
-async def test_annotation_is_selective(seeded):
+async def test_annotation_is_selective(seeded, reference_in_play):
     """Isobaric de novo formulas with no reference match get an empty list."""
     resp = await retrieve_compositions_by_mz(
         mz=_ASPIRIN_MZ,

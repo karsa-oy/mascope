@@ -6,7 +6,6 @@ from mascope_backend.api.controllers.match.aggregate.sample.match_aggregate_samp
     aggregate_sample_match_compounds,
 )
 from mascope_backend.api.controllers.match.lib.match_score_v2 import (
-    fit_sample_mass_accuracy,
     ion_score_v2,
     sample_noise_floor,
 )
@@ -19,6 +18,7 @@ from mascope_backend.api.new.cheminfo.utils import (
     to_custom_element_format,
     to_explicit_isotope_format,
 )
+from mascope_backend.api.new.match.params.lib import default_match_params
 from mascope_backend.api.new.peak_assignments.config import (
     PeakAssignmentConfig,
     peak_assignment_enabled,
@@ -45,18 +45,80 @@ from mascope_tools.composition.utils import (
 # Columns ion_score_v2 needs on a candidate's isotope frame.
 _FIT_COLS = frozenset({"relative_abundance", "match_mz_error", "sample_peak_intensity"})
 
+# The matcher's m/z tolerance is a hard accept/reject window around the sample's
+# mass-error distribution; the fit score wants that distribution's Gaussian width.
+# Reading the tolerance as a ~3 sigma window turns the instrument defaults (5 ppm
+# Orbitrap, 15 ppm TOF) into ~1.7 / ~5 ppm, both inside the ranges score_pattern_v2
+# documents for those instrument classes.
+_TOLERANCE_SIGMA_DIVISOR = 3.0
 
-def _annotate_assignment_scores(results: list[dict]) -> None:
+
+def _instrument_sigma_ppm(match_params: BaseMatchParams | None) -> float | None:
+    """The mass-accuracy sigma (ppm) the fit score should use for this sample.
+
+    The fit score's mass term is ``exp(-0.5 * (ppm / sigma)^2)``, so sigma has to be
+    the *instrument's* mass accuracy. Stage A can fit it from the data
+    (`fit_sample_mass_accuracy` over every isotopologue the target library matched
+    across the whole spectrum - hundreds of independent anchors), but this search
+    cannot: its rows are the candidates for ONE m/z, and they are spread over
+    +/- ``mz_precision`` of that peak by construction. A sigma fitted from them would
+    measure the search window rather than the instrument - with a 30 ppm window the
+    mass term goes near-uniform and every candidate scores alike on mass, which is the
+    opposite of what rescoring the search is for.
+
+    So it comes from the instrument instead. ``match_params`` is resolved per sample
+    from the sample's instrument (or supplied by the caller), and its ``mz_tolerance``
+    is the accept/reject window around the same error distribution the fit score
+    models.
+
+    :param match_params: Effective match parameters for the sample being searched.
+    :return: Sigma in ppm, or None when no usable tolerance is available - which makes
+        the caller report no fit score at all. That is deliberate: ``score_pattern_v2``
+        falls back to an Orbitrap-only 2.0 ppm when sigma is None, which would collapse
+        every candidate's score on a TOF sample, and a missing measurement is more
+        honest than a systematically wrong one.
+    """
+    tolerance = getattr(match_params, "mz_tolerance", None)
+    if tolerance is None:
+        return None
+    try:
+        tolerance = float(tolerance)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(tolerance) or tolerance <= 0.0:
+        return None
+    return tolerance / _TOLERANCE_SIGMA_DIVISOR
+
+
+def _annotate_assignment_scores(
+    results: list[dict], match_params: BaseMatchParams | None
+) -> None:
     """Attach fit_score (v2), plausibility and tier to each search candidate.
 
     Harmonizes the on-demand composition search with the peak-centric assignment
     engine: the fit is computed exactly as Stage A scores an ion (ion_score_v2
-    over the candidate's isotope envelope with the sample's fitted mass
-    accuracy), the plausibility is the graded Seven Golden Rules score, and the
-    tier uses the same bands -- so the search reports the same measurements as a
-    committed assignment instead of the legacy match score. Mutates in place.
+    over the candidate's isotope envelope), the plausibility is the graded Seven
+    Golden Rules score, and the tier uses the same bands -- so the search reports
+    the same measurements as a committed assignment instead of the legacy match
+    score. Mutates in place.
+
+    Two inputs Stage A fits from the whole spectrum cannot be fitted here, because
+    every row belongs to the same single m/z:
+
+    - the mass-accuracy sigma comes from the instrument (`_instrument_sigma_ppm`);
+      when it cannot be determined the annotation is skipped entirely, leaving the
+      response in its unscored shape rather than reporting a misleading score;
+    - no fitted offset (``mu``) is subtracted - the only estimate available would be
+      the median of the same window-bound errors, i.e. the window's centre.
+
+    The noise floor still comes from the matched intensities. It is only a fallback:
+    ``compute_match_isotopes`` carries real per-peak ``signal_to_noise``, and
+    ion_score_v2 prefers that whenever the column is populated.
     """
     if not results:
+        return
+    sigma = _instrument_sigma_ppm(match_params)
+    if sigma is None:
         return
     all_isotopes = [iso for entry in results for iso in entry.get("children", [])]
     if not all_isotopes:
@@ -65,7 +127,6 @@ def _annotate_assignment_scores(results: list[dict]) -> None:
     if not _FIT_COLS.issubset(iso_df.columns):
         return
 
-    mu, sigma = fit_sample_mass_accuracy(iso_df)
     noise = sample_noise_floor(iso_df)
     cfg = PeakAssignmentConfig()
     for entry in results:
@@ -73,9 +134,7 @@ def _annotate_assignment_scores(results: list[dict]) -> None:
         fit = None
         if children:
             try:
-                fit = ion_score_v2(
-                    pd.DataFrame(children), sigma_ppm=sigma, mu=mu, noise=noise
-                )
+                fit = ion_score_v2(pd.DataFrame(children), sigma_ppm=sigma, noise=noise)
             except Exception:  # scoring must never break the search response
                 fit = None
         fit = float(fit) if fit is not None and np.isfinite(fit) else None
@@ -109,8 +168,9 @@ async def retrieve_compositions_by_mz(
       + Explicit isotope formats in formulas are reverted back to custom element format
         e.g. "[15N]" to "^N"
     - Annotate each result with known reference compounds sharing its formula
-      (name, structure, source, license). Purely additive - the de novo scoring
-      is untouched.
+      (name, structure, source, license), when the reference mirror is in play -
+      see `_annotate_with_reference` for when that is. Purely additive - the de
+      novo scoring is untouched.
 
     NOTE: Conversion between custom element notation and explicit isotope notation is only a
     best guess. E.g. "[15N]" will always be converted to "^N" even if the user intended to refer to
@@ -133,7 +193,8 @@ async def retrieve_compositions_by_mz(
         - ionization_mechanism
         - target_isotope_mz
         - target_isotope_mz_error_ppm
-        - known_compounds (list of matching reference-database identities)
+        - known_compounds (list of matching reference-database identities; present
+          only when the reference mirror is consulted, see `_annotate_with_reference`)
     :rtype: dict
     """
     # Fetch ionization mechanisms from database
@@ -221,8 +282,6 @@ async def retrieve_compositions_by_mz(
             # Skip malformed results rather than failing
             continue
 
-    # Annotate results with known reference compounds sharing each formula.
-    # Additive: a lookup failure must never fail the de novo composition search.
     results = await _annotate_with_reference(results, known_only=known_only)
 
     # Return formatted response
@@ -235,22 +294,56 @@ async def retrieve_compositions_by_mz(
     }
 
 
+# A missing or unmigrated reference mirror is a deployment state, not a per-request
+# event: warning about it on every search would turn one misconfiguration into log
+# spam. Warn the first time and stay quiet afterwards.
+_reference_lookup_warned = False
+
+
 async def _annotate_with_reference(results: list[dict], known_only: bool) -> list[dict]:
     """Attach ``known_compounds`` to each result from the reference mirror.
 
+    Only when the mirror is actually in play. The reference mirror is a subsystem of
+    its own, and this composition search long predates it, so consulting it
+    unconditionally would change the response shape (a new ``known_compounds`` key)
+    and cost a second session plus an ``IN`` query for every existing SDK client that
+    never asked for identities. Two things put it in play:
+
+    - ``known_only`` - the suspect-screening prior, an explicit per-call opt-in that
+      cannot be honoured without the lookup;
+    - ``peak_assignment_enabled()`` - the deployment has opted into the peak-centric
+      surfaces, which is where reference identities are read.
+
+    With neither, the results are returned exactly as they were built, so a
+    deployment that opted out sees the pre-feature response and a deployment with no
+    reference data loaded pays nothing for it.
+
     Batches all result formulas into a single indexed lookup. On any failure the
-    results are returned unannotated (each with an empty ``known_compounds``) so
-    annotation can never break composition search.
+    results are returned with an empty ``known_compounds`` so annotation can never
+    break composition search - which means a ``known_only`` search against a broken
+    or unmigrated mirror reports nothing rather than claiming unverified identities.
 
     :param results: Composition results, each carrying ``target_compound_formula``.
     :param known_only: Drop results with no known-compound match when True.
-    :return: The results with ``known_compounds`` attached (and filtered if asked).
+    :return: The results with ``known_compounds`` attached (and filtered if asked),
+        or unchanged when the mirror is not consulted.
     """
+    global _reference_lookup_warned
+
+    if not results:
+        return results
+    if not (known_only or peak_assignment_enabled()):
+        return results
+
     formulas = [r["target_compound_formula"] for r in results]
     try:
         annotations = await reference_service.annotate_formulas(formulas)
     except Exception as e:
-        runtime.logger.warning(f"Reference annotation skipped: {e}")
+        if not _reference_lookup_warned:
+            _reference_lookup_warned = True
+            runtime.logger.warning(
+                f"Reference annotation skipped (further occurrences silent): {e}"
+            )
         annotations = {}
 
     annotated = []
@@ -300,7 +393,10 @@ async def match_compositions_by_mz(
     :type formula_ranges: None | str
     :param ionization_mechanism_ids: List of ionization mechanism IDs to query against
     :type ionization_mechanism_ids: None | list[str]
-    :param match_params: Parameters for customizing the matching algorithm
+    :param match_params: Parameters for customizing the matching algorithm. Resolved
+        from the sample's instrument when omitted, here rather than inside the
+        aggregation call so the fit-score annotation sees the same parameters the
+        match itself ran with.
     :type match_params: None | BaseMatchParams
     :param independent_transaction: Whether this is an independent transaction
     :type independent_transaction: bool
@@ -318,6 +414,9 @@ async def match_compositions_by_mz(
         - target_isotope_mz_error_ppm
     :rtype: dict
     """
+    if match_params is None:
+        match_params = await default_match_params(sample_item_id)
+
     # Get composition data
     runtime.logger.info(f"Starting composition search for m/z {mz}")
     cheminfo_result = await retrieve_compositions_by_mz(
@@ -430,7 +529,7 @@ async def match_compositions_by_mz(
     # reporting the legacy match score and category it always has, and the extra
     # fields stay absent so the UI falls back to the legacy columns.
     if peak_assignment_enabled():
-        _annotate_assignment_scores(data)
+        _annotate_assignment_scores(data, match_params)
 
     # Return formatted response with notification data
     result_data = {
