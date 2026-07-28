@@ -9,10 +9,12 @@ products and acids, a few environmental contaminants incl. PFAS, and some
 recognizable molecules) so that some de novo candidates in the demo light up
 with a named identity.
 
-Idempotent: skips if the demo reference source already exists. Formulas are
-canonicalized and masses computed on insert via ``mascope_reference`` exactly as
-a real ``mascope reference sync`` load would, so the demo rows are queried the
-same way.
+Idempotent by replacement: any existing ``demo`` reference source is deleted and
+re-seeded, so a `mascope demo` start - which runs this every time - always ends
+up with the curated set in this file rather than whatever an older build left
+behind. Formulas are canonicalized and masses computed on insert via
+``mascope_reference`` exactly as a real ``mascope reference sync`` load would, so
+the demo rows are queried the same way.
 
 Usage:
     mascope dev db script run seed_reference_demo
@@ -34,7 +36,8 @@ from mascope_backend.runtime import runtime
 from mascope_reference import canonical_formula, monoisotopic_mass
 
 
-# Fixed name for the demo reference load (used for the idempotency check).
+# Fixed name for the demo reference load. Stable so a re-seed can find and
+# replace the previous one rather than stacking a second demo source beside it.
 DEMO_SOURCE = "demo"
 
 # (name, neutral formula, CAS or None). Every formula here is one the demo

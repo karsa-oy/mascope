@@ -23,6 +23,14 @@ recoverable direction (re-run the sample) where a wrongly-claimed ``completed``
 is not, and the rows an interrupted run left behind are reclaimed by
 ``prune_peak_assignment_runs`` rather than kept alive by adopting the run.
 
+That last part is a two-way dependency, not a convenience: the prune holds runs
+still in a non-terminal state for a deliberately long grace, because it cannot
+tell an abandoned ``running`` row from one a live worker is about to write its
+ledger into. This reset is what makes the distinction - it only ever runs where
+nothing can legitimately be ``running`` - so it is the normal path by which an
+interrupted run becomes reclaimable, and the prune's long grace is only the
+backstop for a server that never restarts.
+
 Entry Points:
 - Async: `reset_running_peak_assignment_runs()` for use in async code
 - Sync: `run_reset_running_peak_assignment_runs()` for CLI and scripts

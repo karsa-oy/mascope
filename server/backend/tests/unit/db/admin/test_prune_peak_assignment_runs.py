@@ -1,23 +1,47 @@
 """
-Unit tests for the peak-assignment retention selection.
+Unit tests for the peak-assignment retention selection and its operator knobs.
 
 ``_select_prunable_run_ids`` decides which runs get deleted, and deleting a run
 cascades to its whole ledger - so a mistake here is silent, irreversible data
-loss. It takes its session as a parameter, so the ranking can be tested without
-a database by feeding it the rows a query would have returned.
+loss. The decision is split across three layers, and each needs its own kind of
+coverage:
 
-The ordering these tests assume is the query's, not Python's: the SELECT sorts
-by sample, then created DESC NULLS LAST, then run id DESC.
+- the Python ranking, which is fed the rows a query returned. Tested through a
+  mocked session.
+- the SQL, which decides *which* rows the ranking ever sees. A mocked session
+  cannot see it at all, so the statements are executed against an in-memory
+  SQLite copy of the run table, and compiled against the Postgres dialect where
+  the two engines disagree (explicit null ordering) so the guard is asserted in
+  the dialect that actually runs it.
+- the batching, which is what stands between the script and the wire-protocol
+  bind-parameter cap on the backlog it exists to clear. Tested by recording the
+  statements a full prune issues.
+
+Everything here stays hermetic - no server, no migration - so it runs on every
+CI job rather than only where a database happens to be up.
 """
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
+from mascope_backend.db import PeakAssignmentRun
+from mascope_backend.db.admin.peak_assignments import prune_runs
 from mascope_backend.db.admin.peak_assignments.prune_runs import (
+    DEFAULT_KEEP_FAILED_HOURS,
+    DEFAULT_KEEP_RUNNING_HOURS,
+    IN_FLIGHT_STATUSES,
+    MIN_KEEP_RUNNING_HOURS,
+    _chunked,
+    _completed_runs_statement,
     _select_prunable_run_ids,
+    _stale_runs_statement,
+    prune_peak_assignment_runs,
 )
+from mascope_backend.db.scripts import prune_peak_assignment_runs as prune_script
 
 
 def _session(completed_rows, stale_ids):
@@ -108,6 +132,287 @@ async def test_nothing_prunable_returns_empty():
     )
 
 
+def _hours_ago(hours: float) -> datetime:
+    """A UTC timestamp ``hours`` in the past."""
+    return datetime.now(timezone.utc) - timedelta(hours=hours)
+
+
+def _run(run_id: str, status: str, sample: str = "si1", created=None, completed=None):
+    """One `peak_assignment_run` row, with only the columns these tests read."""
+    return {
+        "peak_assignment_run_id": run_id,
+        "sample_item_id": sample,
+        "engine_version": "test",
+        "status": status,
+        "peak_assignment_run_utc_created": created,
+        "peak_assignment_run_utc_completed": completed,
+    }
+
+
+@pytest.fixture
+def run_table():
+    """An in-memory SQLite copy of `peak_assignment_run`, one per test.
+
+    Only that table is created. Its foreign key points at a `sample_item` table
+    that is never materialized, which is harmless: SQLite does not enforce
+    foreign keys unless asked to, and nothing here inserts through the ORM.
+    """
+    engine = sa.create_engine("sqlite://")
+    PeakAssignmentRun.__table__.create(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def _seed(engine, rows):
+    """Insert the given run rows."""
+    with engine.begin() as connection:
+        connection.execute(sa.insert(PeakAssignmentRun), rows)
+
+
+def _stale_ids(engine, keep_failed_hours=24, keep_running_hours=72):
+    """Run the stale-run statement for real and return the ids it selects."""
+    now = datetime.now(timezone.utc)
+    statement = _stale_runs_statement(
+        failed_cutoff=now - timedelta(hours=keep_failed_hours),
+        running_cutoff=now - timedelta(hours=keep_running_hours),
+    )
+    with engine.connect() as connection:
+        return list(connection.execute(statement).scalars())
+
+
+class TestCompletedScanOrdering:
+    """The ordering that decides which run keeps a slot, and which is deleted."""
+
+    def test_postgres_sql_orders_nulls_last(self):
+        """The explicit NULLS LAST must survive in the dialect that runs it.
+
+        Postgres orders DESC as NULLS FIRST and SQLite as NULLS LAST, so an
+        execution test proves nothing about the deployment target: dropping
+        ``.nullslast()`` would still pass on SQLite while ranking a
+        null-timestamped run as the newest on Postgres - taking a keep slot and
+        pushing a live run past the cutoff. Only the rendered SQL shows it.
+        """
+        sql = str(_completed_runs_statement().compile(dialect=postgresql.dialect()))
+
+        assert "peak_assignment_run_utc_created DESC NULLS LAST" in sql
+        assert "peak_assignment_run_id DESC" in sql
+
+    def test_a_null_timestamp_ranks_oldest_and_is_pruned_first(self, run_table):
+        """A run with no timestamp loses to any timestamped run of its sample."""
+        _seed(
+            run_table,
+            [
+                _run("older", "completed", created=_hours_ago(48)),
+                _run("no-timestamp", "completed", created=None),
+                _run("newest", "completed", created=_hours_ago(1)),
+            ],
+        )
+
+        with run_table.connect() as connection:
+            ordered = list(connection.execute(_completed_runs_statement()))
+
+        assert [run_id for run_id, _ in ordered] == ["newest", "older", "no-timestamp"]
+
+    @pytest.mark.asyncio
+    async def test_the_live_run_survives_a_null_timestamped_sibling(self, run_table):
+        """End to end: the real scan feeds the ranking, and keeps the live run."""
+        _seed(
+            run_table,
+            [
+                _run("no-timestamp", "completed", created=None),
+                _run("newest", "completed", created=_hours_ago(1)),
+            ],
+        )
+        with run_table.connect() as connection:
+            ordered = list(connection.execute(_completed_runs_statement()))
+
+        prunable = await _select_prunable_run_ids(
+            _session(ordered, []), keep_per_sample=1, keep_failed_hours=24
+        )
+
+        assert prunable == ["no-timestamp"]
+
+
+class TestInFlightRunsAreProtected:
+    """A run that may still be executing is the engine's write target.
+
+    Deleting it mid-flight makes the terminal ledger insert fail on the foreign
+    key and loses the whole run, so the ordinary failed grace must not reach it.
+    """
+
+    def test_a_run_past_the_failed_grace_but_inside_its_own_is_kept(self, run_table):
+        """The knob an operator is most likely to shorten cannot reach a live run."""
+        _seed(
+            run_table,
+            [
+                _run("in-flight", "running", created=_hours_ago(48)),
+                _run("terminal", "failed", created=_hours_ago(48)),
+            ],
+        )
+
+        assert _stale_ids(run_table, keep_failed_hours=1) == ["terminal"]
+
+    def test_a_run_far_past_its_own_grace_is_reclaimed(self, run_table):
+        """The long grace still bounds growth on a server that never restarts."""
+        _seed(run_table, [_run("abandoned", "running", created=_hours_ago(200))])
+
+        assert _stale_ids(run_table, keep_running_hours=72) == ["abandoned"]
+
+    def test_pending_is_treated_as_in_flight(self, run_table):
+        """'pending' is the column default, so a row can exist before it runs."""
+        _seed(run_table, [_run("queued", "pending", created=_hours_ago(48))])
+
+        assert _stale_ids(run_table, keep_failed_hours=1) == []
+        assert "pending" in IN_FLIGHT_STATUSES
+
+    def test_an_in_flight_run_without_timestamps_is_not_ancient(self, run_table):
+        """A missing timestamp reads as 'just started', not as 'long dead'.
+
+        The terminal branch treats a run with neither timestamp as ancient, since
+        it would otherwise be immortal. An in-flight row gets the opposite
+        treatment because there the two cases are indistinguishable - and it is
+        not stranded either: the startup reaper moves it to 'failed', after which
+        the terminal branch reclaims it.
+        """
+        _seed(
+            run_table,
+            [
+                _run("in-flight", "running"),
+                _run("terminal", "failed"),
+            ],
+        )
+
+        assert _stale_ids(run_table) == ["terminal"]
+
+    def test_completed_runs_are_never_stale(self, run_table):
+        """Age alone never deletes a completed run; only the keep-N rule does."""
+        _seed(run_table, [_run("ancient", "completed", completed=_hours_ago(10_000))])
+
+        assert _stale_ids(run_table) == []
+
+    def test_a_fresh_failure_stays_inspectable(self, run_table):
+        """The failed grace exists so its error can still be read."""
+        _seed(run_table, [_run("just-failed", "failed", completed=_hours_ago(1))])
+
+        assert _stale_ids(run_table, keep_failed_hours=24) == []
+
+
+def _in_clause_ids(statement):
+    """The run ids bound into a statement's IN clause.
+
+    SQLAlchemy binds an IN list as one expanding parameter, so the compiled
+    parameters carry the whole batch under a single key - and its length is
+    exactly what counts against the wire-protocol parameter cap.
+    """
+    params = statement.compile().params
+    return next(value for value in params.values() if isinstance(value, list))
+
+
+class _RecordingSession:
+    """Stands in for the session a prune opens, recording the batches it asks for.
+
+    ``_select_prunable_run_ids`` is short-circuited (no completed runs, every
+    prunable id arriving from the stale scan) so the test is about batching only.
+    """
+
+    def __init__(self, prunable_ids, rows_per_run=1000):
+        self.prunable_ids = list(prunable_ids)
+        self.rows_per_run = rows_per_run
+        self.count_batches: list[int] = []
+        self.delete_batches: list[int] = []
+        self._selects = 0
+
+    async def execute(self, statement):
+        if isinstance(statement, sa.Delete):
+            batch = _in_clause_ids(statement)
+            self.delete_batches.append(len(batch))
+            result = MagicMock()
+            result.rowcount = len(batch)
+            return result
+
+        self._selects += 1
+        result = MagicMock()
+        result.all.return_value = []
+        result.scalars.return_value = self.prunable_ids if self._selects == 2 else []
+        return result
+
+    async def scalar(self, statement):
+        batch = _in_clause_ids(statement)
+        self.count_batches.append(len(batch))
+        return len(batch) * self.rows_per_run
+
+    async def commit(self):
+        return None
+
+
+def _session_factory(session):
+    """A stand-in for ``async_session``: called, then entered as a context."""
+    factory = MagicMock()
+    context = MagicMock()
+    context.__aenter__ = AsyncMock(return_value=session)
+    context.__aexit__ = AsyncMock(return_value=False)
+    factory.return_value = context
+    return factory
+
+
+class TestBatching:
+    """No statement may grow with the backlog.
+
+    Every id in the selection binds one parameter, and the protocol caps a
+    statement at 32767 of them. The selection is unbounded - it is precisely the
+    accumulated backlog the prune exists to clear - so an unbatched statement
+    fails on the deployments that need the prune most.
+    """
+
+    def test_chunks_cover_everything_in_order(self):
+        chunks = list(_chunked([str(index) for index in range(7)], 3))
+
+        assert [list(chunk) for chunk in chunks] == [
+            ["0", "1", "2"],
+            ["3", "4", "5"],
+            ["6"],
+        ]
+
+    def test_no_chunk_exceeds_the_size(self):
+        chunks = list(_chunked([str(index) for index in range(100)], 25))
+
+        assert [len(chunk) for chunk in chunks] == [25, 25, 25, 25]
+
+    def test_empty_selection_yields_no_chunks(self):
+        assert list(_chunked([], 25)) == []
+
+    @pytest.mark.asyncio
+    async def test_the_row_count_is_batched_like_the_deletes(self, monkeypatch):
+        """The count query is the one that used to take the whole selection."""
+        ids = [f"run-{index:05d}" for index in range(120)]
+        session = _RecordingSession(ids)
+        monkeypatch.setattr(prune_runs, "async_session", _session_factory(session))
+
+        result = await prune_peak_assignment_runs(batch_size=25)
+
+        assert session.count_batches == [25, 25, 25, 25, 20]
+        assert session.delete_batches == [25, 25, 25, 25, 20]
+        assert result["deleted_runs"] == 120
+        # Summed across batches, not reported from the last one.
+        assert result["deleted_assignments"] == 120 * 1000
+
+    @pytest.mark.asyncio
+    async def test_a_dry_run_batches_its_count_too(self, monkeypatch):
+        """The dry run reports the same total without issuing a delete."""
+        ids = [f"run-{index:05d}" for index in range(60)]
+        session = _RecordingSession(ids)
+        monkeypatch.setattr(prune_runs, "async_session", _session_factory(session))
+
+        result = await prune_peak_assignment_runs(dry_run=True, batch_size=25)
+
+        assert session.count_batches == [25, 25, 10]
+        assert session.delete_batches == []
+        assert result["status"] == "dry_run"
+        assert result["prunable_runs"] == 60
+
+
 class TestPruneGuards:
     """The prune refuses configurations that would delete more than intended."""
 
@@ -118,28 +423,60 @@ class TestPruneGuards:
             {"keep_per_sample": 0},
             {"keep_per_sample": -1},
             {"keep_failed_hours": -1},
+            {"keep_running_hours": 0},
+            {"keep_running_hours": MIN_KEEP_RUNNING_HOURS - 1},
             {"batch_size": 0},
         ],
     )
     async def test_invalid_policy_is_rejected(self, kwargs):
         """keep_per_sample=0 would delete every run of every sample."""
-        from mascope_backend.db.admin.peak_assignments.prune_runs import (
-            prune_peak_assignment_runs,
-        )
-
         with pytest.raises(ValueError):
             await prune_peak_assignment_runs(**kwargs)
 
 
-def test_grace_cutoff_is_in_the_past():
-    """Sanity: the grace window subtracts, so a fresh failure is never pruned."""
-    from mascope_backend.db.admin.peak_assignments.prune_runs import (
-        DEFAULT_KEEP_FAILED_HOURS,
-    )
+class TestEnvOverrides:
+    """The cron entry point's env overrides, which are how a prune is tuned."""
 
+    def test_an_override_below_the_floor_names_the_variable(self, monkeypatch):
+        """A cron job's failure message has to identify what an operator set.
+
+        Letting the value through means dying deeper in on a message that names
+        only a Python parameter, which is not a name the operator ever typed.
+        """
+        monkeypatch.setenv("MASCOPE_PRUNE_KEEP_RUNNING_HOURS", "1")
+
+        with pytest.raises(ValueError, match="MASCOPE_PRUNE_KEEP_RUNNING_HOURS"):
+            prune_script._int_env(
+                "MASCOPE_PRUNE_KEEP_RUNNING_HOURS",
+                DEFAULT_KEEP_RUNNING_HOURS,
+                minimum=MIN_KEEP_RUNNING_HOURS,
+            )
+
+    def test_a_negative_override_is_rejected(self, monkeypatch):
+        monkeypatch.setenv("MASCOPE_PRUNE_KEEP_PER_SAMPLE", "-3")
+
+        with pytest.raises(ValueError, match="MASCOPE_PRUNE_KEEP_PER_SAMPLE"):
+            prune_script._int_env("MASCOPE_PRUNE_KEEP_PER_SAMPLE", 3, minimum=1)
+
+    def test_a_non_integer_falls_back_to_the_default(self, monkeypatch):
+        """A typo has no discernible intent, so the documented policy wins."""
+        monkeypatch.setenv("MASCOPE_PRUNE_KEEP_PER_SAMPLE", "three")
+
+        assert prune_script._int_env("MASCOPE_PRUNE_KEEP_PER_SAMPLE", 3, minimum=1) == 3
+
+    def test_an_unset_variable_uses_the_default(self, monkeypatch):
+        monkeypatch.delenv("MASCOPE_PRUNE_KEEP_PER_SAMPLE", raising=False)
+
+        assert prune_script._int_env("MASCOPE_PRUNE_KEEP_PER_SAMPLE", 3, minimum=1) == 3
+
+
+def test_grace_defaults_hold_the_intended_order():
+    """The in-flight grace must be the longer one, and above its own floor."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=DEFAULT_KEEP_FAILED_HOURS)
     assert cutoff < datetime.now(timezone.utc)
     assert DEFAULT_KEEP_FAILED_HOURS > 0
+    assert DEFAULT_KEEP_RUNNING_HOURS >= MIN_KEEP_RUNNING_HOURS
+    assert DEFAULT_KEEP_RUNNING_HOURS > DEFAULT_KEEP_FAILED_HOURS
 
 
 class TestReaperResilience:
