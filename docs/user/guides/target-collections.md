@@ -147,5 +147,5 @@ See [SDK & API](../sdk/index.md) for installation and the full reference.
   yet — check the batch's status icon and refresh its matches.
 - **Editing a calibrants collection warns about calibration.** Changing
   calibrants affects how samples are calibrated; affected batches are flagged
-  for re-calibration. See
+  for re-calibration, which is an administrative operation. See
   [Concepts → Calibration](../concepts/index.md#calibration).

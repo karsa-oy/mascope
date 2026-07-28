@@ -1,8 +1,8 @@
 # Mascope
 
 Mascope is a platform for analysing high-resolution mass spectrometry data:
-import instrument files, browse samples and batches, run targeted matching and
-calibration, and explore results in the web UI or via the Python SDK.
+import instrument files, browse samples and batches, run targeted matching,
+and explore results in the web UI or via the Python SDK.
 
 ## Where to start
 

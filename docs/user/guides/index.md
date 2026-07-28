@@ -10,7 +10,6 @@ Task-oriented how-tos, one task per page. Each guide links to
 
 <!-- TODO Phase 2. Further candidate pages (one task each):
 - Browse samples and a batch
-- Calibrate a batch
 - Compare stages within a sample
 - Analyse results with the SDK (notebooks)
 -->

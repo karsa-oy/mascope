@@ -1,7 +1,7 @@
 # Concepts
 
 This page explains the Mascope domain model: how your data is organised, and
-the objects you work with when you import files, run matching, and calibrate.
+the objects you work with when you import files and run matching.
 Guides and the rest of the docs link here instead of re-explaining these terms.
 
 For the algorithms that turn raw spectra into assignments (aggregation, peak
@@ -70,8 +70,9 @@ This distinction is central to Mascope, so it is worth stating plainly:
 
 Importing therefore has two steps: **upload** the raw file — Mascope processes
 it automatically into read-only samples in the instrument's acquisition
-workspace — then **copy** those samples into a batch of your own to analyse
-them. See the [Import data files](../guides/import-files.md) guide.
+workspace — then **copy** the acquisition batch (or selected samples) into a
+workspace of your own to analyse it. See the
+[Import data files](../guides/import-files.md) guide.
 
 ## Acquisition and analysis
 
@@ -163,6 +164,10 @@ collection named by the sample's ionization mode, and the correction is
 instrument-specific — a single-point scaling for Orbitrap, a multi-point
 regression for Tofwerk TOF. Accurate calibration is what makes the *m/z* errors
 in matching meaningful.
+
+Calibration runs automatically when a file is processed into samples — as a
+user you never trigger it. Re-calibration only becomes necessary when a mode's
+calibrant collection changes, and that is an administrative operation.
 
 See [How it works → Calibration](../how-it-works/calibration.md) for the method.
 

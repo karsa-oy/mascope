@@ -109,8 +109,8 @@ The agent prints its version when it starts, and uninstalling (Windows
 Files uploaded by the File Agent land in the instrument's
 `Acquisitions <instrument>` workspace and show up in the **Raw files** tab, exactly
 like files uploaded by hand. From there they are the same as any other raw file:
-Mascope processes them automatically into acquisition samples, which you **copy**
-into a batch of your own. The
+Mascope processes them automatically into acquisition batches, which you **copy**
+into your own workspace. The
 [Import data files](../guides/import-files.md#build-your-batch-from-the-acquisition-samples)
 guide covers this, and its [prerequisites](../guides/import-files.md#prerequisites)
 (filename rules and ionization modes) apply to File Agent uploads too.
