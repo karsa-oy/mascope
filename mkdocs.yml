@@ -24,8 +24,11 @@ validation:
 
 # Activate locally with:
 #   uv add --group docs mkdocs-material
-#   uv run mkdocs serve        # live preview at http://localhost:8000
+#   uv run mkdocs serve        # live preview at http://localhost:8000/docs/
 #   uv run mkdocs build --strict
+# The frontend dev server proxies /docs/ here (see server/frontend/
+# vite.config.js), so with `mkdocs serve` running the in-app "Learn more"
+# links work in dev and docs edits live-reload inside the app.
 
 theme:
   name: material
