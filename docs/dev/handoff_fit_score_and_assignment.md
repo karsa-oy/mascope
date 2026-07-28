@@ -75,6 +75,13 @@ branch's shape, not a commit hash that goes stale within a day.*
   the old history has to be rebased too — `feat/reference-stage-a` (PR #1633) already was.
   The rebase re-parented the branch's Alembic chain onto develop's head; the migration
   chain is linear with a single head.
+- **Migrations:** two, not five. The branch's four peak-assignment revisions were squashed
+  into `a1f8c25d9e47` before merge, since one of them renamed a column on a table the
+  branch itself had created two revisions earlier - every deployment would have created
+  `match_score` and immediately renamed it to `fit_score`. The reference tables keep their
+  own revision (`c4f7a2e9b1d8`): independent subsystem, no foreign key either way.
+  Equivalence was proved by diffing a schema dump built from the old chain against one
+  built from the new (identical), and the stairway/single-head/model-drift tests pass.
 - **Opt-in:** the feature is **off by default** (§3). Work stacks on
   `feat/peak-assignment-opt-in`.
 - **Tests:** the full suite is green — libraries, CLI, backend unit + integration +
@@ -113,7 +120,8 @@ branch's shape, not a commit hash that goes stale within a day.*
    See `fit_score.md` §1a.
 3. ✅ **Renamed `match_score` → `fit_score`** on the `PeakAssignment` surface: model column
    + range check constraint, `PeakAssignmentRecord` schema, engine output dicts,
-   read-model, tests, and an Alembic migration (`b2e9d7c14a05`, chained from the
+   read-model, tests, and the peak-assignment migration (`a1f8c25d9e47`; the rename
+   was later squashed into it, so the column is created as `fit_score`), chained from the
    peak-assignment-tables head). Legacy `match_ion` / `match_isotope.match_score`
    deliberately untouched. **Applied to `mascope_demo` (dev postgres) end-to-end**; the
    live API serves `fit_score`.
@@ -188,7 +196,7 @@ branch's shape, not a commit hash that goes stale within a day.*
 
 **D — product / data-gated decisions**
 - **D6. Persisted per-instrument calibration store — DONE.** `assignment_calibration` table
-  (migration `d1a2c3b4e5f6`) holds the Platt curve + per-adduct corroboration log-odds;
+  (created by migration `a1f8c25d9e47`) holds the Platt curve + per-adduct corroboration log-odds;
   `calibration_store.load_calibration` reads the active row and falls back to the in-code
   provisional curve. The service loads it and passes it to the engine, which folds adduct
   corroboration into `p_correct`. The refit path (fit a new active row from labels) is **built** as
@@ -201,7 +209,7 @@ branch's shape, not a commit hash that goes stale within a day.*
   the UI feeding `fit_calibration` per instrument. Designed in
   [`verification_calibration_loop.md`](verification_calibration_loop.md); the central risk is the
   confirmation-bias loop (guardrails recorded there). **V1 capture backend shipped** (the
-  `assignment_verification` table, migration `e4f2a7c9d3b1`, + verify/verifications API); the V1
+  `assignment_verification` table, created by migration `a1f8c25d9e47`, + verify/verifications API); the V1
   UI is handed to the frontend ([`verification_capture_frontend.md`](verification_capture_frontend.md)).
   **V2 built:** `recalibrate_instrument` + `POST /calibration/{instrument}/recalibrate` (superuser)
   refit the curve from labels (provisional until enough reference-grade positives), writing a new

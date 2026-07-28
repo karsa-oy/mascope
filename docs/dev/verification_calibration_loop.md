@@ -7,7 +7,7 @@ instrument's confidence calibration. This closes the loop opened by the P2 calib
 ([`handoff_fit_score_and_assignment.md`](handoff_fit_score_and_assignment.md)).*
 
 **Status.** V1 (capture) backend is **shipped**: the `assignment_verification` table (migration
-`e4f2a7c9d3b1`), the `POST …/verify` + `GET …/verifications` API, and the frontend contract
+`a1f8c25d9e47`), the `POST …/verify` + `GET …/verifications` API, and the frontend contract
 ([`verification_capture_frontend.md`](verification_capture_frontend.md), design branch). The V1 UI
 is being built from that contract. V2 (close the loop) is **built** — `mascope_tools.recalibrate` +
 `calibration_store.save_calibration` + `recalibrate_instrument` + `POST /calibration/{instrument}/recalibrate`
@@ -40,7 +40,7 @@ near-mass decoys.
   [`calibration.py`](../../libraries/tools/src/mascope_tools/composition/calibration.py):
   `fit_calibration(scores, is_correct)` → a `Calibration` with held-out ECE; `MIN_CALIBRATION_LABELS`
   = 30 of each class.
-- **The D6 store + loader.** `assignment_calibration` table (migration `d1a2c3b4e5f6`) and
+- **The D6 store + loader.** `assignment_calibration` table (migration `a1f8c25d9e47`) and
   `calibration_store.load_calibration` (active row → in-code fallback). Writing a new active row
   *is* "recalibrate this instrument".
 - **The score-eval decoy machinery** (`tooling/score_eval/`) for synthetic negatives.
@@ -85,7 +85,7 @@ and records:
 
 ### 4.2 Data model — `assignment_verification` (shipped)
 
-The table (migration `e4f2a7c9d3b1`; mirrors `MatchRating` but keyed to the peak-centric result so
+The table (migration `a1f8c25d9e47`; mirrors `MatchRating` but keyed to the peak-centric result so
 it also covers untargeted/Stage-B formulas that have no `target_ion`):
 
 ```
@@ -154,7 +154,7 @@ prophecy. Everything else here is secondary to getting this right.
 ## 6. Phased plan
 
 - **V1 — capture. Backend DONE; UI in progress.** `assignment_verification` table (migration
-  `e4f2a7c9d3b1`) + `POST …/verify` (editor, `confirmed` requires an evidence level) / `GET …/verifications`,
+  `a1f8c25d9e47`) + `POST …/verify` (editor, `confirmed` requires an evidence level) / `GET …/verifications`,
   with the score snapshot and the Schymanski-aligned evidence levels. The **minimal** capture UI —
   confirm/reject/unsure + evidence dropdown + note in the inspector, a verdict badge, and a
   verified/rejected ledger filter — is handed to the frontend in
