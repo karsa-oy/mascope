@@ -252,9 +252,20 @@ the plan is actionable; revisit as phases land.
 
    The Sample-view rework is gated the same way, so with the flag off the UI is
    the pre-feature layout (see
-   [peak_assignment_frontend.md](peak_assignment_frontend.md)). The explicit
-   assign/read API routes stay reachable regardless, so the engine can be
-   exercised deliberately without switching it on globally.
+   [peak_assignment_frontend.md](peak_assignment_frontend.md)).
+
+   **What the flag does not gate: the API.** The explicit assign/read routes stay
+   reachable regardless, so the engine can be exercised deliberately (and its tests
+   run) without switching it on globally. The honest reading of that is that
+   "nothing changes until someone opts in" holds for the UI and for ingest, but not
+   for the API surface: on a deployment that opted out, any workspace editor can
+   still `POST` an assign request, drive the full untargeted stage, and accumulate a
+   complete per-peak ledger — and the retention prune that reclaims those rows is a
+   manual maintenance script either way (§7). Operators are told this in the
+   `peak_assignment` comment in `base.mascope.toml`, next to the switch itself.
+   Gating the routes too is a deliberate non-decision: it would make the feature
+   untestable on an opted-out deployment, which is exactly where it needs trying
+   before it is turned on.
 
 2. **Peaky: harvest vs. depend-on vs. reimplement.** *Recommend harvest.* Build
    on `mascope_tools.assign_compositions` as the spine and pull peaky's
@@ -311,6 +322,31 @@ instead of queueing it silently behind a multi-minute run. Both are **per
 worker**: with several uvicorn workers, N workers still permit N concurrent batch
 runs. A cross-process bound needs run state in the database - which is also what
 cancellation and resume would need, and is the main reason to add it.
+
+**Loading the reference mirror on a server.** Stage A also matches against the
+reference mirror, which is empty until someone loads it (the engine degrades to the
+curated target library alone, so this is optional, not a prerequisite). Note how it
+is loaded, because the obvious answer is wrong: `mascope reference ...` is
+registered only when the CLI runs from a source checkout
+([main.py](../../tooling/cli/src/mascope_cli/main.py) gates it on
+`source_checkout()`), because it pulls the chemistry dependencies deliberately kept
+out of the lightweight operator CLI. **Reinstalling the CLI on a wheel-installed
+server will therefore never expose `mascope reference`** — it is a developer command
+by construction, not a packaging oversight. The backend image already ships those
+dependencies, so a deployment runs the identical versioned ingest inside the backend
+container:
+
+```sh
+docker compose exec backend \
+    python -m mascope_backend.db.scripts.reference_sync \
+    custom /data/list.csv --name my-list --version 2024
+```
+
+`mascope prod db script run <script>` is the general in-container script runner, but
+it forwards no arguments to the module, so it fits the argument-free scripts
+(`seed_reference_demo`, `prune_peak_assignment_runs`) and not `reference_sync`. Full
+walkthrough, including authoring a custom list:
+[reference_data_authoring.md](reference_data_authoring.md).
 
 **Interrupted runs.** A run is created `running` and finalized by the engine's
 own success and failure paths, neither of which survives the process dying - and

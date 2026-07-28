@@ -54,8 +54,22 @@ stages; the confidence layers are the paradigm's **Phase 3** (tiers/arbitration)
   `[meta]` config (env override `MASCOPE_PEAK_ASSIGNMENT`), read by backend
   (`peak_assignment_enabled()`) and frontend (`runtime.meta`) alike. "Coexist, don't
   replace" turned out to need enforcing: ingest-time assignment, the rescored composition
-  search, and the Sample-view rework all changed behaviour for users who never opened the
-  feature. See [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §5.1.
+  search, the reference annotation on that same search, and the Sample-view rework all
+  changed behaviour for users who never opened the feature. The flag gates the automatic
+  behaviour, **not the API** — the explicit assign/read routes stay reachable with it off,
+  with the consequences spelled out in
+  [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §5.1.
+- **The on-demand composition search takes its mass sigma from the instrument, not from
+  the candidates.** `api/new/cheminfo/service.py` rescores each candidate with
+  `ion_score_v2`, and the fit score's mass term needs the instrument's mass accuracy.
+  Stage A can *fit* it (`fit_sample_mass_accuracy` over every isotopologue the library
+  matched across the spectrum), but the search cannot: its rows are the candidates for a
+  single m/z, spread across `±mz_precision` by construction, so a fitted sigma would
+  measure the search window and flatten the mass term to near-uniform. It uses the
+  sample's resolved `match_params.mz_tolerance` read as a ~3σ window (≈1.7 ppm Orbitrap,
+  ≈5 ppm TOF) instead, and **reports no fit score at all** when no tolerance is
+  resolvable — `score_pattern_v2`'s own `FALLBACK_SIGMA_PPM = 2.0` is Orbitrap-only and
+  would collapse every candidate on a TOF sample.
 
 ## 4. Data-quality findings to revisit (chemistry review)
 
@@ -254,5 +268,15 @@ in `docs/user/how-it-works/` with its literature citations.
   `PYTHONPATH="<worktree>/server/backend/src;<worktree>/libraries/*/src;…" python -m pytest …`.
 - **Demo DB:** Postgres in the `mascope_dev_postgres` docker container (`mascope_demo`
   database) backs the golden-dataset validation.
+- **Deploying this branch — do not tell operators to reinstall the CLI for
+  `mascope reference`.** That group is registered only under `source_checkout()`
+  (`tooling/cli/src/mascope_cli/main.py`), so a wheel install will never expose it no
+  matter how often it is reinstalled; it is developer-only on purpose, because it pulls
+  the chemistry dependencies kept out of the operator CLI. A deployment loads reference
+  data by running the same ingest inside the backend container
+  (`docker compose exec backend python -m mascope_backend.db.scripts.reference_sync ...`);
+  `mascope prod db script run` forwards no arguments, so it covers the argument-free
+  scripts only. See [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §7 and
+  [`reference_data_authoring.md`](reference_data_authoring.md).
 - The fit score was validated end-to-end on the demo (median fit 0.94, max 1.0; scores
   scale monotonically with isotopic corroboration) — see `DESIGN.md` for the numbers.
