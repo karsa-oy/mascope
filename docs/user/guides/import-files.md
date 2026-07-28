@@ -5,8 +5,8 @@ instrument file **in** — automatically via the **File Agent** running on the
 instrument PC, or by **uploading from your computer** in the web app — then
 build your batch from the samples Mascope creates. Every arriving file is
 processed automatically into calibrated, matched samples in the instrument's
-acquisition workspace; you **copy** those samples into a batch of your own to
-analyse them.
+acquisition workspace; you **copy** the acquisition batch (or a selection of
+its samples) into your own workspace to analyse it.
 
 New to the terms *sample file*, *sample*, *batch*, and *ionization mode*? See
 [Concepts](../concepts/index.md) first — this guide assumes them.
@@ -100,8 +100,9 @@ Mode* form:
 | **Diagnostic Collection** | Optional | A [diagnostics](../concepts/index.md#targeted-analysis) collection used to monitor instrument health. |
 
 Click **Create**. The calibrant and diagnostic collections are optional, but
-setting a calibrant collection is what lets Mascope calibrate samples acquired in
-this mode — add it if you intend to calibrate.
+setting a calibrant collection is what lets Mascope calibrate samples acquired
+in this mode automatically on import — without it, samples in this mode stay
+uncalibrated.
 
 !!! note "Who can change modes"
     Any **editor** can create a mode. **Editing or deleting** a mode requires
@@ -154,23 +155,25 @@ the samples into a batch of your own. That is the next step.
 Everything a file needs to become analysable has already happened by the time
 it is uploaded: the `Acquisitions <instrument>` workspace holds a dataset per
 year, a daily batch per ionization mode (named like
-`2026-07-28 Nitrate acquisition`), and one processed sample per file. The
-recommended way to assemble your analysis batch is to copy from there:
+`2026-07-28 Nitrate acquisition`), and one processed sample per file — already
+calibrated and matched. The recommended way to get an analysis batch is to
+copy a whole acquisition batch and make it your own:
 
 1. Open the **Home menu** (house icon, top-left) and select the
    `Acquisitions <instrument>` workspace.
-2. Open the year dataset, then the daily acquisition batch that holds your
-   measurements. Samples appear here as their files finish processing.
-3. Select the samples you want — hold `Shift` or `Ctrl` to select several —
-   then right-click and choose **Copy samples**.
-4. Switch back to your own workspace via the Home menu, open your dataset and
-   batch, right-click the empty space in the *Samples* pane, and choose
-   **Paste samples**.
+2. Open the year dataset, right-click the daily acquisition batch that holds
+   your measurements, and choose **Copy batch**.
+3. Switch back to your own workspace via the Home menu, open your dataset,
+   right-click the empty space in the *Batches* pane, and choose
+   **Paste batch**.
 
-The pasted copies are yours: rename, annotate, or delete them without touching
-the acquisition record. To take a whole day's measurements at once, right-click
-the acquisition batch itself and choose **Copy batch**, then **Paste batch** in
-your own dataset.
+The copy — with all its samples — is yours: rename it, and delete the samples
+that do not belong to your analysis. The acquisition record is untouched.
+
+To cherry-pick individual measurements instead, open the acquisition batch,
+select the samples you want (hold `Shift` or `Ctrl` to select several),
+right-click and choose **Copy samples**, then paste them into a batch of your
+own (right-click the empty space in its *Samples* pane → **Paste samples**).
 
 ### Alternative: process raw files by hand
 
@@ -195,13 +198,13 @@ the copy flow above for routine work.
 
 ## What happens next
 
-Once a batch has samples, you can:
+Your samples arrive already calibrated and matched by the processing pipeline
+([How it works](../how-it-works/index.md) explains the stages), so once a
+batch has samples, you can go straight to analysis:
 
 - **Attach a target collection** and run **matching** to find and score your
   compounds in each sample — see
   [Build a target collection and run matching](target-collections.md).
-- **Calibrate** the batch so *m/z* errors are meaningful — see
-  [How it works → Calibration](../how-it-works/calibration.md).
 - **Compare and visualise** samples in the **Batch** and **Sample** views.
 
 ## Troubleshooting
