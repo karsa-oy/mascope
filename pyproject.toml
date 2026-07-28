@@ -72,7 +72,7 @@ mascope_tools = { workspace = true }
 mascope_runtime = { workspace = true }
 
 [build-system]
-requires = ["uv_build>=0.6,<0.7"]
+requires = ["uv_build>=0.11.32,<0.12"]
 build-backend = "uv_build"
 
 [tool.ruff]
