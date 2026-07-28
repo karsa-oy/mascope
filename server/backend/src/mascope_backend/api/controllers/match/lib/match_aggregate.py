@@ -159,13 +159,84 @@ _V2_REQUIRED_COLS = frozenset(
 )
 
 
+def effective_match_score_version(isotope_df: pd.DataFrame) -> int:
+    """The scale the ion ``match_score`` aggregated from ``isotope_df`` will be on.
+
+    The process-wide switch (:func:`match_score_version`) is only half the answer: v2
+    is skipped on frames that do not carry the per-isotopologue evidence it needs, and
+    an empty frame has nothing to score, so those aggregates stay on the v1 scale even
+    with the switch flipped. Score selection and category thresholds must both branch
+    on *this*, never on the switch alone -- the v2 bands are deliberately lower
+    (possible 0.5 vs v1's 0.7), so a frame scored v1 but thresholded v2 silently
+    promotes every ion in [0.5, 0.7) to "possible".
+    """
+    if match_score_version() != 2:
+        return 1
+    if isotope_df.empty or not _V2_REQUIRED_COLS.issubset(isotope_df.columns):
+        return 1
+    return 2
+
+
 def _can_score_v2(df: pd.DataFrame) -> bool:
-    """True iff v2 is enabled and the frame carries the columns v2 needs."""
-    return match_score_version() == 2 and _V2_REQUIRED_COLS.issubset(df.columns)
+    """True iff the v2 fit score can actually be computed from this frame.
+
+    The emptiness half of :func:`effective_match_score_version` is load-bearing here:
+    on an empty-but-columned frame ``groupby(...).apply(...)`` yields a DataFrame
+    rather than a Series, and the ``.rename("match_score_v2")`` that follows is then
+    read as an index mapper and raises.
+    """
+    return effective_match_score_version(df) == 2
+
+
+def _v2_ion_scores(isotope_df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Per-ion v2 fit scores for ``isotope_df``, keyed by ``keys``.
+
+    The mass-accuracy fit and the noise floor are measured PER SAMPLE, which is what
+    their names and docstrings promise: ``fit_sample_mass_accuracy`` returns one
+    file's systematic mass offset and its robust spread, and ``sample_noise_floor``
+    one file's baseline. An aggregation frame here routinely spans a whole batch --
+    ``aggregate_matches`` is invoked with a ``sample_batch_id`` -- so it can mix files
+    and even instrument classes. Fitting once over that union would subtract one
+    batch-wide mu from a well-centred file's mass errors and stretch or squeeze every
+    Gaussian to the batch-average sigma, making an ion's score depend on which other
+    samples happened to be aggregated with it. Grouping by ``sample_item_id`` fixes
+    both, and separates instruments as a side effect (a sample has exactly one file
+    and one instrument). This mirrors the per-sample engine path in
+    ``api/new/peak_assignments/engine.py``, so batch and single-sample scoring agree.
+
+    Grouping is on ``keys`` only -- the same narrow id columns the v1 aggregation
+    groups on -- rather than on every label column that happens to ride along, and
+    ``include_groups=False`` keeps the key columns out of the per-group frame
+    (pandas 2.2 deprecation; the default flips in pandas 3).
+
+    The per-sample split is skipped when ``keys`` does not carry ``sample_item_id``:
+    such a key set cannot name a per-sample score in the first place, so the caller's
+    own v1 aggregation is already asserting the frame is one sample, and splitting it
+    would only produce duplicate keys for the merge to fan out on.
+    """
+    chunks = (
+        [group for _, group in isotope_df.groupby("sample_item_id", sort=False)]
+        if "sample_item_id" in keys
+        else [isotope_df]
+    )
+    scores = []
+    for chunk in chunks:
+        mu, sigma = fit_sample_mass_accuracy(chunk)
+        noise = sample_noise_floor(chunk)
+        scores.append(
+            chunk.groupby(keys, sort=False, dropna=False).apply(
+                lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise),
+                include_groups=False,
+            )
+        )
+    return pd.concat(scores).rename("match_score_v2").reset_index()
 
 
 async def set_ions_match_category(
-    match_ions_df: pd.DataFrame, match_params: Optional[BaseMatchParams] = None
+    match_ions_df: pd.DataFrame,
+    match_params: Optional[BaseMatchParams] = None,
+    *,
+    score_version: Optional[int] = None,
 ) -> pd.DataFrame:
     """Set the match_category field for each ion in the DataFrame.
 
@@ -177,6 +248,12 @@ async def set_ions_match_category(
     :type match_ions_df: pd.DataFrame
     :param match_params: Optional ion-specific filter parameters.
     :type match_params: Optional[BaseMatchParams]
+    :param score_version: The scale ``match_score`` is actually on, as reported by
+        :func:`effective_match_score_version` for the isotope frame it was aggregated
+        from. Callers that scored the frame themselves must pass it, so the bands and
+        the score cannot disagree. ``None`` falls back to the process-wide switch,
+        which is only correct for callers that apply v2 unconditionally.
+    :type score_version: Optional[int]
     :return: DataFrame with match_category field set for each ion.
     :rtype: pd.DataFrame
     """
@@ -197,7 +274,7 @@ async def set_ions_match_category(
         # Ion-specific overrides (filter_params keyed by instrument), falling back to
         # the score-version-aware module defaults: v2 is a fit-quality score whose
         # category bands differ from v1's cutoffs (see params.py).
-        if match_score_version() == 2:
+        if (score_version if score_version is not None else match_score_version()) == 2:
             default_probable = DEFAULT_PROBABLE_MATCH_THRESHOLD_V2
             default_possible = DEFAULT_POSSIBLE_MATCH_THRESHOLD_V2
         else:
@@ -385,20 +462,17 @@ async def aggregate_match_ions(
     # Phase C experiment: optionally replace the per-ion match_score with the
     # consolidated mascope_tools v2 score (detectability-gated, SNR-aware, calibrated).
     # Additive + gated: v1 above is computed unchanged; v2 overwrites only when enabled.
-    if _can_score_v2(filtered_match_isotope_df):
+    score_version = effective_match_score_version(filtered_match_isotope_df)
+    if score_version == 2:
+        # The same 4 narrow id keys the v1 groupby above uses; the label columns are
+        # functionally dependent on them, so grouping on them too only widens the hash.
         keys = [
-            c
-            for c in match_ions_data_df.columns
-            if c not in ("match_score", "sample_peak_intensity_sum", "filter_params")
+            "sample_item_id",
+            "target_ion_id",
+            "target_compound_id",
+            "target_collection_id",
         ]
-        mu, sigma = fit_sample_mass_accuracy(filtered_match_isotope_df)
-        noise = sample_noise_floor(filtered_match_isotope_df)
-        v2 = (
-            filtered_match_isotope_df.groupby(keys, sort=False, dropna=False)
-            .apply(lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise))
-            .rename("match_score_v2")
-            .reset_index()
-        )
+        v2 = _v2_ion_scores(filtered_match_isotope_df, keys)
         match_ions_data_df = match_ions_data_df.merge(v2, on=keys, how="left")
         match_ions_data_df["match_score"] = match_ions_data_df["match_score_v2"].fillna(
             match_ions_data_df["match_score"]
@@ -421,9 +495,14 @@ async def aggregate_match_ions(
         ]
     ).drop_duplicates(subset=["target_ion_id", "sample_item_id"])
 
-    # set match_category field for ions
-    match_ions_data_df = await set_ions_match_category(match_ions_data_df, match_params)
-    match_ions_df = await set_ions_match_category(match_ions_df, match_params)
+    # set match_category field for ions, banded for the scale the score actually
+    # landed on (v2 bands only apply when the v2 score was actually computed)
+    match_ions_data_df = await set_ions_match_category(
+        match_ions_data_df, match_params, score_version=score_version
+    )
+    match_ions_df = await set_ions_match_category(
+        match_ions_df, match_params, score_version=score_version
+    )
 
     return match_ions_data_df, match_ions_df
 
@@ -462,14 +541,7 @@ def aggregate_match_ions_light(
     # Phase C experiment: optionally replace per-ion match_score with the v2 score
     # (additive + gated; v1 unchanged).
     if _can_score_v2(filtered_match_isotope_df):
-        mu, sigma = fit_sample_mass_accuracy(filtered_match_isotope_df)
-        noise = sample_noise_floor(filtered_match_isotope_df)
-        v2 = (
-            filtered_match_isotope_df.groupby("target_ion_id", sort=False, dropna=False)
-            .apply(lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise))
-            .rename("match_score_v2")
-            .reset_index()
-        )
+        v2 = _v2_ion_scores(filtered_match_isotope_df, ["target_ion_id"])
         match_ions_df = match_ions_df.merge(v2, on="target_ion_id", how="left")
         match_ions_df["match_score"] = match_ions_df["match_score_v2"].fillna(
             match_ions_df["match_score"]
