@@ -3,9 +3,68 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { useData } from '@/lib/store'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import { useSample } from '../sample'
 import { usePeakAssignmentRun } from './run'
+
+// Page size requested per call. A run has one row per detected peak, so a large
+// sample runs to tens of thousands of rows; the endpoint pages them.
+const PAGE_SIZE = 1000
+
+// Hard stop on the paging loop. At PAGE_SIZE rows a page this covers any real
+// run, and it guarantees termination whatever the server does with the params.
+const MAX_PAGES = 200
+
+/**
+ * Fetch one page of assignments.
+ *
+ * Deliberately bypasses the shared `read` handler, which unwraps the envelope
+ * to its `data` array and so hides the `total` this loop needs to know when it
+ * has the whole run.
+ */
+async function fetchAssignmentPage(sampleItemId, params) {
+  const response = await api.http.get(`/peak-assignments/sample/${sampleItemId}`, {
+    params,
+    type: 'load_peak_assignments'
+  })
+  const body = response?.data ?? {}
+  return { rows: body.data ?? [], total: body.total ?? null }
+}
+
+/**
+ * Load every assignment of a run, page by page.
+ *
+ * Tolerates both response shapes: an unpaginated one (no `total`, the first
+ * response is the whole run) and a paginated one. Pages advance by the number
+ * of rows actually received rather than by the requested limit, so a server
+ * that caps the page size lower than PAGE_SIZE still yields the full run, and
+ * a page that repeats rows already seen (a server ignoring `offset`) ends the
+ * loop instead of duplicating them.
+ */
+async function loadAssignments(sampleItemId, runId) {
+  const rows = []
+  const seen = new Set()
+  let offset = 0
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { rows: received, total } = await fetchAssignmentPage(sampleItemId, {
+      peak_assignment_run_id: runId,
+      limit: PAGE_SIZE,
+      offset
+    })
+
+    const fresh = received.filter((record) => !seen.has(String(record.sample_peak_id)))
+    for (const record of fresh) seen.add(String(record.sample_peak_id))
+    rows.push(...fresh)
+
+    if (total == null) break
+    if (received.length === 0 || fresh.length === 0 || rows.length >= total) break
+    offset += received.length
+  }
+
+  return rows
+}
 
 // Peak ASSIGNMENTS for the focused sample + focused run.
 //
@@ -21,15 +80,17 @@ export const usePeakAssignment = defineStore('app.data.peakAssignment', () => {
     name,
     ({ sample_item_id, peak_assignment_run_id }) => {
       if (!sample_item_id || !peak_assignment_run_id) return []
-      return api.http.get(`/peak-assignments/sample/${sample_item_id}`, {
-        params: { peak_assignment_run_id },
-        use: 'read',
-        type: 'load_peak_assignments'
-      })
+      return loadAssignments(sample_item_id, peak_assignment_run_id)
     },
     {
       key,
       deps: () => {
+        // The feature is opt-in and this store is instantiated by useData()
+        // regardless, so with the flag off report the dependency unmet: the
+        // loader skips the request and nothing here reaches the API.
+        if (!peakAssignmentEnabled) {
+          return { sample_item_id: null, peak_assignment_run_id: null }
+        }
         const sample_item_id = useSample().focusedId
         const run = usePeakAssignmentRun().focused
         // Guard against a stale run from the previously focused sample: only

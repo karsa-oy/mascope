@@ -142,6 +142,17 @@ const relAbuFmt = new Intl.NumberFormat('en-US', {
 })
 const formatRel = (value) => (value != null ? relAbuFmt.format(value) : '-')
 
+// Focus the peak behind an isotopologue row. The engine stringifies peak_id
+// into sample_peak_id, so the join has to coerce both sides -- and a miss must
+// leave the focus alone rather than clear it, which is what focus() would do
+// with an id that resolves to nothing.
+const focusIsotopePeak = (iso) => {
+  const peak = app.data.peak.list.find(
+    (p) => String(p.peak_id) === String(iso.sample_peak_id)
+  )
+  if (peak) app.data.peak.focus(peak)
+}
+
 // Per-isotopologue match quality; M0 is the reference and never "poor".
 const isPoorMatch = (iso) => {
   if (iso.role === 'M0' || iso.isotope_label === 'M0') return false
@@ -306,7 +317,7 @@ const altTooltip = (alt) => {
                   ? 'Poorly matched isotopologue (abundance / m/z off) - click to focus'
                   : 'Focus this isotopologue peak'
               "
-              @click="app.data.peak.focus({ peak_id: iso.sample_peak_id })"
+              @click="focusIsotopePeak(iso)"
             >
               <span class="iso-label" v-tooltip.left="iso.isotope_formula || iso.isotope_label"
                 ><span v-if="isPoorMatch(iso)" class="pi ph ph-warning poor-icon" />{{

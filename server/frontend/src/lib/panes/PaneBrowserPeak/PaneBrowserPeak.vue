@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Panel from 'primevue/panel'
@@ -8,8 +9,15 @@ import TabMenu from 'primevue/tabmenu'
 
 import { num } from '@/lib/formatters'
 import { BaseTierTag } from '@/lib/base'
+import { peakAssignmentEnabled } from '@/lib/features'
 import { useApp } from '@/stores'
 import { usePeakScroller } from './stores'
+
+// Two ledgers share this pane. With peak-centric assignment on it reports the
+// committed assignment of the focused run. With it off it stays the ledger it
+// has always been: m/z, height, area and the clickable target-match formulas,
+// which are the only route from a peak to the Match tab in that build (the
+// assignment browser is unreachable there).
 
 const app = useApp()
 const peakTable = ref(null)
@@ -25,8 +33,11 @@ defineProps({
 // The per-peak assignments of the focused run, joined to peaks by
 // String(peak_id) === sample_peak_id (see docs/dev/peak_assignment_frontend.md).
 const assignments = computed(() => app.data.peakAssignment.peak)
-const hasRun = computed(() => !!assignments.value.run)
+const hasRun = computed(() => peakAssignmentEnabled && !!assignments.value.run)
 const tierCounts = computed(() => assignments.value.tierCounts)
+
+// Legacy counter: how many peaks carry at least one target match.
+const matchedCount = computed(() => app.data.peak.list.filter((p) => p.match.length > 0).length)
 
 const assignmentFor = (peak) => assignments.value.forPeak(peak?.peak_id)
 
@@ -84,12 +95,20 @@ onBeforeUnmount(() => {
     style="border: none; min-width: 280px; max-width: 400px; width: 100%"
     :pt="
       app.ui.help.top(
-        `
+        peakAssignmentEnabled
+          ? `
         <h1>Peak Browser</h1>
 
         <p>
         Every detected peak in the selected sample and its committed assignment - formula,
         confidence tier and fit score - from the latest assignment run. Click a peak to inspect it.
+        </p>
+      `
+          : `
+        <h1>Peak Browser</h1>
+
+        <p>
+        List of detected peaks in the currently selected sample. Click on a peak to assign a composition.
         </p>
       `,
         { doc: app.ui.help.docUrl('how-it-works/peak-detection/') }
@@ -100,7 +119,10 @@ onBeforeUnmount(() => {
       <TabMenu :model="[{ label: 'Peaks', icon: 'pi ph ph-crosshair' }]" style="overflow: hidden" />
     </template>
     <template #icons>
-      <span v-if="hasRun" class="tier-summary">
+      <span v-if="!peakAssignmentEnabled" style="opacity: 0.5"
+        >{{ matchedCount }}/{{ app.data.peak.list.length }} peaks matched
+      </span>
+      <span v-else-if="hasRun" class="tier-summary">
         <span class="tier-stat identified" v-tooltip.bottom="'Identified'">
           {{ tierCounts.identified }}
         </span>
@@ -138,12 +160,66 @@ onBeforeUnmount(() => {
           {{ num.mz.format(data.mz) }}
         </template>
       </Column>
-      <Column field="height" header="height" sortable style="height: 20px; min-width: 5rem">
+      <Column
+        field="height"
+        header="height"
+        sortable
+        :style="`height: 20px; min-width: ${peakAssignmentEnabled ? '5rem' : '6rem'}`"
+      >
         <template #body="{ data }">
           {{ num.peakIntensity.format(data.height) }}
         </template>
       </Column>
-      <Column header="assignment" style="height: 20px; min-width: 9rem">
+      <Column
+        v-if="!peakAssignmentEnabled"
+        field="area"
+        header="area"
+        sortable
+        style="height: 20px; min-width: 6rem"
+      >
+        <template #body="{ data }">
+          {{ num.peakIntensity.format(data.area) }}
+        </template>
+      </Column>
+      <Column v-if="!peakAssignmentEnabled" field="match" header="formula" sortable style="height: 20px">
+        <template #body="{ data }">
+          <div class="formula-buttons">
+            <Button
+              size="small"
+              text
+              severity="secondary"
+              v-tooltip.top="
+                `${match.target_compound_formula}${
+                  app.data.ionization.mechanism.list.find(
+                    (m) => m.ionization_mechanism_id === match.ionization_mechanism_id
+                  )?.ionization_mechanism || ''
+                }:\n ${match.target_ion_formula}`
+              "
+              @click="
+                async () => {
+                  if (data.match.length > 0) {
+                    await app.data.match.visualized.set({
+                      sampleId: app.data.sample.focusedId,
+                      ionId: match.target_ion_id,
+                      collectionId:
+                        match.target_collection_ids.find(
+                          (id) => id === app.data.match.collection.focusedId // In case the currently focused collection is among the matches, prioritize it
+                        ) || match.target_collection_ids[0], // Otherwise just take the first one,
+                      isotopeId: data.match[index].target_isotope_id
+                    })
+                    app.ui.tab.active = 'match'
+                  }
+                }
+              "
+              v-for="(match, index) in data.match"
+              :key="match.target_isotope_id"
+            >
+              {{ match.target_isotope_formula }}
+            </Button>
+          </div>
+        </template>
+      </Column>
+      <Column v-if="peakAssignmentEnabled" header="assignment" style="height: 20px; min-width: 9rem">
         <template #body="{ data }">
           <div v-if="assignmentFor(data)" class="assignment-cell">
             <span class="formula" v-if="assignmentFor(data).assigned_formula">
@@ -181,6 +257,14 @@ onBeforeUnmount(() => {
 
 :deep(.p-datatable .p-datatable-tbody > tr) {
   height: 36px !important;
+}
+
+.formula-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: flex-start;
+  align-content: center;
 }
 
 .assignment-cell {

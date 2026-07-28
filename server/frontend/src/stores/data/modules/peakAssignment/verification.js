@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { useData } from '@/lib/store'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import { useSample } from '../sample'
 
@@ -31,7 +32,12 @@ export const usePeakAssignmentVerification = defineStore(
       },
       {
         key,
-        deps: () => ({ sample_item_id: useSample().focusedId })
+        // Opt-in feature, always-instantiated store: with the flag off the
+        // dependency is unmet, so the loader never calls the verifications
+        // endpoint (see run.js for the same gate).
+        deps: () => ({
+          sample_item_id: peakAssignmentEnabled ? useSample().focusedId : null
+        })
       }
     )
 

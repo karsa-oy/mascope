@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, inject } from 'vue'
+import { ref, reactive, computed, inject, watch } from 'vue'
 
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -70,13 +70,24 @@ const submitting = ref(false)
 // untargeted stage starts on here - unlike a batch, where cost scales with the
 // number of samples. The rest is left unset for PeakAssignConfigForm to fill
 // from the server defaults.
-const config = reactive({
-  run_untargeted: true,
-  mz_precision_ppm: null,
-  formula_ranges: null,
-  max_untargeted_peaks: null,
-  peak_intensity_threshold: null,
-  max_alternatives: null
+function initialConfig() {
+  return {
+    run_untargeted: true,
+    mz_precision_ppm: null,
+    formula_ranges: null,
+    max_untargeted_peaks: null,
+    peak_intensity_threshold: null,
+    max_alternatives: null
+  }
+}
+
+const config = reactive(initialConfig())
+
+// Reset each time the dialog opens, the same way the batch launcher does: the
+// form only fills fields that are still unset, so without this a value typed
+// for one sample would silently carry into the next run.
+watch(configVisible, (open) => {
+  if (open) Object.assign(config, initialConfig())
 })
 
 async function launch() {

@@ -60,6 +60,11 @@ function saveParams(mzPrecision, formulaRange) {
   } catch {}
 }
 
+// Fallback debounce for the search, used until /params answers. watchDebounced
+// evaluates the delay before the callback's own guards run -- including on the
+// immediate pass during setup, when chemConfig is still null.
+const DEFAULT_DEBOUNCE_DELAY_MS = 800
+
 const chemConfig = ref(null)
 const ionMechs = ref([])
 const params = reactive({
@@ -221,7 +226,7 @@ watchDebounced(
     )
   },
   {
-    debounce: computed(() => chemConfig.value.DEBOUNCE_DELAY_MS),
+    debounce: computed(() => chemConfig.value?.DEBOUNCE_DELAY_MS ?? DEFAULT_DEBOUNCE_DELAY_MS),
     deep: true,
     immediate: true
   }
@@ -271,7 +276,12 @@ const formatFit = (value) =>
 </script>
 
 <template>
-  <div class="search-pane">
+  <!-- Embedded is the legacy Sample layout, where this pane sits permanently
+       beside the ledger: a sample with no detected peaks has nothing to search,
+       so the pane is absent rather than showing a "No peak selected" card.
+       As a takeover of the time-series pane it always renders, otherwise
+       "Re-search" would open onto nothing with no way back. -->
+  <div class="search-pane" v-if="!embedded || app.data.peak.list.length > 0">
     <header class="search-head">
       <div class="search-title">
         <span class="pi ph ph-magnifying-glass" />
@@ -420,7 +430,11 @@ const formatFit = (value) =>
           />
         </template>
       </Column>
-      <Column>
+      <!-- Known-compound annotation arrived with peak-centric assignment; with
+           the feature off the search results are the legacy ones, so the column
+           (and its header) stays out of the table entirely rather than sitting
+           there empty. -->
+      <Column v-if="peakAssignmentEnabled">
         <template #header>
           <span
             class="pi ph ph-flask"
@@ -487,6 +501,19 @@ const formatFit = (value) =>
           <Column field="match_mz_error" header="Error (ppm)" sortable>
             <template #body="{ data }">
               {{ num.mzError.format(data.match_mz_error) }}
+            </template>
+          </Column>
+          <Column field="match_score" sortable>
+            <template #header>
+              <span class="pi ph ph-seal-percent" v-tooltip="'Match score'" />
+            </template>
+            <template #body="{ data }">
+              <BaseMatchTag
+                :match-score="data?.match_score"
+                :match-category="data?.match_category"
+                :alarming="data?.alarming"
+                nofade
+              />
             </template>
           </Column>
         </DataTable>

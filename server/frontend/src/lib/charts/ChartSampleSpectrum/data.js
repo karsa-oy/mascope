@@ -202,7 +202,13 @@ export const useChartData = defineStore('chart.sample.spectrum', () => {
   // and expected height = intensity / (1 + abundance_error) (= M0 intensity x
   // predicted relative abundance). Named "…Peak" so the intensity-scale toggle
   // scales it like the measured peaks.
+  //
+  // Part of the peak-centric feature, like the tier colouring above: assignment
+  // rows can exist without the flag (written by the CLI, by processing, or by a
+  // prior flag-on deployment), and drawing them would put an unexplained
+  // theoretical envelope in a spectrum that opted into nothing.
   const envelopeTrace = computed(() => {
+    if (!peakAssignmentEnabled) return []
     const focused = app.data.peak.focused
     if (!focused) return []
     const assignments = app.data.peakAssignment.peak

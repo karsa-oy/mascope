@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { api } from '@/api'
 import { useData } from '@/lib/store'
+import { peakAssignmentEnabled } from '@/lib/features'
 
 import { useSample } from '../sample'
 
@@ -26,7 +27,14 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
     },
     {
       key,
-      deps: () => ({ sample_item_id: useSample().focusedId }),
+      // The feature is opt-in, so with the flag off the dependency is reported
+      // unmet: the loader then skips the request entirely and nothing here ever
+      // reaches the API, even though the backend routes are always registered.
+      // This store is instantiated by useData() regardless of the flag, so the
+      // gate has to live where the fetch is decided.
+      deps: () => ({
+        sample_item_id: peakAssignmentEnabled ? useSample().focusedId : null
+      }),
       selection: true,
       // The backend emits peak_assignment_reload when a run finalizes (mirrors
       // match_reload); the useData events framework re-syncs the run list.
@@ -39,20 +47,34 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
     () => data.list.value.find((run) => run.status === 'completed') ?? null
   )
 
-  // Default the view to the latest completed run on initial load and on sample
-  // switch. The run list holds only the focused sample's runs, so a focused id
-  // that is absent from it is either empty or a stale carry-over from the
-  // previous sample (selection persists) -- in both cases re-focus the latest.
-  // An explicit pick of an older run of the SAME sample stays in the list, so it
-  // is left alone; live completion of a new run is likewise not yanked into
-  // focus (that affordance belongs to the Assignments browser).
+  // Default the view to the latest completed run, and follow it whenever it
+  // changes.
+  //
+  // Two cases need the focus moved. The run list holds only the focused
+  // sample's runs, so a focused id absent from it is either empty or a stale
+  // carry-over from the previous sample (selection persists) -- re-focus the
+  // latest. And when a NEW run finishes, the whole view (ledger, tier strip,
+  // spectrum colouring, inspector) would otherwise keep rendering the previous
+  // run's assignments, so re-assigning looks like it did nothing; the run the
+  // user just asked for is what they expect to see.
+  //
+  // An explicit pick of an older run of the same sample is left alone: the
+  // latest completed run has not changed in that case, and the picked run is
+  // still in the list.
+  let followedRunId = null
   watch(
     [latestCompleted, () => data.list.value],
     ([run]) => {
       const focusedInList = data.list.value.some(
         (r) => r.peak_assignment_run_id === data.focusedId.value
       )
-      if (run && !focusedInList) data.focus(run)
+      if (!run) {
+        followedRunId = null
+        return
+      }
+      const isNewLatest = run.peak_assignment_run_id !== followedRunId
+      followedRunId = run.peak_assignment_run_id
+      if (isNewLatest || !focusedInList) data.focus(run)
     },
     { immediate: true }
   )
