@@ -68,9 +68,10 @@ This distinction is central to Mascope, so it is worth stating plainly:
   example one per injection in an autosampler run, or one background window and
   one signal window.
 
-Importing a file therefore has two steps: **upload** the raw file, then
-**process** it into one or more samples inside a batch. See the
-[Import data files](../guides/import-files.md) guide.
+Importing therefore has two steps: **upload** the raw file — Mascope processes
+it automatically into read-only samples in the instrument's acquisition
+workspace — then **copy** those samples into a batch of your own to analyse
+them. See the [Import data files](../guides/import-files.md) guide.
 
 ## Acquisition and analysis
 
@@ -78,8 +79,9 @@ Datasets and batches come in two flavours, and knowing which is which explains a
 lot of the UI:
 
 - **Acquisition** datasets and batches are system-managed. Mascope creates them
-  when raw files are uploaded, groups the files by instrument and polarity, and
-  locks them so the ingested record cannot be edited by hand.
+  when raw files are uploaded, groups the files by instrument, day, and
+  ionization mode, and locks them so the ingested record cannot be edited by
+  hand.
 - **Analysis** datasets and batches are the ones *you* create to do science. They
   are the default, they are editable, and they can combine both polarities. This
   is where you assemble samples, attach target collections, and run matching.

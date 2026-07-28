@@ -12,7 +12,8 @@ uploads them to your Mascope server automatically.
 ### Installing
 
 1. Download the installer on the instrument PC. In the Mascope web app, open
-   the sidebar via your profile icon and click **Download File Agent
+   the **Home menu** (house icon, top-left), go to the **Settings** tab, and
+   click **Download File Agent
    installer** under **API Access Tokens** (or download
    `Mascope-File-Agent-Setup.exe` from the latest [Mascope release on
    GitHub](https://github.com/karsa-oy/mascope/releases/latest)).
@@ -28,9 +29,9 @@ uploads them to your Mascope server automatically.
    `mascope.example.com`), then connects the agent to your account —
    choose **pairing** (the default):
    1. The agent shows a short pairing code, for example `BCD-234`.
-   2. Log in to Mascope in your browser (*editor* role or higher), click
-      your profile icon to open the sidebar, and under **API Access
-      Tokens** click **Pair an agent**.
+   2. Log in to Mascope in your browser (*editor* role or higher), open
+      the **Home menu** (house icon, top-left) **Settings** tab, and under
+      **API Access Tokens** click **Pair an agent**.
    3. Enter the code and approve — the agent picks up its access token
       automatically within a few seconds.
 
@@ -108,9 +109,10 @@ The agent prints its version when it starts, and uninstalling (Windows
 Files uploaded by the File Agent land in the instrument's
 `Acquisitions <instrument>` workspace and show up in the **Raw files** tab, exactly
 like files uploaded by hand. From there they are the same as any other raw file:
-select a batch and **process** them into samples. The
-[Import data files](../guides/import-files.md#process-the-files-into-samples) guide
-covers processing, and its [prerequisites](../guides/import-files.md#prerequisites)
+Mascope processes them automatically into acquisition samples, which you **copy**
+into a batch of your own. The
+[Import data files](../guides/import-files.md#build-your-batch-from-the-acquisition-samples)
+guide covers this, and its [prerequisites](../guides/import-files.md#prerequisites)
 (filename rules and ionization modes) apply to File Agent uploads too.
 
 <!-- TODO Phase 3. Outline:

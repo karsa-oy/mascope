@@ -121,11 +121,20 @@ verdict on the visualized match: **Detection**, **Ambiguous**, or **No
 Detection**. If your rating disagrees with the algorithm, a short
 questionnaire asks what you saw, so the disagreement is captured with context.
 
-## Export the results
+## Take the results further
 
-Right-click the batch and choose **Download → Batch data** to get a
-multi-sheet Excel workbook with the batch's samples, match compounds, and
-match ions. **Download → Peak data** exports the underlying peak lists.
+For anything beyond the built-in views — custom plots, statistics, reports —
+load the results with the Python SDK, which pulls peaks and matches straight
+into dataframes in a notebook or script:
+
+```python
+from mascope_sdk import MascopeClient
+
+mascope = MascopeClient(workspace="My Workspace")
+peaks = mascope.load_peaks(dataset="My Dataset", batches="My Batch")
+```
+
+See [SDK & API](../sdk/index.md) for installation and the full reference.
 
 ## Troubleshooting
 
