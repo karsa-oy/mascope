@@ -22,8 +22,10 @@ export const useHelp = defineStore('app.ui.help', () => {
 
   // Help-card bodies rendered from the shared docs snippets (keyed by helpKey;
   // see tooling/docs/build_help_content.py). Fetched once from the docs served
-  // alongside the app; in dev (no /docs/) this stays empty and helpKey cards
-  // fall back to their title plus the "Learn more" link.
+  // alongside the app. In dev, vite proxies /docs/ to a local `mkdocs serve`
+  // (see vite.config.js); mkdocs serve does not emit help-content.json, so
+  // this stays empty there and helpKey cards fall back to their title plus
+  // the "Learn more" link.
   const content = ref({})
   const loadContent = async () => {
     if (typeof fetch === 'undefined') return

@@ -1861,6 +1861,26 @@ package.json  npm package w/ dependencies
 ...           other tooling configs
 ```
 
+### User docs in dev
+
+The user documentation (`docs/user`, built with MkDocs Material) is baked into
+the frontend image and served at `/docs/` in production, and the in-app help
+popovers link into it. In dev, the vite server proxies `/docs/` to a local
+`mkdocs serve`, so the same links work and docs edits live-reload inside the
+app:
+
+```sh
+# from server/frontend (or `uv run mkdocs serve` at the repo root)
+npm run docs     # serves the docs at http://localhost:8000/docs/
+npm run dev      # /docs/ links in the app now resolve
+```
+
+Without `mkdocs serve` running, `/docs/` responds with a hint page instead.
+Point the proxy elsewhere with `MASCOPE_DOCS_URL` (e.g. when port 8000 is
+taken). The help popover bodies sourced from `docs/user/_help/` snippets
+(help-content.json) are only rendered in the built image, not by
+`mkdocs serve` — in dev those cards fall back to their title.
+
 ### Frontend Tech
 
 The Mascope frontend is build with the following technologies:
