@@ -32,5 +32,5 @@ documentation = "https://github.com/karsa-oy/mascope"
 "Bug Tracker" = "https://github.com/karsa-oy/mascope/issues"
 
 [build-system]
-requires = ["uv_build>=0.6,<0.7"]
+requires = ["uv_build>=0.11.32,<0.12"]
 build-backend = "uv_build"
