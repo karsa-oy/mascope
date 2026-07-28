@@ -77,8 +77,9 @@ The *Samples* pane also has a **Back to batches** button.
 
 ## Get data in and analyse it
 
-- **[Import data files](../guides/import-files.md)** — upload raw instrument
-  files in the **Raw files** tab and process them into samples in your batch.
+- **[Import data files](../guides/import-files.md)** — get raw instrument
+  files into Mascope and copy the automatically processed samples into your
+  batch.
 - **[Build a target collection and run matching](../guides/target-collections.md)**
   — tell Mascope what compounds to look for, and score every sample against
   them.

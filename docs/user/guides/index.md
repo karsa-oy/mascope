@@ -12,5 +12,5 @@ Task-oriented how-tos, one task per page. Each guide links to
 - Browse samples and a batch
 - Calibrate a batch
 - Compare stages within a sample
-- Export results
+- Analyse results with the SDK (notebooks)
 -->

@@ -1,10 +1,12 @@
 # Import data files
 
-Getting a measurement into Mascope is a two-step process: **upload** the raw
-instrument file, then **process** it into one or more samples inside a batch.
-Raw files can reach Mascope two ways — automatically via the **File Agent**
-running on the instrument PC, or by **uploading from your computer** in the web
-app. Either way, you process them the same way afterwards.
+Getting a measurement into Mascope is a two-step process: get the raw
+instrument file **in** — automatically via the **File Agent** running on the
+instrument PC, or by **uploading from your computer** in the web app — then
+build your batch from the samples Mascope creates. Every arriving file is
+processed automatically into calibrated, matched samples in the instrument's
+acquisition workspace; you **copy** those samples into a batch of your own to
+analyse them.
 
 New to the terms *sample file*, *sample*, *batch*, and *ionization mode*? See
 [Concepts](../concepts/index.md) first — this guide assumes them.
@@ -50,10 +52,10 @@ ionization token, the ionization modes you use have to exist first. This is a
 prerequisite in its own right — see [Set up ionization modes](#set-up-ionization-modes)
 below.
 
-**A place to process into.** Processing creates samples inside a **batch**, which
-lives in a **dataset** inside a **workspace**. If you do not have an analysis
-dataset and batch yet, create them in the sample browser (the left-hand panel)
-before you process — you can create the workspace, dataset, and batch there.
+**A place to analyse in.** Your copies of the samples will live in a **batch**,
+which lives in a **dataset** inside a **workspace** of your own. If you do not
+have them yet, create them first — see
+[First steps in the app](../getting-started/first-steps.md#create-a-dataset-and-a-batch).
 
 ## Set up ionization modes
 
@@ -127,7 +129,7 @@ Agent skips files larger than 100 MB; upload those from the web app instead.
 
 To import files you already have on your machine:
 
-1. Open the **Raw files** tab (top-right of the dashboard).
+1. Open the **Raw files** tab (the first tab of the right-hand panel).
 2. Either click **Upload** and pick your files, or drag them onto the pane. You
    can add many files at once (up to 2.5 GB each).
 3. Mascope validates each file's name against the rules above. Anything it cannot
@@ -136,24 +138,50 @@ To import files you already have on your machine:
 4. Watch the progress notification until the uploads finish.
 
 However they arrive, uploaded files appear in the raw-files table (listed by
-filename, polarity, and datetime) and are stored in the instrument's
-`Acquisitions <instrument>` workspace. Uploading does **not** yet create anything
-you can analyse — that is the next step.
+filename, polarity, and datetime), and Mascope processes each one automatically
+in the background: for every ionization mode in the file it creates a
+calibrated, matched **sample** in the instrument's `Acquisitions <instrument>`
+workspace. Those acquisition records are read-only — to analyse the data, copy
+the samples into a batch of your own. That is the next step.
 
 !!! tip "Finding files after upload"
     The table shows one time window at a time (default: the last 24 hours). Use
     the time-range and polarity filters and the filename search at the top of the
     tab to locate older files.
 
-## Process the files into samples
+## Build your batch from the acquisition samples
 
-Processing summarises the chosen part of each raw file into a **sample** (peaks
-detected, ready to calibrate and match) and places it in a batch.
+Everything a file needs to become analysable has already happened by the time
+it is uploaded: the `Acquisitions <instrument>` workspace holds a dataset per
+year, a daily batch per ionization mode (named like
+`2026-07-28 Nitrate acquisition`), and one processed sample per file. The
+recommended way to assemble your analysis batch is to copy from there:
 
-1. In the sample browser on the left, open the **dataset** and select the
-   **batch** you want the samples to go into. (The batch has to be selected — the
-   **Process selected** button stays disabled until it is.)
-2. Back in the **Raw files** tab, select the raw files to process. Select files of
+1. Open the **Home menu** (house icon, top-left) and select the
+   `Acquisitions <instrument>` workspace.
+2. Open the year dataset, then the daily acquisition batch that holds your
+   measurements. Samples appear here as their files finish processing.
+3. Select the samples you want — hold `Shift` or `Ctrl` to select several —
+   then right-click and choose **Copy samples**.
+4. Switch back to your own workspace via the Home menu, open your dataset and
+   batch, right-click the empty space in the *Samples* pane, and choose
+   **Paste samples**.
+
+The pasted copies are yours: rename, annotate, or delete them without touching
+the acquisition record. To take a whole day's measurements at once, right-click
+the acquisition batch itself and choose **Copy batch**, then **Paste batch** in
+your own dataset.
+
+### Alternative: process raw files by hand
+
+The **Raw files** tab can also process files straight into your batch — for
+the cases the automatic processing does not cover, such as custom time windows
+within a file or per-sample metadata pasted from an autosampler report. Prefer
+the copy flow above for routine work.
+
+1. In the sample browser, select the **batch** the samples should go into (the
+   **Process selected** button stays disabled until a batch is selected).
+2. In the **Raw files** tab, select the raw files to process. Select files of
    a single polarity, or pick a polarity from the dropdown if a file contains both.
 3. Click **Process selected**:
    - **One file** opens a dialog to create a single sample from it.
@@ -185,6 +213,9 @@ Once a batch has samples, you can:
 - **The filename token isn't recognised.** Confirm an ionization mode with that
   exact token exists in **Edit ionizations → Ionization Modes**, and that the
   token field is filled in (a mode with no token cannot match a filename).
+- **"Paste samples" doesn't appear in the menu.** Copy samples first, then make
+  sure your own batch is open — the paste goes into the batch whose *Samples*
+  pane you right-click.
 - **"Process selected" is greyed out.** Select a batch in the sample browser
   first, then select at least one raw file. If a file has mixed polarity, choose a
   polarity from the dropdown.
