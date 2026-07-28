@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "serve": "vite --open",
+    "docs": "cd ../.. && uv run --only-group docs mkdocs serve",
     "build": "vite build",
     "preview": "vite preview",
     "test": "npm run test:unit && npm run test:e2e",
