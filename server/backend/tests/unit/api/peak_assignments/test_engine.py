@@ -661,17 +661,26 @@ class TestUntargetedMatches:
             ]
         )
 
-    def _peak_lookup(self) -> dict:
-        return {
-            100.1: ("pA", 5000.0),
-            101.1033: ("pB", 300.0),
-            102.2: ("pC", 50.0),
-        }
+    def _peaks_df(self) -> pd.DataFrame:
+        # The peaks fed to the untargeted search, in the order they were fed.
+        # Results join back to this frame by position, not by float m/z equality.
+        return pd.DataFrame(
+            {
+                "sample_peak_id": ["pA", "pB", "pC"],
+                "mz": [100.1, 101.1033, 102.2],
+                "intensity": [5000.0, 300.0, 50.0],
+            }
+        )
+
+    def _one_peak_df(self, peak_id: str, mz: float, intensity: float) -> pd.DataFrame:
+        return pd.DataFrame(
+            {"sample_peak_id": [peak_id], "mz": [mz], "intensity": [intensity]}
+        )
 
     def test_assigned_rows_map_to_assignments_and_placeholder_is_skipped(self):
         assignments = untargeted_matches_to_peak_assignments(
             self._matches_df(),
-            self._peak_lookup(),
+            self._peaks_df(),
             "sample1",
             "run1",
             POSSIBLE,
@@ -724,7 +733,7 @@ class TestUntargetedMatches:
         )
         assignments = untargeted_matches_to_peak_assignments(
             matches_df,
-            {100.1: ("pA", 5000.0)},
+            self._one_peak_df("pA", 100.1, 5000.0),
             "sample1",
             "run1",
             POSSIBLE,
@@ -739,7 +748,7 @@ class TestUntargetedMatches:
     def test_isotope_child_is_attributed_to_its_formula_group_m0(self):
         assignments = untargeted_matches_to_peak_assignments(
             self._matches_df(),
-            self._peak_lookup(),
+            self._peaks_df(),
             "sample1",
             "run1",
             POSSIBLE,
@@ -754,7 +763,8 @@ class TestUntargetedMatches:
     def test_rows_without_observed_peak_are_skipped(self):
         assignments = untargeted_matches_to_peak_assignments(
             self._matches_df(),
-            {100.1: ("pA", 5000.0)},  # pB's m/z missing from the lookup
+            # Only pA was fed to the search, so pB's row has no peak to own.
+            self._one_peak_df("pA", 100.1, 5000.0),
             "sample1",
             "run1",
             POSSIBLE,
@@ -765,7 +775,7 @@ class TestUntargetedMatches:
     def test_formula_formatter_is_applied(self):
         assignments = untargeted_matches_to_peak_assignments(
             self._matches_df(),
-            self._peak_lookup(),
+            self._peaks_df(),
             "sample1",
             "run1",
             POSSIBLE,
@@ -796,7 +806,7 @@ class TestUntargetedMatches:
         )
         assignments = untargeted_matches_to_peak_assignments(
             matches_df,
-            {100.1: ("pA", 5000.0)},
+            self._one_peak_df("pA", 100.1, 5000.0),
             "sample1",
             "run1",
             POSSIBLE,
@@ -827,7 +837,7 @@ class TestUntargetedMatches:
         )
         assignments = untargeted_matches_to_peak_assignments(
             matches_df,
-            {19.018: ("pR", 1000.0)},
+            self._one_peak_df("pR", 19.018, 1000.0),
             "sample1",
             "run1",
             POSSIBLE,

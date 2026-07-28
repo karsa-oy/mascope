@@ -20,6 +20,7 @@ from mascope_backend.api.controllers.match.lib.match_score_v2 import (
     sample_noise_floor,
 )
 from mascope_backend.db.id import gen_id
+from mascope_backend.runtime import runtime
 from mascope_tools.composition.arbitration import DEFAULT_TIE_TOL
 from mascope_tools.composition.calibration import (
     Calibration,
@@ -27,7 +28,10 @@ from mascope_tools.composition.calibration import (
     apply_corroboration,
     calibration_for,
 )
-from mascope_tools.composition.heuristic_filter import formula_plausibility
+from mascope_tools.composition.heuristic_filter import (
+    SCORE_VERSION,
+    formula_plausibility,
+)
 
 
 # Sentinel so a caller can pass calibration=None (explicitly uncalibrated) distinctly from
@@ -144,6 +148,16 @@ def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
     rejected (``match_score == 0``) as absent, so the fit score honours the same
     tolerance / intensity-floor gating as the targeted Match tab.
 
+    The returned frame carries that verdict: an isotopologue the gating rejected
+    comes back with ``sample_peak_intensity`` zeroed, not just excluded from the
+    arithmetic. `apply_match_params` only zeroes the intensity of *out-of-tolerance*
+    pairings - a within-tolerance pairing it rejected on the intensity floor keeps
+    its intensity - so without this the ownership guard in
+    `invert_matches_to_peak_assignments` would let a pairing this function counted
+    as ABSENT claim its peak anyway, carrying the ion's (possibly "identified") fit
+    score and blocking Stage B from explaining that peak. One gating decision, one
+    frame.
+
     Real per-peak ``signal_to_noise`` (carried from the filestore by
     `compute_match_isotopes`) makes this the full v2 fit; without it `ion_score_v2`
     falls back to its intensity-derived proxy SNR. No-op (returns the frame
@@ -172,11 +186,11 @@ def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
         lambda g: ion_score_v2(g, sigma_ppm=sigma, mu=mu, noise=noise),
         include_groups=False,
     )
-    match_isotope_df = match_isotope_df.copy()
-    match_isotope_df["match_score"] = (
-        match_isotope_df["target_ion_id"].map(fit_by_ion).astype(float)
-    )
-    return match_isotope_df
+    # Return the GATED frame (not a fresh copy of the input): the zeroed intensities
+    # are the record of which pairings this scoring counted as absent, and the
+    # ownership guard downstream reads exactly that.
+    df["match_score"] = df["target_ion_id"].map(fit_by_ion).astype(float)
+    return df
 
 
 def _row_reference_identities(row) -> list | None:
@@ -260,12 +274,14 @@ def invert_matches_to_peak_assignments(
     if match_isotope_df.empty:
         return []
 
-    # A peak may only be OWNED by a target isotopologue whose pairing is within
-    # tolerance. The targeted matcher pairs each target isotope to the nearest peak in a
-    # wide 0.5 Da search window (for the legacy Match tab's ppm-error display), then
-    # `apply_match_params` zeroes `sample_peak_intensity` for pairings outside the m/z /
-    # abundance tolerance. Without this guard a trace isotopologue whose real peak is
-    # absent claims whatever peak sits in that window - tens to hundreds of ppm off, and
+    # A peak may only be OWNED by a target isotopologue the gating accepted. The targeted
+    # matcher pairs each target isotope to the nearest peak in a wide 0.5 Da search window
+    # (for the legacy Match tab's ppm-error display), then `apply_match_params` zeroes
+    # `sample_peak_intensity` for pairings outside the m/z / abundance tolerance and
+    # `score_ions_by_fit` zeroes it for the ones the gating rejected on the intensity floor
+    # (both legs of one gating decision, see its docstring). Without this guard a trace
+    # isotopologue whose real peak is absent claims whatever peak sits in that window - tens
+    # to hundreds of ppm off, or below the floor the scorer treated as no peak at all, and
     # actually belonging to another compound - inheriting its ion's tier and blocking that
     # peak's correct assignment (Stage B or another target). Requiring a positive gated
     # intensity releases those peaks to the untargeted stage instead.
@@ -320,9 +336,19 @@ def invert_matches_to_peak_assignments(
     matched["_fit"] = matched["match_score"].map(lambda v: _score_or_none(v) or 0.0)
     matched["_evidence"] = matched["_fit"] * matched["_plaus"]
     matched["_abs_mz_error"] = matched["match_mz_error"].abs()
+    matched["_formula_key"] = formulas
+    # The ranking mirrors `arbitration.arbitrate_candidates` (evidence first, formula last
+    # for a stable order) but is not delegated to it: that helper competes bare
+    # (formula, fit) candidates and returns a dataclass, while a peak's winner here has to
+    # keep the whole match row - target FKs, reference identities, isotope role, mass and
+    # abundance errors - which the dataclass cannot carry. Mass error is the extra middle
+    # key, and it is the domain-meaningful one: between two equally plausible formulas that
+    # fit equally well, the closer mass is the better assignment. The formula key is last
+    # so two candidates equal on all three still resolve by the data rather than by whatever
+    # order the matcher happened to emit them in.
     matched = matched.sort_values(
-        ["sample_peak_id", "_evidence", "_abs_mz_error"],
-        ascending=[True, False, True],
+        ["sample_peak_id", "_evidence", "_abs_mz_error", "_formula_key"],
+        ascending=[True, False, True, True],
     )
 
     assignments: list[dict] = []
@@ -342,6 +368,15 @@ def invert_matches_to_peak_assignments(
 
         # Arbitration confidence for the chosen winner: its share of the peak's total
         # evidence, plus an honest tie flag when a runner-up is within tie_tol.
+        #
+        # Confidence answers "which of this peak's candidates", NOT "how good is this
+        # assignment" - an uncontested peak scores 1.0 however poorly its single candidate
+        # fits, because there was nothing to lose to. That is the same normalisation
+        # `arbitrate_candidates` reports and the UI already reads, so it is kept rather than
+        # redefined; `n_candidates` is recorded alongside it so a 1.0 earned against
+        # competitors is distinguishable from a 1.0 that was uncontested. The question
+        # "how good" is `p_correct` (the calibrated evidence), which does not divide by the
+        # field and does fall for a poor lone candidate.
         evid = group["_evidence"].to_numpy(dtype=float)
         total_evidence = float(evid.sum())
         confidence = float(evid[0] / total_evidence) if total_evidence > 0 else 0.0
@@ -416,9 +451,16 @@ def invert_matches_to_peak_assignments(
             "alternatives": alternatives or None,
             "provenance": {
                 "confidence": round(confidence, 4),
+                # How many candidates the confidence was normalised across; 1 means the
+                # peak was uncontested and the 1.0 above was won by default.
+                "n_candidates": int(len(group)),
                 "plausibility": round(float(winner["_plaus"]), 4),
                 "evidence": round(float(winner["_evidence"]), 4),
                 "is_tie": is_tie,
+                # The fit-score generation this evidence is on. Snapshotted here because
+                # a verification label is only interpretable against the scoring that
+                # produced it (see AssignmentVerification.score_version).
+                "score_version": SCORE_VERSION,
                 # P(correct) is the calibrated probability; null when uncalibrated,
                 # so the UI can show "uncalibrated" instead of a fabricated number.
                 "p_correct": p_correct,
@@ -490,9 +532,82 @@ def _fold_adduct_corroboration(
         }
 
 
+# Mapping a finder result back to the observed peak it came from is an IDENTITY join,
+# not a mass match: `assign_compositions` copies the m/z straight out of the frame it was
+# handed. The tolerance below exists only to survive a float32/float64 round trip or a
+# decimal rounding inside the finder. At 0.1 ppm it sits well under the spacing of any two
+# peaks a high-resolution instrument resolves (an Orbitrap peak is several ppm wide), so it
+# cannot merge two real peaks - while a rounding change that would otherwise silently
+# unassign the entire stage still lands on the right peak.
+_PEAK_JOIN_REL_TOL = 1e-7
+_PEAK_JOIN_ABS_TOL = 1e-9
+
+
+def _resolve_peak_positions(
+    peaks_df: pd.DataFrame, mz_values: list[float]
+) -> list[int | None]:
+    """Map result m/z values onto POSITIONS in ``peaks_df``, or None when none matches.
+
+    Positional rather than value-keyed: a dict keyed on ``float(mz)`` loses one of two
+    peaks that share a value, and turns any rounding inside the finder into a silent
+    "no observed peak" for every row at once. Resolving to the row's position keeps the
+    two peaks distinct (each value is matched to an as-yet-unclaimed position before a
+    claimed one) and makes a failure to match visible to the caller, which logs it.
+    """
+    peak_mz = peaks_df["mz"].to_numpy(dtype=float)
+    order = np.argsort(peak_mz, kind="stable")
+    sorted_mz = peak_mz[order]
+
+    claimed: set[int] = set()
+    positions: list[int | None] = []
+    for value in mz_values:
+        tol = max(_PEAK_JOIN_ABS_TOL, abs(value) * _PEAK_JOIN_REL_TOL)
+        lo = int(np.searchsorted(sorted_mz, value - tol, side="left"))
+        hi = int(np.searchsorted(sorted_mz, value + tol, side="right"))
+        if lo >= hi:
+            positions.append(None)
+            continue
+        window = list(range(lo, hi))
+        free = [k for k in window if int(order[k]) not in claimed]
+        best = min(free or window, key=lambda k: abs(sorted_mz[k] - value))
+        position = int(order[best])
+        claimed.add(position)
+        positions.append(position)
+    return positions
+
+
+def _untargeted_row_score(row) -> tuple[float, float | None, float | None]:
+    """The row's fit score plus the mass / abundance errors it was derived from.
+
+    Prefers the isotope-pattern fit score mascope_tools already computed over the
+    candidate's whole predicted envelope; falls back to the single-peak term only when no
+    envelope was scored for this row.
+    """
+    # Fall back to composition_error_ppm when mz_error_ppm is absent OR present-but-NaN.
+    # dict.get's default only covers the absent case, so a NaN in a mixed batch (some rows
+    # carry an isotope-envelope mz error, some do not) would otherwise collapse the score.
+    mz_error_ppm = _float_or_none(row.get("mz_error_ppm"))
+    if mz_error_ppm is None:
+        mz_error_ppm = _float_or_none(row.get("composition_error_ppm"))
+    abundance_error = _float_or_none(row.get("intensity_error"))
+
+    score = _score_or_none(row.get("isotopic_pattern_score"))
+    if score is None:
+        mz_term = (
+            max(0.0, 1.0 - 1e-2 * abs(mz_error_ppm))
+            if mz_error_ppm is not None
+            else 0.0
+        )
+        abundance_term = (
+            1.0 - min(1.0, abs(abundance_error)) if abundance_error is not None else 1.0
+        )
+        score = abundance_term * mz_term
+    return score, mz_error_ppm, abundance_error
+
+
 def untargeted_matches_to_peak_assignments(
     matches_df: pd.DataFrame,
-    peak_lookup: dict[float, tuple[str, float]],
+    peaks_df: pd.DataFrame,
     sample_item_id: str,
     peak_assignment_run_id: str,
     possible_threshold: float,
@@ -518,82 +633,131 @@ def untargeted_matches_to_peak_assignments(
     absent/NaN) it falls back to the legacy single-peak maths
     ``score = (1 - min(1, |intensity_error|)) * max(0, 1 - |mz_error_ppm|/100)``.
 
+    Two results can land on the same observed peak - typically one composition's isotope
+    child on another composition's M0 - and only one may own it. The contest is settled by
+    ``evidence = fit x plausibility``, the same currency Stage A arbitrates in, and the
+    loser is kept as an alternative on the winner rather than dropped: a peak that two
+    compositions explain is exactly the peak an analyst needs to see both explanations for.
+
     :param matches_df: First element returned by assign_compositions.
-    :param peak_lookup: Maps peak m/z -> (sample_peak_id, intensity) for the
-        peaks that were fed into the untargeted search.
+    :param peaks_df: The observed peaks that were fed into the untargeted search, with
+        ``sample_peak_id`` / ``mz`` / ``intensity`` columns. Results are joined back to it
+        by position (see :func:`_resolve_peak_positions`).
     :param mechanism_id_by_notation: Maps the ionization notation used in the
         search back to IonizationMechanism ids.
     :param formula_formatter: Optional callable applied to formulas (e.g.
         explicit-isotope to custom element notation conversion).
     :return: One assignment dict per assigned peak, ready for bulk insert.
     """
-    if matches_df.empty:
+    if matches_df.empty or peaks_df.empty:
         return []
 
     mechanism_id_by_notation = mechanism_id_by_notation or {}
     format_formula = formula_formatter or (lambda formula: formula)
 
+    assigned_rows = [
+        row
+        for _, row in matches_df.iterrows()
+        if isinstance(row.get("formula"), str)
+        and row.get("formula") not in (UNTARGETED_NO_MATCH, UNTARGETED_IONIZATION)
+    ]
+    if not assigned_rows:
+        return []
+    positions = _resolve_peak_positions(
+        peaks_df, [float(row["mz"]) for row in assigned_rows]
+    )
+    peak_ids = peaks_df["sample_peak_id"].to_numpy()
+    peak_intensities = peaks_df["intensity"].to_numpy(dtype=float)
+
+    # Contenders per observed peak, in the order the finder emitted them. Insertion order
+    # is preserved so the assignments come back in the finder's (m/z-sorted) order even
+    # though the winner within a peak is chosen by evidence.
+    contenders_by_position: dict[int, list[dict]] = {}
+    unmatched_m0 = 0
+    unmatched_children = 0
+    for row, position in zip(assigned_rows, positions):
+        isotope_label = _str_or_none(row.get("isotope_label")) or "M0"
+        if position is None:
+            # An isotope child can legitimately land on an m/z outside the peaks fed to the
+            # search (e.g. below the intensity threshold), so a child miss is expected. An
+            # M0 came straight out of that peak list, so a missed M0 means the join itself
+            # broke - which would otherwise unassign the whole stage in silence.
+            if isotope_label == "M0":
+                unmatched_m0 += 1
+            else:
+                unmatched_children += 1
+            continue
+        formula = str(row["formula"])
+        score, mz_error_ppm, abundance_error = _untargeted_row_score(row)
+        plausibility = round(float(formula_plausibility(formula)), 4)
+        contenders_by_position.setdefault(position, []).append(
+            {
+                "row": row,
+                "formula": formula,
+                "isotope_label": isotope_label,
+                "fit": _score_or_none(score) or 0.0,
+                "score": score,
+                "plausibility": plausibility,
+                "mz_error_ppm": mz_error_ppm,
+                "abundance_error": abundance_error,
+            }
+        )
+    if unmatched_m0:
+        runtime.logger.warning(
+            f"Untargeted stage: {unmatched_m0} of {len(assigned_rows)} composition rows "
+            f"could not be joined back to an observed peak (M0 rows, which come from the "
+            f"peak list itself). Those peaks stay unassigned - check whether the "
+            f"composition finder is rounding or re-typing the m/z it was given."
+        )
+    if unmatched_children:
+        runtime.logger.debug(
+            f"Untargeted stage: {unmatched_children} isotope-child rows fell outside the "
+            f"peaks fed to the search and were skipped."
+        )
+
     assignments: list[dict] = []
     m0_assignment_by_group: dict[tuple, str] = {}
     child_assignments: list[tuple[dict, tuple]] = []
-    seen_peak_ids: set[str] = set()
 
-    for _, row in matches_df.iterrows():
-        formula = row.get("formula")
-        if not isinstance(formula, str) or formula in (
-            UNTARGETED_NO_MATCH,
-            UNTARGETED_IONIZATION,
-        ):
-            continue
-
-        peak = peak_lookup.get(float(row["mz"]))
-        if peak is None:
-            # Isotope children can land on m/z values outside the peaks fed
-            # to the search (e.g. below the intensity threshold); there is no
-            # observed peak row to assign in that case.
-            continue
-        sample_peak_id, intensity = peak
-        if sample_peak_id in seen_peak_ids:
-            continue
-        seen_peak_ids.add(sample_peak_id)
-
-        # Fall back to composition_error_ppm when mz_error_ppm is absent OR
-        # present-but-NaN. dict.get's default only covers the absent case, so a
-        # NaN in a mixed batch (some rows carry an isotope-envelope mz error,
-        # some do not) would otherwise collapse the score to 0.
-        mz_error_ppm = _float_or_none(row.get("mz_error_ppm"))
-        if mz_error_ppm is None:
-            mz_error_ppm = _float_or_none(row.get("composition_error_ppm"))
-        abundance_error = _float_or_none(row.get("intensity_error"))
-
-        # Prefer the isotope-pattern fit score mascope_tools already computed over
-        # the candidate's whole predicted envelope; fall back to the single-peak
-        # term only when no envelope was scored for this row.
-        score = _score_or_none(row.get("isotopic_pattern_score"))
-        if score is None:
-            mz_term = (
-                max(0.0, 1.0 - 1e-2 * abs(mz_error_ppm))
-                if mz_error_ppm is not None
-                else 0.0
+    for position, contenders in contenders_by_position.items():
+        # Same ranking as Stage A: evidence first, closest mass next, formula last so a
+        # dead heat resolves by the data rather than by the finder's row order.
+        contenders.sort(
+            key=lambda c: (
+                -(c["fit"] * c["plausibility"]),
+                abs(c["mz_error_ppm"])
+                if c["mz_error_ppm"] is not None
+                else float("inf"),
+                c["formula"],
             )
-            abundance_term = (
-                1.0 - min(1.0, abs(abundance_error))
-                if abundance_error is not None
-                else 1.0
-            )
-            score = abundance_term * mz_term
-
-        isotope_label = _str_or_none(row.get("isotope_label")) or "M0"
+        )
+        winner, losers = contenders[0], contenders[1:]
+        row = winner["row"]
+        formula = winner["formula"]
+        isotope_label = winner["isotope_label"]
         is_m0 = isotope_label == "M0"
         notation = _str_or_none(row.get("ionization_mechanism"))
         group_key = (formula, notation)
 
-        # Untargeted runner-ups come back as formula names only (no per-candidate
-        # fit/m-z-error), but chemical plausibility is computable from the formula
-        # itself, so the inspector can still rank competitors by it.
+        # Losing contenders first: they are scored competitors for this actual peak. The
+        # finder's other_candidates are formula names only (no per-candidate fit or mass
+        # error), but chemical plausibility is computable from the formula itself, so the
+        # inspector can still rank them.
+        alternatives = [
+            {
+                "assigned_formula": format_formula(loser["formula"]),
+                "ion_formula": _str_or_none(loser["row"].get("ion")),
+                "isotope_label": loser["isotope_label"],
+                "fit_score": _score_or_none(loser["score"]),
+                "mz_error_ppm": loser["mz_error_ppm"],
+                "plausibility": loser["plausibility"],
+                "source": SOURCE_UNTARGETED,
+            }
+            for loser in losers
+        ]
         other_candidates = _str_or_none(row.get("other_candidates"))
-        alternatives = (
-            [
+        if other_candidates:
+            alternatives.extend(
                 {
                     "assigned_formula": format_formula(alt.strip()),
                     "plausibility": round(float(formula_plausibility(alt.strip())), 4),
@@ -601,19 +765,30 @@ def untargeted_matches_to_peak_assignments(
                 }
                 for alt in other_candidates.split(",")
                 if alt.strip()
-            ][: max_alternatives or 0]
-            or None
-            if other_candidates
-            else None
-        )
+            )
+        alternatives = alternatives[: max_alternatives or 0] or None
 
-        # Chemical plausibility (Seven Golden Rules) is stage-agnostic and the
-        # headline provenance metric, so the untargeted winner reports it on the
-        # same footing as a database winner (engine.py Stage A). Confidence and
-        # P(correct) stay database-arbitration concepts: they need the peak's
-        # full scored candidate set, which the untargeted search does not expose
-        # here (other_candidates carries formulas only, no per-candidate fit).
-        provenance = {"plausibility": round(float(formula_plausibility(formula)), 4)}
+        # Chemical plausibility (Seven Golden Rules) is stage-agnostic and the headline
+        # provenance metric, so the untargeted winner reports it on the same footing as a
+        # database winner (Stage A above). Evidence -- the same fit x plausibility product
+        # -- rides along for a different reason: it is the quantity `create_verification`
+        # snapshots as a verdict's calibration label, and a Stage B label whose evidence is
+        # null can never be fit. It is indistinguishable from a verdict nobody recorded, in
+        # the one table no re-run can rebuild, so the number is captured now even though
+        # nothing fits it yet.
+        #
+        # Confidence and P(correct) stay database-arbitration concepts. Confidence needs
+        # the peak's full scored candidate set, which the untargeted search does not expose
+        # here (other_candidates carries formulas only, no per-candidate fit). P(correct)
+        # would mean applying the Stage A curve to a Stage B number: this stage's fit is
+        # score_pattern (v1 -- no per-peak SNR, no penalty for an absent isotopologue), a
+        # different scale from the ion_score_v2 the curve was fit on. Borrowing it across
+        # scales is the fabricated probability the calibration layer exists to refuse.
+        provenance = {
+            "plausibility": winner["plausibility"],
+            "evidence": round(winner["fit"] * winner["plausibility"], 4),
+            "score_version": SCORE_VERSION,
+        }
         for key in ("neutral_mass", "unsaturation"):
             value = _float_or_none(row.get(key))
             if value is not None:
@@ -623,9 +798,9 @@ def untargeted_matches_to_peak_assignments(
             "peak_assignment_id": gen_id(32),
             "peak_assignment_run_id": peak_assignment_run_id,
             "sample_item_id": sample_item_id,
-            "sample_peak_id": sample_peak_id,
+            "sample_peak_id": str(peak_ids[position]),
             "sample_peak_mz": float(row["mz"]),
-            "sample_peak_intensity": float(intensity),
+            "sample_peak_intensity": float(peak_intensities[position]),
             "sample_peak_tof": None,
             "role": ROLE_M0 if is_m0 else ROLE_ISO_CHILD,
             "assigned_formula": format_formula(formula),
@@ -634,15 +809,17 @@ def untargeted_matches_to_peak_assignments(
             "isotope_label": isotope_label,
             "isotope_formula": _str_or_none(row.get("isotope_formula")),
             "source": SOURCE_UNTARGETED,
-            "fit_score": _score_or_none(score),
-            "mz_error_ppm": mz_error_ppm,
-            "abundance_error": abundance_error,
-            "tier": tier_for_score(score, possible_threshold, probable_threshold),
+            "fit_score": _score_or_none(winner["score"]),
+            "mz_error_ppm": winner["mz_error_ppm"],
+            "abundance_error": winner["abundance_error"],
+            "tier": tier_for_score(
+                winner["score"], possible_threshold, probable_threshold
+            ),
             "target_compound_id": None,
             "target_ion_id": None,
             "owner_peak_assignment_id": None,
             "alternatives": alternatives,
-            "provenance": provenance or None,
+            "provenance": provenance,
         }
         assignments.append(assignment)
 

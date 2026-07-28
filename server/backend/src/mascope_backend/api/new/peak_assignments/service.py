@@ -925,19 +925,20 @@ async def assign_sample_peaks(
                 # before arbitration. It stays off for the legacy composition
                 # search, which predates the rule being implemented.
                 heuristics_config = HeuristicFilterConfig(use_senior=True)
+                # One positionally-indexed frame feeds both the search and the
+                # join back. The finder returns rows in the order it was given
+                # them, so position - not float m/z equality - is what maps a
+                # result to the peak it came from.
+                search_peaks_df = remainder_df.reset_index(drop=True)
                 matches_df, _ = await asyncio.to_thread(
                     assign_compositions,
-                    remainder_df[["mz", "intensity"]].reset_index(drop=True),
+                    search_peaks_df[["mz", "intensity"]],
                     search_config,
                     heuristics_config,
                 )
-                peak_lookup = {
-                    float(row.mz): (str(row.sample_peak_id), float(row.intensity))
-                    for row in remainder_df.itertuples(index=False)
-                }
                 stage_b_assignments = untargeted_matches_to_peak_assignments(
                     matches_df,
-                    peak_lookup=peak_lookup,
+                    peaks_df=search_peaks_df,
                     sample_item_id=sample_item_id,
                     peak_assignment_run_id=run.peak_assignment_run_id,
                     possible_threshold=config.candidate_threshold,

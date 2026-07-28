@@ -53,8 +53,16 @@ def peak_assignment_enabled() -> bool:
     - the ``peak_assignment`` flag in the runtime ``[meta]`` config, which is the
       durable setting and is also what the frontend reads.
 
-    The explicit API routes stay reachable regardless, so the feature can be
-    exercised deliberately (and its tests run) without switching it on globally.
+    What it gates is the *automatic* behaviour, not the API surface: the explicit
+    ``/api/peak-assignments`` routes stay reachable with the flag off, so the feature
+    can be exercised deliberately (and its tests run) without switching it on
+    globally. Operators should read the consequence plainly - "nothing changes until
+    you opt in" holds for the UI and for sample ingest, but not for the API. In a
+    deployment that opted out, any workspace editor can still POST an assign request,
+    run the full untargeted stage, and accumulate a complete per-peak ledger (one row
+    per observed peak, per run). Those rows are reclaimed by the
+    ``prune_peak_assignment_runs`` maintenance script, which nothing schedules
+    automatically whether the flag is on or off - see ``docs/maintaining.md``.
 
     :return: True when the feature is enabled for this environment.
     """
