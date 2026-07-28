@@ -14,11 +14,22 @@ from pathlib import Path
 from typing import IO
 
 
+#: Byte-order mark as it survives decoding, kept as an escape so it stays visible.
+_BOM = "\ufeff"
+
+
 def _open_text(path: Path) -> IO[str]:
-    """Open a path as UTF-8 text, transparently decompressing ``.gz``."""
+    """Open a path as UTF-8 text, transparently decompressing ``.gz``.
+
+    Decoded as ``utf-8-sig`` rather than ``utf-8``: Excel always writes a UTF-8
+    BOM and CompTox / NORMAN exports commonly carry one. A BOM left on the front
+    of the first header key makes every adapter's required-column lookup miss
+    (``"\\ufeffDTXSID" != "DTXSID"``), which drops every row of the file while the
+    load still reports success.
+    """
     if path.suffix == ".gz":
-        return gzip.open(path, mode="rt", encoding="utf-8", errors="replace")
-    return open(path, mode="rt", encoding="utf-8", errors="replace")
+        return gzip.open(path, mode="rt", encoding="utf-8-sig", errors="replace")
+    return open(path, mode="rt", encoding="utf-8-sig", errors="replace")
 
 
 def _open_binary(path: Path) -> IO[bytes]:
@@ -86,6 +97,19 @@ def read_sdf_records(path: Path) -> Iterator[dict[str, str]]:
             yield fields
 
 
+def _clean_key(key: str | None) -> str | None:
+    """Strip whitespace and any stray BOM from a header key.
+
+    ``str.strip()`` does not remove ``\\ufeff``, and the decode only eats a BOM
+    at the very start of the stream - a file concatenated from several
+    BOM-prefixed exports carries more. A BOM glued to a column name silently
+    breaks every lookup against that column, so it is removed here too.
+    """
+    if key is None:
+        return None
+    return key.strip().strip(_BOM).strip()
+
+
 def read_delimited(path: Path, delimiter: str = ",") -> Iterator[dict[str, str]]:
     """Stream a delimited text file, yielding one dict per data row.
 
@@ -101,7 +125,7 @@ def read_delimited(path: Path, delimiter: str = ",") -> Iterator[dict[str, str]]
         reader = csv.DictReader(handle, delimiter=delimiter)
         for row in reader:
             yield {
-                (key.strip() if key else key): (value.strip() if value else "")
+                _clean_key(key): (value.strip() if value else "")
                 for key, value in row.items()
                 if key is not None
             }

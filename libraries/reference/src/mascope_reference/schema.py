@@ -26,14 +26,26 @@ from sqlalchemy import (
 REFERENCE_SOURCE_TABLE = "reference_source"
 REFERENCE_COMPOUND_TABLE = "reference_compound"
 
+# Widths of the bounded varchar columns, mirrored from the backend ORM models
+# and enforced by the ingest path before insert. Postgres answers an over-long
+# value with StringDataRightTruncation, which aborts the statement - and a
+# multi-hour load with it - over one systematic lipid name or one spelled-out
+# licence string. Keep these in lockstep with the ORM like the column names.
+SOURCE_NAME_LENGTH = 64
+SOURCE_VERSION_LENGTH = 128
+LICENSE_LENGTH = 64
+INCHIKEY_LENGTH = 27
+SOURCE_NATIVE_ID_LENGTH = 128
+FORMULA_LENGTH = 512
+
 
 #: One row per ingested source + version (provenance, license, active flag).
 reference_source = table(
     REFERENCE_SOURCE_TABLE,
     column("reference_source_id", Integer),
-    column("name", String),
-    column("version", String),
-    column("license", String),
+    column("name", String(SOURCE_NAME_LENGTH)),
+    column("version", String(SOURCE_VERSION_LENGTH)),
+    column("license", String(LICENSE_LENGTH)),
     column("record_count", Integer),
     column("is_active", Boolean),
     column("ingested_at", TIMESTAMP(timezone=True)),
@@ -45,15 +57,15 @@ reference_compound = table(
     REFERENCE_COMPOUND_TABLE,
     column("reference_compound_id", Integer),
     column("reference_source_id", Integer),
-    column("formula", String),
+    column("formula", String(FORMULA_LENGTH)),
     column("monoisotopic_mass", Float),
-    column("inchikey", String),
+    column("inchikey", String(INCHIKEY_LENGTH)),
     column("name", Text),
     column("smiles", Text),
     column("inchi", Text),
-    column("source_native_id", String),
+    column("source_native_id", String(SOURCE_NATIVE_ID_LENGTH)),
     column("xrefs", JSON),
-    column("license", String),
+    column("license", String(LICENSE_LENGTH)),
 )
 
 # Column-name lists reused by the ingest path (everything except the
