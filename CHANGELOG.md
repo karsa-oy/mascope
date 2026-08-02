@@ -36,7 +36,9 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   offset/resume handling improvements. Newer versions stay blocked:
   4.2.1 ships a path traversal fixed only later, and 4.2.2+ cannot
   import on Windows (unconditional `fcntl`), which would break native
-  dev runs.
+  dev runs. Web-app uploads now use 20 MiB chunks instead of the 5 MiB
+  that worked around the 4.1.3 bug, cutting per-request overhead 4x on
+  multi-GB files.
 
 - The File Agent can now watch subfolders of the watched folder: answer
   yes to the new "Also watch subfolders?" question in the guided setup, or
