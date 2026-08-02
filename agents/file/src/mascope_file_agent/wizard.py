@@ -97,6 +97,27 @@ def _prompt(label: str, default: str = "") -> str:
         print("  A value is required.")
 
 
+def _prompt_yes_no(label: str, default: bool = False) -> bool:
+    """Prompt for a yes/no answer, offering a default.
+
+    :param label: Prompt label
+    :type label: str
+    :param default: Value returned on empty input
+    :type default: bool
+    :return: The answer
+    :rtype: bool
+    """
+    suffix = "[Y/n]" if default else "[y/N]"
+    while True:
+        answer = input(f"{label} {suffix}: ").strip().lower()
+        if not answer:
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+
+
 def _prompt_source(default: str) -> str:
     """Prompt for the watched folder, offering to create it if missing.
 
@@ -284,6 +305,10 @@ def run_setup_wizard(settings: dict) -> dict:
             access_token = _prompt("Access token", access_token)
 
     source = _prompt_source(settings.get("source", ""))
+    recursive = _prompt_yes_no(
+        "Also watch subfolders of that folder?",
+        bool(settings.get("recursive")),
+    )
     mask = _prompt("Pattern of files to upload", settings.get("mask") or "*.raw")
 
     return {
@@ -291,5 +316,6 @@ def run_setup_wizard(settings: dict) -> dict:
         "host": host,
         "access_token": access_token,
         "source": source,
+        "recursive": recursive,
         "mask": mask,
     }

@@ -23,6 +23,7 @@ REQUIRED_SETTINGS = ("host", "access_token", "source")
 DEFAULT_SETTINGS = {
     "mask": "*.raw",
     "timeout": 3,
+    "recursive": False,
     "filename_prefix": "",
     "filename_suffix": "",
 }
@@ -37,6 +38,8 @@ USER_CONFIG_HEADER = """\
 #                  (editor role or higher required).
 #   source       - full path of the folder to watch for new data files
 #   mask         - pattern of the files to upload, e.g. "*.raw"
+#   recursive    - true to also watch subfolders of source (the agent's own
+#                  failed_uploads folder is always excluded)
 #
 # Restart the agent after changing this file. To re-run the guided setup,
 # start the agent with the --setup flag.
@@ -200,6 +203,7 @@ def write_user_config(config_path: str, settings: dict) -> None:
         f"access_token = {toml_str(settings['access_token'])}",
         f"source = {toml_str(settings['source'])}",
         f"mask = {toml_str(settings['mask'])}",
+        f"recursive = {'true' if settings['recursive'] else 'false'}",
         f"timeout = {settings['timeout']}",
     ]
     for key in ("filename_prefix", "filename_suffix"):
@@ -243,6 +247,7 @@ def write_runtime_config(env_path: str, settings: dict, mascope_path: str) -> No
         f"mask = {toml_str(settings['mask'])}",
         f"timeout = {settings['timeout']}",
         f"source = {toml_str(settings['source'])}",
+        f"recursive = {'true' if settings['recursive'] else 'false'}",
         f"host = {toml_str(settings['host'])}",
         f"access_token = {toml_str(settings['access_token'])}",
     ]
