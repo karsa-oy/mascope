@@ -70,6 +70,15 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 - `mascope logs query --max N` now returns the N *most recent* matching
   lines (still printed oldest-first) instead of the N oldest, matching the
   "show me the last N errors" intent.
+- The interactive API docs and OpenAPI schema (`/docs`, `/redoc`,
+  `/openapi.json`) are served in dev mode only (#1675). They were never
+  proxied to end users and only offered recon value on a directly
+  reachable backend.
+- `seed_demo` refuses to run unless `MASCOPE_ALLOW_DEMO_SEED` is set to a
+  truthy value, so the public demo credentials (a well-known
+  owner+superuser with fixed API tokens) can no longer be seeded into a
+  real deployment by accident (#1675). The demo compose stack and
+  `mascope demo` set the flag automatically.
 
 ### Fixed
 
@@ -98,6 +107,41 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   of being interpolated into the SQL.
 - The pretty log printout now decodes JSON escape sequences in messages
   (previously quotes inside messages rendered as `\"`).
+
+### Security
+
+- Temp-file downloads (`GET /api/temp/{name}`) are scoped to the
+  requesting user's own directory (#1675). Previously any authenticated
+  user could fetch any temp file - spreadsheet exports, peak CSVs,
+  download bundles - by guessing its name, which is derived from sample
+  and batch names; crafted filenames could also traverse outside the temp
+  directory. In-flight TUS uploads now live in their own `temp/tus/`
+  subdirectory, separate from the per-user download directories.
+- Socket.IO room subscriptions are authorized against the same workspace
+  read ACL as the REST API (#1675). Previously any authenticated user
+  could subscribe to an arbitrary room id and receive record-data
+  broadcasts for workspaces they are not a member of. `user-<id>`
+  channels are private to their user, global target collections stay
+  readable to any authenticated user, and unknown rooms are denied.
+- Login attempts are rate-limited per account in addition to per client
+  IP, blunting distributed password guessing against a single account
+  from rotating addresses (#1675). Only failed attempts count - a
+  successful login clears the account's counter - so bogus attempts
+  cannot lock the real user out; the Redis keys and log lines carry a
+  SHA-256 digest of the identifier, never the submitted string.
+- Password-reset and email-verification token secrets are derived per
+  deployment from the JWT secret instead of hardcoded constants, and the
+  raw reset/verification tokens are no longer written to the server log
+  (#1675).
+- `@api_route` now refuses at import time to register a non-public route
+  whose `user` parameter does not bind an auth dependency (either
+  `user=Depends(...)` or `Annotated[User, Depends(...)]`), closing a
+  footgun where such a route was silently unauthenticated (#1675).
+- The frontend ships a Content-Security-Policy in Report-Only mode
+  covering the SPA's actual needs (#1675). It blocks nothing yet: after
+  a browser QA pass (exercise a Plotly spectrum view and a live
+  Socket.IO connection with the console open), enforce it by renaming
+  the header in `server/frontend/nginx.conf` and `nginx.http.conf`.
 
 ## [1.4.6] - 2026.07.27
 
