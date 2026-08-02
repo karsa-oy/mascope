@@ -109,6 +109,19 @@ def test_success_returns_response(monkeypatch, upload_file):
 TUS_LOCATION = {"Location": "http://proxy.internal/api/sample/files/upload/tus/abc123"}
 
 
+@pytest.fixture(autouse=True)
+def tus_deletes(monkeypatch):
+    """Record (and neutralize) TUS DELETE calls made on abandoned uploads."""
+    calls: list[str] = []
+
+    def fake_delete(url, headers, verify, timeout):
+        calls.append(url)
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "delete", fake_delete)
+    return calls
+
+
 def _fake_create(captured: dict):
     def fake_post(url, headers, verify, timeout):
         captured.update(url=url, headers=headers)
@@ -184,7 +197,38 @@ def test_tus_upload_resumes_from_server_offset(monkeypatch, upload_file):
     assert chunks == [("3", b"raw-bytes"[3:])]
 
 
-def test_tus_upload_gives_up_after_max_attempts(monkeypatch, upload_file):
+def test_tus_upload_halves_chunk_size_on_connection_failures(monkeypatch, upload_file):
+    # A proxy cutting long requests on a slow uplink surfaces as repeated
+    # connection errors; the client must shrink chunks so uploads still
+    # make progress instead of retrying the same too-large chunk forever.
+    monkeypatch.setattr(_agents.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(_agents, "TUS_MIN_CHUNK_SIZE", 2)
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(
+        _agents.requests,
+        "head",
+        lambda *a, **k: _fake_response(200, headers={"Upload-Offset": "0"}),
+    )
+    attempts = {"n": 0}
+    chunks: list[bytes] = []
+
+    def fake_patch(url, data, headers, verify, timeout):
+        attempts["n"] += 1
+        if attempts["n"] <= 2:
+            raise requests.exceptions.ConnectionError("proxy cut the request")
+        chunks.append(bytes(data))
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    _agents.api_post_file_tus("http://testserver", "tok", upload_file, chunk_size=8)
+
+    # two failures halved 8 -> 4 -> 2; the reduced size sticks afterwards
+    assert [len(c) for c in chunks] == [2, 2, 2, 2, 1]
+    assert b"".join(chunks) == b"raw-bytes"
+
+
+def test_tus_upload_gives_up_after_max_attempts(monkeypatch, upload_file, tus_deletes):
     monkeypatch.setattr(_agents.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
     monkeypatch.setattr(_agents.requests, "head", lambda *a, **k: _fake_response(404))
@@ -200,6 +244,8 @@ def test_tus_upload_gives_up_after_max_attempts(monkeypatch, upload_file):
         _agents.api_post_file_tus("http://testserver", "tok", upload_file)
 
     assert attempts["n"] == _agents.TUS_MAX_ATTEMPTS
+    # the abandoned partial upload was removed from the server
+    assert tus_deletes == ["http://testserver/api/sample/files/upload/tus/abc123"]
 
 
 def test_tus_upload_does_not_retry_client_errors(monkeypatch, upload_file):
