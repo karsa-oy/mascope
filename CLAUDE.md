@@ -5,6 +5,10 @@ Vue 3 + PrimeVue frontend (`server/frontend`), shared Python libraries (`librari
 Typer CLI (`tooling/cli`, entry point `mascope`). Postgres + Redis run via docker
 compose. See `docs/dev/developer_guide.md` for the full picture.
 
+The repository is **public** (github.com/karsa-oy/mascope, Apache-2.0) - do not
+assume it is private. Linking end users to GitHub files, raw URLs, or the issue
+tracker is fine.
+
 ## Running your own instance (agents in worktrees)
 
 Several worktrees on one machine can each run the full app at once against a
