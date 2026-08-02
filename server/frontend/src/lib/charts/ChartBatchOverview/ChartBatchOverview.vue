@@ -2,6 +2,7 @@
 import { ref, computed, watch, toRaw, nextTick, onUnmounted } from 'vue'
 
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import FloatLabel from 'primevue/floatlabel'
 import ProgressSpinner from 'primevue/progressspinner'
 
@@ -24,6 +25,14 @@ const scale = ref({
   max: null,
   log: true
 })
+
+// Trace draw style; plotly mode strings, selectable in the settings menu
+const drawModes = [
+  { label: 'Markers', value: 'markers' },
+  { label: 'Lines', value: 'lines' },
+  { label: 'Both', value: 'lines+markers' }
+]
+const drawMode = ref('markers')
 
 const chartTitle = computed(() => {
   const batchName = app.data.batch?.focused?.sample_batch_name || null
@@ -60,6 +69,10 @@ const traces = computed(() => {
 
   return data.traces.map((trace) => ({
     ...toRaw(trace),
+    mode: drawMode.value,
+    // The store colors traces via marker.color only; without an explicit line
+    // color plotly would pick unrelated colorway colors for the line segments
+    ...(drawMode.value !== 'markers' ? { line: { color: trace.marker.color, width: 1 } } : {}),
     customdata,
     // In "sum" mode multiply intensity rates by sample length to get counts
     y: average
@@ -298,6 +311,17 @@ onUnmounted(() => {
     >
       <template v-slot:settings>
         <ToolbarIntensityScale v-model="scale" />
+        <div style="height: 0.5rem" />
+        <div class="row">
+          <span>Draw style</span>
+          <SelectButton
+            v-model="drawMode"
+            :options="drawModes"
+            optionLabel="label"
+            optionValue="value"
+            :allowEmpty="false"
+          />
+        </div>
         <div style="height: 0.5rem" />
         <FloatLabel>
           <Select
