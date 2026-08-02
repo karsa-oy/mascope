@@ -139,6 +139,37 @@ export const useChartData = defineStore('chart.batch.overview', () => {
   }
 
   /**
+   * Reload the series of all currently selected ions for the focused batch,
+   * replacing the record set. A response that comes back after the focused
+   * batch changed again is discarded (the reload triggered by that later
+   * change owns the record set).
+   */
+  const reloadSelectedIons = async () => {
+    const batchId = app.data.batch.focusedId
+    const targetIonIds = app.data.match.ion.selectedIds
+    if (targetIonIds.length === 0) {
+      records.value = []
+      return
+    }
+
+    pending.value = true
+    const chunkSize = 100 // How many ions to load per request
+    let reloaded = []
+    try {
+      for (let i = 0; i < targetIonIds.length; i += chunkSize) {
+        const chunk = targetIonIds.slice(i, i + chunkSize)
+        const newRecords = await fetchMatchSeries(chunk)
+        reloaded = reloaded.concat(newRecords)
+      }
+    } finally {
+      pending.value = false
+    }
+    if (app.data.batch.focusedId !== batchId) return
+    console.debug(`🔄 [chart.batch.overview] reloaded series for ${reloaded.length} ions`)
+    records.value = reloaded
+  }
+
+  /**
    * Handle batch match (re)creation.
    *
    * A batch rematch creates every sample's matches in one burst and emits a
@@ -155,23 +186,7 @@ export const useChartData = defineStore('chart.batch.overview', () => {
     ) {
       return
     }
-    const targetIonIds = app.data.match.ion.selectedIds
-    if (targetIonIds.length === 0) {
-      records.value = []
-      return
-    }
-
-    pending.value = true
-    const chunkSize = 100 // How many ions to load per request
-    let reloaded = []
-    for (let i = 0; i < targetIonIds.length; i += chunkSize) {
-      const chunk = targetIonIds.slice(i, i + chunkSize)
-      const newRecords = await fetchMatchSeries(chunk)
-      reloaded = reloaded.concat(newRecords)
-    }
-    console.debug(`🔄 [chart.batch.overview] reloaded series for ${reloaded.length} ions`)
-    records.value = reloaded
-    pending.value = false
+    await reloadSelectedIons()
   }
 
   /**
@@ -203,16 +218,21 @@ export const useChartData = defineStore('chart.batch.overview', () => {
 
   const resetChart = ref(0) // Reactive trigger for chart reset
 
-  // Watch for batch change - clear records and trigger chart reset
+  // Watch for batch change - clear records, trigger chart reset, and reload.
+  // When the new batch shares the target collection, the ion selection is
+  // restored with the same ids after the ion list reloads, so the selection
+  // watcher sees no newly selected ions and never refetches — the reload has
+  // to happen here.
   watch(
     () => app.data.batch.focusedId,
-    (batchId, oldBatchId) => {
+    async (batchId, oldBatchId) => {
       if (batchId !== oldBatchId) {
         console.debug(
-          '🔄 [chart.batch.overview] batch changed - clearing records and resetting chart'
+          '🔄 [chart.batch.overview] batch changed - reloading records and resetting chart'
         )
         records.value = []
         resetChart.value++ // Trigger chart reset
+        await reloadSelectedIons()
       }
     }
   )
