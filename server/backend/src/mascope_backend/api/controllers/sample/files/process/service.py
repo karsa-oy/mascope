@@ -7,6 +7,8 @@ Handles automated creation of ACQUISITION datasets, batches, and sample items, a
 import asyncio
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
 from mascope_backend.api.controllers.calibration.calibration_controller import (
     calibration_mz_calibrate_sample,
@@ -98,6 +100,52 @@ def _observe_background_task(task: asyncio.Task) -> None:
 _AUTO_PROCESS_CONCURRENCY = 3
 _auto_process_gate = asyncio.Semaphore(_AUTO_PROCESS_CONCURRENCY)
 
+# Auto-processing runs as a fire-and-forget background task, so a failed
+# pipeline has no caller to retry it and the file is silently lost (converted
+# but never producing sample items). Transient infrastructure congestion -
+# pool starvation in this worker (SQLAlchemy timeout / 503) or a briefly
+# unreachable dependency (502/504) - is retried with growing delays; anything
+# else (validation errors, missing records, data corruption) would fail
+# identically on every attempt and is raised immediately.
+_AUTO_PROCESS_RETRIES = 3
+_AUTO_PROCESS_RETRY_DELAYS_S = (30, 60, 120)
+_RECOVERABLE_STATUS_CODES = {502, 503, 504}
+
+
+def _is_recoverable_error(exc: Exception) -> bool:
+    """Whether a failed auto-process attempt is worth retrying.
+
+    Nested controllers wrap pool starvation into ApiException 503 (and
+    dependency outages into 502/504); database errors from direct session use
+    in this module can still surface unwrapped.
+    """
+    if isinstance(exc, ApiException):
+        return exc.status_code in _RECOVERABLE_STATUS_CODES
+    return isinstance(exc, (SQLAlchemyTimeoutError, OperationalError, InterfaceError))
+
+
+async def _delete_partial_acquisition_items(sample_file_id: str) -> None:
+    """Delete ACQUISITION sample items a failed pipeline attempt left behind.
+
+    Sample items are committed independently before calibration + matching,
+    so a pipeline that failed later leaves them in place and a retry would
+    create duplicates. Only ACQUISITION items are removed - user-created
+    samples referencing the file are never touched.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            delete(SampleItem).where(
+                SampleItem.sample_file_id == sample_file_id,
+                SampleItem.sample_item_type == "ACQUISITION",
+            )
+        )
+        await session.commit()
+    if result.rowcount:
+        runtime.logger.info(
+            f"Removed {result.rowcount} partial ACQUISITION sample item(s) "
+            f"for sample file {sample_file_id} before retrying"
+        )
+
 
 async def _rematch_when_slot_free(**kwargs) -> dict:
     """
@@ -156,14 +204,32 @@ async def auto_process_sample_file(
     :type parent_id: str | None, optional
     :return: Processing results with affected IDs
     """
-    async with _auto_process_gate:
-        return await _auto_process_sample_file(
-            sample_file_id=sample_file_id,
-            independent_transaction=independent_transaction,
-            user_id=user_id,
-            process_id=process_id,
-            parent_id=parent_id,
-        )
+    for attempt in range(_AUTO_PROCESS_RETRIES + 1):
+        try:
+            async with _auto_process_gate:
+                if attempt:
+                    # A failed attempt may have committed sample items before
+                    # dying in calibration/matching; remove them so the retry
+                    # cannot create duplicates.
+                    await _delete_partial_acquisition_items(sample_file_id)
+                return await _auto_process_sample_file(
+                    sample_file_id=sample_file_id,
+                    independent_transaction=independent_transaction,
+                    user_id=user_id,
+                    process_id=process_id,
+                    parent_id=parent_id,
+                )
+        except Exception as e:
+            if attempt >= _AUTO_PROCESS_RETRIES or not _is_recoverable_error(e):
+                raise
+            delay = _AUTO_PROCESS_RETRY_DELAYS_S[attempt]
+            runtime.logger.warning(
+                f"Auto-processing attempt {attempt + 1} for sample file "
+                f"{sample_file_id} hit a recoverable error ({e}); retrying "
+                f"in {delay}s"
+            )
+            # Sleep outside the gate so a waiting pipeline can use the slot.
+            await asyncio.sleep(delay)
 
 
 async def _auto_process_sample_file(
