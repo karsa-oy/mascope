@@ -2,6 +2,11 @@
 
 Python SDK for the Mascope mass spectrometry data analysis platform. Designed for researchers who want to load and analyze data from a Mascope server in Jupyter notebooks or Python scripts, or export it to use in other environments.
 
+> **New to Python?** The user docs include a step-by-step
+> [getting started guide](../../docs/user/sdk/getting-started.md) that walks
+> you from installing an editor to running your first tutorial notebook. It is
+> also available on any Mascope instance under `/docs/sdk/getting-started/`.
+
 ## Contents
 
 - [Installation](#installation)

@@ -91,5 +91,7 @@ nav:
       - Import data files: guides/import-files.md
       - Target collections & matching: guides/target-collections.md
   - Instruments & acquisition: instruments/index.md
-  - SDK & API: sdk/index.md
+  - SDK & API:
+      - Overview: sdk/index.md
+      - Getting started with Python: sdk/getting-started.md
   - Reference: reference/index.md
