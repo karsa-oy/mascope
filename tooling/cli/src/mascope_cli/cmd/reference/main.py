@@ -14,12 +14,13 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
-from sqlalchemy import create_engine, select
+from rich.text import Text
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.pool import NullPool
 
 from mascope_cli.runtime import runtime
 from mascope_reference import available_sources, get_adapter, ingest
-from mascope_reference.ingest import DEFAULT_BATCH_SIZE
+from mascope_reference.ingest import DEFAULT_BATCH_SIZE, EmptyIngest
 from mascope_reference.schema import reference_source
 
 
@@ -107,7 +108,18 @@ def sync(
         bool,
         typer.Option(
             "--stage",
-            help="Ingest without activating (does not replace the current version).",
+            help=(
+                "Ingest without activating (does not replace the current "
+                "version). Expose it later with 'reference activate'."
+            ),
+        ),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Do not ask for confirmation (for non-interactive use).",
         ),
     ] = False,
 ) -> None:
@@ -117,6 +129,18 @@ def sync(
     except KeyError as error:
         runtime.logger.error(str(error))
         raise typer.Exit(1) from None
+
+    # An activating sync replaces whatever is currently serving annotations, and
+    # --prune destroys the load it replaces. Staging changes nothing visible, so
+    # it needs no confirmation.
+    if not stage and not yes:
+        target = name or source
+        consequence = (
+            f"replace the active version of '{target}' and DELETE its prior loads"
+            if prune
+            else f"replace the active version of '{target}'"
+        )
+        typer.confirm(f"This will {consequence}. Continue?", abort=True)
 
     engine = _sync_engine()
     runtime.logger.info(
@@ -138,6 +162,11 @@ def sync(
             prune=prune,
             progress=_progress,
         )
+    except EmptyIngest as error:
+        # The mirror is untouched - report why rather than leaving the operator to
+        # discover an empty source later.
+        runtime.logger.error(str(error))
+        raise typer.Exit(1) from None
     finally:
         engine.dispose()
 
@@ -148,8 +177,80 @@ def sync(
     )
     if stage:
         runtime.logger.info(
-            "Load staged (inactive). Activation replaces the current version."
+            f"Load staged (inactive). Expose it with: mascope reference activate "
+            f"{result.source} --version {result.version}"
         )
+
+
+@reference_app.command()
+def activate(
+    source: Annotated[
+        str,
+        typer.Argument(help="Provenance name of the source, as shown by 'status'."),
+    ],
+    version: Annotated[
+        str,
+        typer.Option("--version", "-v", help="Version tag of the load to activate."),
+    ],
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Do not ask for confirmation."),
+    ] = False,
+) -> None:
+    """Make a staged load the active version of its source.
+
+    The counterpart to ``sync --stage``: without it a staged load can only be
+    exposed by re-running the whole ingest without ``--stage``.
+    """
+    if not yes:
+        typer.confirm(
+            f"This will replace the active version of '{source}' with "
+            f"'{version}'. Continue?",
+            abort=True,
+        )
+
+    engine = _sync_engine()
+    try:
+        with engine.begin() as conn:
+            target = conn.execute(
+                select(
+                    reference_source.c.reference_source_id,
+                    reference_source.c.record_count,
+                )
+                .where(reference_source.c.name == source)
+                .where(reference_source.c.version == version)
+            ).first()
+            if target is None:
+                runtime.logger.error(
+                    f"No load found for source '{source}' version '{version}'. "
+                    "Run 'mascope reference status' to see what is loaded."
+                )
+                raise typer.Exit(1)
+            source_id, record_count = target
+            if not record_count:
+                runtime.logger.error(
+                    f"Load '{source}' version '{version}' has no records; "
+                    "activating it would remove every annotation the current "
+                    "version provides."
+                )
+                raise typer.Exit(1)
+            conn.execute(
+                update(reference_source)
+                .where(reference_source.c.name == source)
+                .where(reference_source.c.reference_source_id != source_id)
+                .values(is_active=False)
+            )
+            conn.execute(
+                update(reference_source)
+                .where(reference_source.c.reference_source_id == source_id)
+                .values(is_active=True)
+            )
+    finally:
+        engine.dispose()
+
+    runtime.logger.success(
+        f"Activated '{source}' version '{version}' ({record_count:,} records)."
+    )
 
 
 @reference_app.command()
@@ -185,12 +286,15 @@ def status() -> None:
     table.add_column("Active")
     table.add_column("Ingested (UTC)")
     for name, version, lic, count, is_active, ingested_at in rows:
+        # Wrapped in Text because these come from the database: Rich would parse
+        # square brackets in them as console markup and swallow them, so a source
+        # named with --name riva2019[hom] would be reported as 'riva2019'.
         table.add_row(
-            name,
-            version,
-            lic,
+            Text(name),
+            Text(version),
+            Text(lic or ""),
             f"{count:,}",
             "[green]yes[/green]" if is_active else "no",
-            str(ingested_at),
+            Text(str(ingested_at)),
         )
     console.print(table)
