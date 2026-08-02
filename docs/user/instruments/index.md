@@ -39,7 +39,9 @@ uploads them to your Mascope server automatically.
    token generated under **API Access Tokens**.)
 
 4. Finally the setup asks for the **folder to watch** for new data files
-   and the **file pattern** to upload (default `*.raw`).
+   (any folder on the PC — where the agent is installed does not matter),
+   whether to **also watch its subfolders**, and the **file pattern** to
+   upload (default `*.raw`).
 
 The setup checks the server connection and the token immediately, so a typo
 is caught before any data acquisition depends on it. After setup completes,
@@ -64,17 +66,32 @@ All settings live in one file on the instrument PC:
 | `host`            | Mascope server address, e.g. `mascope.example.com`                 |
 | `access_token`    | API access token (filled automatically when pairing)               |
 | `source`          | Full path of the folder watched for new data files                 |
+| `recursive`       | `true` to also watch subfolders of `source` (default `false`)      |
 | `mask`            | Pattern of the files to upload, e.g. `*.raw`                       |
 | `timeout`         | Seconds a file must be idle before it is uploaded                  |
 | `filename_prefix` | Optional prefix added to the filename on upload                    |
 | `filename_suffix` | Optional suffix added to the filename on upload (before extension) |
 
-Restart the agent after editing the file. Alternatively, run the guided setup
-again by starting the agent with the `--setup` flag:
+Restart the agent after editing the file (close its console window, then
+start it again from the Start Menu). Alternatively, run the guided setup
+again — it walks through all the settings above, offering the current
+values as defaults — by starting the agent with the `--setup` flag from a
+terminal:
 
 ```
-Mascope-File-Agent.exe --setup
+%LocalAppData%\Programs\Mascope File Agent\Mascope-File-Agent.exe --setup
 ```
+
+### Stopping or disabling the agent
+
+- **Stop until the next sign-in**: close the agent's console window.
+- **Stop starting automatically**: open Task Manager → **Startup apps**,
+  right-click **Mascope File Agent** and choose **Disable** (enable it
+  again the same way). This keeps the agent installed and configured; you
+  can still start it manually from the Start Menu.
+- **Remove it completely**: uninstall via Windows **Settings → Apps**.
+  Your configuration is kept, so reinstalling later picks up where you
+  left off.
 
 ### Upgrading
 
@@ -89,7 +106,9 @@ The agent prints its version when it starts, and uninstalling (Windows
 - Logs are written to `%APPDATA%\Mascope\FileAgent\logs\prod\`.
 - If an upload keeps failing, the file is copied to a `failed_uploads`
   subfolder inside the watched folder. After fixing the cause (network,
-  token), copy the file back into the watched folder to retry.
+  token), copy the file back into the watched folder to retry. The
+  `failed_uploads` folder itself is never watched, even with `recursive`
+  enabled.
 - *"The server rejected the access token"*: re-run the agent with
   `--setup` and pair it again (or generate a new **File Agent** token in
   the web app and update `access_token` in the configuration). Note that
