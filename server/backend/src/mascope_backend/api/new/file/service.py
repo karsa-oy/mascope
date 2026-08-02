@@ -9,6 +9,7 @@ from mascope_backend.api.lib.exceptions.api_exceptions import (
     NotFoundException,
     raise_api_warning,
 )
+from mascope_backend.api.new.temp.storage import user_temp_path
 from mascope_backend.db import SampleFile, async_session
 from mascope_backend.runtime import runtime
 from mascope_file.name import get_instrument_type, parse_path_from_item_filename
@@ -68,10 +69,10 @@ async def download_files(
     found = []
     download = None
     if len(sample_files) > 1:
-        # create a download folder using a datetime stamp
+        # create a download folder using a datetime stamp, scoped to the user
         datetime_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
         dirname = f"sample_files_{datetime_stamp}"
-        download_dir = runtime.env.path("temp", dirname)
+        download_dir = user_temp_path(user_id, dirname)
         os.mkdir(download_dir)
         # copy available files to the folder
         for sample_file in sample_files:
@@ -92,7 +93,7 @@ async def download_files(
         # zip the folder and set the zip as the download path
         if len(found) > 0:
             download = f"{dirname}.zip"
-            zipfile_path = runtime.env.path("temp", dirname)
+            zipfile_path = user_temp_path(user_id, dirname)
             shutil.make_archive(zipfile_path, "zip", download_dir)
     else:
         # derive sample file path
@@ -104,7 +105,7 @@ async def download_files(
         # copy the sample file to the temp folder
         if os.path.exists(from_path):
             download = f"{sample_file.filename}.{extension}"
-            to_path = runtime.env.path("temp", download)
+            to_path = user_temp_path(user_id, download)
             if os.path.exists(to_path):
                 os.remove(to_path)
             shutil.copy(from_path, to_path)

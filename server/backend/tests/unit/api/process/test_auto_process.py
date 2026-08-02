@@ -514,6 +514,110 @@ async def test_return_structure():
 
 
 @pytest.mark.asyncio
+async def test_retries_recoverable_error_then_succeeds():
+    """A 503 (pool starvation) attempt is retried and the retry's result returned."""
+    from mascope_backend.api.controllers.sample.files.process import service
+    from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
+
+    ok = {"message": "done", "_notification_data": {}}
+    body = AsyncMock(
+        side_effect=[ApiException("busy", {}, 503), ok],
+    )
+    cleanup = AsyncMock()
+
+    with (
+        patch(f"{_SVC}._auto_process_sample_file", new=body),
+        patch(f"{_SVC}._delete_partial_acquisition_items", new=cleanup),
+        patch.object(service, "_AUTO_PROCESS_RETRY_DELAYS_S", (0, 0, 0)),
+        patch(f"{_NOTIF}.handle_notifications", new_callable=AsyncMock),
+        patch(f"{_UTILS}.handle_reloads", new_callable=AsyncMock),
+    ):
+        result = await service.auto_process_sample_file(
+            sample_file_id="sf-retry", independent_transaction=True
+        )
+
+    assert result == ok
+    assert body.call_count == 2
+    # Partial sample items are cleaned up before the retry, not the first try.
+    cleanup.assert_called_once_with("sf-retry")
+
+
+@pytest.mark.asyncio
+async def test_retries_raw_pool_timeout():
+    """An unwrapped SQLAlchemy pool timeout is recoverable too."""
+    from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
+
+    from mascope_backend.api.controllers.sample.files.process import service
+
+    ok = {"message": "done", "_notification_data": {}}
+    body = AsyncMock(side_effect=[SQLAlchemyTimeoutError("pool timeout"), ok])
+
+    with (
+        patch(f"{_SVC}._auto_process_sample_file", new=body),
+        patch(f"{_SVC}._delete_partial_acquisition_items", new=AsyncMock()),
+        patch.object(service, "_AUTO_PROCESS_RETRY_DELAYS_S", (0, 0, 0)),
+        patch(f"{_NOTIF}.handle_notifications", new_callable=AsyncMock),
+        patch(f"{_UTILS}.handle_reloads", new_callable=AsyncMock),
+    ):
+        result = await service.auto_process_sample_file(
+            sample_file_id="sf-timeout", independent_transaction=True
+        )
+
+    assert result == ok
+    assert body.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_does_not_retry_non_recoverable_error():
+    """A 400 (e.g. data corruption) fails immediately - retrying cannot help."""
+    from mascope_backend.api.controllers.sample.files.process import service
+    from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
+
+    body = AsyncMock(side_effect=ApiException("corrupt", {}, 400))
+    cleanup = AsyncMock()
+
+    with (
+        patch(f"{_SVC}._auto_process_sample_file", new=body),
+        patch(f"{_SVC}._delete_partial_acquisition_items", new=cleanup),
+        patch.object(service, "_AUTO_PROCESS_RETRY_DELAYS_S", (0, 0, 0)),
+        patch(f"{_NOTIF}.handle_notifications", new_callable=AsyncMock),
+        patch(f"{_UTILS}.handle_reloads", new_callable=AsyncMock),
+    ):
+        with pytest.raises(ApiException) as excinfo:
+            await service.auto_process_sample_file(
+                sample_file_id="sf-bad", independent_transaction=False
+            )
+
+    assert excinfo.value.status_code == 400
+    assert body.call_count == 1
+    cleanup.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_gives_up_after_max_retries():
+    """Persistent congestion stops after _AUTO_PROCESS_RETRIES retries."""
+    from mascope_backend.api.controllers.sample.files.process import service
+    from mascope_backend.api.lib.exceptions.api_exceptions import ApiException
+
+    body = AsyncMock(side_effect=ApiException("busy", {}, 503))
+
+    with (
+        patch(f"{_SVC}._auto_process_sample_file", new=body),
+        patch(f"{_SVC}._delete_partial_acquisition_items", new=AsyncMock()),
+        patch.object(service, "_AUTO_PROCESS_RETRY_DELAYS_S", (0, 0, 0)),
+        patch(f"{_NOTIF}.handle_notifications", new_callable=AsyncMock),
+        patch(f"{_UTILS}.handle_reloads", new_callable=AsyncMock),
+    ):
+        with pytest.raises(ApiException) as excinfo:
+            await service.auto_process_sample_file(
+                sample_file_id="sf-stuck", independent_transaction=False
+            )
+
+    assert excinfo.value.status_code == 503
+    assert body.call_count == service._AUTO_PROCESS_RETRIES + 1
+
+
+@pytest.mark.asyncio
 async def test_concurrent_pipelines_are_bounded():
     """
     A burst of auto-process calls runs at most _AUTO_PROCESS_CONCURRENCY

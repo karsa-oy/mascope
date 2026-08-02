@@ -4,6 +4,170 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.5.0] - 2026.08.02
+
+### Added
+
+- The File Agent now uploads with the resumable TUS protocol - the same
+  endpoint the web app uses - removing the 100 MB upload size limit.
+  Files travel in 50 MB chunks (staying under reverse-proxy body
+  limits), and an interrupted transfer resumes from the last
+  server-confirmed byte instead of restarting. The backend's TUS routes
+  now accept agent access tokens for this. Already-deployed agents are
+  unaffected: the legacy single-request endpoint (capped at 100 MB)
+  stays in place, so older File Agent and TOF Agent installations keep
+  uploading as before - upgrading the agent is what lifts the size
+  limit. (A new agent pointed at a not-yet-updated server likewise
+  falls back to the legacy endpoint automatically.)
+
+- File Agent uploads adapt to unreliable upload paths: a chunk that
+  repeatedly dies mid-transfer is halved (50 -> 25 -> ... -> 5 MB)
+  before resuming. Verified against a real Cloudflare tunnel, where a
+  tuspyserver 4.1.3 server aborts PATCH bodies over ~25 MB (see the
+  upgrade below) - the halving lets a new agent keep uploading through
+  Cloudflare even against a not-yet-upgraded server, and guards
+  against genuine proxy body caps in general. An abandoned upload now
+  also deletes its partial data from the server instead of leaving it
+  there until the next restart.
+
+- `tuspyserver` upgraded 4.1.3 -> 4.2.0: fixes uploads behind
+  Cloudflare, where 4.1.3 aborted PATCH request bodies over ~25 MB
+  (A/B-verified through a real Cloudflare tunnel: 30-40 MB chunks fail
+  on 4.1.3 and pass on 4.2.0), and picks up the upstream fix for the
+  upload-breaking `file_dep` regression (issue #1159) plus
+  offset/resume handling improvements. Newer versions stay blocked:
+  4.2.1 ships a path traversal fixed only later, and 4.2.2+ cannot
+  import on Windows (unconditional `fcntl`), which would break native
+  dev runs. Web-app uploads now use 20 MiB chunks instead of the 5 MiB
+  that worked around the 4.1.3 bug, cutting per-request overhead 4x on
+  multi-GB files.
+
+- The File Agent can now watch subfolders of the watched folder: answer
+  yes to the new "Also watch subfolders?" question in the guided setup, or
+  set `recursive = true` in its `config.toml`. The agent's own
+  `failed_uploads` folder is always excluded, so failed files are never
+  re-uploaded in a loop. The installer's finish page now also explains
+  that the watched folder is chosen in the guided setup on first start,
+  and the user docs cover disabling or removing the agent.
+
+- `mascope fleet` (source checkouts only): `fleet list` shows the production
+  servers from the fleet's Ansible inventory, and `fleet logs <host> ...`
+  runs `mascope logs query --prod` on that server over SSH (tailnet),
+  passing all query flags through — one command for agents and scripts to
+  pull filtered production logs, with the inventory as the single source of
+  truth for addresses and credentials.
+- `mascope logs query` is now agent/script-friendly: `--json` prints the raw
+  NDJSON records (no ANSI colors, no summary line), and `--service`/`-s`
+  narrows the query to one service's log files (e.g. `-s backend`).
+- Opt-in backend performance tracing: with the GlitchTip DSN set,
+  `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
+  requests as transactions, surfacing per-endpoint latency in GlitchTip's
+  Performance tab. Invalid values log a warning and keep tracing off.
+- The user documentation is now built into every deployment and served at
+  `/docs/` on the app's own origin, and the in-app help cards link to the
+  relevant page. The docs gained first-steps orientation, concepts and
+  data-hierarchy pages, guides for file import and matching, and a Python
+  SDK getting-started guide.
+- The batch overview chart has a draw style setting (Markers / Lines /
+  Both) in its chart settings menu; line modes keep each series' assigned
+  color instead of falling back to the default colorway.
+
+### Changed
+
+- The "Download File Agent installer" button in the sidebar's Settings tab
+  is now always visible to editors, like the "Pair an agent" button,
+  instead of appearing only while "File Agent" is the selected token type.
+- `mascope logs query --max N` now returns the N *most recent* matching
+  lines (still printed oldest-first) instead of the N oldest, matching the
+  "show me the last N errors" intent.
+- The interactive API docs and OpenAPI schema (`/docs`, `/redoc`,
+  `/openapi.json`) are served in dev mode only (#1675). They were never
+  proxied to end users and only offered recon value on a directly
+  reachable backend.
+- `seed_demo` refuses to run unless `MASCOPE_ALLOW_DEMO_SEED` is set to a
+  truthy value, so the public demo credentials (a well-known
+  owner+superuser with fixed API tokens) can no longer be seeded into a
+  real deployment by accident (#1675). The demo compose stack and
+  `mascope demo` set the flag automatically.
+
+### Fixed
+
+- The file converter no longer floods the logs (and GlitchTip, when error
+  reporting is on) with `ConnectionError` events while the backend is still
+  starting up. It now waits for the backend quietly - retrying with backoff
+  and logging each attempt at INFO - and starts its watcher and worker
+  threads only after the socket is connected, which also removes the
+  startup `BadNamespaceError` emit failures. A single WARNING fires if the
+  backend stays unreachable for over two minutes, so a genuinely down
+  backend still surfaces as one monitored event.
+- Two `mascope` commands starting at the same moment no longer crash with
+  `json.JSONDecodeError: Expecting value`. Every invocation rewrites
+  `.runtime/state.json` during startup (the entrypoint clears the env
+  override), and the write truncated the file in place, so a concurrent
+  reader could parse an empty or half-written file - a backup cron and a
+  monitoring cron firing the same second was enough. Runtime state is now
+  written to a temp file and moved into place atomically, so a reader sees
+  either the old file or the new one; an unreadable file is retried once and
+  then falls back to defaults with a warning instead of raising. The
+  auto-update state file is written atomically for the same reason: a
+  partial read there is reported as "nothing pending", which would silently
+  hide a pending migration.
+- `mascope logs query --grep` no longer crashes on patterns containing
+  quotes; user-provided filter values are bound as query parameters instead
+  of being interpolated into the SQL.
+- The pretty log printout now decodes JSON escape sequences in messages
+  (previously quotes inside messages rendered as `\"`).
+- Concurrent auto-processing can no longer create duplicate ACQUISITION
+  year-datasets - a race that, once hit, made every subsequent file of
+  that instrument/year fail with `MultipleResultsFound`. The natural key
+  is now enforced with a partial unique index; the migration first merges
+  existing duplicates by repointing their sample batches to the oldest
+  dataset, and the get-or-create recovers from the constraint violation
+  instead of racing.
+- A transient infrastructure error (backend 502/503/504, database pool
+  timeout) no longer permanently drops a file from auto-processing. Such
+  failures are retried with growing delays, and the partial results of
+  the failed attempt are cleaned up before each retry so a rerun cannot
+  duplicate sample items.
+- Switching batches no longer leaves the batch overview chart empty when
+  the new batch shares the focused target collection with the previous
+  one.
+
+### Security
+
+- Temp-file downloads (`GET /api/temp/{name}`) are scoped to the
+  requesting user's own directory (#1675). Previously any authenticated
+  user could fetch any temp file - spreadsheet exports, peak CSVs,
+  download bundles - by guessing its name, which is derived from sample
+  and batch names; crafted filenames could also traverse outside the temp
+  directory. In-flight TUS uploads now live in their own `temp/tus/`
+  subdirectory, separate from the per-user download directories.
+- Socket.IO room subscriptions are authorized against the same workspace
+  read ACL as the REST API (#1675). Previously any authenticated user
+  could subscribe to an arbitrary room id and receive record-data
+  broadcasts for workspaces they are not a member of. `user-<id>`
+  channels are private to their user, global target collections stay
+  readable to any authenticated user, and unknown rooms are denied.
+- Login attempts are rate-limited per account in addition to per client
+  IP, blunting distributed password guessing against a single account
+  from rotating addresses (#1675). Only failed attempts count - a
+  successful login clears the account's counter - so bogus attempts
+  cannot lock the real user out; the Redis keys and log lines carry a
+  SHA-256 digest of the identifier, never the submitted string.
+- Password-reset and email-verification token secrets are derived per
+  deployment from the JWT secret instead of hardcoded constants, and the
+  raw reset/verification tokens are no longer written to the server log
+  (#1675).
+- `@api_route` now refuses at import time to register a non-public route
+  whose `user` parameter does not bind an auth dependency (either
+  `user=Depends(...)` or `Annotated[User, Depends(...)]`), closing a
+  footgun where such a route was silently unauthenticated (#1675).
+- The frontend ships a Content-Security-Policy in Report-Only mode
+  covering the SPA's actual needs (#1675). It blocks nothing yet: after
+  a browser QA pass (exercise a Plotly spectrum view and a live
+  Socket.IO connection with the console open), enforce it by renaming
+  the header in `server/frontend/nginx.conf` and `nginx.http.conf`.
+
 ## [1.4.6] - 2026.07.27
 
 ### Fixed

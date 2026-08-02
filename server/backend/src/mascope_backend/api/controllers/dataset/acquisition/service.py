@@ -132,6 +132,54 @@ async def _ensure_instrument_workspace(
     return ws_id
 
 
+async def _find_acquisition_dataset(
+    instrument: str, year_str: str, workspace_id: str
+) -> Dataset | None:
+    """Look up the ACQUISITION year-dataset for an instrument workspace.
+
+    Duplicate-tolerant: databases that predate
+    ``uq_dataset_acquisition_natural_key`` can hold duplicate year-datasets
+    from get-or-create races; return the oldest so every caller converges on
+    one dataset instead of failing with MultipleResultsFound (the migration
+    merges such duplicates permanently).
+
+    :param instrument: Instrument name
+    :param year_str: Dataset name (calendar year as string)
+    :param workspace_id: The instrument's system workspace
+    :return: The matching dataset, or None
+    """
+    async with async_session() as session:
+        datasets = (
+            (
+                await session.execute(
+                    select(Dataset)
+                    .join(Workspace, Workspace.workspace_id == Dataset.workspace_id)
+                    .where(
+                        Dataset.dataset_type == "ACQUISITION",
+                        Dataset.instrument == instrument,
+                        Dataset.dataset_name == year_str,
+                        Dataset.workspace_id == workspace_id,
+                        Workspace.is_system.is_(True),
+                    )
+                    .order_by(
+                        Dataset.dataset_utc_created.asc().nulls_last(),
+                        Dataset.dataset_id.asc(),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    if len(datasets) > 1:
+        # Recovered data anomaly: worth one grouped warning issue
+        runtime.logger.warning(
+            f"{len(datasets)} duplicate ACQUISITION datasets found for "
+            f"{instrument}/{year_str}, using the oldest"
+        )
+    return datasets[0] if datasets else None
+
+
 @api_controller()
 async def get_acquisition_dataset(
     instrument: str,
@@ -161,20 +209,9 @@ async def get_acquisition_dataset(
     # --- Try to find existing year-dataset in the system workspace ---
     workspace_id = await _ensure_instrument_workspace(instrument, owner_user_id=user_id)
 
-    async with async_session() as session:
-        dataset = (
-            await session.execute(
-                select(Dataset)
-                .join(Workspace, Workspace.workspace_id == Dataset.workspace_id)
-                .where(
-                    Dataset.dataset_type == "ACQUISITION",
-                    Dataset.instrument == instrument,
-                    Dataset.dataset_name == year_str,
-                    Dataset.workspace_id == workspace_id,
-                    Workspace.is_system.is_(True),
-                )
-            )
-        ).scalar_one_or_none()
+    dataset = await _find_acquisition_dataset(
+        instrument=instrument, year_str=year_str, workspace_id=workspace_id
+    )
 
     if dataset is not None:
         runtime.logger.debug(
@@ -185,19 +222,38 @@ async def get_acquisition_dataset(
             "data": DatasetRead.model_validate(dataset).model_dump(),
         }
 
-    async with async_session() as session:
-        new_dataset = Dataset(
-            dataset_id=gen_id(16),
-            workspace_id=workspace_id,
-            dataset_name=year_str,
-            dataset_description=f"{year} acquisitions for {instrument}",
-            dataset_type="ACQUISITION",
-            instrument=instrument,
-            locked=1 if dataset_config.ACQUISITION_AUTO_LOCK else 0,
-            dataset_utc_created=datetime.now(timezone.utc),
+    try:
+        async with async_session() as session:
+            new_dataset = Dataset(
+                dataset_id=gen_id(16),
+                workspace_id=workspace_id,
+                dataset_name=year_str,
+                dataset_description=f"{year} acquisitions for {instrument}",
+                dataset_type="ACQUISITION",
+                instrument=instrument,
+                locked=1 if dataset_config.ACQUISITION_AUTO_LOCK else 0,
+                dataset_utc_created=datetime.now(timezone.utc),
+            )
+            session.add(new_dataset)
+            await session.commit()
+    except IntegrityError:
+        # Another worker created the year-dataset concurrently
+        # (uq_dataset_acquisition_natural_key) - fetch and use its row.
+        dataset = await _find_acquisition_dataset(
+            instrument=instrument, year_str=year_str, workspace_id=workspace_id
         )
-        session.add(new_dataset)
-        await session.commit()
+        if dataset is None:
+            # Not the natural-key collision (e.g. a foreign-key violation) -
+            # surface the original IntegrityError instead of masking it.
+            raise
+        runtime.logger.debug(
+            f"ACQUISITION dataset {instrument}/{year_str} created concurrently, "
+            f"reusing {dataset.dataset_id}"
+        )
+        return {
+            "message": f"Acquisition dataset '{year_str}' retrieved for {instrument}",
+            "data": DatasetRead.model_validate(dataset).model_dump(),
+        }
 
     dataset_data = DatasetRead.model_validate(new_dataset).model_dump()
     await emit_record_created(

@@ -68,8 +68,35 @@ def _duckdb():
 # sentry_sdk.init, no sink, i.e. zero behavior change. Set it to a GlitchTip
 # project DSN to forward WARNING+ log records as events. Needs the optional
 # dependency: `pip install mascope_runtime[sentry]`.
+# MASCOPE_SENTRY_TRACES_RATE (0..1) additionally samples request transactions
+# for GlitchTip's per-endpoint performance view; it does nothing without a DSN.
 _SENTRY_LEVELS = {"WARNING": "warning", "ERROR": "error", "CRITICAL": "fatal"}
 _sentry_ready = False
+
+
+def _traces_sample_rate() -> float:
+    """
+    Read ``MASCOPE_SENTRY_TRACES_RATE`` as the transaction sample rate.
+
+    Unset (the default) means 0.0: errors only, no performance tracing. A
+    value that is not a number in [0, 1] logs a warning and keeps tracing off
+    rather than raising - a typo in ``/etc/environment`` must not break the
+    backend at import time.
+    """
+    raw = os.environ.get("MASCOPE_SENTRY_TRACES_RATE")
+    if not raw:
+        return 0.0
+    try:
+        rate = float(raw)
+    except ValueError:
+        rate = None
+    if rate is None or not 0.0 <= rate <= 1.0:
+        logger.warning(
+            f"MASCOPE_SENTRY_TRACES_RATE={raw!r} is not a number in [0, 1]; "
+            "performance tracing stays OFF."
+        )
+        return 0.0
+    return rate
 
 
 def _init_sentry(environment: str, release: str | None) -> bool:
@@ -108,8 +135,10 @@ def _init_sentry(environment: str, release: str | None) -> bool:
         # hostname, which under Docker is an opaque container id.
         server_name=os.environ.get("MASCOPE_ENV") or None,
         release=release,
-        traces_sample_rate=0.0,  # errors only, no performance tracing
-        profiles_sample_rate=0.0,
+        # 0.0 unless MASCOPE_SENTRY_TRACES_RATE opts this server into
+        # performance tracing (per-endpoint latency in GlitchTip).
+        traces_sample_rate=_traces_sample_rate(),
+        profiles_sample_rate=0.0,  # GlitchTip does not consume profiles
         send_default_pii=False,  # no cookies / auth headers / client IPs
         max_request_body_size="never",
         auto_session_tracking=False,  # GlitchTip does not consume sessions
@@ -560,6 +589,8 @@ class RuntimeLogging:
         to_datetime: str | None = None,
         interval: str | None = None,
         mode: RuntimeMode | None = None,
+        service: str | None = None,
+        json_output: bool = False,
     ):
         """
         Executes a query against dev or prod log files in the active runtime
@@ -569,22 +600,33 @@ class RuntimeLogging:
         relevant fields and values.
 
         :param level: the log level above which to print
-        :param limit: the maximum limit of the number of lines to print
+        :param limit: print only the `limit` most recent matching lines
         :param grep: a search pattern to filter log messages against
         :param grep_context: the number of rows before and after a `grep` match to include
         :param from_datetime: the start of the time range
         :param to_datetime: end of the time range
         :param interval: the interval of the time range
         :param mode: the runtime mode (dev or prod)
+        :param service: only logs of one service/module (e.g. "backend")
+        :param json_output: print raw NDJSON records instead of pretty lines
         """
         if from_datetime and to_datetime and interval:
             self.runtime.logger.error(
                 "runtime.logging.query: cannot use 'from_datetime', 'to_datetime' and 'interval' together"
             )
             return
+        if service and not re.fullmatch(r"[A-Za-z0-9_-]+", service):
+            self.runtime.logger.error(
+                f"runtime.logging.query: invalid service name {service!r}"
+            )
+            return
 
-        # PREPARE - collect key variables and clauses
-        log_path = os.path.join(self.dir, mode or self.runtime.mode, "*.log")
+        # PREPARE - collect key variables and clauses. User-provided values go
+        # through `params` (prepared-statement placeholders), never into the
+        # SQL text: a quote in --grep or --from must not break (or inject
+        # into) the query.
+        pattern = f"*.{service}.log" if service else "*.log"
+        log_path = os.path.join(self.dir, mode or self.runtime.mode, pattern)
         level_no = {
             "trace": 5,
             "debug": 10,
@@ -594,20 +636,33 @@ class RuntimeLogging:
             "error": 40,
             "critical": 50,
         }[level]
-        limit_clause = f"LIMIT {limit}" if limit else ""
-        from_clause = (
-            f"AND timestamp >= '{from_datetime}'::TIMESTAMP" if from_datetime else ""
-        )
-        to_clause = (
-            f"AND timestamp <= '{to_datetime}'::TIMESTAMP" if to_datetime else ""
-        )
+        limit_clause = f"LIMIT {int(limit)}" if limit else ""
+        params: list = []
+        from_clause = to_clause = ""
+        if from_datetime:
+            from_clause = "AND timestamp >= CAST(? AS TIMESTAMP)"
+            params.append(from_datetime)
+        if to_datetime:
+            to_clause = "AND timestamp <= CAST(? AS TIMESTAMP)"
+            params.append(to_datetime)
         if interval:
             if from_clause:
-                to_clause = f"AND timestamp <= '{from_datetime}'::TIMESTAMP + INTERVAL '{interval}'"
+                to_clause = (
+                    "AND timestamp <= CAST(? AS TIMESTAMP) + CAST(? AS INTERVAL)"
+                )
+                params.append(from_datetime)
+                params.append(interval)
             elif to_clause:
-                from_clause = f"AND timestamp >= '{to_datetime}'::TIMESTAMP - INTERVAL '{interval}'"
+                # the from-bound params must precede the to-bound one above
+                from_clause = (
+                    "AND timestamp >= CAST(? AS TIMESTAMP) - CAST(? AS INTERVAL)"
+                )
+                params = [to_datetime, interval] + params
             else:
-                from_clause = f"AND timestamp >= '{datetime.datetime.now().isoformat()}'::TIMESTAMP - INTERVAL '{interval}'"
+                from_clause = (
+                    "AND timestamp >= CAST(? AS TIMESTAMP) - CAST(? AS INTERVAL)"
+                )
+                params = [datetime.datetime.now().isoformat(), interval]
 
         # BUILD - construct the queries
         base_query = f"""
@@ -631,6 +686,8 @@ class RuntimeLogging:
                 {to_clause}
         """
         if not grep:
+            # DESC + LIMIT selects the *most recent* N rows; the fetched rows
+            # are reversed below so the printout still reads oldest-first.
             query = f"""
                 WITH log AS (
                     {base_query}
@@ -641,7 +698,7 @@ class RuntimeLogging:
                   message,
                   json
                 FROM log
-                ORDER BY log.timestamp
+                ORDER BY log.timestamp DESC
                 {limit_clause}
             """
         elif grep:
@@ -682,28 +739,47 @@ class RuntimeLogging:
                   message,
                   json
                 FROM context ctx
-                WHERE ctx.context LIKE '%{grep}%'
+                WHERE ctx.context LIKE '%' || ? || '%'
+                ORDER BY ctx.timestamp DESC
                 {limit_clause}
             """
+            params.append(grep)
 
-        # EXECUTE - run the query and print the logs using loguru
-        with _duckdb().connect() as conn:
-            records = conn.sql(query).fetchall()
-            for (
-                timestamp,
-                level,
-                message,
-                raw,
-            ) in records:
-                raw = json.loads(raw)
-                override = raw["record"]
-                override["time"] = timestamp.isoformat().replace("T", " ")
-                # Spoof the logger to pretend to log the original
-                # record rather than from here:
-                (logger.bind(override=override).log(level[1:-1], message[1:-1]))
-        print(
-            f"\n\n  Printed {len(records)} lines of logs from {log_path.split('*')[0]}"
-        )
+        # EXECUTE - run the query and print the logs
+        duckdb = _duckdb()
+        try:
+            with duckdb.connect() as conn:
+                records = conn.execute(query, params).fetchall()
+        except duckdb.IOException:
+            # read_ndjson_objects raises when the glob matches no files
+            # (e.g. a --service with no log files); that is an empty result,
+            # not a crash.
+            records = []
+        # undo the DESC ordering used for LIMIT: print oldest-first
+        records.reverse()
+        for (
+            timestamp,
+            level,
+            message,
+            raw,
+        ) in records:
+            if json_output:
+                # raw NDJSON pass-through for machine consumers: no loguru
+                # re-emission, so no ANSI colors and no re-formatting
+                print(raw)
+                continue
+            override = json.loads(raw)["record"]
+            override["time"] = timestamp.isoformat().replace("T", " ")
+            # Spoof the logger to pretend to log the original record rather
+            # than from here. Level and message come from the decoded record,
+            # not the raw JSON string slices, so escape sequences render.
+            logger.bind(override=override).log(
+                override["level"]["name"], override["message"]
+            )
+        if not json_output:
+            print(
+                f"\n\n  Printed {len(records)} lines of logs from {log_path.split('*')[0]}"
+            )
 
     def gc(
         self,

@@ -36,6 +36,11 @@ VersionInfoVersion={#FileVersion}
 Compression=lzma2
 SolidCompression=yes
 
+[Messages]
+; Tell the user what happens next: the watched folder is not chosen at
+; install time but in the guided setup on first start.
+FinishedLabel=Setup has finished installing [name] on your computer.%n%nWhen the agent first starts, a guided setup runs in its console window and asks for your Mascope server address and the folder to watch for new data files.
+
 [Tasks]
 Name: "startup"; Description: "Start the File Agent automatically when you sign in to Windows"
 

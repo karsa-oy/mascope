@@ -1,4 +1,7 @@
-# Getting started
+# Run the demo
+
+Already have a Mascope to log in to? Start with
+[First steps in the app](first-steps.md) instead.
 
 The fastest way to see Mascope is to run it on your own machine with Docker,
 preloaded with the demo dataset. This is a local, single-machine setup served
@@ -28,14 +31,15 @@ The first run downloads ~150 MB. Tear it down with
 `docker compose -f docker-compose.demo.yaml down -v`.
 
 For what is in the bundle (and how it is built and published), see the
-[demo dataset guide](../../demo_dataset.md).
+[demo dataset guide](https://github.com/karsa-oy/mascope/blob/master/docs/demo_dataset.md).
 
 To run Mascope for real - with your own data, on a server, over HTTPS - see
-[Hosting & deployment](../../hosting.md).
+[Hosting & deployment](https://github.com/karsa-oy/mascope/blob/master/docs/hosting.md).
 
 ## Next steps
 
+- [First steps in the app](first-steps.md) - find your way around the UI the demo just opened.
 - [Concepts](../concepts/index.md) - the domain model (samples, batches, matching, calibration).
 - [Guides](../guides/index.md) - task-by-task how-tos.
 - Sharing Mascope with a team on a LAN, or production deployment: see
-  [Hosting & deployment](../../hosting.md).
+  [Hosting & deployment](https://github.com/karsa-oy/mascope/blob/master/docs/hosting.md).

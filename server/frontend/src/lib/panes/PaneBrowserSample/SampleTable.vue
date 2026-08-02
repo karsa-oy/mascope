@@ -141,7 +141,9 @@ const tableHeight = computed(() => ((height.value - padding) * app.ui.split.top)
         <p>Click on a sample to select it. Hold Shift or Ctrl to select multiple samples.</p>
 
         <p>Right click on selected sample(s) to perform actions such as copy, cut and delete.</p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('guides/import-files/#build-your-batch-from-the-acquisition-samples') }
+      )
     "
   >
     <template #menu>

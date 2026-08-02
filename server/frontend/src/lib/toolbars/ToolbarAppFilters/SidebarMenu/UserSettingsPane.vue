@@ -41,11 +41,7 @@ const SERVICE_CONFIGS = [
   {
     id: 'file-agent',
     label: 'File Agent',
-    minRole: 200, // editor role_id
-    // Fixed-name asset uploaded to every GitHub release by CI, so this
-    // URL always resolves to the newest released installer
-    downloadUrl:
-      'https://github.com/karsa-oy/mascope/releases/latest/download/Mascope-File-Agent-Setup.exe'
+    minRole: 200 // editor role_id
   },
   {
     id: 'export-agent',
@@ -53,6 +49,11 @@ const SERVICE_CONFIGS = [
     minRole: 200 // editor role_id
   }
 ]
+
+// Fixed-name asset uploaded to every GitHub release by CI, so this
+// URL always resolves to the newest released installer
+const FILE_AGENT_DOWNLOAD_URL =
+  'https://github.com/karsa-oy/mascope/releases/latest/download/Mascope-File-Agent-Setup.exe'
 
 const token = ref(null)
 const selectedTokenType = ref('mascope_sdk')
@@ -182,7 +183,7 @@ const vHelpLayer = app.ui.help.directive(layer)
         code it shows via 'Pair an agent'.
       </p>
     `,
-      doc: 'https://github.com/karsa-oy/mascope/blob/develop/docs/user/instruments/index.md'
+      doc: app.ui.help.docUrl('instruments/#the-file-agent')
     }"
   >
     <h3>API Access Tokens</h3>
@@ -213,9 +214,9 @@ const vHelpLayer = app.ui.help.directive(layer)
         </Message>
       </div>
       <Button
-        v-if="currentServiceConfig?.downloadUrl"
+        v-if="app.auth.user.role_id >= ROLES.editor"
         as="a"
-        :href="currentServiceConfig.downloadUrl"
+        :href="FILE_AGENT_DOWNLOAD_URL"
         label="Download File Agent installer"
         icon="pi pi-download"
         severity="secondary"

@@ -26,11 +26,11 @@ dependencies = [
     "nest-asyncio~=1.6",
     "numpy~=1.26",
     "pandas~=2.2",
-    "pyarrow>=18.0.0",
+    "pyarrow>=25.0.0",
     "python-socketio>=5.16.3,<6",
     "python-multipart>=0.0.31,<0.0.32",
     "pyyaml~=6.0",
-    "redis[hiredis]>=7.1.0,<8", # TODO: v8 has breaking changes in async pub/sub
+    "redis[hiredis]>=8.0.1,<9", # TODO: v8 has breaking changes in async pub/sub
     "requests~=2.32",
     "rich>=15.0.0,<16",
     "scipy~=1.13",
@@ -40,13 +40,18 @@ dependencies = [
     "websocket-client~=1.8",
     "zarr==2.18.2", # TODO: Resolve dependency issue https://github.com/Karsa-Oy/Mascope/issues/479
     "numcodecs==0.15.1", # TODO: See issue above
-    "tuspyserver==4.1.3", # TODO: Bug after tuspyserver 4.1.3, see issue https://github.com/karsa-oy/mascope/issues/1159
+    # Pinned. 4.2.0 fixes the upload-breaking file_dep bug (issue #1159)
+    # and improves offset/resume handling. Newer versions are blocked:
+    # 4.2.1 introduced the concat extension with a path traversal fixed
+    # only later, and 4.2.2+ imports fcntl unconditionally, which breaks
+    # the backend on native Windows dev runs.
+    "tuspyserver==4.2.0",
     "openpyxl>=3.1.5",
     "asyncpg>=0.31.0",
     "alembic>=1.18.5,<2",
-    "psycopg2-binary>=2.9.11",
+    "psycopg2-binary>=2.9.12",
 ]
 
 [build-system]
-requires = ["uv_build>=0.6,<0.7"]
+requires = ["uv_build>=0.11.32,<0.12"]
 build-backend = "uv_build"

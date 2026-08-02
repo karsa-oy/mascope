@@ -13,15 +13,23 @@ import requests
 from mascope_sdk import _agents
 from mascope_sdk.exceptions import (
     AuthenticationError,
+    MascopeAPIError,
     MascopeConnectionError,
+    NotFoundError,
     ServerError,
+    TusNotSupportedError,
+    ValidationError,
 )
 
 
-def _fake_response(status_code: int, payload: dict) -> requests.Response:
+def _fake_response(
+    status_code: int, payload: dict | None = None, headers: dict | None = None
+) -> requests.Response:
     response = requests.Response()
     response.status_code = status_code
-    response._content = json.dumps(payload).encode()
+    response._content = json.dumps(payload or {}).encode()
+    if headers:
+        response.headers.update(headers)
     return response
 
 
@@ -93,3 +101,248 @@ def test_success_returns_response(monkeypatch, upload_file):
     )
 
     assert resp.status_code == 201
+
+
+# --- api_post_file_tus ---
+
+
+TUS_LOCATION = {"Location": "http://proxy.internal/api/sample/files/upload/tus/abc123"}
+
+
+@pytest.fixture(autouse=True)
+def tus_deletes(monkeypatch):
+    """Record (and neutralize) TUS DELETE calls made on abandoned uploads."""
+    calls: list[str] = []
+
+    def fake_delete(url, headers, verify, timeout):
+        calls.append(url)
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "delete", fake_delete)
+    return calls
+
+
+def _fake_create(captured: dict):
+    def fake_post(url, headers, verify, timeout):
+        captured.update(url=url, headers=headers)
+        return _fake_response(201, headers=TUS_LOCATION)
+
+    return fake_post
+
+
+def test_tus_upload_chunks_whole_file(monkeypatch, upload_file):
+    created: dict = {}
+    chunks: list[tuple[str, bytes]] = []
+
+    def fake_patch(url, data, headers, verify, timeout):
+        chunks.append((headers["Upload-Offset"], bytes(data)))
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "post", _fake_create(created))
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    _agents.api_post_file_tus("http://testserver", "tok", upload_file, chunk_size=4)
+
+    # created against our own base URL, with the TUS protocol headers
+    assert created["url"] == "http://testserver/api/sample/files/upload/tus/"
+    assert created["headers"]["Authorization"] == "Bearer tok"
+    assert created["headers"]["Tus-Resumable"] == "1.0.0"
+    assert created["headers"]["Upload-Length"] == "9"  # len(b"raw-bytes")
+    assert created["headers"]["Upload-Metadata"].startswith("filename ")
+    # the 9-byte file went out in 4-byte chunks with advancing offsets
+    assert [offset for offset, _ in chunks] == ["0", "4", "8"]
+    assert b"".join(data for _, data in chunks) == b"raw-bytes"
+
+
+def test_tus_upload_addresses_chunks_via_own_base_url(monkeypatch, upload_file):
+    # The Location header points at whatever host/scheme the proxy chain
+    # reported; only the upload id may be trusted.
+    urls: list[str] = []
+
+    def fake_patch(url, data, headers, verify, timeout):
+        urls.append(url)
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert urls == ["http://testserver/api/sample/files/upload/tus/abc123"]
+
+
+def test_tus_upload_resumes_from_server_offset(monkeypatch, upload_file):
+    monkeypatch.setattr(_agents.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(
+        _agents.requests,
+        "head",
+        lambda *a, **k: _fake_response(200, headers={"Upload-Offset": "3"}),
+    )
+    attempts = {"n": 0}
+    chunks: list[tuple[str, bytes]] = []
+
+    def fake_patch(url, data, headers, verify, timeout):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise requests.exceptions.ConnectionError("dropped mid-chunk")
+        chunks.append((headers["Upload-Offset"], bytes(data)))
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    # resumed from the server-confirmed offset, not from zero
+    assert chunks == [("3", b"raw-bytes"[3:])]
+
+
+def test_tus_upload_halves_chunk_size_on_connection_failures(monkeypatch, upload_file):
+    # A proxy cutting long requests on a slow uplink surfaces as repeated
+    # connection errors; the client must shrink chunks so uploads still
+    # make progress instead of retrying the same too-large chunk forever.
+    monkeypatch.setattr(_agents.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(_agents, "TUS_MIN_CHUNK_SIZE", 2)
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(
+        _agents.requests,
+        "head",
+        lambda *a, **k: _fake_response(200, headers={"Upload-Offset": "0"}),
+    )
+    attempts = {"n": 0}
+    chunks: list[bytes] = []
+
+    def fake_patch(url, data, headers, verify, timeout):
+        attempts["n"] += 1
+        if attempts["n"] <= 2:
+            raise requests.exceptions.ConnectionError("proxy cut the request")
+        chunks.append(bytes(data))
+        return _fake_response(204)
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    _agents.api_post_file_tus("http://testserver", "tok", upload_file, chunk_size=8)
+
+    # two failures halved 8 -> 4 -> 2; the reduced size sticks afterwards
+    assert [len(c) for c in chunks] == [2, 2, 2, 2, 1]
+    assert b"".join(chunks) == b"raw-bytes"
+
+
+def test_tus_upload_gives_up_after_max_attempts(monkeypatch, upload_file, tus_deletes):
+    monkeypatch.setattr(_agents.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(_agents.requests, "head", lambda *a, **k: _fake_response(404))
+    attempts = {"n": 0}
+
+    def fake_patch(*args, **kwargs):
+        attempts["n"] += 1
+        raise requests.exceptions.ConnectionError("network down")
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    with pytest.raises(MascopeConnectionError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert attempts["n"] == _agents.TUS_MAX_ATTEMPTS
+    # the abandoned partial upload was removed from the server
+    assert tus_deletes == ["http://testserver/api/sample/files/upload/tus/abc123"]
+
+
+def test_tus_upload_does_not_retry_client_errors(monkeypatch, upload_file):
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    attempts = {"n": 0}
+
+    def fake_patch(*args, **kwargs):
+        attempts["n"] += 1
+        return _fake_response(422, {"error": "Invalid."})
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    with pytest.raises(ValidationError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert attempts["n"] == 1  # a rejected request cannot heal by waiting
+
+
+@pytest.mark.parametrize("status", [404, 401])
+def test_tus_create_failure_signals_fallback(monkeypatch, upload_file, status):
+    # The File Agent falls back to the legacy endpoint on this: a 404
+    # means no TUS route (old server), a 401 means the route is not
+    # token-accessible (old server) or a genuinely bad token.
+    monkeypatch.setattr(
+        _agents.requests, "post", lambda *a, **k: _fake_response(status)
+    )
+
+    with pytest.raises(TusNotSupportedError) as exc_info:
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert exc_info.value.status_code == status
+
+
+def test_tus_mid_transfer_404_is_not_a_fallback_signal(monkeypatch, upload_file):
+    # An upload vanishing mid-transfer (e.g. backend restart clearing the
+    # temp dir) must keep its normal type: TusNotSupportedError would
+    # latch the agent onto the 100 MB legacy path for its lifetime.
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(_agents.requests, "patch", lambda *a, **k: _fake_response(404))
+
+    with pytest.raises(NotFoundError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+
+def test_tus_upload_fails_fast_on_non_connection_request_error(
+    monkeypatch, upload_file
+):
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    attempts = {"n": 0}
+
+    def fake_patch(*args, **kwargs):
+        attempts["n"] += 1
+        raise requests.exceptions.InvalidURL("bad proxy configuration")
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    with pytest.raises(MascopeConnectionError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert attempts["n"] == 1  # a config error cannot heal by waiting
+
+
+def test_tus_upload_detects_file_shrinking_mid_upload(monkeypatch, upload_file):
+    # If the watched file is rewritten smaller mid-upload, read() returns
+    # b"" while offset < size - without the guard the loop would PATCH
+    # empty bodies forever. Shrink the file between the size probe and
+    # the chunk loop (the creation request sits between the two).
+    def fake_post(url, headers, verify, timeout):
+        open(upload_file, "wb").close()  # truncate to 0 bytes
+        return _fake_response(201, headers=TUS_LOCATION)
+
+    monkeypatch.setattr(_agents.requests, "post", fake_post)
+    monkeypatch.setattr(
+        _agents.requests,
+        "patch",
+        lambda *a, **k: pytest.fail("no PATCH expected for a vanished file"),
+    )
+
+    with pytest.raises(MascopeAPIError, match="changed on disk"):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file, chunk_size=4)
+
+
+def test_tus_upload_empty_file_completes_at_creation(monkeypatch, tmp_path):
+    empty = tmp_path / "empty.raw"
+    empty.write_bytes(b"")
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(
+        _agents.requests,
+        "patch",
+        lambda *a, **k: pytest.fail("no PATCH expected for an empty file"),
+    )
+
+    _agents.api_post_file_tus("http://testserver", "tok", str(empty))
+
+
+def test_tus_upload_rejects_filename_with_path(monkeypatch, upload_file):
+    with pytest.raises(ValueError, match="path components"):
+        _agents.api_post_file_tus(
+            "http://testserver", "tok", upload_file, upload_filename="a/b.raw"
+        )

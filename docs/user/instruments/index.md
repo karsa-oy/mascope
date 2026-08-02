@@ -12,7 +12,8 @@ uploads them to your Mascope server automatically.
 ### Installing
 
 1. Download the installer on the instrument PC. In the Mascope web app, open
-   the sidebar via your profile icon and click **Download File Agent
+   the **Home menu** (house icon, top-left), go to the **Settings** tab, and
+   click **Download File Agent
    installer** under **API Access Tokens** (or download
    `Mascope-File-Agent-Setup.exe` from the latest [Mascope release on
    GitHub](https://github.com/karsa-oy/mascope/releases/latest)).
@@ -28,9 +29,9 @@ uploads them to your Mascope server automatically.
    `mascope.example.com`), then connects the agent to your account —
    choose **pairing** (the default):
    1. The agent shows a short pairing code, for example `BCD-234`.
-   2. Log in to Mascope in your browser (*editor* role or higher), click
-      your profile icon to open the sidebar, and under **API Access
-      Tokens** click **Pair an agent**.
+   2. Log in to Mascope in your browser (*editor* role or higher), open
+      the **Home menu** (house icon, top-left) **Settings** tab, and under
+      **API Access Tokens** click **Pair an agent**.
    3. Enter the code and approve — the agent picks up its access token
       automatically within a few seconds.
 
@@ -38,7 +39,9 @@ uploads them to your Mascope server automatically.
    token generated under **API Access Tokens**.)
 
 4. Finally the setup asks for the **folder to watch** for new data files
-   and the **file pattern** to upload (default `*.raw`).
+   (any folder on the PC — where the agent is installed does not matter),
+   whether to **also watch its subfolders**, and the **file pattern** to
+   upload (default `*.raw`).
 
 The setup checks the server connection and the token immediately, so a typo
 is caught before any data acquisition depends on it. After setup completes,
@@ -63,17 +66,32 @@ All settings live in one file on the instrument PC:
 | `host`            | Mascope server address, e.g. `mascope.example.com`                 |
 | `access_token`    | API access token (filled automatically when pairing)               |
 | `source`          | Full path of the folder watched for new data files                 |
+| `recursive`       | `true` to also watch subfolders of `source` (default `false`)      |
 | `mask`            | Pattern of the files to upload, e.g. `*.raw`                       |
 | `timeout`         | Seconds a file must be idle before it is uploaded                  |
 | `filename_prefix` | Optional prefix added to the filename on upload                    |
 | `filename_suffix` | Optional suffix added to the filename on upload (before extension) |
 
-Restart the agent after editing the file. Alternatively, run the guided setup
-again by starting the agent with the `--setup` flag:
+Restart the agent after editing the file (close its console window, then
+start it again from the Start Menu). Alternatively, run the guided setup
+again — it walks through all the settings above, offering the current
+values as defaults — by starting the agent with the `--setup` flag from a
+terminal:
 
 ```
-Mascope-File-Agent.exe --setup
+%LocalAppData%\Programs\Mascope File Agent\Mascope-File-Agent.exe --setup
 ```
+
+### Stopping or disabling the agent
+
+- **Stop until the next sign-in**: close the agent's console window.
+- **Stop starting automatically**: open Task Manager → **Startup apps**,
+  right-click **Mascope File Agent** and choose **Disable** (enable it
+  again the same way). This keeps the agent installed and configured; you
+  can still start it manually from the Start Menu.
+- **Remove it completely**: uninstall via Windows **Settings → Apps**.
+  Your configuration is kept, so reinstalling later picks up where you
+  left off.
 
 ### Upgrading
 
@@ -88,7 +106,9 @@ The agent prints its version when it starts, and uninstalling (Windows
 - Logs are written to `%APPDATA%\Mascope\FileAgent\logs\prod\`.
 - If an upload keeps failing, the file is copied to a `failed_uploads`
   subfolder inside the watched folder. After fixing the cause (network,
-  token), copy the file back into the watched folder to retry.
+  token), copy the file back into the watched folder to retry. The
+  `failed_uploads` folder itself is never watched, even with `recursive`
+  enabled.
 - *"The server rejected the access token"*: re-run the agent with
   `--setup` and pair it again (or generate a new **File Agent** token in
   the web app and update `access_token` in the configuration). Note that
@@ -100,11 +120,24 @@ The agent prints its version when it starts, and uninstalling (Windows
   web app address. In a development setup, use the backend address (e.g.
   `http://localhost:8090`) — the frontend dev server (port 5173) cannot
   receive uploads.
-- Files larger than 100 MB are not uploaded; they are logged and copied to
-  `failed_uploads`.
+- The agent uploads files of any size in resumable chunks, so a network
+  drop mid-file costs at most one chunk. Older agent versions instead
+  upload each file in a single request capped at 100 MB - larger files
+  are rejected, logged and copied to `failed_uploads`. Download the
+  newest installer to remove the limit.
+
+## After files arrive
+
+Files uploaded by the File Agent land in the instrument's
+`Acquisitions <instrument>` workspace and show up in the **Raw files** tab, exactly
+like files uploaded by hand. From there they are the same as any other raw file:
+Mascope processes them automatically into acquisition batches, which you **copy**
+into your own workspace. The
+[Import data files](../guides/import-files.md#build-your-batch-from-the-acquisition-samples)
+guide covers this, and its [prerequisites](../guides/import-files.md#prerequisites)
+(filename rules and ionization modes) apply to File Agent uploads too.
 
 <!-- TODO Phase 3. Outline:
-- Acquisition workflow (Orbitrap, TOF)
-- How uploaded files become ACQUISITION datasets/batches/samples
+- Acquisition workflow specifics (Orbitrap, TOF)
 Cross-reference the developer agent docs in docs/dev/.
 -->

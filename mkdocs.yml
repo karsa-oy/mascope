@@ -3,13 +3,39 @@ site_description: High-resolution mass spectrometry data analysis platform
 docs_dir: docs/user
 site_dir: site
 
+# Only the /docs/ path component matters at runtime: page links stay relative,
+# but the 404 page resolves its assets against this path (so nginx can serve
+# the themed 404 on any host), and canonical/sitemap URLs use the full value.
+site_url: https://mascope.app/docs/
+
+# Snippet files shared between the docs pages and the in-app help popovers
+# (rendered to help-content.json). They are include fragments, not pages.
+exclude_docs: |
+  _help/
+
+# Escalate link problems to warnings so `mkdocs build --strict` fails on them.
+# Notably `anchors`: broken `#fragment` links are otherwise only INFO-level and
+# would sail through CI and the image build unnoticed.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 # Activate locally with:
 #   uv add --group docs mkdocs-material
-#   uv run mkdocs serve        # live preview at http://localhost:8000
+#   uv run mkdocs serve        # live preview at http://localhost:8000/docs/
 #   uv run mkdocs build --strict
+# The frontend dev server proxies /docs/ here (see server/frontend/
+# vite.config.js), so with `mkdocs serve` running the in-app "Learn more"
+# links work in dev and docs edits live-reload inside the app.
 
 theme:
   name: material
+  # No web fonts: the default (Roboto) is fetched from Google Fonts at view
+  # time, which leaks visits and breaks air-gapped deployments. The docs are
+  # bundled to be self-contained, so use the system font stack instead.
+  font: false
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -34,21 +60,38 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      # Render ```mermaid fences as diagrams (Material ships the mermaid runtime).
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
+  # Lets a page pull in a shared snippet with `--8<-- "_help/<name>.md"`; the
+  # same snippets feed the in-app help popovers (see tooling/docs/build_help_content.py).
+  - pymdownx.snippets:
+      base_path:
+        - docs/user
 
 nav:
   - Home: index.md
-  - Getting started: getting-started/index.md
+  - Getting started:
+      - Run the demo: getting-started/index.md
+      - First steps in the app: getting-started/first-steps.md
   - Concepts: concepts/index.md
   - How it works:
       - Overview: how-it-works/index.md
-      - Instrument functions: how-it-works/instrument_functions.md
-      - Peak detection: how-it-works/peak_detection.md
+      - Instrument functions: how-it-works/instrument-functions.md
+      - Peak detection: how-it-works/peak-detection.md
       - Calibration: how-it-works/calibration.md
       - Matching: how-it-works/matching.md
-  - Guides: guides/index.md
+  - Guides:
+      - Overview: guides/index.md
+      - Import data files: guides/import-files.md
+      - Target collections & matching: guides/target-collections.md
   - Instruments & acquisition: instruments/index.md
-  - SDK & API: sdk/index.md
+  - SDK & API:
+      - Overview: sdk/index.md
+      - Getting started with Python: sdk/getting-started.md
   - Reference: reference/index.md

@@ -1,10 +1,24 @@
-# Overview of the Signal Processing Pipeline
+# How it works: the processing pipeline
 
-The data processing workflow provides a standardized, instrument-agnostic architectural framework for converting raw mass spectrometry outputs into isotopic assignments.
-The architecture branches to accommodate physics-based differences in detector characteristics.
-The modular layout decouples raw hardware signal acquisition from logical compound identification, enabling flexible integration of new instrument types without disrupting the core data handling and matching logic.
+When you [process a sample file](../guides/import-files.md) into a
+[sample](../concepts/index.md#sample-files-vs-samples), Mascope runs it through a
+fixed sequence of stages that turn raw spectra into scored assignments. This page
+is an overview of that pipeline; each stage links to a page with the detail.
 
-![Signal Processing Pipeline](images/signal_processin_pipeline.png)
+The pipeline is instrument-agnostic in shape but branches where the physics
+differs, so Orbitrap and Tofwerk TOF data each get the treatment suited to their
+detector. This separation of raw signal handling from compound identification is
+what lets Mascope support new instrument types without changing the matching
+logic.
+
+```mermaid
+graph LR
+    A["Aggregate<br/>sum the scans"] --> B["Instrument<br/>function"]
+    B --> C["Detect<br/>peaks"]
+    C --> D["Quality<br/>control"]
+    D --> E["Calibrate<br/>the mass axis"]
+    E --> F["Match<br/>to targets"]
+```
 
 ## Processing Stages and Data Flow
 
@@ -14,15 +28,15 @@ To maximize the signal-to-noise ratio for peak detection, the scans are aggregat
 
 ### Empirical Instrument Function Estimation
 To account for instrument characteristics, empirical peak shapes and resolution profiles are extracted directly from the experimental spectrum rather than relying on idealized mathematical assumptions.
-Detailed methodologies for these calculations are provided in [instrument function documentation](instrument_functions.md).
+Detailed methodologies for these calculations are provided in [instrument function documentation](instrument-functions.md).
 
 ### Peak Detection
 Following instrument characterization, the pipeline executes specialized peak detection routines to extract discrete ion signals (peaks) from the sum signal.
-The mathematical implementation of these routines is documented in [peak detection documentation](peak_detection.md).
+The mathematical implementation of these routines is documented in [peak detection documentation](peak-detection.md).
 
 ### Quality Control and Artifact Filtering
 To safeguard downstream calibration steps against false or distorted signals, the resolved peak candidates undergo multi-layered quality control filtering.
-The exact filters are described in [quality control documentation](peak_detection.md#quality-control-filtering).
+The exact filters are described in [quality control documentation](peak-detection.md#quality-control-filtering).
 
 ### Mass Calibration
 The mass calibration corrects systematic mass errors by using known peaks as anchor points to adjust the mass axis.

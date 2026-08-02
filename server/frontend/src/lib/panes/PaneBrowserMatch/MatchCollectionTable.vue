@@ -89,7 +89,9 @@ const breadcrumb = computed(() => {
         Click on the <span class='pi pi-plus'></span> button (top right)
         to create a new target collection.
         </p>
-      `)
+      `,
+        { doc: app.ui.help.docUrl('guides/target-collections/') }
+      )
     "
   >
     <template #menu>

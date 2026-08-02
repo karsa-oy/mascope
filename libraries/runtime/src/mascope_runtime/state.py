@@ -34,6 +34,19 @@ In the production containers, a special `state.json`
 is used. You can find this file committed in
 `runtime/lib/state.prod.json`
 
+Concurrency
+
+The `state.json` is shared by every mascope process using the same
+`MASCOPE_PATH`, and every CLI invocation writes it during startup
+(the entrypoint clears the `env` override). Two commands starting the
+same second - say a backup cron and a monitoring cron - therefore
+read and write the same file concurrently. Writes go to a temp file
+that is then `os.replace`d into place, so a reader observes either
+the old file or the new one, never a truncated one. Reads retry
+briefly and fall back to the defaults with a warning, so a file
+corrupted by an older version or a crashed write cannot take down
+the CLI.
+
 Implementation note: both classes intercept every public attribute
 access via `__setattr__`/`__getattr__`, so their own internals are
 kept in underscore-prefixed attributes written with
@@ -43,9 +56,26 @@ plus a temporary one built for a compose invocation) must not share
 or clobber each other's state.
 """
 
+import contextlib
+import copy
 import json
 import os
+import random
+import tempfile
+import time
 
+from loguru import logger
+
+
+# Writes are atomic, so an unreadable file is corrupt rather than torn -
+# but retry once in case some other writer is not going through this class.
+_READ_RETRY_DELAY = 0.05
+
+# How long to keep retrying a replace that loses a race with a concurrent
+# reader. Only Windows fails this way (it refuses to replace a file another
+# process holds open); POSIX renames straight over an open file. Readers hold
+# the file for microseconds, so this budget is never close to exhausted.
+_REPLACE_TIMEOUT = 5.0
 
 default_state = {
     "env": {"active": "default", "override": None},
@@ -75,12 +105,7 @@ class RuntimeJsonState(object):
         )
 
     def __setattr__(self, attr: str, value: any):
-        self.ensure_state_json()
-        with open(self._state_path, "r") as f:
-            state = json.load(f)
-        with open(self._state_path, "w") as f:
-            state[attr]["active"] = value
-            json.dump(state, f, indent=2)
+        self._update(attr, "active", value)
 
     def __getattr__(self, attr: str) -> any:
         self.ensure_state_json()
@@ -91,26 +116,87 @@ class RuntimeJsonState(object):
             if env_override:
                 return env_override
 
-        with open(self._state_path, "r") as f:
-            state = json.load(f)
-            return state[attr]["override"] or state[attr]["active"]
+        state = self._read_state()
+        return state[attr]["override"] or state[attr]["active"]
 
     def override(self, attr: str, value: any):
-        self.ensure_state_json()
-        with open(self._state_path, "r") as f:
-            state = json.load(f)
-        with open(self._state_path, "w") as f:
-            state[attr]["override"] = value
-            json.dump(state, f, indent=2)
+        self._update(attr, "override", value)
 
     def ensure_state_json(self):
         if not os.path.exists(self._state_path):
-            with open(self._state_path, "x") as f:
-                json.dump(
-                    default_state,
-                    f,
-                    indent=2,
-                )
+            os.makedirs(os.path.dirname(self._state_path), exist_ok=True)
+            # Two processes racing on a fresh runtime home both write the
+            # same defaults, so last-writer-wins is harmless here.
+            self._write_state(copy.deepcopy(default_state))
+
+    def _update(self, attr: str, slot: str, value: any):
+        """Read-modify-write one slot ("active" or "override") of one field."""
+        self.ensure_state_json()
+        state = self._read_state()
+        state[attr][slot] = value
+        self._write_state(state)
+
+    def _read_state(self) -> dict:
+        """
+        Load the state file, tolerating a concurrent writer or a corrupt file.
+
+        Writes are atomic, so a torn read should be impossible - but a state
+        file left corrupt by an older version, a full disk or a killed write
+        must not crash the CLI with an unhandled JSONDecodeError. Fall back
+        to the defaults loudly: the next write repairs the file.
+        """
+        last_error = None
+        for attempt in range(2):
+            try:
+                # Read and close in one call, then parse: on Windows a writer
+                # cannot replace a file this process holds open, so the
+                # shorter the fd lives the less a reader blocks writers.
+                with open(self._state_path, "rb") as f:
+                    raw = f.read()
+                return json.loads(raw)
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError) as error:
+                last_error = error
+            if attempt == 0:
+                time.sleep(_READ_RETRY_DELAY)
+        logger.warning(
+            f"Runtime state {self._state_path} is unreadable ({last_error}); "
+            "falling back to default state"
+        )
+        return copy.deepcopy(default_state)
+
+    def _write_state(self, state: dict):
+        """Write the state file atomically, so readers never see a partial file."""
+        directory = os.path.dirname(self._state_path)
+        fd, tmp_path = tempfile.mkstemp(
+            dir=directory, prefix=".state.json.", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(state, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            self._replace(tmp_path)
+        finally:
+            # A successful replace moved the temp file away; anything still
+            # there is from a failed write and must not be left behind.
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+
+    def _replace(self, tmp_path: str):
+        deadline = time.monotonic() + _REPLACE_TIMEOUT
+        delay = 0.001
+        while True:
+            try:
+                os.replace(tmp_path, self._state_path)
+                return
+            except PermissionError:
+                # Windows only: a reader currently holds the destination
+                # open. Back off (with jitter, so concurrent writers do not
+                # keep colliding) and try again until the budget runs out.
+                if time.monotonic() >= deadline:
+                    raise
+            time.sleep(delay * (1 + random.random()))
+            delay = min(delay * 2, 0.1)
 
 
 class RuntimeTempState(object):

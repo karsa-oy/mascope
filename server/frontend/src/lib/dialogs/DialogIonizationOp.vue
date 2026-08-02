@@ -75,7 +75,7 @@ watch(visible, () => {
                   matching with an ionization mode configured here.
                 </p>
           `,
-              { layer }
+              { layer, doc: app.ui.help.docUrl('guides/import-files/#set-up-ionization-modes') }
             )
           "
         >
@@ -93,17 +93,28 @@ watch(visible, () => {
                   form ions detected by the mass spectrometer.
                 </p>
                 <p>
-                  The ionization mechanism is defined in the format
-                  <code>[modification]</code><code>[polarity]</code>,
-                  where <code>[modification]</code> is the composition change
-                  (e.g. <code>+H</code>, <code>+Br</code>, <code>-H</code>) and
-                  <code>[polarity]</code> is either <code>+</code> or <code>-</code>.
-                  
-                  For example, <code>+H+</code> indicates protonation in positive mode,
-                  while <code>−H−</code> indicates deprotonation in negative mode.
+                  A mechanism describes a single charge-forming reaction as an
+                  operation, a modification formula, and the charge of the
+                  transferred species: a leading <code>+</code> (add) or
+                  <code>-</code> (remove), the formula added or removed
+                  (e.g. <code>H</code> or <code>Br</code>), and a trailing
+                  <code>+</code> or <code>-</code> giving that species' charge.
+                  The <em>ion</em> polarity is not written directly &mdash; it
+                  follows from the two signs: adding a positively charged species
+                  or removing a negatively charged one yields a positive ion, and
+                  vice versa.
                 </p>
+                <ul>
+                  <li><code>+H+</code> &mdash; protonation, <code>[M+H]+</code> (positive)</li>
+                  <li>
+                    <code>-H+</code> &mdash; deprotonation, i.e. removal of a
+                    proton (<code>H+</code>), giving <code>[M-H]-</code> (negative)
+                  </li>
+                  <li><code>+Br-</code> &mdash; bromide adduct, <code>[M+Br]-</code> (negative)</li>
+                  <li>a bare <code>+</code> or <code>-</code> &mdash; electron transfer</li>
+                </ul>
           `,
-              { layer }
+              { layer, doc: app.ui.help.docUrl('concepts/#ionization-modes-and-mechanisms') }
             )
           "
           >Ionization Mechanisms</Tab

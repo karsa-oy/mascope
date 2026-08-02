@@ -744,6 +744,10 @@ The log files are named in the form `<date>.<module>.log` and placed in the acti
 
 > [!TIP]
 > To query these logs with the CLI, you can run `mascope logs query`. To delete old or empty log files, use `mascope logs gc`.
+>
+> Useful filters: `-l error` (minimum level), `--from`/`--to`/`--interval` (time range), `-g <pattern>` (grep with surrounding context), `-s backend` (one service only), and `-m 50` (the 50 most recent matches). For scripts and agents, `--json` emits the raw NDJSON records without colors — e.g. `mascope logs query --prod -l warning --interval '1 day' --json`.
+>
+> To run the same query on a production server from your workstation, use `mascope fleet logs <host> ...` — it SSHes over the tailnet using the fleet's Ansible inventory (see `tooling/fleet/README.md`).
 
 #### Structured logging
 
@@ -1857,6 +1861,26 @@ package.json  npm package w/ dependencies
 ...           other tooling configs
 ```
 
+### User docs in dev
+
+The user documentation (`docs/user`, built with MkDocs Material) is baked into
+the frontend image and served at `/docs/` in production, and the in-app help
+popovers link into it. In dev, the vite server proxies `/docs/` to a local
+`mkdocs serve`, so the same links work and docs edits live-reload inside the
+app:
+
+```sh
+# from server/frontend (or `uv run mkdocs serve` at the repo root)
+npm run docs     # serves the docs at http://localhost:8000/docs/
+npm run dev      # /docs/ links in the app now resolve
+```
+
+Without `mkdocs serve` running, `/docs/` responds with a hint page instead.
+Point the proxy elsewhere with `MASCOPE_DOCS_URL` (e.g. when port 8000 is
+taken). The help popover bodies sourced from `docs/user/_help/` snippets
+(help-content.json) are only rendered in the built image, not by
+`mkdocs serve` — in dev those cards fall back to their title.
+
 ### Frontend Tech
 
 The Mascope frontend is build with the following technologies:
@@ -2723,7 +2747,8 @@ So the one version flows everywhere: git tag, GitHub Release, Zenodo DOI, the im
 
 - a one-to-two sentence summary of the release;
 - highlights grouped as **Added / Changed / Fixed**;
-- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade).
+- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade);
+- a standing note about the installer assets: *"The two File Agent installers are identical — `Mascope-File-Agent-Setup.exe` is the fixed-name copy the in-app download button points at, `Mascope-File-Agent-Setup-vX.Y.Z.exe` the versioned copy for your records. Download either."* (Customers do notice the duplicate and wonder.)
 
 Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release); deployers pin `MASCOPE_VERSION=X.Y.Z` - neither needs the per-merge build tags.
 

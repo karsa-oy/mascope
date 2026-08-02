@@ -16,6 +16,7 @@ from fastapi_users.exceptions import InvalidPasswordException
 from sqlalchemy import select
 
 from mascope_backend.api.lib.exceptions.api_exceptions import NotFoundException
+from mascope_backend.api.lib.rate_limit import clear_login_rate_limit
 from mascope_backend.api.new.auth.access_token.service import regenerate_access_token
 from mascope_backend.api.new.auth.config import auth_settings
 from mascope_backend.api.new.users import exceptions
@@ -244,16 +245,15 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        runtime.logger.info(
-            f"User {user.username} has forgot the password. Reset token: {token}"
-        )
+        # Never log the token: it grants a password reset. Deliver it to the
+        # user out of band (e.g. email) instead.
+        runtime.logger.info(f"Password reset requested for user {user.username}")
 
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        runtime.logger.info(
-            f"Verification requested for user {user.username}. Verification token: {token}"
-        )
+        # Never log the token: it grants email verification.
+        runtime.logger.info(f"Email verification requested for user {user.username}")
 
     async def on_after_login(
         self,
@@ -271,6 +271,21 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
         :param response: Optional response built by the transport.
         Defaults to None
         """
+        # A successful login resets the per-account limiter so it only counts
+        # failed attempts (the user's own logins must not consume the budget,
+        # and bogus attempts against a known address must not outlast a real
+        # sign-in). Keyed on the submitted form identifier, exactly as the
+        # limiter keys it; request.form() is cached by Starlette, so re-reading
+        # it here is free. Done before the sid early-return below so API-only
+        # logins (SDK, scripts) also clear the counter.
+        if request is not None:
+            try:
+                identifier = (await request.form()).get("username")
+            except Exception:
+                identifier = None
+            if identifier:
+                await clear_login_rate_limit(str(identifier))
+
         worker_pid = os.getpid()
         try:
             # Step 1: Socket authentication

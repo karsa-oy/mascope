@@ -339,7 +339,8 @@ watch(
         </p>
         <p>
         Right click on any ion to manage its parent compound.
-        </p>`
+        </p>`,
+        { doc: app.ui.help.docUrl('guides/target-collections/#read-the-results') }
       )
     "
   >

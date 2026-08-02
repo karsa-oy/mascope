@@ -60,6 +60,7 @@ also run the demo from source with `mascope demo` (see
 | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Users** (scientists, operators)  | [User docs](docs/user/index.md) (MkDocs site under `docs/user/`)                                |
 | **SDK / notebook users**           | [SDK readme](libraries/sdk/README.md)                                                           |
+| **Instrument PCs** (automatic upload) | [File Agent](docs/user/instruments/index.md#the-file-agent)                                  |
 | **Developers / contributors**      | [Developer guide](docs/dev/developer_guide.md) (build, run, runtime, backend, database, deploy) |
 | **Hosting & deployment**           | [Hosting](docs/hosting.md) (managed, local, LAN/production)                                     |
 | **Demo dataset & reproducibility** | [Demo dataset](docs/demo_dataset.md)                                                            |
