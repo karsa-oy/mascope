@@ -13,6 +13,11 @@ mascope = MascopeClient(workspace="My Workspace")
 peaks = mascope.load_peaks(dataset="My Dataset", batches="Uronium")
 ```
 
+!!! tip "New to Python?"
+    Follow the step-by-step [getting started guide](getting-started.md) — it
+    walks you from installing an editor to running your first tutorial
+    notebook in about 15 minutes.
+
 Full reference, configuration, and tutorial notebooks: see the
 [SDK readme on GitHub](https://github.com/karsa-oy/mascope/blob/master/libraries/sdk/README.md).
 
