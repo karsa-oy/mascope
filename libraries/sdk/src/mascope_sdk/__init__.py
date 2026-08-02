@@ -14,7 +14,7 @@ from importlib.metadata import version
 __version__ = version("mascope_sdk")
 
 # Agent-internal helpers (used by file-agent)
-from ._agents import SERVICE_NAME, api_post_file  # noqa: F401
+from ._agents import SERVICE_NAME, api_post_file, api_post_file_tus  # noqa: F401
 
 # Public API
 from .client import MascopeClient
@@ -75,4 +75,5 @@ __all__ = [
     # Agent helpers
     "SERVICE_NAME",
     "api_post_file",
+    "api_post_file_tus",
 ]
