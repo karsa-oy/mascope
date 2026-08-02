@@ -308,8 +308,10 @@ class FileSystemWatcher:
         """
         self.observer.schedule(self.handler, self.path, recursive=self.recursive)
         self.observer.start()
+        scope = " and its subfolders" if self.recursive else ""
         runtime.logger.info(
-            f"Started watching {self.path} for new files matching pattern '{self.mask}'"
+            f"Started watching {self.path}{scope} for new files "
+            f"matching pattern '{self.mask}'"
         )
 
     def stop(self) -> None:
@@ -348,11 +350,11 @@ class FileUploader:
     Mascope after file has not been accessed for specified timeout period.
     """
 
-    def __init__(self, source_path: str, mask: str):
+    def __init__(self, source_path: str, mask: str, recursive: bool = False):
         self.shutdown_event = Event()
         self.jobs = Queue()
         self.watcher = FileSystemWatcher(
-            client=self, path=source_path, mask=mask, recursive=False
+            client=self, path=source_path, mask=mask, recursive=recursive
         )
 
     def on_filesystem_object_created(self, fname: str) -> None:
@@ -364,6 +366,11 @@ class FileUploader:
         :param fname: File path
         :type fname: str
         """
+        # failed_uploads holds copies of files that already failed; watching
+        # it recursively would re-upload (and re-fail) them in a loop
+        if "failed_uploads" in os.path.normpath(fname).split(os.sep):
+            runtime.logger.debug(f"Ignoring file in failed_uploads: {fname}")
+            return
         runtime.logger.info(f"File created: {fname}")
         # Wait until the file is ready
         filesize = -1
@@ -483,7 +490,9 @@ def run() -> None:
 
     if not os.path.isdir(runtime.config.source):
         raise RuntimeError(f"Invalid source directory {runtime.config.source}")
-    uploader = FileUploader(runtime.config.source, runtime.config.mask)
+    uploader = FileUploader(
+        runtime.config.source, runtime.config.mask, recursive=runtime.config.recursive
+    )
     uploader.watcher.run_as_daemon()
     uploader.run_until_complete()
     executor.shutdown(wait=True)

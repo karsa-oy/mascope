@@ -70,6 +70,7 @@ def test_run_setup_wizard_happy_path(monkeypatch, tmp_path, capsys):
             "m",  # auth method: manual token entry
             "my-token",  # access token
             str(source),  # watched folder
+            "",  # subfolders: accept default (no)
             "",  # mask: accept default
         ]
     )
@@ -81,9 +82,30 @@ def test_run_setup_wizard_happy_path(monkeypatch, tmp_path, capsys):
     assert settings["host"] == "mascope.example.com"
     assert settings["access_token"] == "my-token"
     assert settings["source"] == str(source)
+    assert settings["recursive"] is False
     assert settings["mask"] == "*.raw"
     assert settings["timeout"] == 3
     assert "accepted the access token" in capsys.readouterr().out
+
+
+def test_run_setup_wizard_enables_subfolder_watching(monkeypatch, tmp_path):
+    source = tmp_path / "watched"
+    source.mkdir()
+    answers = iter(
+        [
+            "mascope.example.com",  # server address
+            "m",  # auth method: manual token entry
+            "my-token",  # access token
+            str(source),  # watched folder
+            "y",  # subfolders: yes
+            "",  # mask default
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    monkeypatch.setattr(wizard, "verify_connection", lambda host, token: (True, ""))
+
+    settings = wizard.run_setup_wizard({"mask": "*.raw", "timeout": 3})
+    assert settings["recursive"] is True
 
 
 def test_run_setup_wizard_retries_bad_token(monkeypatch, tmp_path):
@@ -97,6 +119,7 @@ def test_run_setup_wizard_retries_bad_token(monkeypatch, tmp_path):
             "t",  # choose: re-enter token
             "good-token",  # second token attempt
             str(source),  # watched folder
+            "",  # subfolders default (no)
             "",  # mask default
         ]
     )
@@ -119,6 +142,7 @@ def test_run_setup_wizard_pairing_path(monkeypatch, tmp_path):
             "mascope.example.com",  # server address
             "",  # auth method: default (pairing, since no existing token)
             str(source),  # watched folder
+            "",  # subfolders default (no)
             "",  # mask default
         ]
     )
@@ -139,6 +163,7 @@ def test_run_setup_wizard_pairing_falls_back_to_manual(monkeypatch, tmp_path):
             "p",  # auth method: pairing
             "manual-token",  # manual entry after pairing fails
             str(source),  # watched folder
+            "",  # subfolders default (no)
             "",  # mask default
         ]
     )
@@ -237,6 +262,7 @@ def test_run_setup_wizard_creates_missing_source(monkeypatch, tmp_path):
             "tok",
             str(source),  # does not exist yet
             "y",  # create it
+            "",  # subfolders default (no)
             "",  # mask default
         ]
     )
