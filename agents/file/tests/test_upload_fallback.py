@@ -6,7 +6,7 @@ Hermetic: the SDK upload functions and the runtime are monkeypatched.
 import pytest
 
 from mascope_file_agent import main
-from mascope_sdk.exceptions import AuthenticationError, NotFoundError
+from mascope_sdk.exceptions import NotFoundError, TusNotSupportedError
 
 
 class StubLogger:
@@ -64,22 +64,14 @@ def test_uploads_via_tus_by_default(monkeypatch, sample_file):
     assert not main._legacy_upload
 
 
-@pytest.mark.parametrize(
-    "exception",
-    [
-        NotFoundError("Not found.", status_code=404),
-        AuthenticationError("Not configured for access.", status_code=401),
-    ],
-)
-def test_falls_back_to_legacy_endpoint_on_old_server(
-    monkeypatch, sample_file, exception
-):
+@pytest.mark.parametrize("status", [404, 401])
+def test_falls_back_to_legacy_endpoint_on_old_server(monkeypatch, sample_file, status):
     tus_calls = []
     legacy_calls = []
 
     def failing_tus(**kwargs):
         tus_calls.append(kwargs)
-        raise exception
+        raise TusNotSupportedError("No token TUS access.", status_code=status)
 
     monkeypatch.setattr(main, "api_post_file_tus", failing_tus)
     monkeypatch.setattr(
@@ -96,9 +88,29 @@ def test_falls_back_to_legacy_endpoint_on_old_server(
     assert len(legacy_calls) == 2
 
 
+def test_mid_transfer_errors_do_not_latch_legacy_fallback(monkeypatch, sample_file):
+    # An upload vanishing mid-transfer (e.g. backend restart) keeps its
+    # normal type: the outer retry loop handles it, and the agent must
+    # not conclude "old server" and cap itself at 100 MB.
+    def failing_tus(**kwargs):
+        raise NotFoundError("Upload not found", status_code=404)
+
+    monkeypatch.setattr(main, "api_post_file_tus", failing_tus)
+    monkeypatch.setattr(
+        main,
+        "api_post_file",
+        lambda **kwargs: pytest.fail("legacy endpoint must not be used"),
+    )
+
+    with pytest.raises(NotFoundError):
+        main.upload_sample_file(sample_file)
+
+    assert not main._legacy_upload
+
+
 def test_legacy_fallback_enforces_size_cap(monkeypatch, sample_file):
     def failing_tus(**kwargs):
-        raise NotFoundError("Not found.", status_code=404)
+        raise TusNotSupportedError("No token TUS access.", status_code=404)
 
     monkeypatch.setattr(main, "api_post_file_tus", failing_tus)
     monkeypatch.setattr(

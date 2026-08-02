@@ -77,6 +77,19 @@ class ServerError(MascopeAPIError):
     pass
 
 
+class TusNotSupportedError(MascopeAPIError):
+    """Raised when the server has no token-accessible TUS upload endpoint.
+
+    Raised only from the TUS upload *creation* request (a 404 means no TUS
+    route, a 401 means the route is not token-accessible - both indicate an
+    older Mascope release, though a 401 can also mean a genuinely bad
+    token). Callers use this as the signal to fall back to the legacy
+    upload endpoint; errors during chunk transfer keep their normal types.
+    """
+
+    pass
+
+
 class MascopeConnectionError(MascopeError):
     """Raised when unable to connect to the Mascope server.
 
