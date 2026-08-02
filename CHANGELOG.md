@@ -11,9 +11,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   set `recursive = true` in its `config.toml`. The agent's own
   `failed_uploads` folder is always excluded, so failed files are never
   re-uploaded in a loop. The installer's finish page now also explains
-  that the watched folder is chosen in the first-start setup (it is
-  unrelated to the install location), and the user docs cover disabling
-  or removing the agent.
+  that the watched folder is chosen in the guided setup on first start,
+  and the user docs cover disabling or removing the agent.
 
 - `mascope fleet` (source checkouts only): `fleet list` shows the production
   servers from the fleet's Ansible inventory, and `fleet logs <host> ...`

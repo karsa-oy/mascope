@@ -37,9 +37,9 @@ Compression=lzma2
 SolidCompression=yes
 
 [Messages]
-; Head off a common misconception: the agent does not watch the folder it
-; is installed in - the watched folder is chosen in the first-start setup.
-FinishedLabel=Setup has finished installing [name] on your computer.%n%nThe agent is not tied to the folder it was installed in: when it first starts, a guided setup runs in its console window and asks for your Mascope server address and the folder to watch for new data files.
+; Tell the user what happens next: the watched folder is not chosen at
+; install time but in the guided setup on first start.
+FinishedLabel=Setup has finished installing [name] on your computer.%n%nWhen the agent first starts, a guided setup runs in its console window and asks for your Mascope server address and the folder to watch for new data files.
 
 [Tasks]
 Name: "startup"; Description: "Start the File Agent automatically when you sign in to Windows"
