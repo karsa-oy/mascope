@@ -56,6 +56,7 @@ plus a temporary one built for a compose invocation) must not share
 or clobber each other's state.
 """
 
+import contextlib
 import copy
 import json
 import os
@@ -178,10 +179,8 @@ class RuntimeJsonState(object):
         finally:
             # A successful replace moved the temp file away; anything still
             # there is from a failed write and must not be left behind.
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
 
     def _replace(self, tmp_path: str):
         deadline = time.monotonic() + _REPLACE_TIMEOUT

@@ -48,10 +48,13 @@ def user_temp_path(user_id: int, filename: str, *, create: bool = True) -> str:
     safe = os.path.basename(filename)
     if not safe or safe in (os.curdir, os.pardir):
         raise ValueError(f"Unsafe temp filename: {filename!r}")
-    base = user_temp_dir(user_id, create=create)
-    path = os.path.join(base, safe)
-    # Defense in depth: the resolved path must stay within the user's dir.
-    real_base = os.path.realpath(base)
-    if os.path.commonpath([os.path.realpath(path), real_base]) != real_base:
+    base = os.path.normpath(user_temp_dir(user_id, create=create))
+    # The normalized path must stay within the user's dir. (normpath +
+    # prefix check is the containment guard static analysis recognizes.)
+    path = os.path.normpath(os.path.join(base, safe))
+    if not path.startswith(base + os.sep):
+        raise ValueError(f"Unsafe temp filename: {filename!r}")
+    # Defense in depth: a symlink inside the dir must not escape it either.
+    if not os.path.realpath(path).startswith(os.path.realpath(base) + os.sep):
         raise ValueError(f"Unsafe temp filename: {filename!r}")
     return path

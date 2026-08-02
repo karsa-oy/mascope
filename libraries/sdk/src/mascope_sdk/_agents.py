@@ -6,6 +6,7 @@ New user-facing code should use :class:`MascopeClient` instead.
 """
 
 import base64
+import contextlib
 import json
 import os
 import sys
@@ -196,15 +197,13 @@ def _tus_delete(upload_url: str, access_token: str) -> None:
     Failures are ignored: the backend wipes its temp directory on every
     startup, so a resource that could not be deleted is cleaned up then.
     """
-    try:
+    with contextlib.suppress(RequestException):
         requests.delete(
             upload_url,
             headers=_tus_headers(access_token),
             verify=False,
             timeout=30,
         )
-    except RequestException:
-        pass
 
 
 def api_post_file_tus(
