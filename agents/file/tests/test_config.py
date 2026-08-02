@@ -72,6 +72,7 @@ def test_merge_settings_applies_defaults_and_drops_unknown_keys():
     assert merged["host"] == "example.com"
     assert merged["mask"] == "*.raw"
     assert merged["timeout"] == 3
+    assert merged["recursive"] is False
     assert "obsolete_key" not in merged
     assert config.missing_settings(merged) == ["access_token", "source"]
 
@@ -94,6 +95,7 @@ def test_write_and_load_user_config_roundtrip(tmp_path):
             "access_token": "secret-token",
             "source": r"C:\Xcalibur\Data",
             "mask": "*.raw",
+            "recursive": True,
             "filename_suffix": "_lab1",
         }
     )
@@ -165,6 +167,7 @@ def test_write_runtime_config_is_valid_and_absolute(tmp_path):
     assert agent["host"] == "mascope.example.com"
     assert agent["access_token"] == "tok"
     assert agent["source"] == r"C:\Xcalibur\Data"
+    assert agent["recursive"] is False
     assert agent["filename_prefix"] == "lab1_"
     assert "filename_suffix" not in agent
     # logs resolve next to config.toml, not into the nested runtime env

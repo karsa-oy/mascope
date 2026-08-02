@@ -125,6 +125,7 @@ color = "purple"
 mask = '*.raw'
 timeout = 10
 source = './agents/file'
+# recursive = false
 host = 'localhost'
 access_token = ''
 # filename_prefix = ''
