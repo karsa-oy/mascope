@@ -51,6 +51,14 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Fixed
 
+- The file converter no longer floods the logs (and GlitchTip, when error
+  reporting is on) with `ConnectionError` events while the backend is still
+  starting up. It now waits for the backend quietly - retrying with backoff
+  and logging each attempt at INFO - and starts its watcher and worker
+  threads only after the socket is connected, which also removes the
+  startup `BadNamespaceError` emit failures. A single WARNING fires if the
+  backend stays unreachable for over two minutes, so a genuinely down
+  backend still surfaces as one monitored event.
 - Two `mascope` commands starting at the same moment no longer crash with
   `json.JSONDecodeError: Expecting value`. Every invocation rewrites
   `.runtime/state.json` during startup (the entrypoint clears the env

@@ -31,29 +31,30 @@ class FileConverterSocketClient:
         )
 
     def connect(self):
-        """Connect to Mascope server"""
-        try:
-            # Guard check if already connected (multiple workers race condition)
-            if self.sio.connected:
-                runtime.logger.debug("Already connected, skipping reconnect")
-                return
+        """Connect to Mascope server.
 
-            self.sio.connect(
-                self.url,
-                headers={"X-Service-Name": "file-converter"},
-                namespaces=["/file-converter"],
-                # Websocket only: a single persistent connection stays pinned to one
-                # backend worker. The default polling handshake issues several HTTP
-                # requests that a multi-worker backend (workers="auto") load-balances
-                # across processes, so the Engine.IO session is never found on the
-                # worker handling the next request and the namespace never connects.
-                # The file-converter reaches the backend directly (no nginx ip_hash
-                # stickiness), so it must avoid polling itself.
-                transports=["websocket"],
-            )
-        except Exception:
-            runtime.logger.exception("Failed to connect")
-            raise
+        Raises on failure; the caller owns retry and logging (during a
+        stack restart the backend is expected to be unreachable for a
+        while, so a failed attempt here is not an incident by itself).
+        """
+        # Guard check if already connected (multiple workers race condition)
+        if self.sio.connected:
+            runtime.logger.debug("Already connected, skipping reconnect")
+            return
+
+        self.sio.connect(
+            self.url,
+            headers={"X-Service-Name": "file-converter"},
+            namespaces=["/file-converter"],
+            # Websocket only: a single persistent connection stays pinned to one
+            # backend worker. The default polling handshake issues several HTTP
+            # requests that a multi-worker backend (workers="auto") load-balances
+            # across processes, so the Engine.IO session is never found on the
+            # worker handling the next request and the namespace never connects.
+            # The file-converter reaches the backend directly (no nginx ip_hash
+            # stickiness), so it must avoid polling itself.
+            transports=["websocket"],
+        )
 
     def emit(self, event: str, data: dict, auth: dict = {}):
         """Emit an event to the server, with optional auth.
