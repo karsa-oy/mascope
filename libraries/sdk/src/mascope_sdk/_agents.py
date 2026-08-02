@@ -43,8 +43,17 @@ TUS_UPLOAD_PATH = "sample/files/upload/tus"
 #: at 100 MB) while staying large enough that overhead is negligible.
 TUS_CHUNK_SIZE = 50 * 1024**2
 
+#: Floor for adaptive chunk shrinking. A chunk that repeatedly dies
+#: mid-request is halved down to this floor: some server/proxy chains
+#: abort large request bodies (observed with tuspyserver 4.1.3 behind a
+#: Cloudflare tunnel, where PATCH bodies over ~25 MB were cut while
+#: smaller ones passed), and smaller chunks get through where a fixed
+#: size would fail forever.
+TUS_MIN_CHUNK_SIZE = 5 * 1024**2
+
 #: Consecutive failed chunk attempts before the upload is abandoned.
-TUS_MAX_ATTEMPTS = 4
+#: Generous enough that halving from TUS_CHUNK_SIZE can reach the floor.
+TUS_MAX_ATTEMPTS = 6
 
 #: Base for the exponential backoff between resumed chunk attempts
 #: (2 s, 4 s, 8 s - matching the retry policy in ``_http``).
@@ -181,6 +190,23 @@ def _tus_offset(upload_url: str, access_token: str) -> int | None:
         return None
 
 
+def _tus_delete(upload_url: str, access_token: str) -> None:
+    """Best-effort removal of an abandoned upload resource (TUS DELETE).
+
+    Failures are ignored: the backend wipes its temp directory on every
+    startup, so a resource that could not be deleted is cleaned up then.
+    """
+    try:
+        requests.delete(
+            upload_url,
+            headers=_tus_headers(access_token),
+            verify=False,
+            timeout=30,
+        )
+    except RequestException:
+        pass
+
+
 def api_post_file_tus(
     url: str,
     access_token: str,
@@ -195,8 +221,10 @@ def api_post_file_tus(
     the server-confirmed offset (TUS HEAD), so a network drop mid-file
     costs at most one chunk, not the whole upload - and no single request
     body ever exceeds ``chunk_size``, which keeps uploads of any size
-    within reverse-proxy body limits. The backend processes the file when
-    the last chunk arrives.
+    within reverse-proxy body limits. Chunks that fail on connection
+    errors are halved down to ``TUS_MIN_CHUNK_SIZE``, so servers or
+    proxies that abort large request bodies still make progress. The
+    backend processes the file when the last chunk arrives.
 
     :param url: The base URL of the server.
     :param access_token: Authorization token for API access.
@@ -278,6 +306,38 @@ def api_post_file_tus(
     if size == 0:
         return  # the server completes empty uploads at creation
 
+    try:
+        _transfer_chunks(upload_url, access_token, filepath, size, chunk_size)
+    except Exception:
+        # Abandoning the transfer would otherwise leave a partial upload
+        # on the server until its next restart - and the caller's outer
+        # retry creates a fresh resource per attempt, multiplying them.
+        _tus_delete(upload_url, access_token)
+        raise
+    logger.debug(f"TUS upload of {filename} completed ({size} bytes)")
+
+
+def _transfer_chunks(
+    upload_url: str,
+    access_token: str,
+    filepath: str,
+    size: int,
+    chunk_size: int,
+) -> None:
+    """Send the file content in resumable PATCH chunks.
+
+    :param upload_url: Full URL of the created upload resource
+    :type upload_url: str
+    :param access_token: Authorization token for API access
+    :type access_token: str
+    :param filepath: Path to the file to upload
+    :type filepath: str
+    :param size: Declared upload length in bytes
+    :type size: int
+    :param chunk_size: Starting bytes per PATCH request; halved down to
+        :data:`TUS_MIN_CHUNK_SIZE` on connection failures
+    :type chunk_size: int
+    """
     offset = 0
     failures = 0
     with open(filepath, "rb") as file:
@@ -339,12 +399,24 @@ def api_post_file_tus(
                             url=upload_url,
                         ) from e
                     raise
+                if isinstance(e, (Timeout, RequestsConnectionError)):
+                    # A connection that dies mid-chunk can mean the
+                    # server/proxy chain cannot take a body this large
+                    # (tuspyserver 4.1.3 behind Cloudflare cut PATCHes
+                    # over ~25 MB) - halve so the upload makes progress
+                    # instead of retrying the same doomed size, and keep
+                    # the reduced size for the rest of the file.
+                    chunk_size = max(
+                        chunk_size // 2, min(chunk_size, TUS_MIN_CHUNK_SIZE)
+                    )
                 delay = TUS_RETRY_BACKOFF_BASE**failures
                 logger.info(
-                    "Chunk upload failed (attempt {}/{}), resuming in {}s: {}",
+                    "Chunk upload failed (attempt {}/{}), resuming in {}s "
+                    "with {} MB chunks: {}",
                     failures,
                     TUS_MAX_ATTEMPTS,
                     delay,
+                    round(chunk_size / 1024**2, 1),
                     e,
                 )
                 time.sleep(delay)
@@ -354,5 +426,3 @@ def api_post_file_tus(
                 continue
             failures = 0
             offset += len(chunk)
-
-    logger.debug(f"TUS upload of {filename} completed ({size} bytes)")

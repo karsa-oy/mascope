@@ -18,6 +18,26 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   limit. (A new agent pointed at a not-yet-updated server likewise
   falls back to the legacy endpoint automatically.)
 
+- File Agent uploads adapt to unreliable upload paths: a chunk that
+  repeatedly dies mid-transfer is halved (50 -> 25 -> ... -> 5 MB)
+  before resuming. Verified against a real Cloudflare tunnel, where a
+  tuspyserver 4.1.3 server aborts PATCH bodies over ~25 MB (see the
+  upgrade below) - the halving lets a new agent keep uploading through
+  Cloudflare even against a not-yet-upgraded server, and guards
+  against genuine proxy body caps in general. An abandoned upload now
+  also deletes its partial data from the server instead of leaving it
+  there until the next restart.
+
+- `tuspyserver` upgraded 4.1.3 -> 4.2.0: fixes uploads behind
+  Cloudflare, where 4.1.3 aborted PATCH request bodies over ~25 MB
+  (A/B-verified through a real Cloudflare tunnel: 30-40 MB chunks fail
+  on 4.1.3 and pass on 4.2.0), and picks up the upstream fix for the
+  upload-breaking `file_dep` regression (issue #1159) plus
+  offset/resume handling improvements. Newer versions stay blocked:
+  4.2.1 ships a path traversal fixed only later, and 4.2.2+ cannot
+  import on Windows (unconditional `fcntl`), which would break native
+  dev runs.
+
 - The File Agent can now watch subfolders of the watched folder: answer
   yes to the new "Also watch subfolders?" question in the guided setup, or
   set `recursive = true` in its `config.toml`. The agent's own
