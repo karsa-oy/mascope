@@ -14,13 +14,17 @@ import time
 import requests
 import urllib3
 from loguru import logger
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import RequestException, Timeout
 
 from ._http import _is_retryable, _raise_for_status
 from .exceptions import (
+    AuthenticationError,
     MascopeAPIError,
     MascopeConnectionError,
     MascopeTimeoutError,
+    NotFoundError,
+    TusNotSupportedError,
 )
 
 
@@ -42,8 +46,9 @@ TUS_CHUNK_SIZE = 50 * 1024**2
 #: Consecutive failed chunk attempts before the upload is abandoned.
 TUS_MAX_ATTEMPTS = 4
 
-#: Seconds to wait before resuming after a failed chunk.
-TUS_RETRY_DELAY = 5
+#: Base for the exponential backoff between resumed chunk attempts
+#: (2 s, 4 s, 8 s - matching the retry policy in ``_http``).
+TUS_RETRY_BACKOFF_BASE = 2
 
 
 def _get_service_name() -> str:
@@ -202,13 +207,17 @@ def api_post_file_tus(
     :param chunk_size: Bytes per PATCH request.
     :type chunk_size: int, optional
     :raises ValueError: if ``upload_filename`` contains path components.
+    :raises TusNotSupportedError: if the creation request is rejected with
+        404/401, meaning the server has no token-accessible TUS endpoint
+        (older Mascope release) - the caller's signal to fall back to the
+        legacy upload endpoint.
     :raises MascopeTimeoutError: if a request times out (after retries).
     :raises MascopeConnectionError: if the server cannot be reached (after retries).
     :raises MascopeAPIError: on an error response; the concrete subclass
         (``AuthenticationError``, ``NotFoundError``, ``ValidationError``,
-        ``ServerError``) and message carry the specific cause. Callers can
-        use ``NotFoundError``/``AuthenticationError`` from the initial
-        request to detect servers without token-accessible TUS uploads.
+        ``ServerError``) and message carry the specific cause. Errors
+        during chunk transfer keep these normal types and never signal
+        fallback.
     """
     if upload_filename:
         filename = _sanitize_upload_filename(upload_filename)
@@ -243,7 +252,18 @@ def api_post_file_tus(
             f"and your network connection ({e.__class__.__name__}).",
             url=create_url,
         ) from e
-    _raise_for_status(resp, create_url)
+    try:
+        _raise_for_status(resp, create_url)
+    except (NotFoundError, AuthenticationError) as e:
+        # Only the creation request may signal fallback: a 404 means no
+        # TUS route, a 401 a route that is not token-accessible - both an
+        # older Mascope release. The same statuses during chunk transfer
+        # (e.g. the upload vanishing in a backend restart) keep their
+        # normal types, so a transfer hiccup can never latch callers onto
+        # the legacy path.
+        raise TusNotSupportedError(
+            e.message, status_code=e.status_code, url=create_url
+        ) from e
 
     # The Location header's host/scheme depend on proxy headers; only its
     # upload id is trustworthy. Address the upload via our own base URL.
@@ -264,6 +284,15 @@ def api_post_file_tus(
         while offset < size:
             file.seek(offset)
             chunk = file.read(chunk_size)
+            if not chunk:
+                # The file shrank on disk mid-upload (e.g. rewritten by
+                # the instrument); PATCHing empty bodies would loop
+                # forever since the offset never advances.
+                raise MascopeAPIError(
+                    "The file changed on disk during the upload "
+                    f"(expected {size} bytes, found only {offset}).",
+                    url=upload_url,
+                )
             try:
                 resp = requests.patch(
                     upload_url,
@@ -278,16 +307,24 @@ def api_post_file_tus(
                 )
                 _raise_for_status(resp, upload_url)
             except Exception as e:
-                # A 409 means our offset disagrees with the server's (e.g.
-                # a chunk partially arrived before a drop) - resync and
-                # resume. Transient network/server errors resume the same
-                # way; anything else (rejected token, missing endpoint,
-                # validation) is raised to the caller immediately.
+                # Transient failures resume from the server-confirmed
+                # offset: timeouts, dropped connections, retryable server
+                # errors, and 409 (our offset disagrees with the server's,
+                # e.g. a chunk partially arrived before a drop). Anything
+                # else - rejected token, vanished upload, validation, or
+                # a non-connection request error (SSL, proxy config) -
+                # fails fast, matching the retry policy in _http.
                 conflict = isinstance(e, MascopeAPIError) and e.status_code == 409
-                transient = isinstance(e, (Timeout, RequestException)) or _is_retryable(
-                    e
+                transient = (
+                    conflict
+                    or isinstance(e, (Timeout, RequestsConnectionError))
+                    or _is_retryable(e)
                 )
-                if not (conflict or transient):
+                if not transient:
+                    if isinstance(e, RequestException):
+                        raise MascopeConnectionError(
+                            f"The upload request failed: {e}", url=upload_url
+                        ) from e
                     raise
                 failures += 1
                 if failures >= TUS_MAX_ATTEMPTS:
@@ -295,21 +332,22 @@ def api_post_file_tus(
                         raise MascopeTimeoutError(
                             "The upload timed out.", url=upload_url
                         ) from e
-                    if isinstance(e, RequestException):
+                    if isinstance(e, RequestsConnectionError):
                         raise MascopeConnectionError(
                             "Lost the connection while uploading "
                             f"({e.__class__.__name__}).",
                             url=upload_url,
                         ) from e
                     raise
+                delay = TUS_RETRY_BACKOFF_BASE**failures
                 logger.info(
                     "Chunk upload failed (attempt {}/{}), resuming in {}s: {}",
                     failures,
                     TUS_MAX_ATTEMPTS,
-                    TUS_RETRY_DELAY,
+                    delay,
                     e,
                 )
-                time.sleep(TUS_RETRY_DELAY)
+                time.sleep(delay)
                 server_offset = _tus_offset(upload_url, access_token)
                 if server_offset is not None:
                     offset = server_offset

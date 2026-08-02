@@ -27,6 +27,7 @@ from mascope_sdk import (  # noqa: E402  (needs SERVICE_NAME set first)
 from mascope_sdk.exceptions import (  # noqa: E402
     AuthenticationError,
     NotFoundError,
+    TusNotSupportedError,
     ValidationError,
 )
 
@@ -168,11 +169,14 @@ def upload_sample_file(filepath: str) -> None:
                 f"File upload of file {os.path.basename(filepath)} succeeded!"
             )
             return
-        except (NotFoundError, AuthenticationError) as e:
-            # A missing endpoint (404) or a token gate (401) on the TUS
-            # route means an older server; the legacy attempt below gives
-            # the definitive answer (a genuinely bad token fails there
-            # with the proper message).
+        except TusNotSupportedError as e:
+            # Raised only by the upload *creation* request (404: no TUS
+            # route, 401: route not token-accessible) - an older server.
+            # The legacy attempt below gives the definitive answer (a
+            # genuinely bad token fails there with the proper message).
+            # Mid-transfer errors keep their normal types and are retried
+            # by process_file_upload, so a backend restart mid-upload can
+            # never latch the agent onto the capped legacy path.
             runtime.logger.info(
                 "The server does not accept agent TUS uploads, falling back "
                 f"to the legacy upload endpoint: {e}"

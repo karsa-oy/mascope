@@ -13,9 +13,11 @@ import requests
 from mascope_sdk import _agents
 from mascope_sdk.exceptions import (
     AuthenticationError,
+    MascopeAPIError,
     MascopeConnectionError,
     NotFoundError,
     ServerError,
+    TusNotSupportedError,
     ValidationError,
 )
 
@@ -216,21 +218,68 @@ def test_tus_upload_does_not_retry_client_errors(monkeypatch, upload_file):
     assert attempts["n"] == 1  # a rejected request cannot heal by waiting
 
 
-@pytest.mark.parametrize(
-    ("status", "exception"),
-    [(404, NotFoundError), (401, AuthenticationError)],
-)
-def test_tus_create_failure_is_typed_for_fallback(
-    monkeypatch, upload_file, status, exception
-):
-    # The File Agent falls back to the legacy endpoint on these: a 404
+@pytest.mark.parametrize("status", [404, 401])
+def test_tus_create_failure_signals_fallback(monkeypatch, upload_file, status):
+    # The File Agent falls back to the legacy endpoint on this: a 404
     # means no TUS route (old server), a 401 means the route is not
     # token-accessible (old server) or a genuinely bad token.
     monkeypatch.setattr(
         _agents.requests, "post", lambda *a, **k: _fake_response(status)
     )
-    with pytest.raises(exception):
+
+    with pytest.raises(TusNotSupportedError) as exc_info:
         _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert exc_info.value.status_code == status
+
+
+def test_tus_mid_transfer_404_is_not_a_fallback_signal(monkeypatch, upload_file):
+    # An upload vanishing mid-transfer (e.g. backend restart clearing the
+    # temp dir) must keep its normal type: TusNotSupportedError would
+    # latch the agent onto the 100 MB legacy path for its lifetime.
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    monkeypatch.setattr(_agents.requests, "patch", lambda *a, **k: _fake_response(404))
+
+    with pytest.raises(NotFoundError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+
+def test_tus_upload_fails_fast_on_non_connection_request_error(
+    monkeypatch, upload_file
+):
+    monkeypatch.setattr(_agents.requests, "post", _fake_create({}))
+    attempts = {"n": 0}
+
+    def fake_patch(*args, **kwargs):
+        attempts["n"] += 1
+        raise requests.exceptions.InvalidURL("bad proxy configuration")
+
+    monkeypatch.setattr(_agents.requests, "patch", fake_patch)
+
+    with pytest.raises(MascopeConnectionError):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file)
+
+    assert attempts["n"] == 1  # a config error cannot heal by waiting
+
+
+def test_tus_upload_detects_file_shrinking_mid_upload(monkeypatch, upload_file):
+    # If the watched file is rewritten smaller mid-upload, read() returns
+    # b"" while offset < size - without the guard the loop would PATCH
+    # empty bodies forever. Shrink the file between the size probe and
+    # the chunk loop (the creation request sits between the two).
+    def fake_post(url, headers, verify, timeout):
+        open(upload_file, "wb").close()  # truncate to 0 bytes
+        return _fake_response(201, headers=TUS_LOCATION)
+
+    monkeypatch.setattr(_agents.requests, "post", fake_post)
+    monkeypatch.setattr(
+        _agents.requests,
+        "patch",
+        lambda *a, **k: pytest.fail("no PATCH expected for a vanished file"),
+    )
+
+    with pytest.raises(MascopeAPIError, match="changed on disk"):
+        _agents.api_post_file_tus("http://testserver", "tok", upload_file, chunk_size=4)
 
 
 def test_tus_upload_empty_file_completes_at_creation(monkeypatch, tmp_path):
