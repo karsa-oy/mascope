@@ -32,10 +32,31 @@ _COMPOUND_COLUMNS = (
 )
 
 
-def _active_join():
-    """SELECT of compound columns + source name, joined to active sources only."""
+# A total order over reference rows. (source, source_native_id) is unique within
+# a source, so this never leaves two rows tied and therefore free to swap places
+# between two runs of the same query.
+_STABLE_ORDER = (
+    reference_compound.c.formula,
+    reference_source.c.name,
+    reference_compound.c.source_native_id,
+)
+
+
+def active_join(*columns):
+    """SELECT of the given compound columns + source name, active sources only.
+
+    Callers that do not need the structure columns should say so: ``smiles`` and
+    ``inchi`` are unbounded text, and a bulk read that selects them pulls tens of
+    megabytes it never looks at. Defaults to every compound column.
+
+    :param columns: Compound columns to select; all of them when omitted.
+    :return: A SELECT restricted to active sources, ready to be filtered further.
+    """
     return (
-        select(*_COMPOUND_COLUMNS, reference_source.c.name.label("source_name"))
+        select(
+            *(columns or _COMPOUND_COLUMNS),
+            reference_source.c.name.label("source_name"),
+        )
         .select_from(
             reference_compound.join(
                 reference_source,
@@ -45,6 +66,11 @@ def _active_join():
         )
         .where(reference_source.c.is_active.is_(True))
     )
+
+
+def _active_join():
+    """SELECT of every compound column + source name, active sources only."""
+    return active_join()
 
 
 def _row_to_record(row: Any) -> ReferenceRecord:
@@ -86,9 +112,14 @@ async def annotate_formulas(
     """
     formulas = list(formulas)
     # Map canonical form -> the input strings that produced it, so results can be
-    # handed back keyed the way the caller asked.
+    # handed back keyed the way the caller asked. The inputs are de-duplicated
+    # first: the result dict is keyed by the raw string, so a formula appearing
+    # twice in the input would otherwise append every matching record twice into
+    # the one list behind that key. Callers repeat formulas as a matter of course
+    # - the composition search passes one entry per (composition, ionization
+    # mechanism), so the same neutral formula arrives once per adduct.
     canon_to_inputs: dict[str, list[str]] = {}
-    for raw in formulas:
+    for raw in dict.fromkeys(formulas):
         canon = canonical_formula(raw)
         if canon is not None:
             canon_to_inputs.setdefault(canon, []).append(raw)
@@ -97,8 +128,14 @@ async def annotate_formulas(
     if not canon_to_inputs:
         return result
 
-    stmt = _active_join().where(
-        reference_compound.c.formula.in_(canon_to_inputs.keys())
+    # Ordered so the same query returns the same records in the same order on
+    # every call: without it the identities attached to an assignment - and which
+    # of them survive de-duplication or a per-formula cap - vary run to run,
+    # which defeats the point of pinning a source to a version.
+    stmt = (
+        _active_join()
+        .where(reference_compound.c.formula.in_(canon_to_inputs.keys()))
+        .order_by(*_STABLE_ORDER)
     )
     for row in (await session.execute(stmt)).all():
         record = _row_to_record(row)
@@ -139,6 +176,8 @@ async def by_mass_window(
     stmt = (
         _active_join()
         .where(reference_compound.c.monoisotopic_mass.between(low, high))
-        .order_by(reference_compound.c.monoisotopic_mass)
+        # Mass first, as the caller expects, then the stable tiebreak: isomers
+        # share a mass exactly, so mass alone leaves them free to swap order.
+        .order_by(reference_compound.c.monoisotopic_mass, *_STABLE_ORDER)
     )
     return [_row_to_record(row) for row in (await session.execute(stmt)).all()]

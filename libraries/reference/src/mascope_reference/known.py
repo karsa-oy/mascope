@@ -18,9 +18,27 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mascope_reference.query import _active_join
+from mascope_reference.query import _STABLE_ORDER, active_join
 from mascope_reference.schema import reference_compound
 from mascope_tools.composition.utils import parse_composition
+
+
+# Rows are consumed in batches rather than materialized in one list: this runs
+# once per Stage A, and a mirror the size of CompTox is over a million rows.
+_STREAM_BATCH = 2_000
+
+# The columns an identity needs. Deliberately excludes smiles and inchi, which
+# are unbounded text this provider never reads - Stage A matches on formula and
+# shows a name.
+_KNOWN_COLUMNS = (
+    reference_compound.c.formula,
+    reference_compound.c.monoisotopic_mass,
+    reference_compound.c.inchikey,
+    reference_compound.c.name,
+    reference_compound.c.source_native_id,
+    reference_compound.c.xrefs,
+    reference_compound.c.license,
+)
 
 
 # Default bound: the atmospheric-organics window. Elements a monoterpene-SOA /
@@ -106,16 +124,22 @@ async def iter_known_compositions(
     :param max_identities: Cap on identities retained per formula.
     :return: Known compositions, one per unique formula, ascending by formula.
     """
-    stmt = _active_join()
+    stmt = active_join(*_KNOWN_COLUMNS)
     if licenses is not None:
         stmt = stmt.where(reference_compound.c.license.in_(licenses))
     if max_mass is not None:
         stmt = stmt.where(reference_compound.c.monoisotopic_mass <= max_mass)
-    stmt = stmt.order_by(reference_compound.c.formula)
+    # Totally ordered, so which identities survive ``max_identities`` is the same
+    # on every run over the same data rather than whatever order the rows arrive in.
+    stmt = stmt.order_by(*_STABLE_ORDER)
 
     by_formula: dict[str, KnownComposition] = {}
     rejected: set[str] = set()
-    for row in (await session.execute(stmt)).all():
+    # Streamed, not materialized: only the kept set (bounded by the window below)
+    # and the rejected-formula set stay in memory, so an off-domain mirror costs
+    # a scan rather than the whole table resident in the worker.
+    result = await session.stream(stmt.execution_options(yield_per=_STREAM_BATCH))
+    async for row in result:
         formula = row.formula
         if formula in rejected:
             continue

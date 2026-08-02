@@ -61,6 +61,7 @@ async def _known(db_path, **kw):
         await engine.dispose()
 
 
+@pytest.mark.asyncio
 async def test_dedup_on_formula_with_one_to_many_identities(sync_engine, db_path):
     _seed(
         sync_engine,
@@ -93,6 +94,7 @@ async def test_dedup_on_formula_with_one_to_many_identities(sync_engine, db_path
     assert {i.source for i in by_formula["C10H16O3"].identities} == {"src-a", "src-b"}
 
 
+@pytest.mark.asyncio
 async def test_atmospheric_element_bound(sync_engine, db_path):
     _seed(
         sync_engine,
@@ -116,6 +118,7 @@ async def test_atmospheric_element_bound(sync_engine, db_path):
     assert widened == {"C10H16O3", "C8HF15O2"}
 
 
+@pytest.mark.asyncio
 async def test_carbon_and_mass_bounds(sync_engine, db_path):
     _seed(
         sync_engine,
@@ -138,6 +141,7 @@ async def test_carbon_and_mass_bounds(sync_engine, db_path):
     assert loosened == {"C10H16O3", "C50H2O2", "C12H10O2"}
 
 
+@pytest.mark.asyncio
 async def test_license_filter_and_active_only(sync_engine, db_path):
     _seed(
         sync_engine,
@@ -170,6 +174,7 @@ async def test_license_filter_and_active_only(sync_engine, db_path):
     assert public == {"C10H16O3"}
 
 
+@pytest.mark.asyncio
 async def test_identity_cap(sync_engine, db_path):
     _seed(
         sync_engine,

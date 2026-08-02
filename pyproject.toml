@@ -49,6 +49,10 @@ dev = [
     "pytest-alembic>=0.12,<0.13",
     "pytest~=9.1",
     "pytest-asyncio>=1.4.0,<2",
+    # Async SQLite driver for mascope_reference's query-layer tests. They
+    # importorskip on it, so without it here the whole async read path skips
+    # silently in CI rather than failing.
+    "aiosqlite>=0.20,<1",
 ]
 
 [tool.uv.workspace]
