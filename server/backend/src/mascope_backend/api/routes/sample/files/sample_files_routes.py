@@ -475,8 +475,14 @@ def get_upload_handler(
     return handler
 
 
+# tuspyserver 4.1.3 touches the upload file before running its own
+# makedirs (TusUploadFile.__init__ calls create() first), so on a fresh
+# environment the very first upload 500s - ensure the dir exists up front.
+_tus_files_dir = runtime.env.path("temp")
+os.makedirs(_tus_files_dir, exist_ok=True)
+
 sample_files_upload_router = create_tus_router(
-    files_dir=runtime.env.path("temp"),
+    files_dir=_tus_files_dir,
     upload_complete_dep=get_upload_handler,
     prefix="api/sample/files/upload/tus",
 )
