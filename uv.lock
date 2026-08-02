@@ -1569,7 +1569,7 @@ requires-dist = [
     { name = "rich", specifier = ">=15.0.0,<16" },
     { name = "scipy", specifier = "~=1.13" },
     { name = "sqlalchemy", specifier = "~=2.0" },
-    { name = "tuspyserver", specifier = "==4.1.3" },
+    { name = "tuspyserver", specifier = "==4.2.0" },
     { name = "typer", specifier = ">=0.27.0,<0.28" },
     { name = "uvicorn", specifier = ">=0.34,<0.35" },
     { name = "websocket-client", specifier = "~=1.8" },
@@ -3188,14 +3188,14 @@ wheels = [
 
 [[package]]
 name = "tuspyserver"
-version = "4.1.3"
+version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/38/5593176251ed4bb1c121418e7725370023fff820e8e8488864e33b0ff4dd/tuspyserver-4.1.3.tar.gz", hash = "sha256:8adf69b263081b2b78269432e001728de21efae4e14ee48e4a367930747c866a", size = 9870, upload-time = "2025-09-21T14:56:27.633Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/77/e292c2a109146ed5550d663a20de3eb3351f903b471b9075e584d50fd158/tuspyserver-4.2.0.tar.gz", hash = "sha256:4e0681cacfd3460e03726dfe53c7d0c79b54bb6439a0122c141731a1ea3c53ab", size = 10594, upload-time = "2025-10-21T09:28:03.08Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/8b/2baf85d84c5074c3ee78a221488d7a45235016fe9c2cacaa12cdff4f5f5a/tuspyserver-4.1.3-py3-none-any.whl", hash = "sha256:4529cc4b8b7d1bfe16ce0c895f2119b5ce8abb89afc704a79a0754f4d45fd7aa", size = 14212, upload-time = "2025-09-21T14:56:26.42Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/14/c6d42265c6841f743e2098a1512513c4c10bdc1fb88ad8737cef0508c548/tuspyserver-4.2.0-py3-none-any.whl", hash = "sha256:a7529757094a77af3c64142fb4fe72d0ba5c7388d079ad1a296d72d09afe7585", size = 15322, upload-time = "2025-10-21T09:28:01.629Z" },
 ]
 
 [[package]]
