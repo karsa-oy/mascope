@@ -121,10 +121,10 @@ The agent prints its version when it starts, and uninstalling (Windows
   `http://localhost:8090`) — the frontend dev server (port 5173) cannot
   receive uploads.
 - The agent uploads files of any size in resumable chunks, so a network
-  drop mid-file costs at most one chunk. Only against an older Mascope
-  server (without resumable agent uploads) does the agent fall back to
-  single-request uploads, where files larger than 100 MB are rejected,
-  logged and copied to `failed_uploads`.
+  drop mid-file costs at most one chunk. Older agent versions instead
+  upload each file in a single request capped at 100 MB - larger files
+  are rejected, logged and copied to `failed_uploads`. Download the
+  newest installer to remove the limit.
 
 ## After files arrive
 

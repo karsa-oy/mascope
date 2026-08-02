@@ -11,10 +11,12 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   Files travel in 50 MB chunks (staying under reverse-proxy body
   limits), and an interrupted transfer resumes from the last
   server-confirmed byte instead of restarting. The backend's TUS routes
-  accept agent access tokens for this; against an older server the
-  agent detects the missing support on its first upload and falls back
-  to the legacy single-request endpoint (still capped at 100 MB, which
-  also remains available for older TOF Agent installations).
+  now accept agent access tokens for this. Already-deployed agents are
+  unaffected: the legacy single-request endpoint (capped at 100 MB)
+  stays in place, so older File Agent and TOF Agent installations keep
+  uploading as before - upgrading the agent is what lifts the size
+  limit. (A new agent pointed at a not-yet-updated server likewise
+  falls back to the legacy endpoint automatically.)
 
 - The File Agent can now watch subfolders of the watched folder: answer
   yes to the new "Also watch subfolders?" question in the guided setup, or
