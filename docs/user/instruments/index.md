@@ -120,8 +120,11 @@ The agent prints its version when it starts, and uninstalling (Windows
   web app address. In a development setup, use the backend address (e.g.
   `http://localhost:8090`) — the frontend dev server (port 5173) cannot
   receive uploads.
-- Files larger than 100 MB are not uploaded; they are logged and copied to
-  `failed_uploads`.
+- The agent uploads files of any size in resumable chunks, so a network
+  drop mid-file costs at most one chunk. Only against an older Mascope
+  server (without resumable agent uploads) does the agent fall back to
+  single-request uploads, where files larger than 100 MB are rejected,
+  logged and copied to `failed_uploads`.
 
 ## After files arrive
 

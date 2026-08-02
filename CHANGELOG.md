@@ -6,6 +6,16 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- The File Agent now uploads with the resumable TUS protocol - the same
+  endpoint the web app uses - removing the 100 MB upload size limit.
+  Files travel in 50 MB chunks (staying under reverse-proxy body
+  limits), and an interrupted transfer resumes from the last
+  server-confirmed byte instead of restarting. The backend's TUS routes
+  accept agent access tokens for this; against an older server the
+  agent detects the missing support on its first upload and falls back
+  to the legacy single-request endpoint (still capped at 100 MB, which
+  also remains available for older TOF Agent installations).
+
 - The File Agent can now watch subfolders of the watched folder: answer
   yes to the new "Also watch subfolders?" question in the guided setup, or
   set `recursive = true` in its `config.toml`. The agent's own
