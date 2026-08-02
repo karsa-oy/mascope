@@ -4,6 +4,8 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ## [Unreleased]
 
+## [1.5.0] - 2026.08.02
+
 ### Added
 
 - The File Agent now uploads with the resumable TUS protocol - the same
@@ -61,6 +63,14 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   `MASCOPE_SENTRY_TRACES_RATE` (0-1, default 0) samples that fraction of
   requests as transactions, surfacing per-endpoint latency in GlitchTip's
   Performance tab. Invalid values log a warning and keep tracing off.
+- The user documentation is now built into every deployment and served at
+  `/docs/` on the app's own origin, and the in-app help cards link to the
+  relevant page. The docs gained first-steps orientation, concepts and
+  data-hierarchy pages, guides for file import and matching, and a Python
+  SDK getting-started guide.
+- The batch overview chart has a draw style setting (Markers / Lines /
+  Both) in its chart settings menu; line modes keep each series' assigned
+  color instead of falling back to the default colorway.
 
 ### Changed
 
@@ -107,6 +117,21 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
   of being interpolated into the SQL.
 - The pretty log printout now decodes JSON escape sequences in messages
   (previously quotes inside messages rendered as `\"`).
+- Concurrent auto-processing can no longer create duplicate ACQUISITION
+  year-datasets - a race that, once hit, made every subsequent file of
+  that instrument/year fail with `MultipleResultsFound`. The natural key
+  is now enforced with a partial unique index; the migration first merges
+  existing duplicates by repointing their sample batches to the oldest
+  dataset, and the get-or-create recovers from the constraint violation
+  instead of racing.
+- A transient infrastructure error (backend 502/503/504, database pool
+  timeout) no longer permanently drops a file from auto-processing. Such
+  failures are retried with growing delays, and the partial results of
+  the failed attempt are cleaned up before each retry so a rerun cannot
+  duplicate sample items.
+- Switching batches no longer leaves the batch overview chart empty when
+  the new batch shares the focused target collection with the previous
+  one.
 
 ### Security
 
