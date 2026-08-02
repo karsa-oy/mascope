@@ -242,6 +242,10 @@ async def get_acquisition_dataset(
         dataset = await _find_acquisition_dataset(
             instrument=instrument, year_str=year_str, workspace_id=workspace_id
         )
+        if dataset is None:
+            # Not the natural-key collision (e.g. a foreign-key violation) -
+            # surface the original IntegrityError instead of masking it.
+            raise
         runtime.logger.debug(
             f"ACQUISITION dataset {instrument}/{year_str} created concurrently, "
             f"reusing {dataset.dataset_id}"
