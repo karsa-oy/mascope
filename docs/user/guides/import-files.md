@@ -25,8 +25,12 @@ and makes you its owner.
 
 | Instrument | Extension | Max size (web upload) | Max size (File Agent) |
 | --- | --- | --- | --- |
-| Orbitrap | `.raw` | 2.5 GB | 100 MB |
-| Tofwerk TOF | `.h5` | 2.5 GB | 100 MB |
+| Orbitrap | `.raw` | 2.5 GB | none* |
+| Tofwerk TOF | `.h5` | 2.5 GB | none* |
+
+*The File Agent uploads files of any size in resumable chunks. Against a
+Mascope server older than the agent's resumable-upload support, it falls
+back to single-request uploads capped at 100 MB.
 
 **A filename Mascope can read.** Mascope reads three things out of the filename,
 so uploads are rejected if any is missing. This applies to both upload paths.

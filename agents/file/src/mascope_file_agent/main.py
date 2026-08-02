@@ -20,7 +20,10 @@ from mascope_runtime import Runtime
 
 
 mascope_sdk.SERVICE_NAME = "file-agent"
-from mascope_sdk import api_post_file  # noqa: E402  (needs SERVICE_NAME set first)
+from mascope_sdk import (  # noqa: E402  (needs SERVICE_NAME set first)
+    api_post_file,
+    api_post_file_tus,
+)
 from mascope_sdk.exceptions import (  # noqa: E402
     AuthenticationError,
     NotFoundError,
@@ -28,9 +31,15 @@ from mascope_sdk.exceptions import (  # noqa: E402
 )
 
 
-# TODO: Use TUS protocol for large file uploads, see issue #1131
-# https://github.com/karsa-oy/mascope/issues/1131
+# Size cap for the legacy single-request upload endpoint only; resumable
+# TUS uploads are chunked and have no practical size limit.
 FILE_UPLOAD_SIZE_LIMIT = 100 * 1024**2  # 100 MB
+
+# Set after the first upload attempt shows the server has no
+# token-accessible TUS endpoint (older Mascope release), so every
+# subsequent file skips the doomed TUS attempt.
+_legacy_upload = False
+
 HOST = None
 PORT = None
 URL = None
@@ -121,34 +130,64 @@ def process_file_upload(filepath: str, max_retries: int = 10) -> None:
 def upload_sample_file(filepath: str) -> None:
     """Upload the acquired file to Mascope server using Mascope API
 
+    Uploads with the resumable TUS protocol (chunked, no size limit).
+    Servers without token-accessible TUS uploads (older Mascope releases)
+    are detected on the first attempt and fall back to the legacy
+    single-request endpoint, which caps files at 100 MB.
+
     :param filepath: Full path to the file to be uploaded
     :type filepath: str
     :raises Exception: Raises an exception if the request fails (status code != 200)
     """
+    global _legacy_upload
 
-    # Validate file before upload request
-    # file extension
+    # Validate file extension before upload request
     file_ext = os.path.splitext(filepath)[1].lower()
     mask_ext = os.path.splitext(runtime.config.mask)[1].lower()
     if file_ext != mask_ext:
         raise ValueError(f"{file_ext} is not an allowed file extension!")
-    # file size
-    file_size = os.stat(filepath).st_size
-    if file_size > FILE_UPLOAD_SIZE_LIMIT:
-        raise ValueError(
-            f"File size ({round(file_size / (1024**2), 1)} MB) exceeds the maximum "
-            f"allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024**2)} MB)"
-        )
 
-    # Make file upload request
     runtime.logger.debug(f"Making an upload request to {URL} for file {filepath}")
     upload_filename = get_upload_filename(filepath)
     if upload_filename:
         runtime.logger.info(
             f"Uploading file {os.path.basename(filepath)} as {upload_filename}"
         )
+
     # Raises a typed mascope_sdk exception carrying the specific cause
     # (rejected token, timeout, connection error, server error message).
+    if not _legacy_upload:
+        try:
+            api_post_file_tus(
+                url=URL,
+                access_token=runtime.config.access_token,
+                filepath=filepath,
+                upload_filename=upload_filename,
+            )
+            runtime.logger.info(
+                f"File upload of file {os.path.basename(filepath)} succeeded!"
+            )
+            return
+        except (NotFoundError, AuthenticationError) as e:
+            # A missing endpoint (404) or a token gate (401) on the TUS
+            # route means an older server; the legacy attempt below gives
+            # the definitive answer (a genuinely bad token fails there
+            # with the proper message).
+            runtime.logger.info(
+                "The server does not accept agent TUS uploads, falling back "
+                f"to the legacy upload endpoint: {e}"
+            )
+            _legacy_upload = True
+
+    # Legacy single-request upload: enforce its size cap
+    file_size = os.stat(filepath).st_size
+    if file_size > FILE_UPLOAD_SIZE_LIMIT:
+        raise ValueError(
+            f"File size ({round(file_size / (1024**2), 1)} MB) exceeds the maximum "
+            f"allowed size ({FILE_UPLOAD_SIZE_LIMIT / (1024**2)} MB) of the "
+            "server's upload endpoint. Upgrading the Mascope server enables "
+            "uploads of any size."
+        )
     api_post_file(
         url=URL,
         path="sample/files/upload",
