@@ -115,3 +115,52 @@ async def test_assign_requires_editor_role(guest_client, pa_test_data):
         f"/api/peak-assignments/sample/{pa_test_data['sample_item_id']}/assign"
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_assignments_pages_without_losing_or_repeating_rows(
+    guest_client, pa_test_data
+):
+    """The ledger is one row per detected peak, so it is read a page at a time.
+
+    `total` is the count across all pages, which is what lets a client know it
+    has the whole run; `results` is the size of the page in hand.
+    """
+    sample_item_id = pa_test_data["sample_item_id"]
+    seen = []
+    for offset in range(0, 3):
+        response = await guest_client.get(
+            f"/api/peak-assignments/sample/{sample_item_id}",
+            params={"limit": 1, "offset": offset},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 3
+        assert body["results"] == 1
+        seen.extend(row["sample_peak_id"] for row in body["data"])
+
+    # Every peak exactly once, in m/z order, across the pages.
+    assert seen == ["peak-1", "peak-2", "peak-3"]
+
+    # Reading past the end is empty rather than an error, and still reports total.
+    response = await guest_client.get(
+        f"/api/peak-assignments/sample/{sample_item_id}",
+        params={"limit": 1, "offset": 99},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"] == []
+    assert response.json()["total"] == 3
+
+
+@pytest.mark.asyncio
+async def test_get_assignments_rejects_an_unknown_tier(guest_client, pa_test_data):
+    """A misspelled filter is a 422, not a 200 with an empty ledger.
+
+    An empty 200 reads as "this sample has no such peaks", which is exactly the
+    wrong answer to give someone who typed the value wrong.
+    """
+    response = await guest_client.get(
+        f"/api/peak-assignments/sample/{pa_test_data['sample_item_id']}",
+        params={"tier": "identifed"},
+    )
+    assert response.status_code == 422

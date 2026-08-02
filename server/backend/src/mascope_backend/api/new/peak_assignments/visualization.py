@@ -215,14 +215,20 @@ async def visualize_composition_focus(
 
     # Only isotopes that matched an observed peak feed the visualization core
     # (mirrors the targeted _fetch_isotopes, which inner-joins MatchIsotope).
-    matched = (
-        match_isotope_df[
-            match_isotope_df.get("sample_peak_mz").notna()
-            & (match_isotope_df.get("sample_peak_id", "") != "")
-        ]
-        if not match_isotope_df.empty
-        else match_isotope_df
-    ).sort_values("relative_abundance", ascending=False)
+    #
+    # _composition_match_isotopes returns a bare DataFrame - no columns at all -
+    # when the composition yields no ions or no isotopes at the sample's
+    # resolution, which a TOF sample or a formula the ion generator rejects will
+    # do. Sorting that by a column it does not have raises, and this runs as a
+    # background task, so the user gets an error toast instead of an empty plot.
+    # The sibling aggregate_composition_fit already returns an empty result here.
+    if match_isotope_df.empty:
+        matched = match_isotope_df
+    else:
+        matched = match_isotope_df[
+            match_isotope_df["sample_peak_mz"].notna()
+            & (match_isotope_df["sample_peak_id"].fillna("") != "")
+        ].sort_values("relative_abundance", ascending=False)
 
     isotopes = [
         SimpleNamespace(**{key: _none(value) for key, value in row.items()})

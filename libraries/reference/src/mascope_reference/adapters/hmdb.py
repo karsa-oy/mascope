@@ -5,8 +5,8 @@ metabolites. Free with attribution - commercial terms should be verified before
 any commercial use, which is exactly why the per-record license tag is carried.
 
 The dump is a single multi-gigabyte XML document, so it is parsed with
-``iterparse`` and each ``<metabolite>`` element is cleared after use to keep
-memory bounded.
+``iterparse`` and each finished ``<metabolite>`` is dropped from the root as it
+is consumed, which is what actually keeps memory bounded.
 """
 
 from collections.abc import Iterator
@@ -39,8 +39,18 @@ class HmdbAdapter:
 
     def parse(self, path: Path) -> Iterator[ReferenceRecord]:
         with _open_binary(path) as handle:
-            for event, element in iterparse(handle, events=("end",)):
-                if _localname(element.tag) != "metabolite":
+            context = iterparse(handle, events=("start", "end"))
+            # The root is needed to actually free finished elements: clear() empties
+            # a subtree but the root keeps a reference to every child it has seen,
+            # so on a document with hundreds of thousands of metabolites the element
+            # list grows for the whole parse regardless. Dropping each finished
+            # child from the root is what bounds memory.
+            root = None
+            for event, element in context:
+                if root is None and event == "start":
+                    root = element
+                    continue
+                if event != "end" or _localname(element.tag) != "metabolite":
                     continue
                 accession = _child_text(element, "accession")
                 formula = _child_text(element, "chemical_formula")
@@ -56,5 +66,6 @@ class HmdbAdapter:
                         xrefs={"hmdb_id": accession},
                         license=self.license,
                     )
-                # Release the finished subtree so memory stays bounded.
                 element.clear()
+                if root is not None:
+                    root.clear()

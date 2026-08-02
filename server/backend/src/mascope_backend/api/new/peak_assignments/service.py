@@ -20,7 +20,7 @@ from datetime import timezone
 from types import SimpleNamespace
 
 import pandas as pd
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, update
 
 from mascope_backend.api.controllers.samples.lib.samples_fetch import fetch_sample
 from mascope_backend.api.controllers.samples.lib.samples_peaks import extract_peaks
@@ -63,6 +63,7 @@ from mascope_backend.api.new.peak_assignments.engine import (
     score_ions_by_fit,
     untargeted_matches_to_peak_assignments,
 )
+from mascope_backend.api.new.peak_assignments.schemas import DEFAULT_PAGE_LIMIT
 from mascope_backend.db import (
     AssignmentVerification,
     IonizationMechanism,
@@ -142,6 +143,8 @@ async def get_peak_assignments(
     tier: str | None = None,
     role: str | None = None,
     source: str | None = None,
+    limit: int = DEFAULT_PAGE_LIMIT,
+    offset: int = 0,
 ) -> dict:
     """
     Retrieve peaks-with-assignments for a sample.
@@ -150,15 +153,23 @@ async def get_peak_assignments(
     run when no run id is given. Optional filters narrow by confidence tier,
     peak role, or assignment source.
 
+    Paged. The ledger is deliberately complete - one row per detected peak,
+    each carrying alternatives and provenance JSON - so a dense sample runs to
+    tens of thousands of rows and reading them in one response would serialize
+    tens of megabytes through Pydantic on the event loop. ``total`` reports the
+    match count across all pages so a client knows when it has the whole run.
+
     :param sample_item_id: Unique identifier of the sample item
     :param peak_assignment_run_id: Specific run to read; defaults to the
         latest completed run
     :param tier: Optional filter by confidence tier
     :param role: Optional filter by peak role
     :param source: Optional filter by assignment source (database/untargeted)
-    :return: Dictionary with status, message, and assignment rows. Run identity
-        is on each row (peak_assignment_run_id); run metadata is served by the
-        runs endpoint.
+    :param limit: Maximum rows to return in this page
+    :param offset: Rows to skip, for paging
+    :return: Dictionary with status, message, total, and assignment rows. Run
+        identity is on each row (peak_assignment_run_id); run metadata is served
+        by the runs endpoint.
     """
     sample = await fetch_sample(sample_item_id)
 
@@ -191,32 +202,46 @@ async def get_peak_assignments(
                     f"'{sample.sample_item_name}'"
                 ),
                 "results": 0,
+                "total": 0,
                 "data": [],
             }
 
+        filters = [PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id]
+        if tier:
+            filters.append(PeakAssignment.tier == tier)
+        if role:
+            filters.append(PeakAssignment.role == role)
+        if source:
+            filters.append(PeakAssignment.source == source)
+
+        total = (
+            await session.execute(
+                select(func.count()).select_from(PeakAssignment).where(*filters)
+            )
+        ).scalar_one()
+
+        # Ordered by m/z with the primary key as a tiebreak: two peaks can share
+        # an m/z, and paging over an ordering that does not break such ties can
+        # return one of them on both pages and the other on neither.
         query = (
             select(PeakAssignment)
-            .where(PeakAssignment.peak_assignment_run_id == run.peak_assignment_run_id)
-            .order_by(PeakAssignment.sample_peak_mz)
+            .where(*filters)
+            .order_by(PeakAssignment.sample_peak_mz, PeakAssignment.peak_assignment_id)
+            .offset(offset)
+            .limit(limit)
         )
-        if tier:
-            query = query.where(PeakAssignment.tier == tier)
-        if role:
-            query = query.where(PeakAssignment.role == role)
-        if source:
-            query = query.where(PeakAssignment.source == source)
-
         assignments = (await session.execute(query)).scalars().all()
 
     data = [assignment.to_dict() for assignment in assignments]
     return {
         "status": "success",
         "message": (
-            f"Retrieved {len(data)} peak assignment"
-            f"{'s' if len(data) != 1 else ''} "
+            f"Retrieved {len(data)} of {total} peak assignment"
+            f"{'s' if total != 1 else ''} "
             f"for sample '{sample.sample_item_name}'"
         ),
         "results": len(data),
+        "total": total,
         "data": data,
     }
 
@@ -750,6 +775,14 @@ async def _finalize_run(
         await session.commit()
 
 
+# Samples with an assignment in flight in this worker. A run is CPU-bound - Stage B
+# enumerates compositions for up to max_untargeted_peaks peaks in a worker thread -
+# and writes a full ledger, and nothing about a second concurrent run of the same
+# sample is useful: it produces a duplicate run the user did not ask for while
+# competing for the same pool. Mirrors the batch guard in `batch.py`.
+_sample_assignments_in_flight: set[str] = set()
+
+
 @api_controller_background_task(
     success_notification_rooms=["user_id"],
     error_notification_rooms=["user_id"],
@@ -760,6 +793,52 @@ async def _finalize_run(
     success_reload=[("peak_assignment", "sample_batch_id")],
 )
 async def assign_sample_peaks(
+    sample_item_id: str,
+    config: PeakAssignmentConfig | None = None,
+    independent_transaction: bool = False,
+    user_id: int | None = None,
+    process_id: str | None = None,
+    parent_id: str | None = None,
+) -> dict:
+    """
+    Run the two-stage peak assignment engine over a sample.
+
+    Refuses immediately when this worker is already assigning the sample, rather
+    than queueing a second full run behind the first - what a double-clicked
+    "Assign peaks" deserves. See :func:`_run_sample_assignment` for the engine.
+
+    :param sample_item_id: ID of the sample item to assign
+    :param config: Optional run configuration; defaults are used when omitted
+    :param independent_transaction: Flag for transaction handling
+    :param user_id: Current user triggered operation (for user notifications)
+    :param process_id: Process identifier for progress tracking
+    :param parent_id: Parent process identifier
+    :return: A dictionary with run summary and status message
+    """
+    # Claimed before the first await: checking and adding either side of one would
+    # let two concurrent requests both pass the check.
+    if sample_item_id in _sample_assignments_in_flight:
+        sample = await fetch_sample(sample_item_id)
+        message = (
+            f"Peak assignment is already running for sample "
+            f"'{sample.sample_item_name}'."
+        )
+        runtime.logger.info(message)
+        return {"status": "skipped", "message": message}
+    _sample_assignments_in_flight.add(sample_item_id)
+    try:
+        return await _run_sample_assignment(
+            sample_item_id=sample_item_id,
+            config=config,
+            user_id=user_id,
+            process_id=process_id,
+            parent_id=parent_id,
+        )
+    finally:
+        _sample_assignments_in_flight.discard(sample_item_id)
+
+
+async def _run_sample_assignment(
     sample_item_id: str,
     config: PeakAssignmentConfig | None = None,
     independent_transaction: bool = False,

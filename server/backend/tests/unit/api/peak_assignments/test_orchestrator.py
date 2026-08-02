@@ -422,3 +422,131 @@ class TestRunFinalization:
             )
 
         assert mocks["finalize"].await_args.args[:2] == ("run-1", "failed")
+
+
+class TestSampleAdmissionControl:
+    """One assignment per sample per worker.
+
+    A run is CPU-bound and writes a full ledger, so a second concurrent run of
+    the same sample buys nothing: it duplicates a run the user did not ask for
+    while competing for the pool the interactive request path needs. The batch
+    path has always refused a batch already in flight; this pins the same for
+    the per-sample path, which a double-clicked "Assign peaks" reaches.
+
+    Only the wrapper is under test, so the engine itself is replaced wholesale
+    and just `fetch_sample` (reached on the refusal path, to name the sample) is
+    faked.
+    """
+
+    @staticmethod
+    def _sample():
+        sample = MagicMock()
+        sample.sample_item_name = "S1"
+        return sample
+
+    @pytest.mark.asyncio
+    async def test_second_concurrent_run_of_one_sample_is_refused(self):
+        import asyncio
+
+        from mascope_backend.api.new.peak_assignments.service import (
+            assign_sample_peaks,
+        )
+
+        release = asyncio.Event()
+        started = asyncio.Event()
+
+        async def _slow_run(**kwargs):
+            started.set()
+            await release.wait()
+            return {"status": "success", "message": "done"}
+
+        with (
+            patch(f"{_MOD}.fetch_sample", AsyncMock(return_value=self._sample())),
+            patch(f"{_MOD}._run_sample_assignment", side_effect=_slow_run),
+        ):
+            first = asyncio.create_task(
+                assign_sample_peaks(
+                    sample_item_id="si-1",
+                    independent_transaction=True,
+                    user_id=None,
+                    process_id="proc-1",
+                )
+            )
+            await started.wait()
+            second = await assign_sample_peaks(
+                sample_item_id="si-1",
+                independent_transaction=True,
+                user_id=None,
+                process_id="proc-2",
+            )
+            release.set()
+            await first
+
+        assert second["status"] == "skipped"
+        assert "already running" in second["message"]
+
+    @pytest.mark.asyncio
+    async def test_the_claim_is_released_when_a_run_fails(self):
+        """A failed run must not lock the sample out of being assigned again."""
+        from mascope_backend.api.new.peak_assignments.service import (
+            _sample_assignments_in_flight,
+            assign_sample_peaks,
+        )
+
+        with (
+            patch(f"{_MOD}.fetch_sample", AsyncMock(return_value=self._sample())),
+            patch(f"{_MOD}._run_sample_assignment", side_effect=RuntimeError("boom")),
+        ):
+            # Whether the decorator re-raises or reports the failure is its own
+            # concern; what matters here is that the claim does not outlive the run.
+            try:
+                await assign_sample_peaks(
+                    sample_item_id="si-1",
+                    independent_transaction=True,
+                    user_id=None,
+                    process_id="proc-1",
+                )
+            except RuntimeError:
+                pass
+
+        assert "si-1" not in _sample_assignments_in_flight
+
+    @pytest.mark.asyncio
+    async def test_a_different_sample_is_not_blocked(self):
+        import asyncio
+
+        from mascope_backend.api.new.peak_assignments.service import (
+            assign_sample_peaks,
+        )
+
+        release = asyncio.Event()
+        started = asyncio.Event()
+
+        async def _slow_run(**kwargs):
+            started.set()
+            await release.wait()
+            return {"status": "success", "message": "done"}
+
+        with (
+            patch(f"{_MOD}.fetch_sample", AsyncMock(return_value=self._sample())),
+            patch(f"{_MOD}._run_sample_assignment", side_effect=_slow_run),
+        ):
+            first = asyncio.create_task(
+                assign_sample_peaks(
+                    sample_item_id="si-1",
+                    independent_transaction=True,
+                    user_id=None,
+                    process_id="proc-1",
+                )
+            )
+            await started.wait()
+            release.set()
+            other = await assign_sample_peaks(
+                sample_item_id="si-2",
+                independent_transaction=True,
+                user_id=None,
+                process_id="proc-2",
+            )
+            await first
+
+        assert other["status"] != "skipped"

@@ -14,6 +14,20 @@ from mascope_backend.api.new.peak_assignments.config import PeakAssignmentConfig
 Verdict = Literal["confirmed", "rejected", "unsure"]
 EvidenceLevel = Literal["reference_standard", "msms", "orthogonal", "pattern", "visual"]
 
+# The assignment vocabulary, mirrored from the engine's constants. Typed rather
+# than free strings so a misspelled filter is a 422 naming the accepted values,
+# not a 200 with an empty ledger that reads as "this sample has no such peaks".
+AssignmentTier = Literal["identified", "candidate", "below_assignability", "unassigned"]
+AssignmentRole = Literal["M0", "iso_child", "reagent", "artifact", "unassigned"]
+AssignmentSource = Literal["database", "untargeted"]
+
+# A run holds one row per detected peak, each carrying alternatives and
+# provenance JSON, so an unbounded read serializes tens of megabytes through
+# Pydantic on the event loop. Clients page instead; the response carries `total`
+# so they know when they have the run.
+DEFAULT_PAGE_LIMIT = 1000
+MAX_PAGE_LIMIT = 5000
+
 
 class PeakAssignmentRunRecord(BaseModel):
     """One peak assignment run over a sample."""
@@ -68,6 +82,9 @@ class PeakAssignmentsResponse(BaseModel):
     status: str = "success"
     message: str
     results: int
+    #: Rows matching the query across every page, so a client knows when paging
+    #: is done. ``results`` is the size of this page.
+    total: int = 0
     data: list[PeakAssignmentRecord]
 
 
@@ -81,27 +98,27 @@ class PeakAssignmentRunsResponse(BaseModel):
 
 
 class PeakAssignmentQueryParams(BaseModel):
-    """Optional filters for the peaks-with-assignments query."""
+    """Optional filters and paging for the peaks-with-assignments query."""
 
     peak_assignment_run_id: str | None = Field(
         None, description="Specific run to read; defaults to the latest completed run."
     )
-    tier: str | None = Field(
-        None,
+    tier: AssignmentTier | None = Field(None, description="Filter by confidence tier.")
+    role: AssignmentRole | None = Field(None, description="Filter by peak role.")
+    source: AssignmentSource | None = Field(
+        None, description="Filter by assignment source."
+    )
+    limit: int = Field(
+        DEFAULT_PAGE_LIMIT,
+        ge=1,
+        le=MAX_PAGE_LIMIT,
         description=(
-            "Filter by confidence tier: identified, candidate, "
-            "below_assignability, or unassigned."
+            "Maximum rows to return. A run holds one row per detected peak, so a "
+            "dense sample runs to tens of thousands; read the whole run by paging "
+            "with `offset` until the rows returned reach `total`."
         ),
     )
-    role: str | None = Field(
-        None,
-        description=(
-            "Filter by peak role: M0, iso_child, reagent, artifact, or unassigned."
-        ),
-    )
-    source: str | None = Field(
-        None, description="Filter by assignment source: database or untargeted."
-    )
+    offset: int = Field(0, ge=0, description="Rows to skip, for paging.")
 
 
 class AssignSamplePeaksBody(BaseModel):
