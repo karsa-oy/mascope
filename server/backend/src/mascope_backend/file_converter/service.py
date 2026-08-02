@@ -14,24 +14,57 @@ from .runtime import runtime
 
 
 def main():
-    """Main loop of the service. Connect socket.io and then do nothing."""
-    runtime.logger.info(f"Attempting to connect to {URL}...")
-    while not SHUTDOWN_EVENT.is_set():
-        # Keep trying to connect to socket.io server
-        try:
-            SOCKET_CLIENT.connect()
-            break
-        except Exception:
-            # Connection timed out, wait before retry
-            sleep(1)
-    # socket.io connection established
+    """Main loop of the service. Idle until shutdown."""
     while not SHUTDOWN_EVENT.is_set():
         # Wait for shutdown event
         sleep(1)
 
 
+def wait_for_backend() -> bool:
+    """Connect the socket, waiting for the backend to come up first.
+
+    The converter starts alongside the backend (stack start, update
+    restart), so the backend refusing connections is the normal case at
+    startup: retry with backoff, logging each attempt at INFO. Escalate
+    to a single WARNING once the wait stops looking like a startup, then
+    keep retrying quietly - the converter cannot do anything useful
+    without the backend, so there is nothing better to do than wait.
+
+    :return: True once connected, False when shutdown was requested first
+    :rtype: bool
+    """
+    runtime.logger.info(f"Waiting for the backend at {URL}...")
+    delay = 1
+    waited = 0
+    warned = False
+    while not SHUTDOWN_EVENT.is_set():
+        try:
+            SOCKET_CLIENT.connect()
+        except Exception as e:
+            runtime.logger.info(f"Backend not ready yet ({e}), retrying in {delay} s")
+            SHUTDOWN_EVENT.wait(delay)
+            waited += delay
+            if not warned and waited >= CONNECT_WARN_AFTER_S:
+                warned = True
+                runtime.logger.warning(
+                    f"Backend at {URL} still unreachable after {waited} s; "
+                    "the file converter keeps retrying but cannot process "
+                    "files until the backend is up"
+                )
+            delay = min(delay * 2, CONNECT_RETRY_MAX_S)
+        else:
+            runtime.logger.info(f"Connected to the backend at {URL}")
+            return True
+    return False
+
+
 # Global variables
 SHUTDOWN_EVENT = Event()
+# Startup wait tuning: retry delays double from 1 s up to this cap, and a
+# single WARNING (= one monitored GlitchTip event) fires once the backend
+# has been unreachable for longer than any normal startup takes.
+CONNECT_RETRY_MAX_S = 30
+CONNECT_WARN_AFTER_S = 120
 HOST = runtime.config.server if runtime.mode == "prod" else "localhost"
 URL = f"http://{HOST}:{runtime.meta.api_port}"
 # Maximum number of peak detection requests that can run in parallel.
@@ -55,6 +88,12 @@ def run():
             f"Creating missing source directory {runtime.config.source}"
         )
         os.makedirs(runtime.config.source)
+
+    # Everything the converter produces flows through the socket, so connect
+    # before starting any watcher or worker threads: starting them earlier
+    # only yields emit errors while the backend is still booting.
+    if not wait_for_backend():
+        return
 
     # Initialize streamer thread(s)
     # tof streamers
