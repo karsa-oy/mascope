@@ -86,6 +86,7 @@ describe('chart.batch.overview data store', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     mockApp.data.match.ion.selectedIds = []
+    mockApp.data.batch.focusedId = 'batch-1'
     store = useChartData()
   })
 
@@ -192,6 +193,56 @@ describe('chart.batch.overview data store', () => {
 
     expect(store.traces).toHaveLength(1) // TIC only
     expect(store.traces[0].name).toBe('TIC')
+  })
+
+  it('refetches series for the new batch when the ion selection persists across a batch switch', async () => {
+    api.http.post.mockResolvedValue([
+      seriesRecord('ion-1', {
+        sample_item_ids: ['s1'],
+        sample_peak_intensity_sums: [5],
+        match_categories: [1]
+      })
+    ])
+
+    mockApp.data.match.ion.selectedIds = ['ion-1']
+    await flushAsync()
+    expect(store.traces).toHaveLength(2) // ion-1 + TIC
+    api.http.post.mockClear()
+
+    // Switching to a batch that shares the target collection keeps the same
+    // selected ion ids, so the selection watcher alone would never refetch.
+    mockApp.data.batch.focusedId = 'batch-2'
+    await flushAsync()
+
+    expect(api.http.post).toHaveBeenCalledTimes(1)
+    expect(api.http.post.mock.calls[0][1]).toEqual({
+      sample_batch_id: 'batch-2',
+      target_ion_ids: ['ion-1']
+    })
+    expect(store.traces).toHaveLength(2) // series reloaded for the new batch
+  })
+
+  it('clears records on batch switch when no ions are selected', async () => {
+    api.http.post.mockResolvedValue([
+      seriesRecord('ion-1', {
+        sample_item_ids: ['s1'],
+        sample_peak_intensity_sums: [5],
+        match_categories: [1]
+      })
+    ])
+
+    mockApp.data.match.ion.selectedIds = ['ion-1']
+    await flushAsync()
+    expect(store.traces).toHaveLength(2)
+    api.http.post.mockClear()
+
+    mockApp.data.match.ion.selectedIds = []
+    await flushAsync()
+    mockApp.data.batch.focusedId = 'batch-3'
+    await flushAsync()
+
+    expect(api.http.post).not.toHaveBeenCalled()
+    expect(store.traces).toHaveLength(1) // TIC only
   })
 
   it('removes a deleted sample from every series and drops emptied ions', async () => {
