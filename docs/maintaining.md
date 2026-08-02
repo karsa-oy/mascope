@@ -426,7 +426,32 @@ an exclusive lock while it runs.
 There is no timer for this yet - run it when the disk monitor flags growth, or
 add it to your own cron alongside the backup job.
 
-## Files and secrets
+### Loading reference chemistry data
+
+Peak assignment can additionally match against a mirror of public chemistry
+databases, so a peak gets a named identity and not just a formula. The mirror is
+optional: with none loaded, assignment works exactly as described above and
+simply reports no identities.
+
+**`mascope reference` is not available on a server.** It is registered only when
+the CLI runs from a monorepo checkout, because it pulls the chemistry
+dependencies that are deliberately kept out of the operator install - so
+reinstalling the CLI does not expose it. A deployed backend image already ships
+those dependencies, so load reference data by running the ingest inside the
+backend container instead:
+
+```sh
+docker compose exec backend python -m mascope_backend.db.scripts.reference_sync custom /data/my_list.csv --name my-list --version 2026-07
+```
+
+Mount the dump into the backend service first; the path is resolved inside the
+container. `custom` is the adapter for hand-authored CSV/TSV lists - the public
+databases have their own adapters, and each load is versioned.
+
+A load replaces the active version of that source only once it has successfully
+read records, so a dump the adapter cannot parse leaves the existing mirror
+serving rather than emptying it. Re-running the same source is how you update
+it; prior versions stay on disk until pruned.
 
 | Path | What |
 |---|---|
