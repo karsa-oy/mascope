@@ -66,7 +66,14 @@ export const useUppy = defineStore('app.uppy', () => {
     endpoint: `${runtime.api_path}/api/sample/files/upload/tus`,
     // settings
     retryDelays: [0, 3000, 5000, 10000, 20000],
-    chunkSize: 5 * 1024 * 1024, // 5 MiB, small chunks seem the most reliable
+    // 20 MiB per request: large enough that per-request overhead is minor
+    // on multi-GB files, small enough to stay reliable through proxies
+    // (well under Cloudflare's 100 MB body cap, and unlike the File
+    // Agent's SDK client, tus-js-client cannot shrink a failing chunk).
+    // Do not raise while any server may still run tuspyserver < 4.2.0,
+    // which aborts request bodies over ~25 MB behind Cloudflare - that
+    // bug is why this used to be 5 MiB.
+    chunkSize: 20 * 1024 * 1024,
     withCredentials: true,
     removeFingerprintOnSuccess: true,
     limit: 1, // Upload files sequentially, one by one
