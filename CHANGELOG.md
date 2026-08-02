@@ -6,6 +6,15 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Added
 
+- The File Agent can now watch subfolders of the watched folder: answer
+  yes to the new "Also watch subfolders?" question in the guided setup, or
+  set `recursive = true` in its `config.toml`. The agent's own
+  `failed_uploads` folder is always excluded, so failed files are never
+  re-uploaded in a loop. The installer's finish page now also explains
+  that the watched folder is chosen in the first-start setup (it is
+  unrelated to the install location), and the user docs cover disabling
+  or removing the agent.
+
 - `mascope fleet` (source checkouts only): `fleet list` shows the production
   servers from the fleet's Ansible inventory, and `fleet logs <host> ...`
   runs `mascope logs query --prod` on that server over SSH (tailnet),
@@ -22,6 +31,9 @@ Notable changes to Mascope are documented here. Versions follow the date-based s
 
 ### Changed
 
+- The "Download File Agent installer" button in the sidebar's Settings tab
+  is now always visible to editors, like the "Pair an agent" button,
+  instead of appearing only while "File Agent" is the selected token type.
 - `mascope logs query --max N` now returns the N *most recent* matching
   lines (still printed oldest-first) instead of the N oldest, matching the
   "show me the last N errors" intent.

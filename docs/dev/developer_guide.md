@@ -2747,7 +2747,8 @@ So the one version flows everywhere: git tag, GitHub Release, Zenodo DOI, the im
 
 - a one-to-two sentence summary of the release;
 - highlights grouped as **Added / Changed / Fixed**;
-- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade).
+- **Upgrade notes** when there are DB migrations or breaking/config changes (what an operator must do on upgrade);
+- a standing note about the installer assets: *"The two File Agent installers are identical — `Mascope-File-Agent-Setup.exe` is the fixed-name copy the in-app download button points at, `Mascope-File-Agent-Setup-vX.Y.Z.exe` the versioned copy for your records. Download either."* (Customers do notice the duplicate and wonder.)
 
 Citers reference the **DOI** on the Zenodo record (or the `vX.Y.Z` release); deployers pin `MASCOPE_VERSION=X.Y.Z` - neither needs the per-merge build tags.
 
