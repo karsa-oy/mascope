@@ -350,6 +350,23 @@ class Dataset(Base):
         passive_deletes=True,
     )
 
+    __table_args__ = (
+        # ACQUISITION datasets are auto-created per (workspace, instrument,
+        # year) by a read-then-write get-or-create that can race under
+        # concurrent ingest; constrain the natural key so the race fails
+        # loudly (and is recovered in get_acquisition_dataset) instead of
+        # inserting duplicates. Partial: user-created dataset types have no
+        # naming invariant.
+        Index(
+            "uq_dataset_acquisition_natural_key",
+            "workspace_id",
+            "instrument",
+            "dataset_name",
+            unique=True,
+            postgresql_where=text("dataset_type = 'ACQUISITION'"),
+        ),
+    )
+
 
 class SampleBatch(Base):
     """Sample batch grouping related samples for analysis."""
