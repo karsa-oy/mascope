@@ -382,20 +382,26 @@ transactions are far more numerous than errors.
 
 **Peak assignment** (assign a chemical composition to every peak - see
 [the user docs](user/how-it-works/peak-assignment.md)) ships **off**. A server
-that leaves it off is unaffected by it: samples process exactly as before and
-the UI is unchanged. To enable it on a deployment, set it in the env's config
-toml and restart the stack:
+that leaves it off is unaffected by it: samples process exactly as before, the
+UI is unchanged, and the `/api/peak-assignments` write routes refuse to launch
+runs (403; the read routes stay open, so results from an earlier opted-in
+period remain visible). To enable it on a deployment, set it in the env's
+config toml:
 
 ```toml
 [meta]
 peak_assignment = true
 ```
 
-`MASCOPE_PEAK_ASSIGNMENT=1` in `/etc/environment` does the same without editing
-the toml (remember host env vars apply at login - start the stack from a fresh
-shell). Enabling it means every newly processed sample also gets a
-database-stage assignment run, which adds processing time and one database row
-per detected peak per run, so watch disk after turning it on (see
+then rebuild and restart the stack (`mascope prod up --build`). The rebuild
+matters: the frontend bakes the flag in at image build time, so a plain
+restart flips only the backend and leaves the UI on the old setting.
+`MASCOPE_PEAK_ASSIGNMENT=1` in `/etc/environment` flips the backend without
+editing the toml (remember host env vars apply at login - start the stack from
+a fresh shell), but the frontend still needs the toml value and a rebuild.
+Enabling it means every newly processed sample also gets a database-stage
+assignment run, which adds processing time and one database row per detected
+peak per run, so watch disk after turning it on (see
 [Disk space](#disk-space)). Existing samples are not assigned retroactively;
 run assignment explicitly from the UI for those.
 
@@ -416,8 +422,9 @@ The dry run reports what it would delete and changes nothing. A real run keeps
 the newest few completed runs per sample (so a result can still be compared
 against the one it replaced) and drops the rest, plus failed runs past a short
 grace period; deleting a run cascades to its rows. Tune with
-`MASCOPE_PRUNE_KEEP_PER_SAMPLE` (default 3) and `MASCOPE_PRUNE_KEEP_FAILED_HOURS`
-(default 24).
+`MASCOPE_PRUNE_KEEP_PER_SAMPLE` (default 3), `MASCOPE_PRUNE_KEEP_FAILED_HOURS`
+(default 24) and `MASCOPE_PRUNE_KEEP_RUNNING_HOURS` (default 72, floored at 12
+so runs that may still be executing cannot be pruned out from under a worker).
 
 Deleting rows returns space to Postgres for reuse but not to the filesystem;
 `VACUUM FULL peak_assignment` (or `pg_repack`) afterwards does that, and takes
