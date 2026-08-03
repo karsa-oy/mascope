@@ -1,7 +1,7 @@
 import { runtime } from '@/lib/runtime'
 
 /**
- * Peak-centric assignment (docs/user/how-it-works/peak_assignment.md).
+ * Peak-centric assignment (docs/user/how-it-works/peak-assignment.md).
  *
  * Off unless the deployment opts in via the `peak_assignment` flag in the
  * runtime `[meta]` config -- the same switch the backend reads. With it off the

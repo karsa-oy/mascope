@@ -175,6 +175,11 @@ export const useMatchVisualized = defineStore('app.data.match.visualized', () =>
   // scoring the assigned formula + ionization mechanism on the fly, so no
   // persisted target_ion_id is needed. Populates the isotope table (aggregate)
   // and triggers the sum-spectrum + time-series traces (visualize, via socket).
+  //
+  // NOT WIRED TO ANY UI YET: no component calls this. The planned "Verify fit"
+  // button was dropped when the Fit view was slated for retirement -- see
+  // docs/dev/peak_assignment_frontend.md (Open threads / F6) before deleting
+  // or re-implementing this.
   async function verifyAssignment(assignment) {
     const sample_item_id = sample.focused?.sample_item_id
     if (!sample_item_id || !assignment?.assigned_formula || !assignment?.ionization_mechanism_id) {

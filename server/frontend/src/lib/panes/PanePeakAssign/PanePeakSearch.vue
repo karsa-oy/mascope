@@ -281,7 +281,22 @@ const formatFit = (value) =>
        so the pane is absent rather than showing a "No peak selected" card.
        As a takeover of the time-series pane it always renders, otherwise
        "Re-search" would open onto nothing with no way back. -->
-  <div class="search-pane" v-if="!embedded || app.data.peak.list.length > 0">
+  <div
+    class="search-pane"
+    v-if="!embedded || app.data.peak.list.length > 0"
+    v-help.top="{
+      message: `
+        <h1>Peak Assignment</h1>
+        <p>
+        Assign a composition to the currently selected peak based on the m/z value,
+        ionization mechanisms and allowed ranges of atom counts.
+        </p>
+        <p>
+        Select peaks by clicking rows in the peak browser to the left, or by clicking
+        the vertical grey peak lines in the spectrum chart.
+        </p>`
+    }"
+  >
     <header class="search-head">
       <div class="search-title">
         <span class="pi ph ph-magnifying-glass" />
