@@ -59,6 +59,10 @@ reference_compound = table(
     column("reference_source_id", Integer),
     column("formula", String(FORMULA_LENGTH)),
     column("monoisotopic_mass", Float),
+    # Intrinsic charge; NULL/0 = neutral. Recorded, never matched (issue #1726):
+    # ingest still rejects charge-suffixed formulas, so nothing writes it yet,
+    # and iter_known_compositions excludes charged rows either way.
+    column("charge", Integer),
     column("inchikey", String(INCHIKEY_LENGTH)),
     column("name", Text),
     column("smiles", Text),

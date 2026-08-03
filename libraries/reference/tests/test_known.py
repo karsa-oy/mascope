@@ -39,6 +39,7 @@ def _seed(sync_engine, source_rows):
                         reference_source_id=sid,
                         formula=c["formula"],
                         monoisotopic_mass=c.get("mass"),
+                        charge=c.get("charge"),
                         inchikey=c.get("inchikey"),
                         name=c.get("name"),
                         smiles=None,
@@ -92,6 +93,31 @@ async def test_dedup_on_formula_with_one_to_many_identities(sync_engine, db_path
     names = sorted(i.name for i in by_formula["C10H16O3"].identities)
     assert names == ["Norpinonic acid isomer", "Pinonic acid"]
     assert {i.source for i in by_formula["C10H16O3"].identities} == {"src-a", "src-b"}
+
+
+@pytest.mark.asyncio
+async def test_charged_rows_are_excluded(sync_engine, db_path):
+    """Intrinsic charge is recorded, never matched (issue #1726).
+
+    Stage A pairs a neutral formula with an ionization mechanism, so a charged
+    row has no neutral precursor to expand. NULL and 0 are both neutral - NULL
+    is also what every pre-charge-column row carries.
+    """
+    _seed(
+        sync_engine,
+        [
+            (
+                {"name": "s"},
+                [
+                    {"formula": "C10H16O3", "mass": 184.11},  # NULL charge - kept
+                    {"formula": "C9H14O4", "mass": 186.09, "charge": 0},  # kept
+                    {"formula": "C5H14NO", "mass": 104.11, "charge": 1},  # dropped
+                ],
+            ),
+        ],
+    )
+    result = await _known(db_path)
+    assert {k.formula for k in result} == {"C10H16O3", "C9H14O4"}
 
 
 @pytest.mark.asyncio

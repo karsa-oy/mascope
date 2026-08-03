@@ -16,6 +16,7 @@ as an open decision. Callers can widen or disable it.
 
 from dataclasses import dataclass, field
 
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mascope_reference.query import _STABLE_ORDER, active_join
@@ -125,6 +126,17 @@ async def iter_known_compositions(
     :return: Known compositions, one per unique formula, ascending by formula.
     """
     stmt = active_join(*_KNOWN_COLUMNS)
+    # Charged species are recorded, not matched: Stage A pairs a NEUTRAL formula
+    # with an ionization mechanism, so an intrinsically charged row has no
+    # neutral precursor to expand and could only ever produce a false identity
+    # (issue #1726). NULL is both the pre-charge-column state and the neutral
+    # default, so it passes.
+    stmt = stmt.where(
+        or_(
+            reference_compound.c.charge.is_(None),
+            reference_compound.c.charge == 0,
+        )
+    )
     if licenses is not None:
         stmt = stmt.where(reference_compound.c.license.in_(licenses))
     if max_mass is not None:

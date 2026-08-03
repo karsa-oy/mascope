@@ -1329,6 +1329,14 @@ class ReferenceCompound(Base):
     )
     formula: Mapped[str] = mapped_column(String(512), index=True)
     monoisotopic_mass: Mapped[Optional[float]] = mapped_column(Float, index=True)
+    # Intrinsic charge of the stored species; NULL/0 means neutral. Recorded so
+    # permanently charged species (choline, quaternary ammoniums) can be
+    # represented, but deliberately NOT matched: Stage A pairs neutral formulas
+    # with ionization mechanisms, so charged rows are excluded from
+    # iter_known_compositions until intrinsic-charge analytes are supported
+    # (issue #1726). Nothing writes it yet - ingest still rejects
+    # charge-suffixed formulas.
+    charge: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     inchikey: Mapped[Optional[str]] = mapped_column(String(27), index=True)
     name: Mapped[Optional[str]] = mapped_column(Text)
     smiles: Mapped[Optional[str]] = mapped_column(Text)

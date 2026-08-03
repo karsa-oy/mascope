@@ -3,8 +3,10 @@
 Adds reference_source (one row per ingested public-database source + version)
 and reference_compound (one row per compound per source version) for the public
 database integration. reference_compound indexes formula and monoisotopic_mass
-(annotation is an indexed lookup) and inchikey (cross-source dedup key). No data
-is ingested by this migration - schema only.
+(annotation is an indexed lookup) and inchikey (cross-source dedup key), and
+carries a nullable charge column so permanently charged species (choline,
+quaternary ammoniums) can later be represented - recorded, not matched; see
+issue #1726. No data is ingested by this migration - schema only.
 
 Revision ID: c4f7a2e9b1d8
 Revises: f2d8b5c3a9e1
@@ -61,6 +63,7 @@ def upgrade() -> None:
         sa.Column("reference_source_id", sa.Integer(), nullable=False),
         sa.Column("formula", sa.String(length=512), nullable=False),
         sa.Column("monoisotopic_mass", sa.Float(), nullable=True),
+        sa.Column("charge", sa.Integer(), nullable=True),
         sa.Column("inchikey", sa.String(length=27), nullable=True),
         sa.Column("name", sa.Text(), nullable=True),
         sa.Column("smiles", sa.Text(), nullable=True),

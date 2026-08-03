@@ -50,6 +50,7 @@ Table(
     ),
     Column("formula", String),
     Column("monoisotopic_mass", Float),
+    Column("charge", Integer),
     Column("inchikey", String),
     Column("name", Text),
     Column("smiles", Text),
