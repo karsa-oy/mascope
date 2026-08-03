@@ -172,11 +172,13 @@ wanted.
 
 ### 3.4 Ingestion via the CLI
 
-A `mascope reference sync <source>` Typer command
-([tooling/cli](../../tooling/cli)) that fetches the dump, runs the adapter,
-upserts into `reference_compound`, and records a `reference_source` row. Each
-load is versioned so a past annotation can be reproduced. This mirrors how the
-demo dataset is built and keeps ingestion out of the request path.
+A `mascope reference sync <source> <dump> --version <tag>` Typer command
+([tooling/cli](../../tooling/cli)) that runs the adapter over an
+already-downloaded dump (fetches happen out of band - the dumps are large and
+some sources need registration), upserts into `reference_compound`, and records
+a `reference_source` row. Each load is versioned so a past annotation can be
+reproduced. This mirrors how the demo dataset is built and keeps ingestion out
+of the request path.
 
 ### 3.5 Wiring MS1 annotation into the composition flow
 

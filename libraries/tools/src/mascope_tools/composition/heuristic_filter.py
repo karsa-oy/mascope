@@ -933,8 +933,10 @@ def score_pattern(
 # isotopologue's intensity against ITS OWN noise (per-peak SNR), uses a Gaussian
 # mass likelihood, and aggregates as a predicted-abundance-weighted geometric mean.
 # On the demo golden set vs v1: ROC-AUC 0.876->0.890, held-out calibrated ECE
-# 0.020->0.0069 (see tooling/score_eval/DESIGN.md). v1 is retained byte-identical;
-# callers select via SCORE_VERSION. Inputs use the same matched-array convention as
+# 0.020->0.0069 (see tooling/score_eval/DESIGN.md -- untracked scratch, not in the
+# repo). v1 is retained byte-identical, and each caller calls the version it wants
+# directly (SCORE_VERSION records the newest shipped version; nothing branches on
+# it). Inputs use the same matched-array convention as
 # v1 (unmatched isotopologues carry 0), PLUS the matched peaks' signal_to_noise --
 # which is OPTIONAL: SNR is only ever used to widen a tolerance, so a caller that has
 # none (the DB-read aggregation paths) passes None / NaN and is scored in "no-SNR mode"
@@ -971,8 +973,8 @@ REL_DETECT_NO_SNR = 0.10
 # Platt calibration (raw fit score -> P(correct)) fitted on the demo Br/Ur golden
 # set, on the real-per-peak-SNR path — it is NOT calibrated for the no-SNR mode.
 # Maps a raw v2 score to a probability; refit per instrument/dataset with the
-# score_eval harness (DESIGN.md §5.3) for production — a sensible default, not a
-# universal constant.
+# score_eval harness (tooling/score_eval; its DESIGN.md §5.3 is untracked scratch)
+# for production — a sensible default, not a universal constant.
 DEFAULT_CALIBRATION_V2 = (6.0546, -4.1481)  # (a, b) fit on the demo Br/Ur golden set
 
 

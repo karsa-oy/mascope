@@ -6,8 +6,9 @@ isotopologue rows as produced by `compute_match_isotopes`. Wired alongside the
 legacy `Σ score_i·rel_ab` aggregation behind `MATCH_SCORE_VERSION` so the two can
 be switched and compared; v1 stays byte-identical.
 
-See tooling/score_eval/DESIGN.md. The score returned is the raw fit quality; the
-optional Platt calibration must be supplied by the caller (see `ion_score_v2`).
+Background in tooling/score_eval/DESIGN.md (untracked scratch, not in the repo).
+The score returned is the raw fit quality; the optional Platt calibration must
+be supplied by the caller (see `ion_score_v2`).
 
 NOTE: this is a pure function (unit-tested via mascope_tools). End-to-end behaviour
 in the live match pipeline must be validated with the backend test suite.

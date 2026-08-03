@@ -55,9 +55,10 @@ stages; the confidence layers are the paradigm's **Phase 3** (tiers/arbitration)
   (`peak_assignment_enabled()`) and frontend (`runtime.meta`) alike. "Coexist, don't
   replace" turned out to need enforcing: ingest-time assignment, the rescored composition
   search, the reference annotation on that same search, and the Sample-view rework all
-  changed behaviour for users who never opened the feature. The flag gates the automatic
-  behaviour, **not the API** — the explicit assign/read routes stay reachable with it off,
-  with the consequences spelled out in
+  changed behaviour for users who never opened the feature. On the API the flag gates the
+  **writes**: assign / verify / recalibrate return 403 with it off
+  (`require_peak_assignment_enabled` in `routes.py`), while the read routes stay open so
+  ledgers from opted-in periods remain inspectable — the full reasoning in
   [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §5.1.
 - **The on-demand composition search takes its mass sigma from the instrument, not from
   the candidates.** `api/new/cheminfo/service.py` rescores each candidate with
@@ -156,7 +157,8 @@ branch's shape, not a commit hash that goes stale within a day.*
    `calibration_error`, per-instrument `calibration_for`. **Honest fallback:** no curve for
    an instrument → `p_correct=null, calibrated=false` (TOF today); one **provisional
    Orbitrap** curve (a=5.74, b=-3.36, held-out ECE 0.029) fit from the demo bundle via
-   `arbitration_eval.py --fit-calibration`. Wired into the engine → `provenance.p_correct /
+   `arbitration_eval.py --fit-calibration` (untracked scratch alongside the
+   `tooling/score_eval` harness). Wired into the engine → `provenance.p_correct /
    calibrated / calibration`. Labels = reference-confirmed identities (Schymanski L1) vs
    decoys — the reference-dataset link + basis for future user self-calibration. See
    `assignment_confidence.md` §4 + `how-it-works/peak-assignment.md`.
@@ -278,5 +280,7 @@ in `docs/user/how-it-works/` with its literature citations.
   `mascope prod db script run` forwards no arguments, so it covers the argument-free
   scripts only. See [`peak_assignment_paradigm.md`](peak_assignment_paradigm.md) §7 and
   [`reference_data_authoring.md`](reference_data_authoring.md).
-- The fit score was validated end-to-end on the demo (median fit 0.94, max 1.0; scores
-  scale monotonically with isotopic corroboration) — see `DESIGN.md` for the numbers.
+- The fit score was validated end-to-end on the demo (median fit 0.92, max 1.0; scores
+  scale monotonically with isotopic corroboration) — the numbers live in
+  [`fit_score.md`](../../libraries/tools/docs/fit_score.md) §5 (originally in the
+  untracked `DESIGN.md` scratch).

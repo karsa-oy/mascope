@@ -1,7 +1,8 @@
 """#2 — Match-score evaluation harness (baseline + regression gate).
 
 Scores the demo golden dataset with `mascope_tools` and reports the four numbers
-that define whether a scorer is good (DESIGN.md §5.3):
+that define whether a scorer is good (DESIGN.md §5.3 — untracked scratch, kept
+out of the repo):
 
   reproducibility  scoring is deterministic (re-run → identical scores)
   ranking          per peak, does the TRUE formula outrank its near-mass decoys?

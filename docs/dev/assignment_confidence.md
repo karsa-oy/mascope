@@ -324,8 +324,8 @@ no backend or DB, only `mascope_tools` + tests.
   [`verification_calibration_loop.md`](verification_calibration_loop.md).
 
   **Status.** One **provisional Orbitrap** curve, fit from the demo bundle via
-  `arbitration_eval.py --fit-calibration` (evidence → P(correct) over all candidates,
-  true vs decoy). It is a placeholder pending a curated dataset; no TOF curve exists.
+  `arbitration_eval.py --fit-calibration` (scratch, untracked — like the harness above;
+  evidence → P(correct) over all candidates, true vs decoy). It is a placeholder pending a curated dataset; no TOF curve exists.
   `invert_matches_to_peak_assignments` stores `p_correct` / `calibrated` / `calibration`
   in the assignment `provenance`. Unit-tested (`test_calibration_layer.py`, engine tests).
 

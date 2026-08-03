@@ -96,8 +96,8 @@ is persistence, arbitration, and productization - not the science.
   already exposes `find_compositions` over the API for a single m/z (on demand,
   not persisted). This is the seed of an untargeted endpoint.
 
-- **`peaky`** (external repo `~/Documents/Repositories/peaky`, skill
-  `mascope-peak-assign`) - the research-grade reference on top of the same
+- **`peaky`** (external repo `~/Documents/Repositories/peaky`, registered as
+  the `peaky` skill) - the research-grade reference on top of the same
   `mascope_tools` scoring. It contributes hard-won logic the app currently lacks:
   a one-row-per-peak **ledger** with a single-owner-per-peak invariant,
   multi-pass **arbitration**, confidence **tiers**
@@ -225,57 +225,65 @@ Each phase is intended to land independently and leave the system shippable.
 These are the forks that shape the work. Current recommendations are recorded so
 the plan is actionable; revisit as phases land.
 
-1. **Coexist vs. replace targeted.** *Decided: coexist, and enforced by a flag.*
-   Peak-centric assignment becomes the substrate; targeted analysis becomes a
-   filtered view (`target_compound_id IS NOT NULL`). Targeted alarms/collections
-   keep working and are not rewritten up front.
+### 5.1 Coexist vs. replace targeted
 
-   The whole feature is **off by default**, behind `peak_assignment` in the
-   runtime `[meta]` config (env override `MASCOPE_PEAK_ASSIGNMENT`). Backend
-   reads it via `peak_assignment_enabled()`
-   ([config.py](../../server/backend/src/mascope_backend/api/new/peak_assignments/config.py)),
-   frontend via `runtime.meta`
-   ([features.js](../../server/frontend/src/lib/features.js)) — one switch, both
-   sides. This exists because "coexist" is easy to claim and easy to lose: three
-   parts of the first iteration changed behaviour for users who never opened the
-   feature, and are now gated on it:
+*Decided: coexist, and enforced by a flag.*
+Peak-centric assignment becomes the substrate; targeted analysis becomes a
+filtered view (`target_compound_id IS NOT NULL`). Targeted alarms/collections
+keep working and are not rewritten up front.
 
-   - assignment ran on **every sample ingest**, creating a run per sample
-     (`auto_assign_sample_peaks`);
-   - the on-demand composition search was rescored to fit/tier/plausibility,
-     bypassing the `MASCOPE_MATCH_SCORE_VERSION` switch meant to keep legacy
-     scoring intact (`api/new/cheminfo`);
-   - `rule_senior` went from a no-op placeholder to a real filter, silently
-     narrowing that same search's results — now opt-in via
-     `HeuristicFilterConfig.use_senior`, which Stage B sets and the legacy
-     search does not.
+The whole feature is **off by default**, behind `peak_assignment` in the
+runtime `[meta]` config (env override `MASCOPE_PEAK_ASSIGNMENT`). Backend
+reads it via `peak_assignment_enabled()`
+([config.py](../../server/backend/src/mascope_backend/api/new/peak_assignments/config.py)),
+frontend via `runtime.meta`
+([features.js](../../server/frontend/src/lib/features.js)) — one switch, both
+sides. This exists because "coexist" is easy to claim and easy to lose: three
+parts of the first iteration changed behaviour for users who never opened the
+feature, and are now gated on it:
 
-   The Sample-view rework is gated the same way, so with the flag off the UI is
-   the pre-feature layout (see
-   [peak_assignment_frontend.md](peak_assignment_frontend.md)).
+- assignment ran on **every sample ingest**, creating a run per sample
+  (`auto_assign_sample_peaks`);
+- the on-demand composition search was rescored to fit/tier/plausibility,
+  bypassing the `MASCOPE_MATCH_SCORE_VERSION` switch meant to keep legacy
+  scoring intact (`api/new/cheminfo`);
+- `rule_senior` went from a no-op placeholder to a real filter, silently
+  narrowing that same search's results — now opt-in via
+  `HeuristicFilterConfig.use_senior`, which Stage B sets and the legacy
+  search does not.
 
-   **What the flag does not gate: the API.** The explicit assign/read routes stay
-   reachable regardless, so the engine can be exercised deliberately (and its tests
-   run) without switching it on globally. The honest reading of that is that
-   "nothing changes until someone opts in" holds for the UI and for ingest, but not
-   for the API surface: on a deployment that opted out, any workspace editor can
-   still `POST` an assign request, drive the full untargeted stage, and accumulate a
-   complete per-peak ledger — and the retention prune that reclaims those rows is a
-   manual maintenance script either way (§7). Operators are told this in the
-   `peak_assignment` comment in `base.mascope.toml`, next to the switch itself.
-   Gating the routes too is a deliberate non-decision: it would make the feature
-   untestable on an opted-out deployment, which is exactly where it needs trying
-   before it is turned on.
+The Sample-view rework is gated the same way, so with the flag off the UI is
+the pre-feature layout (see
+[peak_assignment_frontend.md](peak_assignment_frontend.md)).
 
-2. **Peaky: harvest vs. depend-on vs. reimplement.** *Recommend harvest.* Build
-   on `mascope_tools.assign_compositions` as the spine and pull peaky's
-   hard-won parts (arbitration, tiers, degeneracy, calibration, reagent contexts)
-   into the backend incrementally. Peaky stays the reference and research surface;
-   the app takes no runtime dependency on prototype-grade, file-oriented code.
+**On the API, the flag gates the writes.** The read routes stay open
+regardless — ledgers written while the feature was on remain inspectable after
+opting out — but the write routes (assign per sample or batch, verify,
+recalibrate) return 403 via `require_peak_assignment_enabled`
+([routes.py](../../server/backend/src/mascope_backend/api/new/peak_assignments/routes.py))
+while the flag is off. The first iteration left every route open so the engine
+could be exercised without opting in; the honest reading was that "nothing
+changes until someone opts in" held for the UI and for ingest but not for the
+API — any workspace editor could accumulate a complete per-peak ledger on a
+deployment that never opted in. Tests exercise the writes by setting the
+`MASCOPE_PEAK_ASSIGNMENT` env override, which removed the testability argument
+for keeping them open. Operators see the posture in the `peak_assignment`
+comment in `base.mascope.toml`, next to the switch itself; the retention prune
+that reclaims ledger rows is a manual maintenance script either way (§7).
 
-3. **Peak persistence.** *Recommend keep files as source of truth* and denormalize
-   peak fields onto `PeakAssignment` exactly as `MatchIsotope` already does -
-   avoiding a heavy peak-table import.
+### 5.2 Peaky: harvest vs. depend-on vs. reimplement
+
+*Recommend harvest.* Build
+on `mascope_tools.assign_compositions` as the spine and pull peaky's
+hard-won parts (arbitration, tiers, degeneracy, calibration, reagent contexts)
+into the backend incrementally. Peaky stays the reference and research surface;
+the app takes no runtime dependency on prototype-grade, file-oriented code.
+
+### 5.3 Peak persistence
+
+*Recommend keep files as source of truth* and denormalize
+peak fields onto `PeakAssignment` exactly as `MatchIsotope` already does -
+avoiding a heavy peak-table import.
 
 ---
 

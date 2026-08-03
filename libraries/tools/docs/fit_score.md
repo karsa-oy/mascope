@@ -50,10 +50,12 @@ unconditionally, not via the legacy `MASCOPE_MATCH_SCORE_VERSION` switch:
   fit score `assign_compositions` already computes (`match_isotopic_pattern`), i.e. the fit
   score's **v1 degradation** — the untargeted path carries no SNR — instead of the crude
   single-peak term.
-- **Follow-up (product):** the confidence-tier *bands* are still the legacy `match_params`
-  thresholds; on the fit scale a lone mass-only match scores low by design, so the
-  identified / candidate bands want recalibrating (DESIGN.md v2 bands ≈ 0.8 / 0.5). Tracked
-  as a threshold-semantics decision, separate from this measurement wiring.
+- **Tier bands (landed):** the confidence-tier bands sit on the fit scale —
+  `identified_threshold = 0.8` / `candidate_threshold = 0.5` on `PeakAssignmentConfig`
+  (`api/new/peak_assignments/config.py`), the v2 estimates rather than the legacy
+  `match_params` 0.8/0.7, because on the fit scale a lone mass-only match scores low by
+  design. Still open: recalibrating those bands per instrument once verification labels
+  accumulate.
 
 **Naming.** This is being renamed `match_score` → **`fit_score`** across the schema/API to
 say plainly that it measures *fit*, not identification.
@@ -169,6 +171,27 @@ This is a censored-data treatment: missing low-abundance isotopologues do not pu
 genuine low-intensity ions, but a missing $^{81}$Br twin of a bromine ion does. Defaults
 $k_{\text{detect}} = 3$, $\text{miss\_penalty} = 0.3$.
 
+### 3.3a No-SNR mode (callers without per-peak signal-to-noise)
+
+SNR is **optional**: every SNR term in the model is a *concession granted on evidence
+that a peak is noisy* — it only ever widens a tolerance. A caller with no usable SNR
+(`observed_snr=None`, or per-row values that are zero, negative, NaN or infinite — the
+DB-read aggregation paths, which read matched isotopes back without noise data) therefore
+grants no concession: each row is judged at the fixed instrument width `sigma_ppm` and the
+abundance floors, exactly as a clean high-SNR peak is. The one term that cannot fall back
+per-row is the detectability gate, whose expected-SNR test needs the **base** peak's SNR;
+with it unknown, an absent isotopologue is instead penalised when its predicted abundance
+alone says it should have been seen ($p_i \ge$ `REL_DETECT_NO_SNR`, default $0.10$ — the
+~1:10 dynamic range any matchable peak demonstrably exceeds).
+
+Because the real-SNR ratio tolerance only exceeds the 5 %-of-abundance floor below
+SNR ≈ 20, a normally-measured envelope scores the same in both modes; they diverge only
+for genuinely weak peaks, and then conservatively. The residual difference: an absent
+isotopologue predicted between $k_{\text{detect}}/s_0$ and `REL_DETECT_NO_SNR` is excluded
+rather than penalised in no-SNR mode (max deviation ≈ 0.085; see §6). Note the
+`DEFAULT_CALIBRATION_V2` Platt fit was made on the real-SNR path and is **not** calibrated
+for this mode.
+
 ### 3.4 Satellites
 
 Ringing/satellite artefacts near intense peaks are **not** real matches; the caller flags
@@ -196,6 +219,7 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 | `MASS_SNR_K` | `2.36` (ppm) | SNR-dependent mass width: $\sigma_i=\sqrt{\sigma^2+(k/s_i)^2}$; fit on the demo goldens |
 | `k_detect` | `3.0` | expected-SNR threshold above which an absent peak is penalised |
 | `miss_penalty` | `0.3` | likelihood assigned to a detectable-but-absent peak |
+| `rel_detect_no_snr` | `0.10` | no-SNR fallback (§3.3a): predicted abundance above which an absent peak is penalised when the base peak's SNR is unknown |
 | `PRED_SIGMA_PPM` | `0.5` (backend adapter) | prediction/centroiding term added to $\sigma$ in quadrature |
 
 ## 5. Properties (validated on the demo)
@@ -231,6 +255,12 @@ proportionally less. The result is in $[0,1]$, equals $1$ only for a flawless fi
 - **Geometric-mean harshness (rare):** one badly-fitting high-abundance peak can dominate.
   On the demo this affects ~1 % of ions; revisit the aggregation (e.g. a soft floor or a
   robust mean) if it proves material.
+- **No-SNR mode is slightly envelope-blinder (§3.3a):** without a base-peak SNR the
+  detectability gate falls back to predicted abundance alone, so an absent isotopologue
+  predicted between $k_{\text{detect}}/s_0$ and `REL_DETECT_NO_SNR` is excluded rather
+  than penalised — a score deviation of at most ≈ 0.085 versus the real-SNR path. The
+  Platt calibration is fitted on the real-SNR path, so no-SNR callers report the raw fit
+  without a calibrated $P(\text{correct})$.
 - **Depends on isotopologue matching completeness:** a *missed* match looks like a missing
   predicted peak, so the score is only as good as the upstream peak matching.
 - **Single-ion:** it scores one ion's isotope envelope; cross-peak corroboration (adducts,

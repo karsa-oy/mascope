@@ -57,14 +57,19 @@ predicted spectrum* — it is a reproducible measurement, **not** a probability 
 candidates is the real one is a separate identification-confidence layer (a distinct
 workstream that builds on this score).
 
-The current score is **v2** (`score_pattern_v2`, `SCORE_VERSION = 2`), fully documented in
+This pipeline scores with **v1** (`score_pattern`): a fixed
+$0.6\,\text{mass} + 0.2\,\text{cosine} + 0.2\,\text{intensity}$ blend over matched peaks
+only, carried on each candidate as `isotopic_pattern_score`. The same module also ships the
+newer **v2** fit score (`score_pattern_v2`), fully documented in
 [`fit_score.md`](fit_score.md). In brief, each predicted isotopologue contributes a Gaussian
 mass likelihood (with a resolution-aware, per-sample-fitted width, valid for both Orbitrap
 and TOF) times an intensity likelihood whose tolerance is set by the peak's own
 signal-to-noise; a predicted peak that is *absent but should have been detectable* is
 penalised, while an undetectable one is excluded; and the per-isotopologue likelihoods are
-combined as a predicted-abundance-weighted geometric mean. The legacy **v1** score — a fixed
-$0.6\,\text{mass} + 0.2\,\text{cosine} + 0.2\,\text{intensity}$ blend over matched peaks
-only — is retained byte-identical behind `SCORE_VERSION` for comparison.
+combined as a predicted-abundance-weighted geometric mean. Nothing in this pipeline selects
+between the two — the module constant `SCORE_VERSION` records the newest version shipped,
+but no code branches on it. v2 is called directly by the consumers that want the fit score:
+Mascope's peak-assignment engine (Stage A, `score_ions_by_fit`) and the backend's
+`ion_score_v2` adapter behind `MASCOPE_MATCH_SCORE_VERSION=2`.
 
 The highest-scoring formula candidate is assigned as the primary chemical identification, and its corresponding higher isotopes are flagged and linked within the final output data tables to complete the processing sequence.

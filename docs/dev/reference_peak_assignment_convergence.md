@@ -71,14 +71,19 @@ Today (shipped): per-formula lookup used for *annotation* -
 
 New for Stage A: a **bulk provider of the active known-composition set**, so
 Stage A can pre-compute isotopologues once per run instead of querying per peak.
-Proposed addition to `mascope_reference.query`:
+Implemented as `mascope_reference.known.iter_known_compositions` (consumed by
+`api/new/peak_assignments/service.py`):
 
 ```python
-def iter_known_compositions(
-    session,
+async def iter_known_compositions(
+    session: AsyncSession,
     *,
     licenses: set[str] | None = None,  # commercial gating; None = all
-) -> Iterator[KnownComposition]: ...
+    elements: frozenset[str] | None = DEFAULT_ELEMENTS,  # atmospheric window
+    max_carbon: int | None = DEFAULT_MAX_CARBON,
+    max_mass: float | None = DEFAULT_MAX_MASS,
+    max_identities: int = DEFAULT_MAX_IDENTITIES,
+) -> list[KnownComposition]: ...
 ```
 
 where a `KnownComposition` is **one unique neutral formula** plus the identities
@@ -184,7 +189,10 @@ PR to rebase.
 
 ---
 
-## 6. Edits to the existing design docs (when this is applied)
+## 6. Edits to the existing design docs (not yet applied)
+
+The convergence itself is implemented (Section 2), but these doc edits have not
+been made — the two documents still describe the pre-convergence plan:
 
 - [public_database_integration.md](public_database_integration.md) **Phase 3**:
   replace the phase body with a pointer to this document.

@@ -472,8 +472,9 @@ def recalibrate(
 # Per-instrument registry.
 #
 # Ships one PROVISIONAL Orbitrap curve fit from the demo golden set (evidence =
-# fit x plausibility of the arbitrated winners vs near-mass decoys); see
-# tooling/score_eval/arbitration_eval.py --fit-calibration. There is deliberately
+# fit x plausibility of the arbitrated winners vs near-mass decoys); fit via
+# arbitration_eval.py --fit-calibration (untracked scratch alongside the
+# tooling/score_eval harness, not in the repo). There is deliberately
 # NO TOF curve: no curated TOF golden set exists yet, so TOF stays uncalibrated and
 # callers must report its assignments as such rather than borrow the Orbitrap curve.
 # The long-term store is per-instrument and user-refittable (a DB-backed follow-up).

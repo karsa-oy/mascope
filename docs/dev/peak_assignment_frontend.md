@@ -63,9 +63,22 @@ is not mounted **while the flag is on** — but it is still the Sample tab's led
 off, so it is live code, not dead. Retiring it depends on the feature becoming the default.
 
 **Stores** ([`peakAssignment/`](../../server/frontend/src/stores/data/modules/peakAssignment/)):
-`run` (auto-focus latest completed via a list-membership watcher; `peak_assignment_reload` event) and
-`peak` (`byPeakId`/`forPeak`, `childrenOf`/`familyOf`, `tierCounts` excluding iso_child). Registered
-nested (not spread) under `app.data.peakAssignment.{run,peak}`.
+`run` (auto-focus latest completed via a list-membership watcher in the store itself;
+`peak_assignment_reload` event), `peak` (`byPeakId`/`forPeak`, `childrenOf`/`familyOf`, `tierCounts`
+excluding iso_child; loads the ledger itself page by page — see §2.2) and `verification` (the
+append-only verdict history: `currentByIdentity`/`forAssignment` keyed on the stable
+`sample_peak_id|assigned_formula|ionization_mechanism_id` identity — not `peak_assignment_id`, which
+every run regenerates — plus `verify()`). Registered nested (not spread) under
+`app.data.peakAssignment.{run,peak,verification}`.
+
+**Verification.** Assignments can be hand-labelled confirm / reject / unsure: the inspector renders
+the current verdict as a [`BaseVerdictBadge`](../../server/frontend/src/lib/base/BaseVerdictBadge.vue)
+(shared constants in [`lib/verification.js`](../../server/frontend/src/lib/verification.js)) with a
+small verdict form posting through `verification.verify()`. Backend surface:
+`GET /sample/{id}/verifications`, `POST /sample/{id}/verify` (editor), and the superuser
+`POST /calibration/{instrument}/recalibrate` that refits the confidence calibration from the
+accumulated labels. Details in [`verification_capture_frontend.md`](verification_capture_frontend.md)
+and [`verification_calibration_loop.md`](verification_calibration_loop.md).
 
 **Confidence.** fit, plausibility and calibrated P(correct) are surfaced (see
 [`peak_assignment_confidence_frontend.md`](peak_assignment_confidence_frontend.md)). Untargeted winners
@@ -111,14 +124,23 @@ applies rather than a null overriding it.
 
 ## 1. The backend contract (what we consume)
 
-Three endpoints, all under `/api/peak-assignments` (see
-[`routes.py`](../../server/backend/src/mascope_backend/api/new/peak_assignments/routes.py)):
+Nine endpoints, all under `/api/peak-assignments` (see
+[`routes.py`](../../server/backend/src/mascope_backend/api/new/peak_assignments/routes.py)). The
+write routes (assign / verify / recalibrate) are additionally gated on the opt-in flag —
+`require_peak_assignment_enabled` returns 403 with the feature off; the reads stay open so ledgers
+from opted-in periods remain inspectable:
 
 | Method | Path | Returns | Notes |
 |---|---|---|---|
-| `GET` | `/sample/{sample_item_id}` | `{ run, data: PeakAssignment[] }` | Query: `peak_assignment_run_id?`, `tier?`, `role?`, `source?`. No run id ⇒ **latest completed** run. |
+| `GET` | `/sample/{sample_item_id}` | `{ data: PeakAssignment[], total, results }` | Query: `peak_assignment_run_id?`, `tier?`, `role?`, `source?`, `limit?`, `offset?`. No run id ⇒ **latest completed** run. |
 | `GET` | `/sample/{sample_item_id}/runs` | `{ data: PeakAssignmentRun[] }` | Newest first. |
-| `POST` | `/sample/{sample_item_id}/assign` | `202 { message, process_id }` | Body `{ config?: PeakAssignmentConfig }`. Requires `editor`. |
+| `GET` | `/sample/{sample_item_id}/verifications` | `{ data: AssignmentVerification[] }` | Append-only verdict history, newest first. |
+| `POST` | `/sample/{sample_item_id}/verify` | `201` | Record confirm / reject / unsure. Requires `editor` + flag. |
+| `POST` | `/calibration/{instrument}/recalibrate` | `{ recalibrated, ... }` | Refit the confidence calibration from labels. Superuser + flag. |
+| `POST` | `/sample/{sample_item_id}/assign` | `202 { message, process_id }` | Body `{ config?: PeakAssignmentConfig }`. Requires `editor` + flag. |
+| `POST` | `/batch/{sample_batch_id}/assign` | `202 { message, process_id }` | One run per eligible sample; Stage A only by default. Requires `editor` + flag. |
+| `POST` | `/sample/{sample_item_id}/fit/aggregate` | `{ match_ions, match_isotopes }` | B2a: non-persisting composition fit (isotope table). |
+| `POST` | `/sample/{sample_item_id}/fit/visualize` | `202` | B2b: composition Fit visualization over the socket. |
 
 **Record shape** (`PeakAssignmentRecord`, one row per observed peak):
 
@@ -157,9 +179,11 @@ alternatives (JSON list) · provenance (JSON)
 
 ## 2. New Pinia stores
 
-Two modules under `src/stores/data/modules/peakAssignment/`, mirroring `modules/match/`. Both use the
-existing [`useData`](../../server/frontend/src/lib/store/data.js) composable (deps-driven reload,
-selection, socket CRUD auto-registration).
+Three modules under `src/stores/data/modules/peakAssignment/`, mirroring `modules/match/`: `run`,
+`assignment` and `verification` (the last added with verification capture — see
+[`verification_capture_frontend.md`](verification_capture_frontend.md); this section describes the
+first two). All use the existing [`useData`](../../server/frontend/src/lib/store/data.js) composable
+(deps-driven reload, selection, socket CRUD auto-registration).
 
 ### 2.1 `usePeakAssignmentRun` — the run list + selector
 
@@ -192,7 +216,7 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
   // launch a run; returns process_id, completion arrives via notification (§2.3)
   const assign = (sampleItemId, config) =>
     api.http.post(`/peak-assignments/sample/${sampleItemId}/assign`, { config },
-      { use: 'read', type: 'assign_sample_peaks' })
+      { use: 'process', type: 'assign_sample_peaks' })
 
   return { ...data, latestCompleted, assign }
 })
@@ -200,13 +224,21 @@ export const usePeakAssignmentRun = defineStore('app.data.peakAssignment.run', (
 
 ### 2.2 `usePeakAssignment` — the ledger for the focused sample + selected run
 
-**Handler caveat.** The shared `read` handler returns `response.data.data` — i.e. it unwraps to the
-body's `data` field and **drops the sibling `run`** from the `{ run, data }` envelope
-([`handlers.js`](../../server/frontend/src/api/handlers.js)). So the assignment fetch yields only the
-array; **run metadata comes from the run store** (`usePeakAssignmentRun().focused`, which already holds
-each run's full `to_dict()`), not the envelope. To keep that unambiguous, the app **explicitly focuses
-`latestCompleted`** once runs load (a one-line watcher in the Assignments browser), so
-`peak_assignment_run_id` is never `null` at fetch time and the viewed run is always the focused one.
+**Handler caveat (updated to the shipped store).** The shared `read` handler returns
+`response.data.data` — it unwraps to the body's `data` field and drops the envelope's siblings
+([`handlers.js`](../../server/frontend/src/api/handlers.js)). The shipped assignment store therefore
+**bypasses the `read` handler deliberately**: a run is one row per detected peak, so the endpoint
+pages the ledger and the loader needs the envelope's `total` to know when it has the whole run
+(`fetchAssignmentPage` + `loadAssignments` in
+[`assignment.js`](../../server/frontend/src/stores/data/modules/peakAssignment/assignment.js),
+`PAGE_SIZE = 1000`, hard-capped at `MAX_PAGES = 200`, dedup-by-`sample_peak_id` so a server ignoring
+`offset` terminates the loop). **Run metadata comes from the run store**
+(`usePeakAssignmentRun().focused`, which already holds each run's full `to_dict()`), not the
+envelope. The auto-focus of `latestCompleted` lives **in the run store itself** (a list-membership
+watcher in [`run.js`](../../server/frontend/src/stores/data/modules/peakAssignment/run.js)), not in
+the Assignments browser, and the assignment store's deps guard against a stale run id from the
+previously focused sample. The snippet below is the original design record; the shipped store
+differs as described here.
 
 ```js
 // modules/peakAssignment/assignment.js
@@ -261,7 +293,8 @@ namespace (nested, **not** spread — spreading a Pinia store snapshots its refs
 ```js
 peakAssignment: {
   run: usePeakAssignmentRun(),   // app.data.peakAssignment.run.{list,focused,assign,latestCompleted}
-  peak: usePeakAssignment()      // app.data.peakAssignment.peak.{list,byPeakId,forPeak,tierCounts,run}
+  peak: usePeakAssignment(),     // app.data.peakAssignment.peak.{list,byPeakId,forPeak,tierCounts,run}
+  verification: usePeakAssignmentVerification() // .{currentByIdentity,forAssignment,verify}
 }
 ```
 
@@ -271,7 +304,8 @@ The selection state of both stores is registered in
 rather than a local fallback ref.
 
 **Filtering** (tier/role/source) is **client-side** off `data.list` — the full ledger is already in
-memory, so filter chips are instant. The server query params exist for later pagination only.
+memory, so filter chips are instant. The server's `limit`/`offset` params are used by the store's
+paging loop (§2.2); the tier/role/source query params stay unused by the UI.
 
 ### 2.3 Run-completion refresh — `peak_assignment_reload` event (decided)
 
@@ -379,15 +413,17 @@ Add a **"Verify fit"** action (assignments browser row / inspector) that calls
 `app.data.match.visualized.set({ assignment })` and switches to the Fit tab. The chart components need
 no change — B2 returns the same shapes.
 
-**Status: implemented.** `api/new/peak_assignments/visualization.py` holds the non-persisting
-`aggregate_composition_fit` (B2a) and `visualize_composition_focus` (B2b); the visualization core was
-extracted from `visualize_ion_focus` into the shared `emit_isotope_visualization`. Routes:
-`POST /api/peak-assignments/sample/{id}/fit/aggregate` and `.../fit/visualize`. F6:
-`useMatchVisualized.verifyAssignment(assignment)` calls both (aggregate → isotope table, visualize →
-socket spectra/timeseries) and the inspector's **"Verify fit"** button opens the Fit view. Uses the
-composition path for *every* assignment (database and untargeted alike), so the Fit view no longer needs
-a persisted `target_ion_id` or a collection lookup. Verified live: aggregate returns the nested
-match_ions/match_isotopes for an untargeted formula; visualize emits both socket events without error.
+**Status: backend implemented, UI wiring not built.** `api/new/peak_assignments/visualization.py`
+holds the non-persisting `aggregate_composition_fit` (B2a) and `visualize_composition_focus` (B2b);
+the visualization core was extracted from `visualize_ion_focus` into the shared
+`emit_isotope_visualization`. Routes: `POST /api/peak-assignments/sample/{id}/fit/aggregate` and
+`.../fit/visualize`. On the frontend, `useMatchVisualized.verifyAssignment(assignment)` calls both
+(aggregate → isotope table, visualize → socket spectra/timeseries) using the composition path for
+*every* assignment (database and untargeted alike) — but **no UI control invokes it yet**: there is
+no "Verify fit" button (see the Current state section and Open threads — the Fit view is slated for
+retirement, so the wiring stopped at the store function). Verified live at the API level: aggregate
+returns the nested match_ions/match_isotopes for an untargeted formula; visualize emits both socket
+events without error.
 
 ## 4. The Fit view rename & composition-driven visualization (decided)
 

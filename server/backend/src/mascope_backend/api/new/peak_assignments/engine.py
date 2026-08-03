@@ -163,11 +163,12 @@ def score_ions_by_fit(match_isotope_df: pd.DataFrame) -> pd.DataFrame:
     falls back to its intensity-derived proxy SNR. No-op (returns the frame
     unchanged) when empty or missing the required columns.
 
-    NOTE (follow-up, not this change): the confidence-tier *bands* are still the
-    legacy `match_params` thresholds. The fit score sits on a different scale (a
-    lone mass-only match scores low by design), so the identified/candidate bands
-    want recalibrating for the fit scale (DESIGN.md: v2 bands ~0.8/0.5) -- a
-    product decision, tracked separately from this measurement change.
+    NOTE: the confidence-tier bands sit on the fit scale --
+    identified/candidate = 0.8/0.5 on `PeakAssignmentConfig` (config.py), the v2
+    estimates rather than the legacy `match_params` 0.8/0.7, because a lone
+    mass-only match scores low by design on this scale. Per-instrument
+    recalibration of the bands is a follow-up once verification labels
+    accumulate.
     """
     if match_isotope_df.empty or not _FIT_SCORE_COLS.issubset(match_isotope_df.columns):
         return match_isotope_df
