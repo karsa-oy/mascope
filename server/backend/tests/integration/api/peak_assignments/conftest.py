@@ -198,6 +198,7 @@ async def pa_test_data(async_session_factory, test_users, pa_sample_view):
 
     return {
         "workspace_id": workspace_id,
+        "sample_batch_id": sample_batch_id,
         "sample_item_id": sample_item_id,
         "completed_run_id": completed_run_id,
         "running_run_id": running_run_id,

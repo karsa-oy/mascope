@@ -10,10 +10,13 @@ Each peak gets exactly one assignment per run, together with a **fit score** and
 
     It is switched **off** by default, and a deployment that has not enabled it behaves
     exactly as before: no assignment runs when a sample is processed, the composition
-    search keeps reporting the familiar match score, and the Sample tab keeps its peak
-    ledger. To turn it on, set `peak_assignment = true` under `[meta]` in the
-    environment's config toml (or export `MASCOPE_PEAK_ASSIGNMENT=1`) and restart the
-    stack. Targeted matching keeps working either way — peak assignment is an addition,
+    search keeps reporting the familiar match score, the Sample tab keeps its peak
+    ledger, and the API refuses to launch assignment runs (the write routes return 403;
+    reads stay open so earlier results remain visible). To turn it on, set
+    `peak_assignment = true` under `[meta]` in the environment's config toml (or export
+    `MASCOPE_PEAK_ASSIGNMENT=1`) and restart the stack — on a production deployment the
+    frontend bakes the flag in at build time, so also rebuild the frontend image.
+    Targeted matching keeps working either way — peak assignment is an addition,
     not a replacement.
 
 The design rests on a foundational result of the field: **accurate mass alone — even at

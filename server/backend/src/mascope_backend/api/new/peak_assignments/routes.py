@@ -5,7 +5,7 @@ Exposes the peak-centric assignment results ("every peak in a sample with its
 formula and confidence") and the endpoint that launches an assignment run.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 from mascope_backend.api.controllers.sample.lib.sample_batches_fetch import (
     fetch_sample_batch,
@@ -17,6 +17,7 @@ from mascope_backend.api.new.auth.dependencies import (
     current_superuser,
 )
 from mascope_backend.api.new.peak_assignments.batch import assign_sample_batch_peaks
+from mascope_backend.api.new.peak_assignments.config import peak_assignment_enabled
 from mascope_backend.api.new.peak_assignments.schemas import (
     AssignmentVerificationsResponse,
     AssignSamplePeaksBody,
@@ -52,6 +53,28 @@ from mascope_backend.db.id import gen_id
 peak_assignments_router = APIRouter(
     prefix="/api/peak-assignments", tags=["Peak Assignments"]
 )
+
+
+async def require_peak_assignment_enabled() -> None:
+    """Reject writes when peak-centric assignment is not enabled for this env.
+
+    The read endpoints stay open so a deployment that turns the feature off
+    again can still inspect (and prune) ledgers written while it was on. The
+    write endpoints - launching runs, recording verdicts, refitting the
+    calibration - are what make "off means off" hold: without this, any
+    workspace editor could accumulate per-peak ledgers on a deployment that
+    never opted in. Tests exercise the writes by setting the
+    ``MASCOPE_PEAK_ASSIGNMENT`` env override.
+    """
+    if not peak_assignment_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Peak assignment is disabled for this environment. Set "
+                "peak_assignment = true under [meta] in the env config (or "
+                "MASCOPE_PEAK_ASSIGNMENT=1) to enable it."
+            ),
+        )
 
 
 @peak_assignments_router.get(
@@ -130,6 +153,7 @@ async def get_verifications_route(
 @peak_assignments_router.post(
     "/sample/{sample_item_id}/verify",
     response_model=AssignmentVerificationsResponse,
+    dependencies=[Depends(require_peak_assignment_enabled)],
 )
 @api_route(status_code=201, token_access=True)
 async def verify_assignment_route(
@@ -144,6 +168,8 @@ async def verify_assignment_route(
     Snapshots the assignment's score at verification time and stores the verdict + evidence
     level as an append-only label -- the honest source for refitting the confidence
     calibration later (verification-calibration loop, V1).
+
+    Returns 403 when peak assignment is not enabled for this environment.
 
     :param sample_item_id: The unique identifier of the sample.
     :param body: The assignment id, verdict, evidence level, and optional note.
@@ -163,7 +189,9 @@ async def verify_assignment_route(
 
 
 @peak_assignments_router.post(
-    "/calibration/{instrument}/recalibrate", response_model=RecalibrateResponse
+    "/calibration/{instrument}/recalibrate",
+    response_model=RecalibrateResponse,
+    dependencies=[Depends(require_peak_assignment_enabled)],
 )
 @api_route(token_access=True)
 async def recalibrate_instrument_route(
@@ -177,6 +205,8 @@ async def recalibrate_instrument_route(
     reads, so it is restricted to superusers. The curve stays provisional unless enough
     reference-grade labels back it. No-op (``recalibrated: false``) when there are too few labels.
 
+    Returns 403 when peak assignment is not enabled for this environment.
+
     :param instrument: Instrument class to recalibrate (e.g. "orbi").
     :param user: The current authenticated user. Requires superuser.
     :return: Whether it recalibrated, with before/after ECE and label counts.
@@ -185,7 +215,10 @@ async def recalibrate_instrument_route(
     return RecalibrateResponse.model_validate(result)
 
 
-@peak_assignments_router.post("/sample/{sample_item_id}/assign")
+@peak_assignments_router.post(
+    "/sample/{sample_item_id}/assign",
+    dependencies=[Depends(require_peak_assignment_enabled)],
+)
 @api_route(status_code=202, token_access=True)
 async def assign_sample_peaks_route(
     sample_item_id: str,
@@ -201,6 +234,8 @@ async def assign_sample_peaks_route(
     library (Stage A), then via untargeted composition search for the
     remainder (Stage B, configurable). Results are persisted as a new
     PeakAssignmentRun and readable via the sibling GET endpoints.
+
+    Returns 403 when peak assignment is not enabled for this environment.
 
     :param sample_item_id: The unique identifier of the sample.
     :param body: Optional run configuration overrides.
@@ -228,7 +263,10 @@ async def assign_sample_peaks_route(
     }
 
 
-@peak_assignments_router.post("/batch/{sample_batch_id}/assign")
+@peak_assignments_router.post(
+    "/batch/{sample_batch_id}/assign",
+    dependencies=[Depends(require_peak_assignment_enabled)],
+)
 @api_route(status_code=202, token_access=True)
 async def assign_sample_batch_peaks_route(
     sample_batch_id: str,
@@ -250,6 +288,8 @@ async def assign_sample_batch_peaks_route(
     include the untargeted stage. Blank samples and samples whose m/z
     calibration is unverified are skipped. A batch already being assigned by
     this worker is refused rather than queued.
+
+    Returns 403 when peak assignment is not enabled for this environment.
 
     :param sample_batch_id: The unique identifier of the sample batch.
     :param body: Optional run configuration overrides applied to every sample.

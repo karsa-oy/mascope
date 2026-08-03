@@ -53,16 +53,18 @@ def peak_assignment_enabled() -> bool:
     - the ``peak_assignment`` flag in the runtime ``[meta]`` config, which is the
       durable setting and is also what the frontend reads.
 
-    What it gates is the *automatic* behaviour, not the API surface: the explicit
-    ``/api/peak-assignments`` routes stay reachable with the flag off, so the feature
-    can be exercised deliberately (and its tests run) without switching it on
-    globally. Operators should read the consequence plainly - "nothing changes until
-    you opt in" holds for the UI and for sample ingest, but not for the API. In a
-    deployment that opted out, any workspace editor can still POST an assign request,
-    run the full untargeted stage, and accumulate a complete per-peak ledger (one row
-    per observed peak, per run). Those rows are reclaimed by the
-    ``prune_peak_assignment_runs`` maintenance script, which nothing schedules
-    automatically whether the flag is on or off - see ``docs/maintaining.md``.
+    It gates the automatic behaviour *and* the API writes. With the flag off,
+    the ``/api/peak-assignments`` read endpoints stay open - ledgers written
+    while the feature was on remain inspectable after opting out - but the
+    write endpoints (launching runs, recording verdicts, refitting the
+    calibration) return 403 via ``require_peak_assignment_enabled`` in
+    ``routes.py``. That is what makes "nothing changes until you opt in" hold
+    for the API as well as for the UI and sample ingest: an opted-out
+    deployment cannot accumulate per-peak ledgers, deliberately or otherwise.
+    Tests exercise the writes by setting the env override. Ledger rows from
+    opted-in periods are reclaimed by the ``prune_peak_assignment_runs``
+    maintenance script, which nothing schedules automatically whether the
+    flag is on or off - see ``docs/maintaining.md``.
 
     :return: True when the feature is enabled for this environment.
     """

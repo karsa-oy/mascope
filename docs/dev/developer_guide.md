@@ -623,7 +623,7 @@ else can only gate one half of a feature.
 
 | Flag | Default | What it gates |
 |---|---|---|
-| `peak_assignment` | `false` | [Peak-centric assignment](peak_assignment_paradigm.md): assignment on sample ingest, the rescored composition search, and the reworked Sample view. Env override: `MASCOPE_PEAK_ASSIGNMENT=1`. |
+| `peak_assignment` | `false` | [Peak-centric assignment](peak_assignment_paradigm.md): assignment on sample ingest, the rescored composition search, the reworked Sample view, and the `/api/peak-assignments` write routes (403 while off; reads stay open). Env override: `MASCOPE_PEAK_ASSIGNMENT=1`. The frontend bakes the flag in at build time, so flipping it on a deployment requires a frontend rebuild. |
 
 Read it via `peak_assignment_enabled()`
 (`api/new/peak_assignments/config.py`) on the backend and `peakAssignmentEnabled`
